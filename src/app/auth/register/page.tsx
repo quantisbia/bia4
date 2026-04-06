@@ -8,10 +8,16 @@ import { CheckCircle2, AlertCircle, Loader2, Eye, EyeOff, Zap } from "lucide-rea
 
 function BiaLogoIcon({ size = 38 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="BIA Logo">
-      <circle cx="50" cy="50" r="44" stroke="white" strokeWidth="5" strokeLinecap="round" strokeDasharray="240 40" strokeDashoffset="20" />
-      <path d="M22 30 L22 70 M22 30 L38 30 Q48 30 48 40 Q48 50 38 50 L22 50 M22 50 L40 50 Q52 50 52 60 Q52 70 40 70 L22 70" stroke="white" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M56 70 L68 30 L80 70 M61 55 L75 55" stroke="white" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width={size} height={size} viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="BIA Logo">
+      <path d="M60 8 A52 52 0 1 1 59.99 8" stroke="white" strokeWidth="9" strokeLinecap="round" fill="none" opacity="0.95" />
+      <rect x="53" y="4" width="14" height="11" fill="#2d0a6e" />
+      <rect x="53" y="105" width="14" height="11" fill="#2d0a6e" />
+      <rect x="57" y="28" width="6" height="64" rx="3" fill="white" />
+      <rect x="26" y="28" width="6" height="64" rx="3" fill="white" />
+      <path d="M32 28 Q52 28 52 42 Q52 56 32 56" stroke="white" strokeWidth="6" strokeLinecap="round" fill="none" />
+      <path d="M32 56 Q54 56 54 70 Q54 84 32 84" stroke="white" strokeWidth="6" strokeLinecap="round" fill="none" />
+      <path d="M63 84 L75 28 L87 84" stroke="white" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <line x1="67" y1="66" x2="83" y2="66" stroke="white" strokeWidth="5.5" strokeLinecap="round" />
     </svg>
   )
 }
