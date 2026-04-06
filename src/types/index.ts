@@ -1,5 +1,5 @@
 // ============================================
-// BIA v3 - Type Definitions
+// BIA v4 - Type Definitions
 // ============================================
 
 export type UserRole = "USER" | "ADMIN" | "RESEARCHER"
@@ -54,7 +54,8 @@ export const PLANS: PlanConfig[] = [
     name: "Discovery",
     price: 270,
     credits: 500,
-    color: "emerald",
+    color: "violet",
+    popular: true,
     features: [
       "500 créditos/mês",
       "Pipeline de 12 etapas",
@@ -70,7 +71,6 @@ export const PLANS: PlanConfig[] = [
     price: 490,
     credits: 1500,
     color: "blue",
-    popular: true,
     features: [
       "1.500 créditos/mês",
       "Pipeline completo",
@@ -104,7 +104,7 @@ export const PLANS: PlanConfig[] = [
     name: "Academy",
     price: 4970,
     credits: 20000,
-    color: "amber",
+    color: "indigo",
     features: [
       "20.000 créditos/mês",
       "Tudo do Enterprise",

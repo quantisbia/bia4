@@ -4,7 +4,8 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { signIn } from "next-auth/react"
 import Link from "next/link"
-import { Dna, CheckCircle2, AlertCircle, Loader2, Eye, EyeOff } from "lucide-react"
+import Image from "next/image"
+import { CheckCircle2, AlertCircle, Loader2, Eye, EyeOff, Zap } from "lucide-react"
 
 const RESEARCH_AREAS = [
   { value: "", label: "Selecione sua área..." },
@@ -48,7 +49,6 @@ export default function RegisterPage() {
     setLoading(true)
     setError("")
 
-    // Basic validations
     if (!form.terms) {
       setError("Você precisa aceitar os Termos de Uso para continuar.")
       setLoading(false)
@@ -61,7 +61,6 @@ export default function RegisterPage() {
     }
 
     try {
-      // 1. Register
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -75,7 +74,6 @@ export default function RegisterPage() {
         return
       }
 
-      // 2. Auto sign-in after registration
       const signInResult = await signIn("credentials", {
         email: form.email.toLowerCase(),
         password: form.password,
@@ -83,7 +81,6 @@ export default function RegisterPage() {
       })
 
       if (signInResult?.error) {
-        // Registration OK but auto-login failed → redirect to login
         router.push("/auth/login?registered=true")
       } else {
         router.push("/dashboard")
@@ -97,32 +94,43 @@ export default function RegisterPage() {
   }
 
   const inputClass =
-    "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all disabled:opacity-50"
+    "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all disabled:opacity-50"
 
   return (
-    <div className="min-h-screen bg-[#030a04] flex items-center justify-center p-6 grid-bg">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-[#0a0514] flex items-center justify-center p-6 grid-bg">
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-violet-500/5 rounded-full blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-lg relative z-10 py-8">
         {/* Logo */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-3 group">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-              <Dna className="w-6 h-6 text-white" />
+          <Link href="/" className="inline-flex flex-col items-center gap-2 group">
+            <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gradient-to-br from-violet-600 to-purple-800 flex items-center justify-center shadow-xl shadow-violet-500/30 group-hover:shadow-violet-500/40 transition-shadow">
+              <Image src="/bia-logo.png" alt="BIA Logo" width={52} height={52} className="object-contain" />
             </div>
-            <span className="text-2xl font-bold">
-              BIA <span className="text-emerald-400">v3</span>
-            </span>
+            <div>
+              <span className="text-2xl font-bold leading-tight block">
+                BIA <span className="text-violet-400">v4</span>
+              </span>
+              <span className="text-[11px] text-purple-400/70 tracking-widest uppercase">
+                Biofabrication Intelligent Assistant
+              </span>
+            </div>
           </Link>
           <h1 className="text-2xl font-bold mt-6 mb-2">Criar sua conta</h1>
-          <p className="text-gray-400 text-sm">Comece a usar BIA v3 — 50 créditos grátis</p>
+          <p className="text-gray-400 text-sm">Comece a usar BIA v4 — demonstração gratuita</p>
+        </div>
+
+        {/* Demo notice */}
+        <div className="flex items-center justify-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-2.5 mb-6 text-sm text-blue-300">
+          <Zap className="w-4 h-4 text-blue-400 shrink-0" />
+          <span><strong className="text-blue-200">10 créditos</strong> de uso gratuitos para demonstração</span>
         </div>
 
         {/* Perks */}
         <div className="flex flex-wrap justify-center gap-4 mb-6 text-xs text-gray-400">
-          {["50 créditos grátis", "7 dias de trial", "Sem cartão de crédito"].map((perk) => (
+          {["10 créditos grátis", "Sem cartão de crédito", "Acesso imediato"].map((perk) => (
             <div key={perk} className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-violet-400" />
               <span>{perk}</span>
             </div>
           ))}
@@ -207,7 +215,6 @@ export default function RegisterPage() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              {/* Password strength indicator */}
               {form.password && (
                 <div className="flex gap-1 mt-1.5">
                   {[1, 2, 3, 4].map((level) => {
@@ -220,7 +227,7 @@ export default function RegisterPage() {
                             ? strength <= 1 ? "bg-red-500"
                               : strength <= 2 ? "bg-amber-500"
                               : strength <= 3 ? "bg-blue-500"
-                              : "bg-emerald-500"
+                              : "bg-violet-500"
                             : "bg-white/10"
                         }`}
                       />
@@ -254,7 +261,7 @@ export default function RegisterPage() {
                 value={form.researchArea}
                 onChange={handleChange}
                 disabled={loading}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all disabled:opacity-50 [&>option]:bg-[#0a1a10]"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all disabled:opacity-50 [&>option]:bg-[#0a0514]"
               >
                 {RESEARCH_AREAS.map((area) => (
                   <option key={area.value} value={area.value}>
@@ -273,14 +280,14 @@ export default function RegisterPage() {
                 checked={form.terms}
                 onChange={handleChange}
                 disabled={loading}
-                className="mt-0.5 w-4 h-4 rounded border-white/20 bg-white/5 accent-emerald-500 cursor-pointer"
+                className="mt-0.5 w-4 h-4 rounded border-white/20 bg-white/5 accent-violet-500 cursor-pointer"
               />
               <label htmlFor="terms" className="text-xs text-gray-400 leading-relaxed cursor-pointer">
                 Concordo com os{" "}
-                <Link href="/terms" className="text-emerald-400 hover:underline">Termos de Uso</Link>
+                <Link href="/terms" className="text-violet-400 hover:underline">Termos de Uso</Link>
                 {" "}e{" "}
-                <Link href="/privacy" className="text-emerald-400 hover:underline">Política de Privacidade</Link>
-                . Entendo que receberei 50 créditos gratuitos para explorar a plataforma.
+                <Link href="/privacy" className="text-violet-400 hover:underline">Política de Privacidade</Link>
+                . Entendo que receberei 10 créditos de demonstração para explorar a plataforma.
               </label>
             </div>
 
@@ -295,14 +302,14 @@ export default function RegisterPage() {
                   Criando sua conta...
                 </>
               ) : (
-                "Criar conta e começar grátis →"
+                "Criar conta e começar →"
               )}
             </button>
           </form>
 
           <div className="mt-5 text-center text-sm text-gray-400">
             Já tem uma conta?{" "}
-            <Link href="/auth/login" className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors">
+            <Link href="/auth/login" className="text-violet-400 hover:text-violet-300 font-medium transition-colors">
               Entrar
             </Link>
           </div>

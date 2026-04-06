@@ -4,12 +4,14 @@ import { useState } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Dna, AlertCircle, Loader2, Eye, EyeOff } from "lucide-react"
+import Image from "next/image"
+import { AlertCircle, Loader2, Eye, EyeOff, Zap } from "lucide-react"
 
 export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get("callbackUrl") || "/dashboard"
+  const registered = searchParams.get("registered")
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -48,24 +50,37 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#030a04] flex items-center justify-center p-6 grid-bg">
+    <div className="min-h-screen bg-[#0a0514] flex items-center justify-center p-6 grid-bg">
       {/* Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-violet-500/5 rounded-full blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-md relative z-10">
         {/* Logo */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-3 group">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/30 group-hover:shadow-emerald-500/50 transition-shadow">
-              <Dna className="w-6 h-6 text-white" />
+          <Link href="/" className="inline-flex flex-col items-center gap-2 group">
+            <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gradient-to-br from-violet-600 to-purple-800 flex items-center justify-center shadow-xl shadow-violet-500/30 group-hover:shadow-violet-500/50 transition-shadow">
+              <Image src="/bia-logo.png" alt="BIA Logo" width={52} height={52} className="object-contain" />
             </div>
-            <span className="text-2xl font-bold">
-              BIA <span className="text-emerald-400">v3</span>
-            </span>
+            <div>
+              <span className="text-2xl font-bold leading-tight block">
+                BIA <span className="text-violet-400">v4</span>
+              </span>
+              <span className="text-[11px] text-purple-400/70 tracking-widest uppercase">
+                Biofabrication Intelligent Assistant
+              </span>
+            </div>
           </Link>
           <h1 className="text-2xl font-bold mt-6 mb-2">Bem-vindo de volta</h1>
-          <p className="text-gray-400 text-sm">Entre na sua conta BIA v3</p>
+          <p className="text-gray-400 text-sm">Entre na sua conta BIA v4</p>
         </div>
+
+        {/* Registration success */}
+        {registered && (
+          <div className="flex items-center gap-3 bg-violet-500/10 border border-violet-500/20 rounded-xl px-4 py-3 mb-6 text-sm text-violet-300">
+            <Zap className="w-4 h-4 shrink-0 text-violet-400" />
+            <span>Conta criada com sucesso! Faça login para continuar.</span>
+          </div>
+        )}
 
         {/* Error */}
         {error && (
@@ -90,7 +105,7 @@ export default function LoginPage() {
                 required
                 placeholder="seu@email.com"
                 disabled={loading}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all disabled:opacity-50"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all disabled:opacity-50"
               />
             </div>
 
@@ -99,7 +114,7 @@ export default function LoginPage() {
                 <label className="text-sm font-medium text-gray-300" htmlFor="password">
                   Senha
                 </label>
-                <Link href="/auth/forgot-password" className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors">
+                <Link href="/auth/forgot-password" className="text-xs text-violet-400 hover:text-violet-300 transition-colors">
                   Esqueceu a senha?
                 </Link>
               </div>
@@ -112,7 +127,7 @@ export default function LoginPage() {
                   required
                   placeholder="••••••••"
                   disabled={loading}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pr-12 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all disabled:opacity-50"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pr-12 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all disabled:opacity-50"
                 />
                 <button
                   type="button"
@@ -142,8 +157,8 @@ export default function LoginPage() {
 
           <div className="mt-6 text-center text-sm text-gray-400">
             Não tem conta?{" "}
-            <Link href="/auth/register" className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors">
-              Criar conta gratuita
+            <Link href="/auth/register" className="text-violet-400 hover:text-violet-300 font-medium transition-colors">
+              Criar conta — 10 créditos grátis
             </Link>
           </div>
         </div>

@@ -9,14 +9,14 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" })
 
 export const metadata: Metadata = {
-  title: { default: "BIA v3 - Plataforma de IA para Biofabricação", template: "%s | BIA v3" },
-  description: "Plataforma de inteligência artificial especializada em design de tecidos artificiais e organoides.",
-  keywords: ["biofabricação", "tecidos artificiais", "organoides", "inteligência artificial", "biomateriais"],
+  title: { default: "BIA v4 - Biofabrication Intelligent Assistant", template: "%s | BIA v4" },
+  description: "BIA v4 - Biofabrication Intelligent Assistant. Plataforma de inteligência artificial especializada em design de tecidos artificiais e organoides.",
+  keywords: ["biofabricação", "tecidos artificiais", "organoides", "inteligência artificial", "biomateriais", "BIA"],
 }
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#030a04" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0514" },
   ],
 }
 

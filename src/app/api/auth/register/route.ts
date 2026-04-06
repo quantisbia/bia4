@@ -54,23 +54,23 @@ export async function POST(req: NextRequest) {
         },
       })
 
-      // Create FREE subscription (7-day trial)
+      // Create FREE subscription (demo: 10 credits)
       await tx.subscription.create({
         data: {
           userId: newUser.id,
           plan: "FREE",
-          status: "TRIALING",
-          currentPeriodEnd: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-          monthlyCredits: 50,
+          status: "ACTIVE",
+          currentPeriodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+          monthlyCredits: 10,
         },
       })
 
-      // Create initial credit balance (50 free credits)
+      // Create initial credit balance (10 demo credits)
       await tx.creditBalance.create({
         data: {
           userId: newUser.id,
-          balance: 50,
-          totalEarned: 50,
+          balance: 10,
+          totalEarned: 10,
           totalSpent: 0,
         },
       })
@@ -80,10 +80,10 @@ export async function POST(req: NextRequest) {
         data: {
           userId: newUser.id,
           type: "CREDIT",
-          amount: 50,
-          balance: 50,
-          description: "Créditos de boas-vindas BIA v3",
-          metadata: { action: "welcome_bonus" },
+          amount: 10,
+          balance: 10,
+          description: "Créditos de demonstração BIA v4",
+          metadata: { action: "demo_credits" },
         },
       })
 

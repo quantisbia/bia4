@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import { DashboardSidebar } from "@/components/layout/DashboardSidebar"
 
 export const metadata: Metadata = {
-  title: { default: "Dashboard", template: "%s | BIA v3" },
+  title: { default: "Dashboard", template: "%s | BIA v4" },
 }
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -15,7 +15,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="flex h-screen bg-[#030a04] overflow-hidden">
+    <div className="flex h-screen bg-[#0a0514] overflow-hidden">
       <DashboardSidebar />
       <main className="flex-1 overflow-y-auto flex flex-col">
         {children}

@@ -161,7 +161,7 @@ model Subscription {
   userId String @unique
 
   plan   SubscriptionPlan   @default(FREE)
-  status SubscriptionStatus @default(TRIALING)
+  status SubscriptionStatus @default(ACTIVE)
 
   // Billing cycle
   currentPeriodStart DateTime @default(now())
@@ -170,7 +170,7 @@ model Subscription {
   cancelledAt        DateTime?
 
   // Credits config
-  monthlyCredits Int @default(50)  // FREE plan gets 50
+  monthlyCredits Int @default(10)  // FREE plan gets 10 demo credits
   
   // External billing
   externalId String? // Stripe/payment ID (future)
@@ -191,8 +191,8 @@ model CreditBalance {
   id     String @id @default(cuid())
   userId String @unique
 
-  balance      Int @default(50) // Current balance
-  totalEarned  Int @default(50) // Lifetime earned
+  balance      Int @default(10) // Current balance
+  totalEarned  Int @default(10) // Lifetime earned
   totalSpent   Int @default(0)  // Lifetime spent
 
   updatedAt DateTime @updatedAt

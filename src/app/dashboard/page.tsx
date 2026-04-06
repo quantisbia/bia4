@@ -35,17 +35,17 @@ export default async function DashboardPage() {
 
   const planColors: Record<string, string> = {
     FREE: "text-gray-400 bg-gray-500/10 border-gray-500/20",
-    DISCOVERY: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+    DISCOVERY: "text-violet-400 bg-violet-500/10 border-violet-500/20",
     ADVANCED: "text-blue-400 bg-blue-500/10 border-blue-500/20",
     ENTERPRISE: "text-purple-400 bg-purple-500/10 border-purple-500/20",
-    ACADEMY: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+    ACADEMY: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
   }
 
   const quickActions = [
-    { title: "Novo Pipeline", desc: "Iniciar design de tecido", href: "/dashboard/pipeline", icon: GitBranch, color: "emerald" },
+    { title: "Novo Pipeline", desc: "Iniciar design de tecido", href: "/dashboard/pipeline", icon: GitBranch, color: "violet" },
     { title: "Formular Biomaterial", desc: "Buscar formulação ideal", href: "/dashboard/biomaterials", icon: FlaskConical, color: "blue" },
     { title: "Chat com IA", desc: "Tire dúvidas científicas", href: "/dashboard/chat", icon: MessageSquare, color: "purple" },
-    { title: "Base de Conhecimento", desc: "Pesquisar artigos", href: "/dashboard/knowledge", icon: BookOpen, color: "amber" },
+    { title: "Base de Conhecimento", desc: "Pesquisar artigos", href: "/dashboard/knowledge", icon: BookOpen, color: "indigo" },
   ]
 
   return (
@@ -57,7 +57,7 @@ export default async function DashboardPage() {
             Olá, {userName}! 👋
           </h1>
           <p className="text-gray-400 text-sm">
-            Bem-vindo à plataforma BIA v3 — sua IA para biofabricação
+            Bem-vindo à plataforma BIA v4 — sua IA para biofabricação
           </p>
         </div>
         <div className={`flex items-center gap-2 border rounded-xl px-4 py-2 text-sm font-semibold ${planColors[plan] ?? planColors.FREE}`}>
@@ -69,10 +69,10 @@ export default async function DashboardPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Créditos disponíveis", value: stats.credits.toLocaleString("pt-BR"), icon: Zap, color: "emerald", sub: `${stats.creditsSpent} gastos` },
+          { label: "Créditos disponíveis", value: stats.credits.toLocaleString("pt-BR"), icon: Zap, color: "violet", sub: `${stats.creditsSpent} gastos` },
           { label: "Projetos pipeline", value: stats.pipelineCount.toString(), icon: GitBranch, color: "blue", sub: "projetos" },
           { label: "Sessões de chat", value: stats.chatCount.toString(), icon: MessageSquare, color: "purple", sub: "conversas" },
-          { label: "Protocolos gerados", value: stats.protocolCount.toString(), icon: FlaskConical, color: "teal", sub: "protocolos" },
+          { label: "Protocolos gerados", value: stats.protocolCount.toString(), icon: FlaskConical, color: "indigo", sub: "protocolos" },
         ].map((stat) => (
           <div key={stat.label} className="bg-white/2 border border-white/8 rounded-2xl p-5 hover:border-white/15 transition-colors">
             <div className="flex items-start justify-between mb-4">
@@ -97,7 +97,7 @@ export default async function DashboardPage() {
               <Link
                 key={action.title}
                 href={action.href}
-                className="flex items-center gap-4 p-4 rounded-xl bg-white/2 border border-white/8 hover:border-emerald-500/20 hover:bg-emerald-500/3 transition-all group"
+                className="flex items-center gap-4 p-4 rounded-xl bg-white/2 border border-white/8 hover:border-violet-500/20 hover:bg-violet-500/3 transition-all group"
               >
                 <div className={`w-10 h-10 rounded-xl bg-${action.color}-500/10 border border-${action.color}-500/20 flex items-center justify-center shrink-0`}>
                   <action.icon className={`w-5 h-5 text-${action.color}-400`} />
@@ -106,7 +106,7 @@ export default async function DashboardPage() {
                   <p className="text-sm font-medium text-white">{action.title}</p>
                   <p className="text-xs text-gray-500">{action.desc}</p>
                 </div>
-                <ArrowRight className="w-4 h-4 text-gray-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+                <ArrowRight className="w-4 h-4 text-gray-600 group-hover:text-violet-400 group-hover:translate-x-0.5 transition-all shrink-0" />
               </Link>
             ))}
           </div>
@@ -121,11 +121,11 @@ export default async function DashboardPage() {
                 <div key={i} className="flex items-start gap-4 p-4 hover:bg-white/2 transition-colors">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
                     txn.type === "CREDIT"
-                      ? "bg-emerald-500/10 border border-emerald-500/20"
+                      ? "bg-violet-500/10 border border-violet-500/20"
                       : "bg-blue-500/10 border border-blue-500/20"
                   }`}>
                     {txn.type === "CREDIT"
-                      ? <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      ? <CheckCircle2 className="w-4 h-4 text-violet-400" />
                       : <AlertCircle className="w-4 h-4 text-blue-400" />
                     }
                   </div>
@@ -138,7 +138,7 @@ export default async function DashboardPage() {
                       </span>
                     </div>
                   </div>
-                  <span className={`text-xs font-semibold shrink-0 ${txn.type === "CREDIT" ? "text-emerald-400" : "text-red-400"}`}>
+                  <span className={`text-xs font-semibold shrink-0 ${txn.type === "CREDIT" ? "text-violet-400" : "text-red-400"}`}>
                     {txn.type === "CREDIT" ? "+" : ""}{txn.amount}
                   </span>
                 </div>
@@ -158,7 +158,7 @@ export default async function DashboardPage() {
 
       {/* Getting Started (shown when user is new) */}
       {stats.pipelineCount === 0 && (
-        <div className="relative rounded-2xl border border-emerald-500/15 bg-emerald-500/3 p-6 overflow-hidden">
+        <div className="relative rounded-2xl border border-violet-500/15 bg-violet-500/3 p-6 overflow-hidden">
           <div className="absolute inset-0 grid-bg opacity-30" />
           <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
