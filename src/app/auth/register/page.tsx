@@ -4,8 +4,17 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { signIn } from "next-auth/react"
 import Link from "next/link"
-import Image from "next/image"
 import { CheckCircle2, AlertCircle, Loader2, Eye, EyeOff, Zap } from "lucide-react"
+
+function BiaLogoIcon({ size = 38 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="BIA Logo">
+      <circle cx="50" cy="50" r="44" stroke="white" strokeWidth="5" strokeLinecap="round" strokeDasharray="240 40" strokeDashoffset="20" />
+      <path d="M22 30 L22 70 M22 30 L38 30 Q48 30 48 40 Q48 50 38 50 L22 50 M22 50 L40 50 Q52 50 52 60 Q52 70 40 70 L22 70" stroke="white" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M56 70 L68 30 L80 70 M61 55 L75 55" stroke="white" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
 
 const RESEARCH_AREAS = [
   { value: "", label: "Selecione sua área..." },
@@ -104,8 +113,8 @@ export default function RegisterPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex flex-col items-center gap-2 group">
-            <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gradient-to-br from-violet-600 to-purple-800 flex items-center justify-center shadow-xl shadow-violet-500/30 group-hover:shadow-violet-500/40 transition-shadow">
-              <Image src="/bia-logo.png" alt="BIA Logo" width={52} height={52} className="object-contain" />
+            <div className="w-16 h-16 rounded-2xl bg-[#2d0a6e] flex items-center justify-center shadow-xl shadow-violet-900/60 group-hover:shadow-violet-900/80 transition-shadow">
+              <BiaLogoIcon size={40} />
             </div>
             <div>
               <span className="text-2xl font-bold leading-tight block">

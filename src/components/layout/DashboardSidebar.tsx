@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
 import { useSession } from "next-auth/react"
@@ -20,6 +19,31 @@ import {
   ChevronRight,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
+
+/* ─── Logo SVG Branco ──────────────────────────────────────────────────── */
+function BiaLogoIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-label="BIA Logo"
+    >
+      <circle cx="50" cy="50" r="44" stroke="white" strokeWidth="5" strokeLinecap="round"
+        strokeDasharray="240 40" strokeDashoffset="20" />
+      <path
+        d="M22 30 L22 70 M22 30 L38 30 Q48 30 48 40 Q48 50 38 50 L22 50 M22 50 L40 50 Q52 50 52 60 Q52 70 40 70 L22 70"
+        stroke="white" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round"
+      />
+      <path
+        d="M56 70 L68 30 L80 70 M61 55 L75 55"
+        stroke="white" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Visão Geral", icon: LayoutDashboard, exact: true },
@@ -67,13 +91,12 @@ export function DashboardSidebar() {
       {/* Logo */}
       <div className="p-5 border-b border-white/5">
         <Link href="/dashboard" className="flex items-center gap-3 group">
-          <div className="w-9 h-9 rounded-xl overflow-hidden bg-gradient-to-br from-violet-600 to-purple-800 flex items-center justify-center shadow-lg shadow-violet-500/20 group-hover:shadow-violet-500/30 transition-shadow">
-            <Image src="/bia-logo.png" alt="BIA Logo" width={28} height={28} className="object-contain" />
+          {/* Quadrado roxo escuro + ícone branco */}
+          <div className="w-9 h-9 rounded-xl bg-[#2d0a6e] flex items-center justify-center shadow-lg shadow-violet-900/60 group-hover:shadow-violet-900/80 transition-shadow shrink-0">
+            <BiaLogoIcon size={22} />
           </div>
           <div>
-            <span className="font-bold text-white tracking-tight leading-tight block">
-              BIA <span className="text-violet-400">v4</span>
-            </span>
+            <span className="font-bold text-white tracking-tight leading-tight block">BIA</span>
             <span className="text-[9px] text-purple-400/70 tracking-widest uppercase leading-tight block">
               Biofabrication AI
             </span>
@@ -174,7 +197,7 @@ export function DashboardSidebar() {
 
         {/* User */}
         <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 cursor-pointer group transition-all mt-1">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center text-xs font-bold text-white shrink-0">
+          <div className="w-8 h-8 rounded-full bg-[#2d0a6e] flex items-center justify-center text-xs font-bold text-white shrink-0 shadow shadow-violet-900/60">
             {initials}
           </div>
           <div className="flex-1 min-w-0">
