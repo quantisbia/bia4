@@ -236,6 +236,7 @@ model PipelineProject {
 
   // AI context
   targetApplication String?   // e.g., "cartilage replacement", "skin graft"
+  cellSource        String?   // e.g., "iPSC, MSC"
   patientProfile    String?   // e.g., "adult, 45yo, knee cartilage defect"
   
   // Computed
@@ -290,8 +291,9 @@ model Biomaterial {
   category BiomaterialCategory
   
   // Composition
-  components  String[]    // List of components
-  composition Json        // Detailed composition { component: %, notes: "" }
+  components   String[]    // List of components
+  composition  Json        // Detailed composition { component: %, notes: "" }
+  concentration String?    // e.g., "5% w/v"
   
   // Properties
   elasticity      Float?   // kPa
@@ -300,6 +302,7 @@ model Biomaterial {
   biocompatibility String  // HIGH, MEDIUM, LOW
   printable       Boolean  @default(false)
   crosslinking    String?  // e.g., "UV, ionic, enzymatic"
+  gelTime         String?  // e.g., "5-10 min"
   
   // Applications
   applications String[]
@@ -312,6 +315,7 @@ model Biomaterial {
   
   // Meta
   isPublic  Boolean @default(true)
+  isActive  Boolean @default(true)
   verified  Boolean @default(false)
 
   createdAt DateTime @default(now())
@@ -327,7 +331,12 @@ model Biomaterial {
 model FormulationRecord {
   id           String @id @default(cuid())
   userId       String?
-  biomaterialId String
+  biomaterialId String?
+
+  // AI Formulation
+  application  String?
+  tissueType   String?
+  formulation  Json?   // Full AI-generated formulation object
 
   // Customization
   customInputs Json?   // User-specific parameters
@@ -339,7 +348,7 @@ model FormulationRecord {
 
   createdAt DateTime @default(now())
 
-  biomaterial Biomaterial @relation(fields: [biomaterialId], references: [id])
+  biomaterial Biomaterial? @relation(fields: [biomaterialId], references: [id])
 
   @@index([biomaterialId])
   @@map("formulation_records")
@@ -355,6 +364,8 @@ model OrganoidDesign {
 
   name        String
   organoidType OrganoidType
+  purpose      String?  @db.Text
+  cellSource   String?
   
   // Design parameters
   cellTypes   String[]
@@ -363,8 +374,8 @@ model OrganoidDesign {
   protocol    String? @db.Text
   
   // AI outputs
-  aiDesign    String? @db.Text
-  predictions Json?   // viability, maturation time, etc.
+  aiDesign     String? @db.Text
+  predictions  Json?   // viability, maturation time, etc.
   
   creditsUsed Int @default(15)
 
@@ -388,6 +399,7 @@ model Protocol {
   description String?
   
   // Content
+  content     String? @db.Text  // Full generated content
   steps       Json     // Array of { stepNumber, title, duration, materials, procedure }
   materials   Json     // List of required materials/reagents
   equipment   String[]

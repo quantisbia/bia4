@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next"
 import { Inter, JetBrains_Mono } from "next/font/google"
 import "./globals.css"
 import { SessionProvider } from "@/components/providers/SessionProvider"
+import { ToastProvider } from "@/components/ui/Toast"
 import { auth } from "@/lib/auth/config"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
@@ -26,7 +27,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="pt-BR" className="dark" suppressHydrationWarning>
       <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
         <SessionProvider session={session}>
-          {children}
+          <ToastProvider>
+            {children}
+          </ToastProvider>
         </SessionProvider>
       </body>
     </html>

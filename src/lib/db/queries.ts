@@ -263,6 +263,7 @@ export async function createPipelineProject(
     description?: string
     tissueType: string
     targetApplication?: string
+    cellSource?: string
     patientProfile?: string
   }
 ) {
