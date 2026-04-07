@@ -8,9 +8,11 @@ import { useSession } from "next-auth/react"
 import {
   LayoutDashboard, GitBranch, FlaskConical, CircleDot,
   FileText, BookOpen, MessageSquare, CreditCard, Settings,
-  LogOut, Zap, ChevronRight, Shield, Menu, X, Printer, Microscope, Box, ClipboardCheck, BookMarked,
+  LogOut, Zap, ChevronRight, Menu, X, Printer, Microscope, Box, ClipboardCheck, BookMarked,
+  Crown,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
+import { isSuperAdmin } from "@/lib/auth/admin-shared"
 
 export function BiaLogoIcon({ size = 22 }: { size?: number }) {
   return (
@@ -146,13 +148,17 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       {/* ── Bottom section ── */}
       <div className="px-2 pb-3 border-t border-white/[0.06] pt-2 space-y-0.5">
 
-        {/* Admin link */}
-        {(user as { role?: string })?.role === "ADMIN" && (
-          <Link href="/admin" onClick={onNavigate}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-red-400 hover:bg-red-500/5 border border-red-500/10 hover:border-red-500/20 mb-1">
-            <Shield className="w-4 h-4 shrink-0" />
-            <span className="flex-1">Painel Admin</span>
-            <span className="text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded font-bold">ADM</span>
+        {/* Admin / SuperAdmin link */}
+        {(isSuperAdmin(user?.email) || (user as { role?: string })?.role === "ADMIN") && (
+          <Link href="/dashboard/admin" onClick={onNavigate}
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all mb-1",
+              "bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20",
+              "text-amber-300 hover:from-amber-500/15 hover:to-orange-500/15 hover:border-amber-500/35"
+            )}>
+            <Crown className="w-4 h-4 shrink-0 text-amber-400" />
+            <span className="flex-1 font-semibold">Admin Dashboard</span>
+            <span className="text-[9px] bg-amber-500/25 text-amber-300 px-1.5 py-0.5 rounded-full font-bold tracking-wide">ELITE</span>
           </Link>
         )}
 
