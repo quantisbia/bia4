@@ -1,7 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Pacotes que devem rodar no servidor (não no edge)
-  serverExternalPackages: ["@prisma/client", "bcryptjs"],
+  // Next 14: pacotes que devem rodar só no servidor (não no Edge runtime)
+  experimental: {
+    serverComponentsExternalPackages: ["@prisma/client", "bcryptjs"],
+  },
 
   images: {
     domains: ["avatars.githubusercontent.com", "lh3.googleusercontent.com"],
@@ -11,18 +13,18 @@ const nextConfig = {
     ],
   },
 
-  // Cabeçalhos CORS para as rotas de API
+  // CORS apenas para rotas de API públicas — NÃO incluir /api/auth/*
+  // Access-Control-Allow-Origin: * é INCOMPATÍVEL com credentials:true do NextAuth
   async headers() {
     return [
       {
-        source: "/api/:path*",
+        source: "/api/((?!auth).*)",
         headers: [
           { key: "Access-Control-Allow-Credentials", value: "true" },
-          { key: "Access-Control-Allow-Origin",      value: "*" },
-          { key: "Access-Control-Allow-Methods",     value: "GET,DELETE,PATCH,POST,PUT,OPTIONS" },
+          { key: "Access-Control-Allow-Methods", value: "GET,DELETE,PATCH,POST,PUT,OPTIONS" },
           {
             key: "Access-Control-Allow-Headers",
-            value: "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization",
+            value: "X-Requested-With, Accept, Accept-Version, Content-Length, Content-Type, Date, Authorization",
           },
         ],
       },

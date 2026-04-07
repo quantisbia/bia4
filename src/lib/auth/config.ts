@@ -1,6 +1,5 @@
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
-import { PrismaAdapter } from "@auth/prisma-adapter"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/db/prisma"
 import { getUserByEmail } from "@/lib/db/queries"
@@ -12,10 +11,12 @@ const loginSchema = z.object({
 })
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
+  // IMPORTANTE: Sem PrismaAdapter quando usamos JWT + Credentials
+  // O PrismaAdapter tenta gravar Sessions no DB o que conflita com JWT strategy
+  // e pode causar falhas silenciosas no login com Neon serverless
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 30 * 24 * 60 * 60, // 30 dias
   },
   pages: {
     signIn: "/auth/login",
@@ -30,35 +31,50 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Senha", type: "password" },
       },
       async authorize(credentials) {
-        // Validate input
-        const parsed = loginSchema.safeParse(credentials)
-        if (!parsed.success) return null
+        try {
+          // Validate input
+          const parsed = loginSchema.safeParse(credentials)
+          if (!parsed.success) return null
 
-        const { email, password } = parsed.data
+          const { email, password } = parsed.data
 
-        // Find user
-        const user = await getUserByEmail(email)
-        if (!user || !user.password) return null
+          // Find user
+          const user = await getUserByEmail(email)
+          if (!user || !user.password) return null
 
-        // Verify password
-        const valid = await bcrypt.compare(password, user.password)
-        if (!valid) return null
+          // Verify password
+          const valid = await bcrypt.compare(password, user.password)
+          if (!valid) return null
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
-          role: user.role,
-          plan: user.subscription?.plan ?? "FREE",
-          credits: user.creditBalance?.balance ?? 0,
+          // Log login (fire-and-forget — não bloqueia o login)
+          prisma.auditLog.create({
+            data: {
+              userId: user.id,
+              action: "user_login",
+              entity: "session",
+              metadata: { email: user.email },
+            },
+          }).catch(() => {})
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            image: user.image ?? null,
+            role: user.role,
+            plan: user.subscription?.plan ?? "FREE",
+            credits: user.creditBalance?.balance ?? 0,
+          }
+        } catch (error) {
+          console.error("[AUTH] authorize error:", error)
+          return null
         }
       },
     }),
   ],
   callbacks: {
     async jwt({ token, user, trigger, session }) {
-      // On initial sign-in, attach user data to token
+      // No sign-in: attach user data to token
       if (user) {
         token.id = user.id
         token.role = (user as { role?: string }).role ?? "USER"
@@ -66,13 +82,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.credits = (user as { credits?: number }).credits ?? 0
       }
 
-      // On session update trigger, refresh user data from DB
+      // On session update trigger: refresh user data from DB
       if (trigger === "update" && session) {
-        const freshUser = await getUserByEmail(token.email as string)
-        if (freshUser) {
-          token.credits = freshUser.creditBalance?.balance ?? 0
-          token.plan = freshUser.subscription?.plan ?? "FREE"
-          token.name = freshUser.name
+        try {
+          const freshUser = await getUserByEmail(token.email as string)
+          if (freshUser) {
+            token.credits = freshUser.creditBalance?.balance ?? 0
+            token.plan = freshUser.subscription?.plan ?? "FREE"
+            token.name = freshUser.name
+          }
+        } catch {
+          // Keep existing token data on DB error
         }
       }
 
@@ -89,67 +109,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session
     },
   },
-  events: {
-    async createUser({ user }) {
-      // Auto-create credit balance and FREE subscription for new users
-      if (!user.id) return
-      await Promise.all([
-        prisma.subscription.upsert({
-          where: { userId: user.id },
-          update: {},
-          create: {
-            userId: user.id,
-            plan: "FREE",
-            status: "ACTIVE",
-            currentPeriodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-            monthlyCredits: 10,
-          },
-        }),
-        prisma.creditBalance.upsert({
-          where: { userId: user.id },
-          update: {},
-          create: {
-            userId: user.id,
-            balance: 10,
-            totalEarned: 10,
-            totalSpent: 0,
-          },
-        }),
-        prisma.auditLog.create({
-          data: {
-            userId: user.id,
-            action: "user_created",
-            entity: "user",
-            entityId: user.id,
-            metadata: { email: user.email },
-          },
-        }),
-      ])
-    },
-    async signIn({ user }) {
-      if (!user.id) return
-      await prisma.auditLog.create({
-        data: {
-          userId: user.id,
-          action: "user_login",
-          entity: "session",
-          metadata: { email: user.email },
-        },
-      }).catch(() => {})
-    },
-    async signOut(message) {
-      const token = "token" in message ? message.token : null
-      if (!token?.sub) return
-      await prisma.auditLog.create({
-        data: {
-          userId: token.sub as string,
-          action: "user_logout",
-          entity: "session",
-          metadata: { email: token.email },
-        },
-      }).catch(() => {})
-    },
-  },
   trustHost: true,
   secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === "development",
 })
