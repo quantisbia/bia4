@@ -4,20 +4,26 @@ import { useState } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { AlertCircle, Loader2, Eye, EyeOff, Zap } from "lucide-react"
+import { AlertCircle, Loader2, Eye, EyeOff, Zap, ArrowRight } from "lucide-react"
 
 function BiaLogoIcon({ size = 38 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="BIA Logo">
-      <path d="M60 8 A52 52 0 1 1 59.99 8" stroke="white" strokeWidth="9" strokeLinecap="round" fill="none" opacity="0.95" />
+    <svg width={size} height={size} viewBox="0 0 120 120" fill="none"
+      xmlns="http://www.w3.org/2000/svg" aria-label="BIA Logo">
+      <path d="M60 8 A52 52 0 1 1 59.99 8" stroke="white" strokeWidth="9"
+        strokeLinecap="round" fill="none" opacity="0.95" />
       <rect x="53" y="4" width="14" height="11" fill="#2d0a6e" />
       <rect x="53" y="105" width="14" height="11" fill="#2d0a6e" />
       <rect x="57" y="28" width="6" height="64" rx="3" fill="white" />
       <rect x="26" y="28" width="6" height="64" rx="3" fill="white" />
-      <path d="M32 28 Q52 28 52 42 Q52 56 32 56" stroke="white" strokeWidth="6" strokeLinecap="round" fill="none" />
-      <path d="M32 56 Q54 56 54 70 Q54 84 32 84" stroke="white" strokeWidth="6" strokeLinecap="round" fill="none" />
-      <path d="M63 84 L75 28 L87 84" stroke="white" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <line x1="67" y1="66" x2="83" y2="66" stroke="white" strokeWidth="5.5" strokeLinecap="round" />
+      <path d="M32 28 Q52 28 52 42 Q52 56 32 56" stroke="white" strokeWidth="6"
+        strokeLinecap="round" fill="none" />
+      <path d="M32 56 Q54 56 54 70 Q54 84 32 84" stroke="white" strokeWidth="6"
+        strokeLinecap="round" fill="none" />
+      <path d="M63 84 L75 28 L87 84" stroke="white" strokeWidth="6"
+        strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <line x1="67" y1="66" x2="83" y2="66" stroke="white" strokeWidth="5.5"
+        strokeLinecap="round" />
     </svg>
   )
 }
@@ -38,14 +44,12 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError("")
-
     try {
       const result = await signIn("credentials", {
         email: email.trim().toLowerCase(),
         password,
         redirect: false,
       })
-
       if (result?.error) {
         setError("Email ou senha incorretos. Tente novamente.")
       } else {
@@ -65,50 +69,52 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0514] flex items-center justify-center p-6 grid-bg">
+    <div className="min-h-screen bg-[#0a0514] flex flex-col items-center justify-center px-4 py-8 grid-bg">
       {/* Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-violet-500/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-violet-500/6 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="w-full max-w-md relative z-10">
+      <div className="w-full max-w-sm relative z-10">
+
         {/* Logo */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex flex-col items-center gap-2 group">
-            <div className="w-16 h-16 rounded-2xl bg-[#2d0a6e] flex items-center justify-center shadow-xl shadow-violet-900/60 group-hover:shadow-violet-900/80 transition-shadow">
-              <BiaLogoIcon size={40} />
+          <Link href="/" className="inline-flex flex-col items-center gap-2.5 group">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#2d0a6e] flex items-center justify-center shadow-xl shadow-violet-900/60 group-hover:shadow-violet-900/80 transition-shadow">
+              <BiaLogoIcon size={36} />
             </div>
             <div>
-              <span className="text-2xl font-bold leading-tight block">
+              <span className="text-xl sm:text-2xl font-bold leading-tight block">
                 BIA <span className="text-violet-400">v4</span>
               </span>
-              <span className="text-[11px] text-purple-400/70 tracking-widest uppercase">
-                Biofabrication Intelligent Assistant
+              <span className="text-[10px] text-purple-400/70 tracking-widest uppercase block">
+                Biofabrication AI
               </span>
             </div>
           </Link>
-          <h1 className="text-2xl font-bold mt-6 mb-2">Bem-vindo de volta</h1>
+          <h1 className="text-xl sm:text-2xl font-bold mt-6 mb-1.5">Bem-vindo de volta</h1>
           <p className="text-gray-400 text-sm">Entre na sua conta BIA v4</p>
         </div>
 
         {/* Registration success */}
         {registered && (
-          <div className="flex items-center gap-3 bg-violet-500/10 border border-violet-500/20 rounded-xl px-4 py-3 mb-6 text-sm text-violet-300">
+          <div className="flex items-center gap-3 bg-violet-500/10 border border-violet-500/20 rounded-xl px-4 py-3 mb-5 text-sm text-violet-300">
             <Zap className="w-4 h-4 shrink-0 text-violet-400" />
-            <span>Conta criada com sucesso! Faça login para continuar.</span>
+            <span>Conta criada! Faça login para continuar.</span>
           </div>
         )}
 
         {/* Error */}
         {error && (
-          <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 mb-6 text-sm text-red-400">
+          <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 mb-5 text-sm text-red-400">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        {/* Form */}
-        <div className="bg-white/2 border border-white/10 rounded-2xl p-8">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
+        {/* Card */}
+        <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-6 sm:p-8">
+          <form onSubmit={handleSubmit} className="space-y-4">
+
+            <div className="space-y-1.5">
               <label className="text-sm font-medium text-gray-300" htmlFor="email">
                 Email
               </label>
@@ -120,18 +126,17 @@ export default function LoginPage() {
                 required
                 placeholder="seu@email.com"
                 disabled={loading}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all disabled:opacity-50"
+                autoComplete="email"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all disabled:opacity-50"
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-gray-300" htmlFor="password">
                   Senha
                 </label>
-                <Link href="/auth/forgot-password" className="text-xs text-violet-400 hover:text-violet-300 transition-colors">
-                  Esqueceu a senha?
-                </Link>
+                <span className="text-xs text-violet-400/60">Esqueceu?</span>
               </div>
               <div className="relative">
                 <input
@@ -142,12 +147,14 @@ export default function LoginPage() {
                   required
                   placeholder="••••••••"
                   disabled={loading}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pr-12 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all disabled:opacity-50"
+                  autoComplete="current-password"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pr-11 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all disabled:opacity-50"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 p-1 transition-colors"
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -156,8 +163,8 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={loading}
-              className="w-full bia-button-primary py-3 rounded-xl text-sm font-semibold disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              disabled={loading || !email || !password}
+              className="w-full bia-button-primary py-3.5 rounded-xl text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
             >
               {loading ? (
                 <>
@@ -165,27 +172,39 @@ export default function LoginPage() {
                   Entrando...
                 </>
               ) : (
-                "Entrar na plataforma"
+                <>
+                  Entrar na plataforma
+                  <ArrowRight className="w-4 h-4" />
+                </>
               )}
             </button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-gray-400">
+          <div className="mt-6 text-center text-sm text-gray-500">
             Não tem conta?{" "}
-            <Link href="/auth/register" className="text-violet-400 hover:text-violet-300 font-medium transition-colors">
-              Criar conta — 10 créditos grátis
+            <Link href="/auth/register"
+              className="text-violet-400 hover:text-violet-300 font-medium transition-colors">
+              Criar grátis →
             </Link>
           </div>
         </div>
 
-        {/* Demo shortcut */}
+        {/* Demo */}
         <div className="mt-4 text-center">
           <button
             onClick={fillDemo}
-            className="text-xs text-gray-600 hover:text-gray-400 transition-colors underline underline-offset-2"
+            className="text-xs text-gray-600 hover:text-gray-400 transition-colors underline underline-offset-2 py-2 px-4"
           >
-            Preencher com credenciais demo
+            Usar credenciais demo
           </button>
+        </div>
+
+        {/* Back to home */}
+        <div className="mt-2 text-center">
+          <Link href="/"
+            className="text-xs text-gray-700 hover:text-gray-500 transition-colors">
+            ← Voltar ao início
+          </Link>
         </div>
       </div>
     </div>

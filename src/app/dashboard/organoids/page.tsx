@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { CircleDot, Loader2, Zap, CheckCircle2 } from "lucide-react"
+import { CircleDot, Loader2, Zap, CheckCircle2, ChevronDown, History, Plus, X } from "lucide-react"
+import { cn } from "@/lib/utils/helpers"
 
 interface OrganoidDesign {
   id?: string
@@ -17,30 +18,31 @@ interface OrganoidDesign {
 }
 
 const ORGANOID_TYPES = [
-  { value: "intestinal", label: "Intestinal", icon: "🫁", desc: "Cripta-vilo, absorção, barreira" },
-  { value: "hepatico", label: "Hepático", icon: "🫀", desc: "Metabolismo, detox, bile" },
-  { value: "neural", label: "Neural", icon: "🧠", desc: "Córtex cerebral, mini-brain" },
-  { value: "cardiaco", label: "Cardíaco", icon: "❤️", desc: "Cardiomiócitos, contratilidade" },
-  { value: "renal", label: "Renal", icon: "🫘", desc: "Néfrons, filtração glomerular" },
-  { value: "pancreatico", label: "Pancreático", icon: "🔬", desc: "Ilhotas, insulina, glucagon" },
-  { value: "pulmonar", label: "Pulmonar", icon: "🫁", desc: "Alvéolos, surfactante, barreira" },
+  { value: "intestinal",   label: "Intestinal",   icon: "🫁", desc: "Cripta-vilo, absorção, barreira" },
+  { value: "hepatico",     label: "Hepático",     icon: "🫀", desc: "Metabolismo, detox, bile" },
+  { value: "neural",       label: "Neural",       icon: "🧠", desc: "Córtex cerebral, mini-brain" },
+  { value: "cardiaco",     label: "Cardíaco",     icon: "❤️", desc: "Cardiomiócitos, contratilidade" },
+  { value: "renal",        label: "Renal",        icon: "🫘", desc: "Néfrons, filtração glomerular" },
+  { value: "pancreatico",  label: "Pancreático",  icon: "🔬", desc: "Ilhotas, insulina, glucagon" },
+  { value: "pulmonar",     label: "Pulmonar",     icon: "🌬️", desc: "Alvéolos, surfactante, barreira" },
 ]
 
 const CELL_SOURCES = [
-  { value: "iPSC", label: "iPSC (Células-Tronco Pluripotentes Induzidas)" },
-  { value: "ESC", label: "ESC (Células-Tronco Embrionárias)" },
-  { value: "Adult_Stem", label: "Células-Tronco Adultas" },
-  { value: "Primary", label: "Células Primárias" },
+  { value: "iPSC",         label: "iPSC (Pluripotentes Induzidas)" },
+  { value: "ESC",          label: "ESC (Embrionárias)" },
+  { value: "Adult_Stem",   label: "Células-Tronco Adultas" },
+  { value: "Primary",      label: "Células Primárias" },
 ]
 
 export default function OrganoidsPage() {
-  const [designs, setDesigns] = useState<OrganoidDesign[]>([])
+  const [designs, setDesigns]         = useState<OrganoidDesign[]>([])
   const [selectedType, setSelectedType] = useState("")
-  const [purpose, setPurpose] = useState("")
-  const [cellSource, setCellSource] = useState("iPSC")
-  const [designing, setDesigning] = useState(false)
-  const [result, setResult] = useState<OrganoidDesign | null>(null)
-  const [activeSection, setActiveSection] = useState<"new" | "history">("new")
+  const [purpose, setPurpose]         = useState("")
+  const [cellSource, setCellSource]   = useState("iPSC")
+  const [designing, setDesigning]     = useState(false)
+  const [result, setResult]           = useState<OrganoidDesign | null>(null)
+  const [showHistory, setShowHistory] = useState(false)  // mobile history drawer
+  const [showTypeMenu, setShowTypeMenu] = useState(false) // mobile type picker
 
   useEffect(() => { loadDesigns() }, [])
 
@@ -70,59 +72,38 @@ export default function OrganoidsPage() {
     } finally { setDesigning(false) }
   }
 
+  const selectedTypeObj = ORGANOID_TYPES.find(t => t.value === selectedType)
+
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Sidebar */}
-      <div className="w-72 border-r border-white/5 bg-black/10 flex flex-col shrink-0">
-        <div className="p-4 border-b border-white/5">
-          <div className="flex gap-1 p-1 bg-white/5 rounded-xl">
-            {[
-              { key: "new", label: "Novo Design" },
-              { key: "history", label: "Histórico" },
-            ].map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveSection(tab.key as "new" | "history")}
-                className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${
-                  activeSection === tab.key ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
 
-        <div className="flex-1 overflow-y-auto p-3">
-          {activeSection === "new" ? (
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-2">Tipo de Organoide</p>
-                <div className="space-y-1">
-                  {ORGANOID_TYPES.map((type) => (
-                    <button
-                      key={type.value}
-                      onClick={() => setSelectedType(type.value)}
-                      className={`w-full text-left p-3 rounded-xl transition-all ${
-                        selectedType === type.value
-                          ? "bg-teal-500/10 border border-teal-500/20"
-                          : "hover:bg-white/3 border border-transparent"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{type.icon}</span>
-                        <div>
-                          <p className="text-xs font-medium text-white">{type.label}</p>
-                          <p className="text-[10px] text-gray-500">{type.desc}</p>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
+      {/* ── Desktop sidebar ── */}
+      <div className="hidden md:flex w-72 border-r border-white/5 bg-black/10 flex-col shrink-0">
+        <SidebarContent
+          designs={designs}
+          selectedType={selectedType}
+          onSelectType={setSelectedType}
+          onSelectDesign={(d) => setResult(d)}
+        />
+      </div>
+
+      {/* ── Mobile: history drawer ── */}
+      {showHistory && (
+        <>
+          <div className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowHistory(false)} />
+          <div className="md:hidden fixed top-0 right-0 bottom-0 z-50 w-72 max-w-[85vw] bg-[#0d0720] border-l border-white/8 flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-white/5">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <History className="w-4 h-4 text-teal-400" />
+                Histórico
+              </h3>
+              <button onClick={() => setShowHistory(false)}
+                className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-gray-400">
+                <X className="w-4 h-4" />
+              </button>
             </div>
-          ) : (
-            <div className="space-y-2">
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
               {designs.length === 0 ? (
                 <div className="py-8 text-center">
                   <CircleDot className="w-6 h-6 text-gray-700 mx-auto mb-2" />
@@ -130,11 +111,8 @@ export default function OrganoidsPage() {
                 </div>
               ) : (
                 designs.map((d) => (
-                  <button
-                    key={d.id}
-                    onClick={() => setResult(d)}
-                    className="w-full text-left p-3 rounded-xl border border-white/5 hover:border-white/10 bg-white/2 transition-all"
-                  >
+                  <button key={d.id} onClick={() => { setResult(d); setShowHistory(false) }}
+                    className="w-full text-left p-3 rounded-xl border border-white/5 hover:border-teal-500/20 bg-white/2 transition-all active:scale-[0.98]">
                     <p className="text-xs font-medium text-white capitalize">{d.organoidType}</p>
                     <p className="text-[10px] text-gray-500 mt-0.5 truncate">{d.purpose}</p>
                     <p className="text-[10px] text-gray-600 mt-1">
@@ -144,155 +122,332 @@ export default function OrganoidsPage() {
                 ))
               )}
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Conteúdo */}
-      <div className="flex-1 overflow-y-auto p-6">
-        {!result ? (
-          <div className="max-w-xl mx-auto">
-            <div className="mb-6">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-1">
-                <CircleDot className="w-5 h-5 text-teal-400" />
-                Organoid Builder
-              </h2>
-              <p className="text-sm text-gray-400">
-                Design assistido por IA para protocolos de diferenciação de organoides
-              </p>
-            </div>
-
-            {selectedType && (
-              <div className="p-4 rounded-xl bg-teal-500/5 border border-teal-500/15 mb-6">
-                <p className="text-xs text-teal-300 font-medium mb-1">
-                  Organoide selecionado: {ORGANOID_TYPES.find(t => t.value === selectedType)?.label}
-                </p>
-                <p className="text-xs text-gray-400">{ORGANOID_TYPES.find(t => t.value === selectedType)?.desc}</p>
-              </div>
-            )}
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-medium text-gray-400 block mb-1.5">
-                  Finalidade / Propósito
-                </label>
-                <textarea
-                  value={purpose}
-                  onChange={e => setPurpose(e.target.value)}
-                  placeholder="ex: Modelagem de doença de Crohn para triagem de drogas; Estudo de infecção por SARS-CoV-2"
-                  rows={3}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-teal-500/40 resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-gray-400 block mb-1.5">Fonte Celular</label>
-                <div className="space-y-1">
-                  {CELL_SOURCES.map((cs) => (
-                    <label key={cs.value} className="flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer hover:bg-white/3 transition-colors">
-                      <input
-                        type="radio"
-                        value={cs.value}
-                        checked={cellSource === cs.value}
-                        onChange={() => setCellSource(cs.value)}
-                        className="accent-teal-500"
-                      />
-                      <span className="text-sm text-gray-300">{cs.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <button
-                onClick={designOrganoid}
-                disabled={designing || !selectedType || !purpose}
-                className="w-full py-3 rounded-xl bg-teal-500 text-white text-sm font-semibold hover:bg-teal-400 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {designing ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Gerando protocolo com IA...</>
-                ) : (
-                  <><Zap className="w-4 h-4" /> Gerar Design (15 créditos)</>
-                )}
-              </button>
-            </div>
           </div>
-        ) : (
-          <div className="max-w-2xl mx-auto">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-bold text-white capitalize">
-                  Organoide {result.organoidType}
+        </>
+      )}
+
+      {/* ── Main content ── */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+
+        {/* Mobile top bar */}
+        <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-white/5 shrink-0">
+          <CircleDot className="w-4 h-4 text-teal-400 shrink-0" />
+          <span className="text-sm font-semibold text-white flex-1">Organoid Builder</span>
+          <button
+            onClick={() => setShowHistory(true)}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white bg-white/5 border border-white/8 rounded-xl px-2.5 py-1.5 transition-all"
+          >
+            <History className="w-3.5 h-3.5 text-teal-400" />
+            Histórico {designs.length > 0 && `(${designs.length})`}
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {!result ? (
+            <div className="max-w-xl mx-auto">
+              <div className="hidden md:block mb-6">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-1">
+                  <CircleDot className="w-5 h-5 text-teal-400" />
+                  Organoid Builder
                 </h2>
-                <p className="text-sm text-gray-400 mt-0.5">{result.purpose}</p>
+                <p className="text-sm text-gray-400">
+                  Design assistido por IA para protocolos de diferenciação
+                </p>
               </div>
-              <button
-                onClick={() => setResult(null)}
-                className="text-xs text-gray-500 hover:text-gray-300 px-3 py-1.5 rounded-lg border border-white/10"
-              >
-                Novo design
-              </button>
-            </div>
 
-            <div className="space-y-4">
-              {result.protocol && (
-                <div className="rounded-xl border border-white/8 bg-white/2 p-5">
-                  <h3 className="text-sm font-semibold text-white mb-3">📋 Protocolo de Diferenciação</h3>
-                  <p className="text-xs text-gray-300 leading-relaxed whitespace-pre-line">{result.protocol}</p>
-                </div>
-              )}
+              <div className="space-y-4 sm:space-y-5">
 
-              {result.timeline && (
-                <div className="rounded-xl border border-teal-500/15 bg-teal-500/3 p-5">
-                  <h3 className="text-sm font-semibold text-teal-300 mb-2">⏱️ Timeline</h3>
-                  <p className="text-xs text-gray-300 leading-relaxed">{result.timeline}</p>
-                </div>
-              )}
+                {/* Type selector — mobile uses dropdown, desktop uses full list in sidebar */}
+                <div>
+                  <label className="text-xs font-medium text-gray-400 block mb-2 uppercase tracking-wide">
+                    Tipo de Organoide
+                  </label>
 
-              {result.materials && result.materials.length > 0 && (
-                <div className="rounded-xl border border-white/8 bg-white/2 p-5">
-                  <h3 className="text-sm font-semibold text-white mb-3">🧪 Materiais</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    {result.materials.map((m, i) => (
-                      <div key={i} className="flex items-start gap-2 text-xs text-gray-300">
-                        <CheckCircle2 className="w-3 h-3 text-teal-400 shrink-0 mt-0.5" />
-                        {m}
+                  {/* Mobile: dropdown button */}
+                  <div className="md:hidden">
+                    <button
+                      onClick={() => setShowTypeMenu(!showTypeMenu)}
+                      className={cn(
+                        "w-full flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all",
+                        selectedType
+                          ? "border-teal-500/30 bg-teal-500/5"
+                          : "border-white/10 bg-white/5"
+                      )}
+                    >
+                      {selectedTypeObj ? (
+                        <>
+                          <span className="text-lg">{selectedTypeObj.icon}</span>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-white">{selectedTypeObj.label}</p>
+                            <p className="text-[10px] text-gray-500">{selectedTypeObj.desc}</p>
+                          </div>
+                        </>
+                      ) : (
+                        <span className="text-sm text-gray-500 flex-1">Selecione o tipo...</span>
+                      )}
+                      <ChevronDown className={cn("w-4 h-4 text-gray-500 shrink-0 transition-transform", showTypeMenu && "rotate-180")} />
+                    </button>
+
+                    {showTypeMenu && (
+                      <div className="mt-1 rounded-xl border border-white/10 bg-[#0d0720] overflow-hidden shadow-xl">
+                        {ORGANOID_TYPES.map((type) => (
+                          <button
+                            key={type.value}
+                            onClick={() => { setSelectedType(type.value); setShowTypeMenu(false) }}
+                            className={cn(
+                              "w-full text-left flex items-center gap-3 px-4 py-3 transition-all",
+                              selectedType === type.value
+                                ? "bg-teal-500/10 text-teal-300"
+                                : "text-gray-300 hover:bg-white/5"
+                            )}
+                          >
+                            <span className="text-base">{type.icon}</span>
+                            <div>
+                              <p className="text-xs font-medium">{type.label}</p>
+                              <p className="text-[10px] text-gray-500">{type.desc}</p>
+                            </div>
+                          </button>
+                        ))}
                       </div>
+                    )}
+                  </div>
+
+                  {/* Desktop: type grid */}
+                  <div className="hidden md:grid grid-cols-2 gap-2">
+                    {ORGANOID_TYPES.map((type) => (
+                      <button
+                        key={type.value}
+                        onClick={() => setSelectedType(type.value)}
+                        className={cn(
+                          "text-left p-3 rounded-xl border transition-all active:scale-[0.98]",
+                          selectedType === type.value
+                            ? "bg-teal-500/10 border-teal-500/20"
+                            : "border-white/5 bg-white/2 hover:border-white/10"
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{type.icon}</span>
+                          <div>
+                            <p className="text-xs font-medium text-white">{type.label}</p>
+                            <p className="text-[10px] text-gray-500">{type.desc}</p>
+                          </div>
+                        </div>
+                      </button>
                     ))}
                   </div>
                 </div>
-              )}
 
-              <div className="grid grid-cols-2 gap-4">
-                {result.expectedMarkers && result.expectedMarkers.length > 0 && (
-                  <div className="rounded-xl border border-white/8 bg-white/2 p-4">
-                    <h3 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wide">Marcadores Esperados</h3>
-                    <div className="space-y-1">
-                      {result.expectedMarkers.map((m, i) => (
-                        <div key={i} className="text-xs text-gray-300 flex items-start gap-1.5">
-                          <span className="text-teal-500 shrink-0">•</span>{m}
-                        </div>
-                      ))}
-                    </div>
+                {/* Purpose textarea */}
+                <div>
+                  <label className="text-xs font-medium text-gray-400 block mb-1.5 uppercase tracking-wide">
+                    Finalidade / Propósito
+                  </label>
+                  <textarea
+                    value={purpose}
+                    onChange={e => setPurpose(e.target.value)}
+                    placeholder="ex: Modelagem de doença de Crohn para triagem de drogas; Estudo de infecção por SARS-CoV-2"
+                    rows={3}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-teal-500/40 resize-none leading-relaxed"
+                  />
+                </div>
+
+                {/* Cell source */}
+                <div>
+                  <label className="text-xs font-medium text-gray-400 block mb-2 uppercase tracking-wide">
+                    Fonte Celular
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {CELL_SOURCES.map((cs) => (
+                      <label key={cs.value}
+                        className={cn(
+                          "flex items-center gap-2.5 p-3 rounded-xl cursor-pointer border transition-all",
+                          cellSource === cs.value
+                            ? "border-teal-500/25 bg-teal-500/5"
+                            : "border-white/5 bg-white/2 hover:border-white/10"
+                        )}>
+                        <input type="radio" value={cs.value} checked={cellSource === cs.value}
+                          onChange={() => setCellSource(cs.value)} className="accent-teal-500" />
+                        <span className="text-xs text-gray-300 leading-tight">{cs.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Submit */}
+                <button
+                  onClick={designOrganoid}
+                  disabled={designing || !selectedType || !purpose}
+                  className="w-full py-3.5 rounded-xl bg-teal-500 text-white text-sm font-semibold hover:bg-teal-400 transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
+                >
+                  {designing ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Gerando protocolo com IA...</>
+                  ) : (
+                    <><Zap className="w-4 h-4" /> Gerar Design (15 créditos)</>
+                  )}
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* ── Result ── */
+            <div className="max-w-2xl mx-auto">
+              <div className="flex items-start justify-between mb-5 sm:mb-6 gap-3">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-bold text-white capitalize">
+                    {result.organoidType} Organoid
+                  </h2>
+                  <p className="text-xs sm:text-sm text-gray-400 mt-0.5">{result.purpose}</p>
+                </div>
+                <button
+                  onClick={() => setResult(null)}
+                  className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 px-3 py-1.5 rounded-xl border border-white/10 shrink-0 transition-all"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Novo design
+                </button>
+              </div>
+
+              <div className="space-y-3 sm:space-y-4">
+                {result.protocol && (
+                  <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4 sm:p-5">
+                    <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-1.5">
+                      📋 Protocolo de Diferenciação
+                    </h3>
+                    <p className="text-xs sm:text-sm text-gray-300 leading-relaxed whitespace-pre-line">{result.protocol}</p>
                   </div>
                 )}
-                {result.qualityMetrics && result.qualityMetrics.length > 0 && (
-                  <div className="rounded-xl border border-white/8 bg-white/2 p-4">
-                    <h3 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wide">Métricas de Qualidade</h3>
-                    <div className="space-y-1">
-                      {result.qualityMetrics.map((m, i) => (
-                        <div key={i} className="text-xs text-gray-300 flex items-start gap-1.5">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />
+
+                {result.timeline && (
+                  <div className="rounded-xl border border-teal-500/15 bg-teal-500/[0.03] p-4 sm:p-5">
+                    <h3 className="text-sm font-semibold text-teal-300 mb-2">⏱️ Timeline</h3>
+                    <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">{result.timeline}</p>
+                  </div>
+                )}
+
+                {result.materials && result.materials.length > 0 && (
+                  <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4 sm:p-5">
+                    <h3 className="text-sm font-semibold text-white mb-3">🧪 Materiais</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {result.materials.map((m, i) => (
+                        <div key={i} className="flex items-start gap-2 text-xs text-gray-300">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-teal-400 shrink-0 mt-0.5" />
                           {m}
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {result.expectedMarkers && result.expectedMarkers.length > 0 && (
+                    <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
+                      <h3 className="text-xs font-semibold text-gray-400 mb-2.5 uppercase tracking-wide">Marcadores Esperados</h3>
+                      <div className="space-y-1.5">
+                        {result.expectedMarkers.map((m, i) => (
+                          <div key={i} className="text-xs text-gray-300 flex items-start gap-1.5">
+                            <span className="text-teal-500 shrink-0">•</span>{m}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {result.qualityMetrics && result.qualityMetrics.length > 0 && (
+                    <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
+                      <h3 className="text-xs font-semibold text-gray-400 mb-2.5 uppercase tracking-wide">Métricas de Qualidade</h3>
+                      <div className="space-y-1.5">
+                        {result.qualityMetrics.map((m, i) => (
+                          <div key={i} className="text-xs text-gray-300 flex items-start gap-1.5">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />
+                            {m}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Desktop sidebar content ── */
+function SidebarContent({
+  designs, selectedType, onSelectType, onSelectDesign,
+}: {
+  designs: OrganoidDesign[]
+  selectedType: string
+  onSelectType: (v: string) => void
+  onSelectDesign: (d: OrganoidDesign) => void
+}) {
+  const [tab, setTab] = useState<"new" | "history">("new")
+
+  return (
+    <>
+      <div className="p-4 border-b border-white/5">
+        <div className="flex gap-1 p-1 bg-white/5 rounded-xl">
+          {[{ key: "new", label: "Novo Design" }, { key: "history", label: "Histórico" }].map((t) => (
+            <button key={t.key} onClick={() => setTab(t.key as "new" | "history")}
+              className={cn(
+                "flex-1 py-2 rounded-lg text-xs font-medium transition-all",
+                tab === t.key ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"
+              )}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-3">
+        {tab === "new" ? (
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold mb-2 px-1">
+              Tipo de Organoide
+            </p>
+            <div className="space-y-1">
+              {ORGANOID_TYPES.map((type) => (
+                <button key={type.value} onClick={() => onSelectType(type.value)}
+                  className={cn(
+                    "w-full text-left p-3 rounded-xl transition-all active:scale-[0.98]",
+                    selectedType === type.value
+                      ? "bg-teal-500/10 border border-teal-500/20"
+                      : "hover:bg-white/3 border border-transparent"
+                  )}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">{type.icon}</span>
+                    <div>
+                      <p className="text-xs font-medium text-white">{type.label}</p>
+                      <p className="text-[10px] text-gray-500">{type.desc}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {designs.length === 0 ? (
+              <div className="py-8 text-center">
+                <CircleDot className="w-6 h-6 text-gray-700 mx-auto mb-2" />
+                <p className="text-xs text-gray-500">Nenhum design criado</p>
+              </div>
+            ) : (
+              designs.map((d) => (
+                <button key={d.id} onClick={() => onSelectDesign(d)}
+                  className="w-full text-left p-3 rounded-xl border border-white/5 hover:border-teal-500/20 bg-white/2 transition-all active:scale-[0.98]">
+                  <p className="text-xs font-medium text-white capitalize">{d.organoidType}</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5 truncate">{d.purpose}</p>
+                  <p className="text-[10px] text-gray-600 mt-1">
+                    {d.createdAt && new Date(d.createdAt).toLocaleDateString("pt-BR")}
+                  </p>
+                </button>
+              ))
+            )}
           </div>
         )}
       </div>
-    </div>
+    </>
   )
 }

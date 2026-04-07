@@ -1,7 +1,11 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { MessageSquare, Send, Plus, Loader2, Zap, Bot, User } from "lucide-react"
+import {
+  MessageSquare, Send, Plus, Loader2, Zap, Bot, User,
+  ChevronDown, X, Menu as MenuIcon,
+} from "lucide-react"
+import { cn } from "@/lib/utils/helpers"
 
 interface ChatMessage {
   id?: string
@@ -18,12 +22,26 @@ interface ChatSession {
 }
 
 const MODES = [
-  { value: "general", label: "Geral", desc: "Especialista em biofabricação" },
-  { value: "pipeline", label: "Pipeline", desc: "Design de tecidos" },
-  { value: "biomaterial", label: "Biomaterial", desc: "Formulações e propriedades" },
-  { value: "organoid", label: "Organoide", desc: "Protocolos de diferenciação" },
-  { value: "protocol", label: "Protocolo", desc: "Geração de SOPs" },
+  { value: "general",    label: "Geral",       short: "G",  desc: "Especialista em biofabricação" },
+  { value: "pipeline",   label: "Pipeline",    short: "P",  desc: "Design de tecidos" },
+  { value: "biomaterial",label: "Biomaterial", short: "B",  desc: "Formulações" },
+  { value: "organoid",   label: "Organoide",   short: "O",  desc: "Diferenciação" },
+  { value: "protocol",   label: "Protocolo",   short: "Pr", desc: "SOPs" },
 ]
+
+const STARTER_QUESTIONS = [
+  "Qual a concentração ideal de GelMA para bioimpressão de cartilagem?",
+  "Como diferenciar iPSCs em organoides intestinais?",
+  "Quais fatores de crescimento usar para vasculogênese?",
+]
+
+function formatMessage(text: string) {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.*?)\*/g, "<em>$1</em>")
+    .replace(/`([^`]+)`/g, '<code class="bg-white/10 px-1 py-0.5 rounded text-emerald-300 font-mono text-xs">$1</code>')
+    .replace(/\n/g, "<br/>")
+}
 
 export default function ChatPage() {
   const [sessions, setSessions] = useState<ChatSession[]>([])
@@ -33,6 +51,8 @@ export default function ChatPage() {
   const [mode, setMode] = useState("general")
   const [sending, setSending] = useState(false)
   const [streamingText, setStreamingText] = useState("")
+  const [showSessions, setShowSessions] = useState(false) // mobile: session drawer
+  const [showModeMenu, setShowModeMenu] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -48,6 +68,7 @@ export default function ChatPage() {
 
   async function loadSession(session: ChatSession) {
     setCurrentSession(session)
+    setShowSessions(false)
     const res = await fetch(`/api/chat?sessionId=${session.id}`)
     if (res.ok) {
       const data = await res.json()
@@ -55,11 +76,26 @@ export default function ChatPage() {
     }
   }
 
+  function newChat() {
+    setCurrentSession(null)
+    setMessages([])
+    setStreamingText("")
+    setShowSessions(false)
+    inputRef.current?.focus()
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      sendMessage()
+    }
+  }
+
   const sendMessage = useCallback(async () => {
     if (!input.trim() || sending) return
-
-    const userMessage: ChatMessage = { role: "user", content: input }
-    setMessages(prev => [...prev, userMessage])
+    const userMsg: ChatMessage = { role: "user", content: input.trim() }
+    setMessages((prev) => [...prev, userMsg])
+    const sent = input.trim()
     setInput("")
     setSending(true)
     setStreamingText("")
@@ -69,7 +105,7 @@ export default function ChatPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: userMessage.content,
+          message: sent,
           sessionId: currentSession?.id,
           mode,
           streaming: true,
@@ -78,87 +114,101 @@ export default function ChatPage() {
 
       if (!res.ok) {
         const err = await res.json()
-        setMessages(prev => [...prev, { role: "assistant", content: `❌ Erro: ${err.error}` }])
+        setMessages((prev) => [...prev, {
+          role: "assistant",
+          content: `Erro: ${err.error || "Algo deu errado. Tente novamente."}`,
+        }])
         return
       }
 
-      // Se nova sessão, atualizar sessão atual
-      const newSessionId = res.headers.get("X-Session-Id")
-      if (newSessionId && !currentSession) {
-        setCurrentSession({ id: newSessionId, title: "Nova Conversa", createdAt: new Date().toISOString() })
-        loadSessions()
-      }
+      const contentType = res.headers.get("content-type") || ""
+      if (contentType.includes("text/event-stream")) {
+        const reader = res.body?.getReader()
+        const decoder = new TextDecoder()
+        let fullText = ""
+        let sid = currentSession?.id
 
-      // Processar streaming SSE
-      const reader = res.body?.getReader()
-      const decoder = new TextDecoder()
-      let fullText = ""
-
-      if (reader) {
-        while (true) {
+        while (reader) {
           const { done, value } = await reader.read()
           if (done) break
-
           const chunk = decoder.decode(value)
           const lines = chunk.split("\n")
-
           for (const line of lines) {
             if (line.startsWith("data: ")) {
               const data = line.slice(6)
-              if (data === "[DONE]") {
-                setMessages(prev => [...prev, { role: "assistant", content: fullText }])
-                setStreamingText("")
-              } else {
-                try {
-                  const parsed = JSON.parse(data)
-                  fullText += parsed.text ?? ""
-                  setStreamingText(fullText)
-                } catch {
-                  // ignore
-                }
-              }
+              if (data === "[DONE]") break
+              try {
+                const parsed = JSON.parse(data)
+                if (parsed.text) { fullText += parsed.text; setStreamingText(fullText) }
+                if (parsed.sessionId && !sid) { sid = parsed.sessionId }
+              } catch { /* skip */ }
             }
           }
         }
+        setStreamingText("")
+        setMessages((prev) => [...prev, { role: "assistant", content: fullText }])
+        if (sid && sid !== currentSession?.id) {
+          setCurrentSession({ id: sid, title: sent.slice(0, 40), createdAt: new Date().toISOString() })
+          loadSessions()
+        }
+      } else {
+        const data = await res.json()
+        setMessages((prev) => [...prev, { role: "assistant", content: data.message }])
+        if (data.sessionId && data.sessionId !== currentSession?.id) {
+          setCurrentSession({ id: data.sessionId, title: sent.slice(0, 40), createdAt: new Date().toISOString() })
+          loadSessions()
+        }
       }
-    } catch (e) {
-      console.error(e)
-      setMessages(prev => [...prev, { role: "assistant", content: "❌ Erro de conexão. Tente novamente." }])
+    } catch {
+      setMessages((prev) => [...prev, {
+        role: "assistant",
+        content: "Erro de conexão. Verifique sua internet e tente novamente.",
+      }])
     } finally {
       setSending(false)
+      setStreamingText("")
     }
   }, [input, sending, currentSession, mode])
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
-    }
-  }
-
-  function formatMessage(content: string) {
-    // Simples: transforma **bold** e `code`
-    return content
-      .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
-      .replace(/`([^`]+)`/g, '<code class="bg-white/10 px-1 py-0.5 rounded text-emerald-300 font-mono text-xs">$1</code>')
-      .replace(/\n/g, "<br/>")
-  }
+  const currentMode = MODES.find((m) => m.value === mode)
 
   return (
-    <div className="flex h-full">
-      {/* Sidebar de sessões */}
-      <div className="w-64 border-r border-white/5 bg-black/10 flex flex-col shrink-0">
-        <div className="p-4 border-b border-white/5 flex items-center justify-between">
+    <div className="flex h-full overflow-hidden relative">
+
+      {/* ── Sessions panel — desktop sidebar, mobile drawer ───────── */}
+      {/* Mobile backdrop */}
+      {showSessions && (
+        <div className="md:hidden fixed inset-0 z-30 bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowSessions(false)} />
+      )}
+
+      {/* Sessions panel */}
+      <div className={cn(
+        "flex flex-col border-r border-white/5 bg-black/10 shrink-0 transition-all duration-300",
+        // Desktop: always visible
+        "md:relative md:w-60 md:translate-x-0",
+        // Mobile: drawer from left, full height, fixed
+        "fixed top-0 left-0 bottom-0 z-40 w-72",
+        showSessions ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+      )}>
+        {/* Mobile offset for top bar */}
+        <div className="md:hidden h-[56px] shrink-0" />
+
+        <div className="p-3 border-b border-white/5 flex items-center justify-between shrink-0">
           <h2 className="text-sm font-semibold text-white flex items-center gap-2">
             <MessageSquare className="w-4 h-4 text-purple-400" />
             Conversas
           </h2>
-          <button
-            onClick={() => { setCurrentSession(null); setMessages([]) }}
-            className="w-7 h-7 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center hover:bg-purple-500/20 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5 text-purple-400" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button onClick={newChat}
+              className="w-7 h-7 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center hover:bg-purple-500/20 transition-colors">
+              <Plus className="w-3.5 h-3.5 text-purple-400" />
+            </button>
+            <button onClick={() => setShowSessions(false)}
+              className="md:hidden w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-gray-400">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
@@ -169,15 +219,13 @@ export default function ChatPage() {
             </div>
           ) : (
             sessions.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => loadSession(s)}
-                className={`w-full text-left p-3 rounded-xl transition-all ${
+              <button key={s.id} onClick={() => loadSession(s)}
+                className={cn(
+                  "w-full text-left p-3 rounded-xl transition-all",
                   currentSession?.id === s.id
                     ? "bg-purple-500/10 border border-purple-500/15"
                     : "hover:bg-white/3 border border-transparent"
-                }`}
-              >
+                )}>
                 <p className="text-xs font-medium text-gray-300 truncate">{s.title}</p>
                 <p className="text-[10px] text-gray-600 mt-0.5">
                   {new Date(s.createdAt).toLocaleDateString("pt-BR")}
@@ -188,60 +236,83 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* Área de chat */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header com modo */}
-        <div className="p-4 border-b border-white/5 flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Bot className="w-5 h-5 text-purple-400" />
-            <span className="text-sm font-semibold text-white">BIA Chat</span>
-          </div>
+      {/* ── Main chat area ─────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+
+        {/* Chat header */}
+        <div className="px-3 sm:px-4 py-3 border-b border-white/5 flex items-center gap-2 shrink-0">
+          {/* Mobile: sessions toggle */}
+          <button onClick={() => setShowSessions(true)}
+            className="md:hidden w-8 h-8 rounded-lg bg-white/5 border border-white/8 flex items-center justify-center text-gray-400 hover:text-white shrink-0">
+            <MenuIcon className="w-4 h-4" />
+          </button>
+
+          <Bot className="w-4 h-4 text-purple-400 shrink-0" />
+          <span className="text-sm font-semibold text-white">BIA Chat</span>
+
           <div className="flex-1" />
-          <div className="flex gap-1">
-            {MODES.map((m) => (
-              <button
-                key={m.value}
-                onClick={() => setMode(m.value)}
-                title={m.desc}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                  mode === m.value
-                    ? "bg-purple-500/15 text-purple-300 border border-purple-500/20"
-                    : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
+
+          {/* Mode selector — compact on mobile */}
+          <div className="relative">
+            {/* Mobile: dropdown */}
+            <button onClick={() => setShowModeMenu(!showModeMenu)}
+              className="sm:hidden flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs text-purple-300">
+              <span>{currentMode?.label}</span>
+              <ChevronDown className="w-3 h-3" />
+            </button>
+            {showModeMenu && (
+              <div className="sm:hidden absolute right-0 top-full mt-1 w-44 bg-[#0f0720] border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden">
+                {MODES.map((m) => (
+                  <button key={m.value} onClick={() => { setMode(m.value); setShowModeMenu(false) }}
+                    className={cn(
+                      "w-full text-left px-3 py-2.5 text-xs transition-colors",
+                      mode === m.value ? "bg-purple-500/15 text-purple-300" : "text-gray-400 hover:bg-white/5"
+                    )}>
+                    <span className="font-medium">{m.label}</span>
+                    <span className="text-gray-600 ml-2">{m.desc}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Desktop: pills */}
+            <div className="hidden sm:flex gap-1">
+              {MODES.map((m) => (
+                <button key={m.value} onClick={() => setMode(m.value)} title={m.desc}
+                  className={cn(
+                    "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all",
+                    mode === m.value
+                      ? "bg-purple-500/15 text-purple-300 border border-purple-500/20"
+                      : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
+                  )}>
+                  {m.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-1 text-[11px] text-gray-500">
+
+          <div className="hidden sm:flex items-center gap-1 text-[11px] text-gray-600 shrink-0">
             <Zap className="w-3 h-3 text-purple-400" />
-            <span>2 créditos/msg</span>
+            <span>2 cr/msg</span>
           </div>
         </div>
 
-        {/* Mensagens */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-4">
           {messages.length === 0 && !streamingText && (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center max-w-md">
-                <div className="w-16 h-16 rounded-2xl bg-purple-500/10 border border-purple-500/15 flex items-center justify-center mx-auto mb-4">
-                  <Bot className="w-8 h-8 text-purple-400" />
+            <div className="flex items-center justify-center h-full py-8">
+              <div className="text-center max-w-xs sm:max-w-md w-full px-2">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-purple-500/10 border border-purple-500/15 flex items-center justify-center mx-auto mb-4">
+                  <Bot className="w-7 h-7 sm:w-8 sm:h-8 text-purple-400" />
                 </div>
-                <h3 className="text-lg font-semibold text-white mb-2">BIA — Assistente de Biofabricação</h3>
-                <p className="text-sm text-gray-500 mb-6">
-                  Especialista em engenharia de tecidos, biomateriais e organoides. Faça perguntas técnicas ou peça análises.
+                <h3 className="text-base sm:text-lg font-semibold text-white mb-2">BIA — Assistente Científico</h3>
+                <p className="text-xs sm:text-sm text-gray-500 mb-5">
+                  Especialista em biofabricação, biomateriais e organoides.
                 </p>
-                <div className="grid grid-cols-1 gap-2 text-left">
-                  {[
-                    "Qual a concentração ideal de GelMA para bioimpressão de cartilagem?",
-                    "Como diferenciar iPSCs em organoides intestinais?",
-                    "Quais fatores de crescimento usar para vasculogênese?",
-                  ].map((q) => (
-                    <button
-                      key={q}
-                      onClick={() => setInput(q)}
-                      className="text-xs text-left p-3 rounded-xl bg-white/3 border border-white/8 text-gray-400 hover:border-purple-500/20 hover:text-gray-300 transition-all"
-                    >
+                <div className="space-y-2">
+                  {STARTER_QUESTIONS.map((q) => (
+                    <button key={q} onClick={() => setInput(q)}
+                      className="w-full text-xs text-left p-3 rounded-xl bg-white/3 border border-white/8 text-gray-400 hover:border-purple-500/20 hover:text-gray-300 transition-all active:scale-[0.98]">
                       {q}
                     </button>
                   ))}
@@ -251,34 +322,35 @@ export default function ChatPage() {
           )}
 
           {messages.map((msg, i) => (
-            <div key={i} className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+            <div key={i} className={cn("flex gap-2.5 sm:gap-3", msg.role === "user" ? "flex-row-reverse" : "")}>
+              <div className={cn(
+                "w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0",
                 msg.role === "user"
                   ? "bg-purple-500/15 border border-purple-500/20"
                   : "bg-emerald-500/10 border border-emerald-500/15"
-              }`}>
+              )}>
                 {msg.role === "user"
-                  ? <User className="w-4 h-4 text-purple-400" />
-                  : <Bot className="w-4 h-4 text-emerald-400" />
+                  ? <User className="w-3.5 h-3.5 text-purple-400" />
+                  : <Bot className="w-3.5 h-3.5 text-emerald-400" />
                 }
               </div>
-              <div className={`max-w-2xl rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+              <div className={cn(
+                "rounded-2xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm leading-relaxed max-w-[85%] sm:max-w-2xl",
                 msg.role === "user"
                   ? "bg-purple-500/10 border border-purple-500/15 text-gray-200 rounded-tr-none"
                   : "bg-white/3 border border-white/8 text-gray-300 rounded-tl-none"
-              }`}>
+              )}>
                 <div dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }} />
               </div>
             </div>
           ))}
 
-          {/* Streaming em progresso */}
           {streamingText && (
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/15 flex items-center justify-center shrink-0">
-                <Bot className="w-4 h-4 text-emerald-400" />
+            <div className="flex gap-2.5 sm:gap-3">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/15 flex items-center justify-center shrink-0">
+                <Bot className="w-3.5 h-3.5 text-emerald-400" />
               </div>
-              <div className="max-w-2xl rounded-2xl px-4 py-3 text-sm leading-relaxed bg-white/3 border border-white/8 text-gray-300 rounded-tl-none">
+              <div className="max-w-[85%] sm:max-w-2xl rounded-2xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm leading-relaxed bg-white/3 border border-white/8 text-gray-300 rounded-tl-none">
                 <div dangerouslySetInnerHTML={{ __html: formatMessage(streamingText) }} />
                 <span className="inline-block w-1.5 h-4 bg-emerald-400 animate-pulse ml-0.5 align-middle" />
               </div>
@@ -286,14 +358,15 @@ export default function ChatPage() {
           )}
 
           {sending && !streamingText && (
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/15 flex items-center justify-center shrink-0">
-                <Bot className="w-4 h-4 text-emerald-400" />
+            <div className="flex gap-2.5 sm:gap-3">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/15 flex items-center justify-center shrink-0">
+                <Bot className="w-3.5 h-3.5 text-emerald-400" />
               </div>
-              <div className="px-4 py-3 bg-white/3 border border-white/8 rounded-2xl rounded-tl-none">
+              <div className="px-3.5 py-2.5 bg-white/3 border border-white/8 rounded-2xl rounded-tl-none">
                 <div className="flex gap-1">
-                  {[0, 1, 2].map(i => (
-                    <div key={i} className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce"
+                      style={{ animationDelay: `${i * 0.15}s` }} />
                   ))}
                 </div>
               </div>
@@ -303,20 +376,19 @@ export default function ChatPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input */}
-        <div className="p-4 border-t border-white/5">
-          <div className="flex gap-3 items-end">
+        {/* Input area */}
+        <div className="p-3 sm:p-4 border-t border-white/5 shrink-0">
+          <div className="flex gap-2 sm:gap-3 items-end">
             <div className="flex-1 relative">
               <textarea
                 ref={inputRef}
                 value={input}
-                onChange={e => setInput(e.target.value)}
+                onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={`Pergunte sobre ${MODES.find(m => m.value === mode)?.desc.toLowerCase()}... (Enter para enviar)`}
+                placeholder={`Pergunte sobre ${currentMode?.desc.toLowerCase()}…`}
                 rows={1}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-purple-500/40 resize-none min-h-[44px] max-h-32"
-                style={{ height: "auto" }}
-                onInput={e => {
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-purple-500/40 resize-none min-h-[42px] sm:min-h-[44px] max-h-32"
+                onInput={(e) => {
                   const el = e.currentTarget
                   el.style.height = "auto"
                   el.style.height = `${Math.min(el.scrollHeight, 128)}px`
@@ -326,15 +398,17 @@ export default function ChatPage() {
             <button
               onClick={sendMessage}
               disabled={!input.trim() || sending}
-              className="w-10 h-10 rounded-xl bg-purple-500 flex items-center justify-center hover:bg-purple-400 transition-colors disabled:opacity-50 shrink-0"
+              className="w-10 h-10 rounded-xl bg-purple-500 flex items-center justify-center hover:bg-purple-400 transition-colors disabled:opacity-50 shrink-0 active:scale-95"
             >
-              {sending ? (
-                <Loader2 className="w-4 h-4 text-white animate-spin" />
-              ) : (
-                <Send className="w-4 h-4 text-white" />
-              )}
+              {sending
+                ? <Loader2 className="w-4 h-4 text-white animate-spin" />
+                : <Send className="w-4 h-4 text-white" />
+              }
             </button>
           </div>
+          <p className="text-[10px] text-gray-700 text-center mt-2">
+            Enter para enviar · Shift+Enter para nova linha
+          </p>
         </div>
       </div>
     </div>

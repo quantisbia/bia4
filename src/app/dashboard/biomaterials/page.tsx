@@ -1,54 +1,48 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { FlaskConical, Search, Loader2, ChevronDown, ChevronUp, Filter, Sparkles } from "lucide-react"
+import {
+  FlaskConical, Search, Loader2, ChevronDown, ChevronUp,
+  Filter, Sparkles, X, SlidersHorizontal
+} from "lucide-react"
+import { cn } from "@/lib/utils/helpers"
 
 interface Biomaterial {
-  id: string
-  name: string
-  category: string
-  composition: string
-  concentration: string
-  applications: string[]
-  biocompatibility: string
-  gelTime?: string
-  crosslinking?: string
+  id: string; name: string; category: string; composition: string
+  concentration: string; applications: string[]; biocompatibility: string
+  gelTime?: string; crosslinking?: string
 }
 
 interface FormulationResult {
-  name: string
-  category: string
-  composition: string
-  concentration: string
-  crosslinking?: string
-  mechanicalProps: Record<string, string>
-  biologicalProps: Record<string, string>
-  applications: string[]
-  preparation: string
-  considerations: string[]
-  references: string[]
+  name: string; category: string; composition: string; concentration: string
+  crosslinking?: string; mechanicalProps: Record<string, string>
+  biologicalProps: Record<string, string>; applications: string[]
+  preparation: string; considerations: string[]; references: string[]
 }
 
 const CATEGORIES = ["Hidrogel", "Polímero Sintético", "Matriz Natural", "Compósito", "Bioink"]
 
+const CATEGORY_COLORS: Record<string, string> = {
+  HYDROGEL:          "text-blue-400 bg-blue-500/10 border-blue-500/20",
+  SYNTHETIC_POLYMER: "text-purple-400 bg-purple-500/10 border-purple-500/20",
+  NATURAL_MATRIX:    "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+  COMPOSITE:         "text-amber-400 bg-amber-500/10 border-amber-500/20",
+  BIOINK:            "text-teal-400 bg-teal-500/10 border-teal-500/20",
+}
+
 export default function BiomaterialsPage() {
   const [biomaterials, setBiomaterials] = useState<Biomaterial[]>([])
-  const [total, setTotal] = useState(0)
-  const [search, setSearch] = useState("")
-  const [category, setCategory] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [expanded, setExpanded] = useState<string | null>(null)
-
-  // Formulação com IA
+  const [total, setTotal]               = useState(0)
+  const [search, setSearch]             = useState("")
+  const [category, setCategory]         = useState("")
+  const [loading, setLoading]           = useState(false)
+  const [expanded, setExpanded]         = useState<string | null>(null)
+  const [showFilter, setShowFilter]     = useState(false)  // mobile filter drawer
   const [showFormulate, setShowFormulate] = useState(false)
   const [formulationForm, setFormulationForm] = useState({
-    application: "",
-    tissueType: "",
-    biodegradable: false,
-    printable: false,
-    cellLaden: false,
+    application: "", tissueType: "", biodegradable: false, printable: false, cellLaden: false,
   })
-  const [formulating, setFormulating] = useState(false)
+  const [formulating, setFormulating]     = useState(false)
   const [formulationResult, setFormulationResult] = useState<FormulationResult | null>(null)
 
   const loadBiomaterials = useCallback(async () => {
@@ -68,14 +62,13 @@ export default function BiomaterialsPage() {
   }, [search, category])
 
   useEffect(() => {
-    const timer = setTimeout(loadBiomaterials, 300)
-    return () => clearTimeout(timer)
+    const t = setTimeout(loadBiomaterials, 300)
+    return () => clearTimeout(t)
   }, [loadBiomaterials])
 
   async function formulateWithAI() {
     if (!formulationForm.application || !formulationForm.tissueType) return
-    setFormulating(true)
-    setFormulationResult(null)
+    setFormulating(true); setFormulationResult(null)
     try {
       const res = await fetch("/api/biomaterials", {
         method: "POST",
@@ -89,112 +82,152 @@ export default function BiomaterialsPage() {
           },
         }),
       })
-      if (res.ok) {
-        setFormulationResult(await res.json())
-      } else {
-        const err = await res.json()
-        alert(err.error)
-      }
+      if (res.ok) setFormulationResult(await res.json())
+      else { const e = await res.json(); alert(e.error) }
     } finally { setFormulating(false) }
   }
 
-  const CATEGORY_COLORS: Record<string, string> = {
-    HYDROGEL: "text-blue-400 bg-blue-500/10 border-blue-500/20",
-    SYNTHETIC_POLYMER: "text-purple-400 bg-purple-500/10 border-purple-500/20",
-    NATURAL_MATRIX: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-    COMPOSITE: "text-amber-400 bg-amber-500/10 border-amber-500/20",
-    BIOINK: "text-teal-400 bg-teal-500/10 border-teal-500/20",
-  }
-
   return (
-    <div className="flex h-full">
-      {/* Lista de biomateriais */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="p-6 border-b border-white/5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                <FlaskConical className="w-5 h-5 text-blue-400" />
-                Formulário de Biomateriais
-              </h1>
-              <p className="text-sm text-gray-400 mt-0.5">{total.toLocaleString("pt-BR")} formulações validadas</p>
-            </div>
-            <button
-              onClick={() => setShowFormulate(!showFormulate)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm font-medium hover:bg-blue-500/20 transition-all"
-            >
-              <Sparkles className="w-4 h-4" />
-              Formular com IA
-              <span className="text-[10px] bg-blue-500/20 px-1.5 py-0.5 rounded-md">10 créditos</span>
-            </button>
+    <div className="flex flex-col h-full overflow-hidden">
+
+      {/* ── Header ── */}
+      <div className="p-4 sm:p-5 border-b border-white/5 shrink-0">
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
+          <div>
+            <h1 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+              <FlaskConical className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
+              Formulador Bio
+            </h1>
+            <p className="text-xs text-gray-400 mt-0.5">{total.toLocaleString("pt-BR")} formulações validadas</p>
+          </div>
+          <button
+            onClick={() => setShowFormulate(!showFormulate)}
+            className={cn(
+              "flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl border text-xs sm:text-sm font-medium transition-all active:scale-[0.98]",
+              showFormulate
+                ? "bg-blue-500/20 border-blue-500/30 text-blue-300"
+                : "bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20"
+            )}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Formular com </span>IA
+            <span className="hidden sm:inline text-[10px] bg-blue-500/20 px-1.5 py-0.5 rounded-md">10 créditos</span>
+          </button>
+        </div>
+
+        {/* Search + filter row */}
+        <div className="flex gap-2">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+            <input
+              type="text" value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar biomaterial..."
+              className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-blue-500/40 transition-colors"
+            />
           </div>
 
-          {/* Busca e filtros */}
-          <div className="flex gap-3">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-              <input
-                type="text"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Buscar por nome, composição ou aplicação..."
-                className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-blue-500/40"
-              />
-            </div>
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-              <select
-                value={category}
-                onChange={e => setCategory(e.target.value)}
-                className="bg-white/5 border border-white/10 rounded-xl pl-9 pr-8 py-2.5 text-sm text-gray-300 appearance-none cursor-pointer focus:outline-none focus:border-blue-500/40"
-              >
-                <option value="">Todas categorias</option>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
+          {/* Mobile: filter button */}
+          <button
+            onClick={() => setShowFilter(!showFilter)}
+            className={cn(
+              "sm:hidden flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-xs transition-all",
+              category
+                ? "border-blue-500/30 bg-blue-500/10 text-blue-400"
+                : "border-white/10 bg-white/5 text-gray-400"
+            )}
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+          </button>
+
+          {/* Desktop: filter select */}
+          <div className="relative hidden sm:block">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+            <select
+              value={category} onChange={e => setCategory(e.target.value)}
+              className="bg-white/5 border border-white/10 rounded-xl pl-9 pr-8 py-2.5 text-sm text-gray-300 appearance-none cursor-pointer focus:outline-none focus:border-blue-500/40"
+            >
+              <option value="">Todas categorias</option>
+              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
           </div>
         </div>
 
-        {/* Formulação com IA */}
-        {showFormulate && (
-          <div className="border-b border-white/5 p-6 bg-blue-500/3">
+        {/* Mobile filter dropdown */}
+        {showFilter && (
+          <div className="sm:hidden mt-2 grid grid-cols-3 gap-1.5">
+            <button
+              onClick={() => { setCategory(""); setShowFilter(false) }}
+              className={cn(
+                "px-3 py-2 rounded-xl text-xs font-medium border transition-all",
+                !category ? "border-blue-500/30 bg-blue-500/10 text-blue-400" : "border-white/8 text-gray-500"
+              )}
+            >
+              Todas
+            </button>
+            {CATEGORIES.map(c => (
+              <button key={c}
+                onClick={() => { setCategory(c); setShowFilter(false) }}
+                className={cn(
+                  "px-3 py-2 rounded-xl text-xs font-medium border transition-all",
+                  category === c
+                    ? "border-blue-500/30 bg-blue-500/10 text-blue-400"
+                    : "border-white/8 text-gray-500 hover:text-gray-300"
+                )}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── AI Formulation panel ── */}
+      {showFormulate && (
+        <div className="border-b border-white/5 bg-blue-500/[0.03] shrink-0">
+          <div className="p-4 sm:p-5">
             {!formulationResult ? (
-              <div>
-                <h3 className="text-sm font-semibold text-white mb-4">🧪 Formular Biomaterial Ideal com IA</h3>
-                <div className="grid grid-cols-2 gap-4 mb-4">
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                    🧪 Formular Biomaterial com IA
+                  </h3>
+                  <button onClick={() => setShowFormulate(false)}
+                    className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center text-gray-500 hover:text-gray-300">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1.5">Aplicação clínica</label>
+                    <label className="text-xs text-gray-400 block mb-1.5">Aplicação clínica *</label>
                     <input
-                      type="text"
-                      value={formulationForm.application}
-                      onChange={e => setFormulationForm(prev => ({ ...prev, application: e.target.value }))}
+                      type="text" value={formulationForm.application}
+                      onChange={e => setFormulationForm(p => ({ ...p, application: e.target.value }))}
                       placeholder="ex: Reparo de cartilagem articular"
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-blue-500/40"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-blue-500/40"
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1.5">Tipo de tecido</label>
+                    <label className="text-xs text-gray-400 block mb-1.5">Tipo de tecido *</label>
                     <input
-                      type="text"
-                      value={formulationForm.tissueType}
-                      onChange={e => setFormulationForm(prev => ({ ...prev, tissueType: e.target.value }))}
+                      type="text" value={formulationForm.tissueType}
+                      onChange={e => setFormulationForm(p => ({ ...p, tissueType: e.target.value }))}
                       placeholder="ex: Cartilagem hialina"
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-blue-500/40"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-blue-500/40"
                     />
                   </div>
                 </div>
-                <div className="flex gap-6 mb-4">
+                <div className="flex flex-wrap gap-3 sm:gap-5 mb-4">
                   {[
                     { key: "biodegradable", label: "Biodegradável" },
-                    { key: "printable", label: "Imprimível (Bioink)" },
+                    { key: "printable", label: "Bioimprimível" },
                     { key: "cellLaden", label: "Cell-laden" },
                   ].map((req) => (
                     <label key={req.key} className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={formulationForm[req.key as keyof typeof formulationForm] as boolean}
-                        onChange={e => setFormulationForm(prev => ({ ...prev, [req.key]: e.target.checked }))}
+                        onChange={e => setFormulationForm(p => ({ ...p, [req.key]: e.target.checked }))}
                         className="w-4 h-4 rounded border-white/20 bg-white/5 accent-blue-500"
                       />
                       <span className="text-sm text-gray-300">{req.label}</span>
@@ -204,32 +237,39 @@ export default function BiomaterialsPage() {
                 <button
                   onClick={formulateWithAI}
                   disabled={formulating || !formulationForm.application || !formulationForm.tissueType}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-500 text-white text-sm font-semibold hover:bg-blue-400 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-500 text-white text-sm font-semibold hover:bg-blue-400 transition-colors disabled:opacity-50 active:scale-[0.98]"
                 >
                   {formulating ? <><Loader2 className="w-4 h-4 animate-spin" /> Formulando...</> : <><Sparkles className="w-4 h-4" /> Gerar Formulação</>}
                 </button>
-              </div>
+              </>
             ) : (
-              <div>
+              <>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-semibold text-white">✅ Formulação Gerada pela IA</h3>
-                  <button onClick={() => setFormulationResult(null)} className="text-xs text-gray-500 hover:text-gray-300">
-                    Nova formulação
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setFormulationResult(null)}
+                      className="text-xs text-gray-500 hover:text-gray-300 px-2.5 py-1 rounded-lg border border-white/10 transition-colors">
+                      Nova formulação
+                    </button>
+                    <button onClick={() => setShowFormulate(false)}
+                      className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center text-gray-500 hover:text-gray-300">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <h4 className="text-lg font-bold text-white mb-1">{formulationResult.name}</h4>
-                    <span className={`text-xs px-2 py-1 rounded-lg border ${CATEGORY_COLORS[formulationResult.category] ?? "text-gray-400"}`}>
+                    <h4 className="text-base font-bold text-white mb-1">{formulationResult.name}</h4>
+                    <span className={cn("text-xs px-2 py-1 rounded-lg border inline-block mb-3", CATEGORY_COLORS[formulationResult.category] ?? "text-gray-400")}>
                       {formulationResult.category}
                     </span>
-                    <p className="text-sm text-gray-300 mt-3"><strong className="text-gray-400">Composição:</strong> {formulationResult.composition}</p>
-                    <p className="text-sm text-gray-300 mt-1"><strong className="text-gray-400">Concentração:</strong> {formulationResult.concentration}</p>
+                    <p className="text-xs text-gray-300 mb-1"><strong className="text-gray-400">Composição:</strong> {formulationResult.composition}</p>
+                    <p className="text-xs text-gray-300 mb-1"><strong className="text-gray-400">Concentração:</strong> {formulationResult.concentration}</p>
                     {formulationResult.crosslinking && (
-                      <p className="text-sm text-gray-300 mt-1"><strong className="text-gray-400">Crosslinking:</strong> {formulationResult.crosslinking}</p>
+                      <p className="text-xs text-gray-300 mb-3"><strong className="text-gray-400">Crosslinking:</strong> {formulationResult.crosslinking}</p>
                     )}
-                    <div className="mt-3">
-                      <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Propriedades mecânicas</p>
+                    <div>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Propriedades mecânicas</p>
                       {Object.entries(formulationResult.mechanicalProps).map(([k, v]) => (
                         <p key={k} className="text-xs text-gray-300"><span className="text-gray-500">{k}:</span> {v}</p>
                       ))}
@@ -237,12 +277,12 @@ export default function BiomaterialsPage() {
                   </div>
                   <div>
                     <div className="mb-3">
-                      <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Preparação</p>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Preparação</p>
                       <p className="text-xs text-gray-300 leading-relaxed">{formulationResult.preparation.substring(0, 300)}...</p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Considerações</p>
-                      <ul className="space-y-0.5">
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Considerações</p>
+                      <ul className="space-y-1">
                         {formulationResult.considerations.slice(0, 3).map((c, i) => (
                           <li key={i} className="text-xs text-amber-300/70 flex items-start gap-1">
                             <span className="text-amber-500 shrink-0">•</span>{c}
@@ -252,70 +292,81 @@ export default function BiomaterialsPage() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </>
             )}
           </div>
-        )}
-
-        {/* Grid de biomateriais */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-6 h-6 text-gray-600 animate-spin" />
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              {biomaterials.map((bm) => (
-                <div
-                  key={bm.id}
-                  className="rounded-xl border border-white/5 bg-white/2 hover:border-white/10 transition-all"
-                >
-                  <button
-                    onClick={() => setExpanded(expanded === bm.id ? null : bm.id)}
-                    className="w-full p-4 text-left flex items-start gap-3"
-                  >
-                    <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/15 flex items-center justify-center shrink-0">
-                      <FlaskConical className="w-4 h-4 text-blue-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-medium text-white truncate">{bm.name}</p>
-                        {expanded === bm.id ? (
-                          <ChevronUp className="w-4 h-4 text-gray-500 shrink-0" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-gray-500 shrink-0" />
-                        )}
-                      </div>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-md border inline-block mt-1 ${CATEGORY_COLORS[bm.category] ?? "text-gray-400"}`}>
-                        {bm.category}
-                      </span>
-                    </div>
-                  </button>
-
-                  {expanded === bm.id && (
-                    <div className="px-4 pb-4 border-t border-white/5 pt-3 space-y-2">
-                      <p className="text-xs text-gray-400"><span className="text-gray-500">Composição: </span>{bm.composition}</p>
-                      <p className="text-xs text-gray-400"><span className="text-gray-500">Concentração: </span>{bm.concentration}</p>
-                      {bm.crosslinking && <p className="text-xs text-gray-400"><span className="text-gray-500">Crosslinking: </span>{bm.crosslinking}</p>}
-                      {bm.gelTime && <p className="text-xs text-gray-400"><span className="text-gray-500">Gel time: </span>{bm.gelTime}</p>}
-                      {bm.biocompatibility && <p className="text-xs text-gray-400"><span className="text-gray-500">Biocompat.: </span>{bm.biocompatibility}</p>}
-                      {bm.applications?.length > 0 && (
-                        <div className="flex flex-wrap gap-1 pt-1">
-                          {bm.applications.slice(0, 4).map((app, i) => (
-                            <span key={i} className="text-[10px] px-2 py-0.5 bg-white/5 rounded-md text-gray-400">
-                              {app}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
+      )}
+
+      {/* ── Biomaterials grid ── */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-5">
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-6 h-6 text-gray-600 animate-spin" />
+          </div>
+        ) : biomaterials.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16">
+            <FlaskConical className="w-8 h-8 text-gray-700 mb-3" />
+            <p className="text-sm text-gray-500">Nenhum biomaterial encontrado</p>
+            <p className="text-xs text-gray-600 mt-1">Tente um termo diferente</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+            {biomaterials.map((bm) => (
+              <div key={bm.id}
+                className="rounded-xl border border-white/5 bg-white/[0.02] hover:border-white/10 transition-all">
+                <button
+                  onClick={() => setExpanded(expanded === bm.id ? null : bm.id)}
+                  className="w-full p-3.5 sm:p-4 text-left flex items-start gap-3 active:scale-[0.99]"
+                >
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-500/10 border border-blue-500/15 flex items-center justify-center shrink-0">
+                    <FlaskConical className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-xs sm:text-sm font-medium text-white leading-tight">{bm.name}</p>
+                      {expanded === bm.id
+                        ? <ChevronUp className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
+                        : <ChevronDown className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
+                      }
+                    </div>
+                    <span className={cn("text-[10px] px-2 py-0.5 rounded-md border inline-block mt-1.5", CATEGORY_COLORS[bm.category] ?? "text-gray-400")}>
+                      {bm.category}
+                    </span>
+                  </div>
+                </button>
+
+                {expanded === bm.id && (
+                  <div className="px-3.5 sm:px-4 pb-4 border-t border-white/5 pt-3 space-y-1.5">
+                    <InfoRow label="Composição" value={bm.composition} />
+                    <InfoRow label="Concentração" value={bm.concentration} />
+                    {bm.crosslinking && <InfoRow label="Crosslinking" value={bm.crosslinking} />}
+                    {bm.gelTime && <InfoRow label="Gel time" value={bm.gelTime} />}
+                    {bm.biocompatibility && <InfoRow label="Biocompat." value={bm.biocompatibility} />}
+                    {bm.applications?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        {bm.applications.slice(0, 4).map((app, i) => (
+                          <span key={i} className="text-[10px] px-2 py-0.5 bg-white/5 rounded-md text-gray-400">
+                            {app}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
+  )
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <p className="text-xs text-gray-400">
+      <span className="text-gray-500">{label}: </span>{value}
+    </p>
   )
 }
