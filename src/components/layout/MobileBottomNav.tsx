@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard, GitBranch, MessageSquare, FlaskConical,
-  BookOpen, FileText, MoreHorizontal, Printer, CircleDot, Microscope
+  BookOpen, FileText, MoreHorizontal, Printer, CircleDot, Microscope, Box
 } from "lucide-react"
 import { useState } from "react"
 import { cn } from "@/lib/utils/helpers"
@@ -22,6 +22,7 @@ const MORE_TABS = [
   { href: "/dashboard/protocols",  label: "Protocolos",  icon: FileText },
   { href: "/dashboard/analyses",   label: "Análises",    icon: Microscope },
   { href: "/dashboard/knowledge",  label: "Artigos",     icon: BookOpen },
+  { href: "/dashboard/stl",        label: "STL/OBJ",     icon: Box },
 ]
 
 export function MobileBottomNav() {

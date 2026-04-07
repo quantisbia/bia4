@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import {
   TrendingUp, Zap, GitBranch, FlaskConical,
   MessageSquare, BookOpen, ArrowRight, Activity,
-  Clock, CheckCircle2, AlertCircle, CircleDot, FileText, Printer, Microscope
+  Clock, CheckCircle2, AlertCircle, CircleDot, FileText, Printer, Microscope, Box
 } from "lucide-react"
 import Link from "next/link"
 
@@ -45,6 +45,7 @@ export default async function DashboardPage() {
     { title: "Protocolos GLP/GMP",   desc: "Protocolo laboratorial", href: "/dashboard/protocols",     icon: FileText,     color: "violet" },
     { title: "Análises & Dossiês",   desc: "Molecular, celular, FDA",href: "/dashboard/analyses",      icon: Microscope,   color: "rose"   },
     { title: "Chat com IA",          desc: "Dúvidas científicas",    href: "/dashboard/chat",          icon: MessageSquare,color: "indigo" },
+    { title: "Gerador STL/OBJ",      desc: "12 geometrias 3D",        href: "/dashboard/stl",           icon: Box,          color: "violet" },
     { title: "Base de Conhecimento", desc: "Pesquisar artigos",      href: "/dashboard/knowledge",     icon: BookOpen,     color: "blue"   },
   ]
 
