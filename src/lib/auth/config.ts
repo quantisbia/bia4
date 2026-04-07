@@ -13,7 +13,6 @@ const loginSchema = z.object({
 export const { handlers, auth, signIn, signOut } = NextAuth({
   // IMPORTANTE: Sem PrismaAdapter quando usamos JWT + Credentials
   // O PrismaAdapter tenta gravar Sessions no DB o que conflita com JWT strategy
-  // e pode causar falhas silenciosas no login com Neon serverless
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 dias
@@ -73,6 +72,30 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
+    // Auth.js v5: authorized callback é usado pelo middleware para proteger rotas
+    authorized({ auth, request: { nextUrl } }) {
+      const isLoggedIn = !!auth?.user
+      const pathname = nextUrl.pathname
+
+      const protectedPaths = ["/dashboard", "/admin"]
+      const authPaths = ["/auth/login", "/auth/register"]
+
+      const isProtected = protectedPaths.some((p) => pathname.startsWith(p))
+      const isAuthPage = authPaths.some((p) => pathname.startsWith(p))
+
+      // Proteger rotas: redirecionar para login se não autenticado
+      if (isProtected && !isLoggedIn) {
+        return false // Auth.js v5 redireciona automaticamente para signIn page
+      }
+
+      // Redirecionar para dashboard se já logado e tentar acessar auth pages
+      if (isAuthPage && isLoggedIn) {
+        return Response.redirect(new URL("/dashboard", nextUrl))
+      }
+
+      return true
+    },
+
     async jwt({ token, user, trigger, session }) {
       // No sign-in: attach user data to token
       if (user) {
