@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import {
   TrendingUp, Zap, GitBranch, FlaskConical,
   MessageSquare, BookOpen, ArrowRight, Activity,
-  Clock, CheckCircle2, AlertCircle, CircleDot, FileText
+  Clock, CheckCircle2, AlertCircle, CircleDot, FileText, Printer
 } from "lucide-react"
 import Link from "next/link"
 
@@ -38,12 +38,13 @@ export default async function DashboardPage() {
   }
 
   const quickActions = [
-    { title: "Novo Pipeline",        desc: "Design de tecido",      href: "/dashboard/pipeline",      icon: GitBranch,   color: "violet" },
-    { title: "Formular Biomaterial", desc: "Buscar formulação",     href: "/dashboard/biomaterials",  icon: FlaskConical, color: "blue"  },
-    { title: "Organoid Builder",     desc: "Design de organoide",   href: "/dashboard/organoids",     icon: CircleDot,   color: "purple" },
-    { title: "Chat com IA",          desc: "Dúvidas científicas",   href: "/dashboard/chat",          icon: MessageSquare, color: "indigo"},
-    { title: "Base de Conhecimento", desc: "Pesquisar artigos",     href: "/dashboard/knowledge",     icon: BookOpen,    color: "blue"   },
-    { title: "Gerar Protocolo",      desc: "Protocolo laboratorial",href: "/dashboard/protocols",     icon: FileText,    color: "violet" },
+    { title: "Novo Pipeline",        desc: "Design de tecido",       href: "/dashboard/pipeline",      icon: GitBranch,    color: "violet" },
+    { title: "Formular Biomaterial", desc: "Buscar formulação",      href: "/dashboard/biomaterials",  icon: FlaskConical, color: "blue"   },
+    { title: "Bioimpressão 3D",      desc: "STL · GCode · Reologia", href: "/dashboard/bioprinting",   icon: Printer,      color: "indigo" },
+    { title: "Organoid Builder",     desc: "Design de organoide",    href: "/dashboard/organoids",     icon: CircleDot,    color: "purple" },
+    { title: "Chat com IA",          desc: "Dúvidas científicas",    href: "/dashboard/chat",          icon: MessageSquare,color: "indigo" },
+    { title: "Base de Conhecimento", desc: "Pesquisar artigos",      href: "/dashboard/knowledge",     icon: BookOpen,     color: "blue"   },
+    { title: "Gerar Protocolo",      desc: "Protocolo laboratorial", href: "/dashboard/protocols",     icon: FileText,     color: "violet" },
   ]
 
   return (

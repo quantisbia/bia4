@@ -31,10 +31,10 @@ function BiaLogoSvg({ size = 32 }: { size?: number }) {
 }
 
 function BiaLogoBox({ sizeClass = "w-10 h-10", size = 32, rounded = "rounded-xl",
-  shadow = "shadow-lg shadow-violet-900/60", pulse = false }:
-  { sizeClass?: string; size?: number; rounded?: string; shadow?: string; pulse?: boolean }) {
+  shadow = "shadow-lg shadow-violet-900/60", pulse = false, className = "" }:
+  { sizeClass?: string; size?: number; rounded?: string; shadow?: string; pulse?: boolean; className?: string }) {
   return (
-    <div className={`${sizeClass} ${rounded} ${shadow} ${pulse ? "bio-pulse" : ""} bg-[#2d0a6e] flex items-center justify-center shrink-0`}>
+    <div className={`${sizeClass} ${rounded} ${shadow} ${pulse ? "bio-pulse" : ""} ${className} bg-[#2d0a6e] flex items-center justify-center shrink-0`}>
       <BiaLogoSvg size={size} />
     </div>
   )
@@ -137,7 +137,7 @@ export default function HomePage() {
           {/* Free credits banner */}
           <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-blue-300">
             <Zap className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-            <span>Demonstração com <strong className="text-blue-200">10 créditos gratuitos</strong></span>
+            <span>Comece com <strong className="text-blue-200">Discovery — 10 créditos</strong></span>
           </div>
 
           {/* Stats */}
@@ -342,7 +342,7 @@ export default function HomePage() {
             </p>
             <div className="mt-4 inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-2 text-xs sm:text-sm text-blue-300">
               <Zap className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-              <span><strong className="text-blue-200">10 créditos gratuitos</strong> antes de assinar</span>
+              <span><strong className="text-blue-200">10 créditos Discovery</strong> para começar</span>
             </div>
           </div>
 
@@ -354,7 +354,7 @@ export default function HomePage() {
               </div>
               <h3 className="text-lg font-bold mb-1">Grátis</h3>
               <div className="text-2xl font-bold mb-3">R$ 0</div>
-              <p className="text-xs text-gray-400 mb-4">10 créditos de demonstração — sem cartão</p>
+              <p className="text-xs text-gray-400 mb-4">Plano Discovery — acesso imediato</p>
               <Link href="/auth/register"
                 className="block w-full text-center py-2.5 px-4 rounded-xl font-medium text-sm border border-white/10 text-gray-300 hover:bg-white/5 transition-all">
                 Criar conta grátis
@@ -500,7 +500,7 @@ export default function HomePage() {
             Comece hoje mesmo
           </h2>
           <p className="text-gray-400 text-sm sm:text-base mb-8">
-            10 créditos gratuitos para explorar todos os módulos BIA
+            Comece agora com o plano Discovery e explore todos os módulos BIA
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 px-4">
             <Link href="/auth/register"

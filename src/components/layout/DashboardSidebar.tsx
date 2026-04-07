@@ -8,7 +8,7 @@ import { useSession } from "next-auth/react"
 import {
   LayoutDashboard, GitBranch, FlaskConical, CircleDot,
   FileText, BookOpen, MessageSquare, CreditCard, Settings,
-  LogOut, Zap, ChevronRight, Shield, Menu, X,
+  LogOut, Zap, ChevronRight, Shield, Menu, X, Printer,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
@@ -36,17 +36,18 @@ export function BiaLogoIcon({ size = 22 }: { size?: number }) {
 
 export const NAV_ITEMS = [
   { href: "/dashboard",               label: "Visão Geral",         icon: LayoutDashboard, exact: true },
-  { href: "/dashboard/pipeline",      label: "Pipeline",            icon: GitBranch },
-  { href: "/dashboard/biomaterials",  label: "Formulador Bio",      icon: FlaskConical },
-  { href: "/dashboard/organoids",     label: "Organoid Builder",    icon: CircleDot },
-  { href: "/dashboard/protocols",     label: "Protocolos",          icon: FileText },
-  { href: "/dashboard/knowledge",     label: "Base de Conhecimento",icon: BookOpen },
-  { href: "/dashboard/chat",          label: "Chat IA",             icon: MessageSquare },
+  { href: "/dashboard/pipeline",      label: "Pipeline",            icon: GitBranch,        exact: false },
+  { href: "/dashboard/biomaterials",  label: "Formulador Bio",      icon: FlaskConical,     exact: false },
+  { href: "/dashboard/bioprinting",   label: "Bioimpressão 3D",     icon: Printer,          exact: false },
+  { href: "/dashboard/organoids",     label: "Organoid Builder",    icon: CircleDot,        exact: false },
+  { href: "/dashboard/protocols",     label: "Protocolos",          icon: FileText,         exact: false },
+  { href: "/dashboard/knowledge",     label: "Base de Conhecimento",icon: BookOpen,         exact: false },
+  { href: "/dashboard/chat",          label: "Chat IA",             icon: MessageSquare,    exact: false },
 ]
 
 const BOTTOM_ITEMS = [
-  { href: "/dashboard/billing",  label: "Assinatura", icon: CreditCard },
-  { href: "/dashboard/settings", label: "Configurações", icon: Settings },
+  { href: "/dashboard/billing",  label: "Assinatura", icon: CreditCard,  exact: false },
+  { href: "/dashboard/settings", label: "Configurações", icon: Settings, exact: false },
 ]
 
 const PLAN_CREDITS: Record<string, number> = {

@@ -4,22 +4,23 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard, GitBranch, MessageSquare, FlaskConical,
-  BookOpen, FileText, MoreHorizontal
+  BookOpen, FileText, MoreHorizontal, Printer, CircleDot
 } from "lucide-react"
 import { useState } from "react"
 import { cn } from "@/lib/utils/helpers"
 
 const PRIMARY_TABS = [
-  { href: "/dashboard",              label: "Home",     icon: LayoutDashboard, exact: true },
-  { href: "/dashboard/pipeline",     label: "Pipeline", icon: GitBranch },
-  { href: "/dashboard/chat",         label: "Chat IA",  icon: MessageSquare },
-  { href: "/dashboard/biomaterials", label: "Bio",      icon: FlaskConical },
-  { href: "/dashboard/knowledge",    label: "Artigos",  icon: BookOpen },
+  { href: "/dashboard",              label: "Home",      icon: LayoutDashboard, exact: true },
+  { href: "/dashboard/pipeline",     label: "Pipeline",  icon: GitBranch },
+  { href: "/dashboard/chat",         label: "Chat IA",   icon: MessageSquare },
+  { href: "/dashboard/biomaterials", label: "Bio",       icon: FlaskConical },
+  { href: "/dashboard/bioprinting",  label: "Bioprint",  icon: Printer },
 ]
 
 const MORE_TABS = [
-  { href: "/dashboard/organoids",  label: "Organoides",  icon: FlaskConical },
+  { href: "/dashboard/organoids",  label: "Organoides",  icon: CircleDot },
   { href: "/dashboard/protocols",  label: "Protocolos",  icon: FileText },
+  { href: "/dashboard/knowledge",  label: "Artigos",     icon: BookOpen },
 ]
 
 export function MobileBottomNav() {

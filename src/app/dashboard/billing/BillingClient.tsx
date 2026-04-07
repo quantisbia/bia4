@@ -162,6 +162,7 @@ export function BillingClient({
   const maxCredits = PLAN_CREDITS_MAX[currentPlan] ?? 10
 
   /* Internal upgrade (for FREE users being auto-moved to DISCOVERY) */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleInternalUpgrade = async (planId: string) => {
     if (planId === currentPlan) { info("Plano atual", "Você já está neste plano."); return }
     setUpgrading(planId)
@@ -353,7 +354,7 @@ export function BillingClient({
               const c       = COLOR[plan.color as keyof typeof COLOR]
               const isCur   = plan.id === currentPlan
               const isDown  = planIndex(plan.id) < currentIdx
-              const isUp    = upgrading === plan.id
+              void upgrading // used for UI state in desktop grid above
               const isExp   = expandedPlan === plan.id
 
               return (
@@ -445,7 +446,7 @@ export function BillingClient({
             <div>
               <p className="text-sm text-violet-300 font-semibold mb-1">Pagamento seguro via Asaas</p>
               <p className="text-xs text-gray-400 leading-relaxed">
-                Ao clicar em "Assinar agora", você será redirecionado para o checkout seguro do Asaas.
+                Ao clicar em &quot;Assinar agora&quot;, você será redirecionado para o checkout seguro do Asaas.
                 Após a confirmação do pagamento, seu plano será ativado automaticamente em até 24h.
                 Em caso de dúvidas, entre em contato pelo suporte.
               </p>

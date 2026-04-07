@@ -127,7 +127,7 @@ export default function RegisterPage() {
         {/* Discovery intro badge */}
         <div className="flex items-center justify-center gap-2 bg-violet-500/10 border border-violet-500/20 rounded-xl px-4 py-2.5 mb-5 text-sm text-violet-300">
           <Zap className="w-3.5 h-3.5 text-violet-400 shrink-0" />
-          <span><strong className="text-violet-200">10 créditos</strong> de boas-vindas incluídos</span>
+          <span>Plano <strong className="text-violet-200">Discovery</strong> — 10 créditos de boas-vindas</span>
         </div>
 
         {/* Perks */}
