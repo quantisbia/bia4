@@ -140,12 +140,14 @@ export async function POST(req: Request) {
 
     const { title, type, context, tissueType, application, specialRequirements } = parsed.data
 
-    // ── Verificar créditos ────────────────────────────────────────────────────
+    // ── Verificar créditos (ADMIN tem bypass automático) ─────────────────────
+    const userRole = (session.user as { role?: string }).role
     const creditCheck = await requireCredits(
       session.user.id,
       "PROTOCOL_GENERATION",
       `Protocolo: ${title}`,
-      { type, title } as Prisma.InputJsonValue
+      { type, title } as Prisma.InputJsonValue,
+      userRole
     )
     if (creditCheck) return creditCheck.error
 

@@ -22,6 +22,36 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     error: "/auth/error",
     newUser: "/dashboard",
   },
+  // Cookies mais permissivos para funcionar com proxy/sandbox
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: false, // Permite HTTP no sandbox
+      },
+    },
+    callbackUrl: {
+      name: `next-auth.callback-url`,
+      options: {
+        httpOnly: false,
+        sameSite: "lax",
+        path: "/",
+        secure: false,
+      },
+    },
+    csrfToken: {
+      name: `next-auth.csrf-token`,
+      options: {
+        httpOnly: false,
+        sameSite: "lax",
+        path: "/",
+        secure: false,
+      },
+    },
+  },
   providers: [
     Credentials({
       name: "credentials",
@@ -115,8 +145,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const freshUser = await getUserByEmail(token.email as string)
           if (freshUser) {
             token.credits = freshUser.creditBalance?.balance ?? 0
-            token.plan = freshUser.subscription?.plan ?? "FREE"
+            const rawPlan = freshUser.subscription?.plan ?? "FREE"
+            token.plan = rawPlan === "FREE" ? "DISCOVERY" : rawPlan
             token.name = freshUser.name
+            token.role = freshUser.role
           }
         } catch {
           // Keep existing token data on DB error
@@ -138,5 +170,5 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   trustHost: true,
   secret: process.env.NEXTAUTH_SECRET,
-  debug: process.env.NODE_ENV === "development",
+  debug: false,
 })

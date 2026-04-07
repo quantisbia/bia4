@@ -54,12 +54,14 @@ export async function POST(req: NextRequest) {
 
   const { message, sessionId, mode, streaming } = parsed.data
 
-  // Verificar e gastar créditos (2 por mensagem)
+  // Verificar e gastar créditos (2 por mensagem) — ADMIN tem bypass
+  const userRole = (session.user as { role?: string }).role
   const creditCheck = await requireCredits(
     session.user.id,
     "CHAT_MESSAGE",
     `Chat ${mode}: ${message.substring(0, 50)}`,
-    { mode, sessionId } as Prisma.InputJsonValue
+    { mode, sessionId } as Prisma.InputJsonValue,
+    userRole
   )
   if (creditCheck) return creditCheck.error
 

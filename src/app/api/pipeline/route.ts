@@ -74,12 +74,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "projectId e stageNum são obrigatórios" }, { status: 400 })
     }
 
-    // Verificar créditos (5 por análise de etapa)
+    // Verificar créditos (5 por análise de etapa) — ADMIN tem bypass
+    const userRole = (session.user as { role?: string }).role
     const creditCheck = await requireCredits(
       session.user.id,
       "PIPELINE_STAGE",
       `Análise Pipeline - Etapa ${stageNum}`,
-      { projectId, stageNum } as Prisma.InputJsonValue
+      { projectId, stageNum } as Prisma.InputJsonValue,
+      userRole
     )
     if (creditCheck) return creditCheck.error
 
@@ -117,13 +119,15 @@ export async function POST(req: NextRequest) {
   // Sugerir biomateriais para o pipeline
   if (body.action === "suggest_biomaterials") {
     const { tissueType, stageContext } = body
-    const creditCheck = await requireCredits(
+    const userRole2 = (session.user as { role?: string }).role
+    const creditCheck2 = await requireCredits(
       session.user.id,
       "BIOMATERIAL_FORMULATION",
       "Sugestão de biomateriais para pipeline",
-      { tissueType } as Prisma.InputJsonValue
+      { tissueType } as Prisma.InputJsonValue,
+      userRole2
     )
-    if (creditCheck) return creditCheck.error
+    if (creditCheck2) return creditCheck2.error
 
     const suggestions = await suggestBiomaterials(tissueType, stageContext)
     return NextResponse.json(suggestions)

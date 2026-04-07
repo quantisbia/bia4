@@ -50,11 +50,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Dados inválidos", details: parsed.error.flatten() }, { status: 400 })
   }
 
+  const userRole = (session.user as { role?: string }).role
   const creditCheck = await requireCredits(
     session.user.id,
     "ORGANOID_DESIGN",
     `Design de organoide ${parsed.data.organoidType}`,
-    { type: parsed.data.organoidType } as Prisma.InputJsonValue
+    { type: parsed.data.organoidType } as Prisma.InputJsonValue,
+    userRole
   )
   if (creditCheck) return creditCheck.error
 

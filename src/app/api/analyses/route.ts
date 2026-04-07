@@ -133,25 +133,29 @@ export async function POST(req: Request) {
 
     const { type, title, context, objective, material, tissueType, species, regulatoryTarget } = parsed.data
     const analysisConfig = ANALYSIS_TYPES[type]
+    const userRole = (session.user as { role?: string }).role
 
-    // Verificar plano mínimo
-    const userPlan = (session.user as { plan?: string }).plan ?? "FREE"
-    const userPlanIdx = PLAN_ORDER.indexOf(userPlan)
-    const minPlanIdx  = PLAN_ORDER.indexOf(analysisConfig.minPlan)
-    if (userPlanIdx < minPlanIdx) {
-      return NextResponse.json({
-        error: `Esta análise requer plano ${analysisConfig.minPlan} ou superior. Seu plano atual: ${userPlan}.`,
-        code: "PLAN_REQUIRED",
-        requiredPlan: analysisConfig.minPlan,
-      }, { status: 403 })
+    // Verificar plano mínimo (ADMIN tem acesso irrestrito)
+    if (userRole !== "ADMIN") {
+      const userPlan = (session.user as { plan?: string }).plan ?? "FREE"
+      const userPlanIdx = PLAN_ORDER.indexOf(userPlan)
+      const minPlanIdx  = PLAN_ORDER.indexOf(analysisConfig.minPlan)
+      if (userPlanIdx < minPlanIdx) {
+        return NextResponse.json({
+          error: `Esta análise requer plano ${analysisConfig.minPlan} ou superior. Seu plano atual: ${userPlan}.`,
+          code: "PLAN_REQUIRED",
+          requiredPlan: analysisConfig.minPlan,
+        }, { status: 403 })
+      }
     }
 
-    // Verificar créditos usando a ação mais próxima disponível
+    // Verificar créditos usando a ação mais próxima disponível — ADMIN tem bypass
     const creditResult = await requireCredits(
       session.user.id,
       "PROTOCOL_GENERATION",  // reutilizamos esta ação; ajustamos o custo na lógica abaixo
       `Análise ${analysisConfig.label}: ${title}`,
-      { type, title } as Prisma.InputJsonValue
+      { type, title } as Prisma.InputJsonValue,
+      userRole
     )
     if (creditResult) return creditResult.error
 

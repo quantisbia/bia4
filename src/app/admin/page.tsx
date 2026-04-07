@@ -63,7 +63,7 @@ interface UserEditModal {
 }
 
 export default function AdminDashboardPage() {
-  const { data: session, status } = useSession()
+  const { data: session, status, update } = useSession()
   const router = useRouter()
   const [data, setData] = useState<OverviewData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -74,6 +74,7 @@ export default function AdminDashboardPage() {
   const [editModal, setEditModal] = useState<UserEditModal | null>(null)
   const [editForm, setEditForm] = useState({ role: "", plan: "", addCredits: 0, note: "" })
   const [saving, setSaving] = useState(false)
+  const [setupLoading, setSetupLoading] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null)
 
   useEffect(() => {
@@ -89,6 +90,29 @@ export default function AdminDashboardPage() {
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type })
     setTimeout(() => setToast(null), 4000)
+  }
+
+  // Auto-setup: garante que o admin tem plano ACADEMY + 20k créditos
+  const handleAutoSetup = async () => {
+    setSetupLoading(true)
+    try {
+      const res = await fetch("/api/admin/self", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "ensure_admin_setup" }),
+      })
+      if (res.ok) {
+        await update() // Força refresh do JWT
+        showToast("✅ Admin configurado: ACADEMY + 20.000 créditos!", "success")
+        fetchOverview()
+      } else {
+        showToast("Erro no setup automático", "error")
+      }
+    } catch {
+      showToast("Erro de conexão", "error")
+    } finally {
+      setSetupLoading(false)
+    }
   }
 
   const fetchOverview = async () => {
@@ -221,6 +245,19 @@ export default function AdminDashboardPage() {
             <span className="text-xs text-gray-500">
               {session?.user?.email}
             </span>
+            <button
+              onClick={handleAutoSetup}
+              disabled={setupLoading}
+              className="flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 transition-colors px-3 py-1.5 rounded-lg border border-emerald-500/20 hover:border-emerald-500/40 disabled:opacity-50"
+              title="Garante plano ACADEMY + 20.000 créditos para o admin"
+            >
+              {setupLoading ? (
+                <div className="w-3.5 h-3.5 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />
+              ) : (
+                <Zap className="w-3.5 h-3.5" />
+              )}
+              Auto-Setup
+            </button>
             <button
               onClick={fetchOverview}
               className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg border border-white/8 hover:border-white/15"

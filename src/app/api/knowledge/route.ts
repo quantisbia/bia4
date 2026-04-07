@@ -24,12 +24,14 @@ export async function GET(req: NextRequest) {
   if (aiSearch && query && articles.length > 0) {
     const session = await auth()
     if (session?.user?.id) {
-      // Gastar 1 crédito para busca com IA
+      const userRole = (session.user as { role?: string }).role
+      // Gastar 1 crédito para busca com IA — ADMIN tem bypass
       const creditCheck = await requireCredits(
         session.user.id,
         "KNOWLEDGE_SEARCH",
         `Busca IA: ${query}`,
-        { query } as Prisma.InputJsonValue
+        { query } as Prisma.InputJsonValue,
+        userRole
       )
 
       if (!creditCheck) {

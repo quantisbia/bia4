@@ -19,17 +19,31 @@ export const CREDIT_COSTS = {
 export type CreditAction = keyof typeof CREDIT_COSTS
 
 /**
+ * Check if user is ADMIN — admins bypass ALL credit and plan restrictions
+ */
+export async function isAdminSession(): Promise<boolean> {
+  const session = await auth()
+  return session?.user?.role === "ADMIN"
+}
+
+/**
  * Server-side credit guard for API routes.
+ * ADMIN users bypass all credit checks.
  * Returns an error response if insufficient credits, otherwise deducts and returns null.
  */
 export async function requireCredits(
   userId: string,
   action: CreditAction,
   description: string,
-  metadata?: Prisma.InputJsonValue
+  metadata?: Prisma.InputJsonValue,
+  userRole?: string
 ): Promise<{ error: NextResponse } | null> {
-  const cost = CREDIT_COSTS[action]
+  // ADMIN bypass: never charge credits, always succeed
+  if (userRole === "ADMIN") {
+    return null
+  }
 
+  const cost = CREDIT_COSTS[action]
   const result = await spendCredits(userId, cost, description, metadata)
 
   if (!result.success) {
@@ -69,6 +83,7 @@ export async function checkCredits(
 
 /**
  * Full auth + credits check for API routes.
+ * ADMIN users bypass all restrictions.
  * Returns userId if OK, or an error NextResponse.
  */
 export async function authAndCredits(
@@ -84,7 +99,9 @@ export async function authAndCredits(
     }
   }
 
-  const guard = await requireCredits(session.user.id, action, description, metadata)
+  const userRole = session.user.role as string | undefined
+
+  const guard = await requireCredits(session.user.id, action, description, metadata, userRole)
   if (guard) return guard
 
   return { userId: session.user.id, cost: CREDIT_COSTS[action] }

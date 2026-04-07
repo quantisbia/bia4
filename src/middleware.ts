@@ -7,17 +7,34 @@ const authRoutes = ["/auth/login", "/auth/register"]
 export async function middleware(req: NextRequest) {
   const { nextUrl } = req
 
-  // Auth.js v5 em produção usa cookie __Secure-authjs.session-token
-  // getToken precisa saber que é secureCookie=true para usar o prefixo correto
-  const isProduction = process.env.NODE_ENV === "production"
+  // Auth.js v5: O sandbox usa HTTPS externamente mas HTTP internamente.
+  // Tentamos primeiro com secureCookie=true (HTTPS), depois com false (HTTP fallback)
+  // para garantir que o token seja lido corretamente em qualquer ambiente.
+  let token = null
 
-  const token = await getToken({
-    req,
-    secret: process.env.NEXTAUTH_SECRET,
-    secureCookie: isProduction,
-    // Auth.js v5 beta usa salt = cookieName para encode/decode
-    // cookieName é derivado automaticamente pelo secureCookie flag
-  })
+  // Tenta com secureCookie=true primeiro (produção HTTPS)
+  try {
+    token = await getToken({
+      req,
+      secret: process.env.NEXTAUTH_SECRET,
+      secureCookie: true,
+    })
+  } catch {
+    // silencioso
+  }
+
+  // Se não encontrou, tenta sem secureCookie (desenvolvimento HTTP)
+  if (!token) {
+    try {
+      token = await getToken({
+        req,
+        secret: process.env.NEXTAUTH_SECRET,
+        secureCookie: false,
+      })
+    } catch {
+      // silencioso
+    }
+  }
 
   const isLoggedIn = !!token
   const isProtectedRoute = protectedRoutes.some((r) => nextUrl.pathname.startsWith(r))

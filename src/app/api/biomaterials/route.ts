@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const limit = parseInt(searchParams.get("limit") ?? "20")
 
   const where: Prisma.BiomaterialWhereInput = {
-    isActive: true,
+    isPublic: true,
     ...(search && {
       OR: [
         { name: { contains: search, mode: "insensitive" } },
@@ -34,11 +34,11 @@ export async function GET(req: NextRequest) {
       name: true,
       category: true,
       composition: true,
-      concentration: true,
       applications: true,
       biocompatibility: true,
-      gelTime: true,
       crosslinking: true,
+      tissueTypes: true,
+      tags: true,
     },
   })
 
@@ -73,12 +73,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Dados inválidos", details: parsed.error.flatten() }, { status: 400 })
   }
 
-  // Verificar e gastar créditos (10 por formulação)
+  // Verificar e gastar créditos (ADMIN tem bypass automático)
+  const userRole = (session.user as { role?: string }).role
   const creditCheck = await requireCredits(
     session.user.id,
     "BIOMATERIAL_FORMULATION",
     `Formulação: ${parsed.data.application} para ${parsed.data.tissueType}`,
-    { application: parsed.data.application } as Prisma.InputJsonValue
+    { application: parsed.data.application } as Prisma.InputJsonValue,
+    userRole
   )
   if (creditCheck) return creditCheck.error
 
@@ -88,16 +90,24 @@ export async function POST(req: NextRequest) {
     parsed.data.requirements ?? {}
   )
 
-  // Salvar formulação no histórico
-  await prisma.formulationRecord.create({
-    data: {
-      userId: session.user.id,
-      application: parsed.data.application,
-      tissueType: parsed.data.tissueType,
-      formulation: formulation as unknown as Prisma.InputJsonValue,
-      creditsUsed: 10,
-    },
-  })
+  // Salvar formulação no histórico (usando campos do schema real)
+  try {
+    await prisma.formulationRecord.create({
+      data: {
+        userId: session.user.id,
+        biomaterialId: (formulation as { biomaterialId?: string }).biomaterialId ?? "unknown",
+        customInputs: {
+          application: parsed.data.application,
+          tissueType: parsed.data.tissueType,
+          requirements: parsed.data.requirements,
+        } as Prisma.InputJsonValue,
+        aiSuggestion: JSON.stringify(formulation).substring(0, 1000),
+        creditsUsed: 10,
+      },
+    })
+  } catch {
+    // Formulação salva mesmo sem persistir no histórico
+  }
 
   return NextResponse.json(formulation)
 }
