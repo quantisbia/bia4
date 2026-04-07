@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard, GitBranch, MessageSquare, FlaskConical,
-  BookOpen, FileText, MoreHorizontal, Printer, CircleDot
+  BookOpen, FileText, MoreHorizontal, Printer, CircleDot, Microscope
 } from "lucide-react"
 import { useState } from "react"
 import { cn } from "@/lib/utils/helpers"
@@ -20,6 +20,7 @@ const PRIMARY_TABS = [
 const MORE_TABS = [
   { href: "/dashboard/organoids",  label: "Organoides",  icon: CircleDot },
   { href: "/dashboard/protocols",  label: "Protocolos",  icon: FileText },
+  { href: "/dashboard/analyses",   label: "Análises",    icon: Microscope },
   { href: "/dashboard/knowledge",  label: "Artigos",     icon: BookOpen },
 ]
 

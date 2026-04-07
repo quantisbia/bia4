@@ -55,13 +55,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             },
           }).catch(() => {})
 
+          // Mapear FREE → DISCOVERY (plan legado sem créditos)
+          const rawPlan = user.subscription?.plan ?? "FREE"
+          const plan = rawPlan === "FREE" ? "DISCOVERY" : rawPlan
+
           return {
             id: user.id,
             email: user.email,
             name: user.name,
             image: user.image ?? null,
             role: user.role,
-            plan: user.subscription?.plan ?? "FREE",
+            plan,
             credits: user.creditBalance?.balance ?? 0,
           }
         } catch (error) {

@@ -2,6 +2,12 @@ import { defineConfig } from "prisma/config"
 import { Pool, neonConfig } from "@neondatabase/serverless"
 import { PrismaNeon } from "@prisma/adapter-neon"
 import ws from "ws"
+import * as dotenv from "dotenv"
+import * as path from "path"
+
+// Load .env.local first, then .env (for Prisma CLI usage)
+dotenv.config({ path: path.resolve(process.cwd(), ".env.local") })
+dotenv.config({ path: path.resolve(process.cwd(), ".env") })
 
 neonConfig.webSocketConstructor = ws
 

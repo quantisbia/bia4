@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,9 +6,316 @@ datasource db {
   provider = "postgresql"
 }
 
-// ============================================
-// ENUMS
-// ============================================
+model User {
+  id               String              @id @default(cuid())
+  name             String?
+  email            String              @unique
+  emailVerified    DateTime?
+  image            String?
+  password         String?
+  role             UserRole            @default(USER)
+  institution      String?
+  researchArea     String?
+  bio              String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  accounts         Account[]
+  chatSessions     ChatSession[]
+  creditBalance    CreditBalance?
+  creditTxns       CreditTransaction[]
+  pipelineProjects PipelineProject[]
+  protocols        Protocol[]
+  sessions         Session[]
+  subscription     Subscription?
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  userId             String             @unique
+  plan               SubscriptionPlan   @default(FREE)
+  status             SubscriptionStatus @default(TRIALING)
+  currentPeriodStart DateTime           @default(now())
+  currentPeriodEnd   DateTime           @default(dbgenerated("(now() + '7 days'::interval)"))
+  trialEndsAt        DateTime?
+  cancelledAt        DateTime?
+  monthlyCredits     Int                @default(50)
+  externalId         String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+model CreditBalance {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  balance     Int      @default(50)
+  totalEarned Int      @default(50)
+  totalSpent  Int      @default(0)
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("credit_balances")
+}
+
+model CreditTransaction {
+  id          String          @id @default(cuid())
+  userId      String
+  type        TransactionType
+  amount      Int
+  balance     Int
+  description String
+  metadata    Json?
+  createdAt   DateTime        @default(now())
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("credit_transactions")
+}
+
+model PipelineProject {
+  id                String          @id @default(cuid())
+  userId            String
+  name              String
+  description       String?
+  tissueType        String
+  status            PipelineStatus  @default(DRAFT)
+  currentStage      Int             @default(1)
+  targetApplication String?
+  patientProfile    String?
+  completionRate    Float           @default(0)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stages            PipelineStage[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("pipeline_projects")
+}
+
+model PipelineStage {
+  id          String          @id @default(cuid())
+  projectId   String
+  stageNumber Int
+  name        String
+  description String
+  status      StageStatus     @default(PENDING)
+  inputs      Json?
+  outputs     Json?
+  aiAnalysis  String?
+  creditsUsed Int?
+  completedAt DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  project     PipelineProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, stageNumber])
+  @@index([projectId])
+  @@map("pipeline_stages")
+}
+
+model Biomaterial {
+  id               String              @id @default(cuid())
+  name             String
+  category         BiomaterialCategory
+  components       String[]
+  composition      Json
+  elasticity       Float?
+  porosity         Float?
+  degradationTime  String?
+  biocompatibility String
+  printable        Boolean             @default(false)
+  crosslinking     String?
+  applications     String[]
+  tissueTypes      String[]
+  references       String[]
+  doi              String[]
+  tags             String[]
+  isPublic         Boolean             @default(true)
+  verified         Boolean             @default(false)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  formulations     FormulationRecord[]
+
+  @@index([category])
+  @@map("biomaterials")
+}
+
+model FormulationRecord {
+  id            String      @id @default(cuid())
+  userId        String?
+  biomaterialId String
+  customInputs  Json?
+  aiSuggestion  String?
+  notes         String?
+  creditsUsed   Int         @default(10)
+  createdAt     DateTime    @default(now())
+  biomaterial   Biomaterial @relation(fields: [biomaterialId], references: [id], onDelete: NoAction)
+
+  @@index([biomaterialId])
+  @@map("formulation_records")
+}
+
+model OrganoidDesign {
+  id           String       @id @default(cuid())
+  userId       String
+  name         String
+  organoidType OrganoidType
+  cellTypes    String[]
+  scaffold     String?
+  dimensions   Json?
+  protocol     String?
+  aiDesign     String?
+  predictions  Json?
+  creditsUsed  Int          @default(15)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([userId])
+  @@map("organoid_designs")
+}
+
+model Protocol {
+  id           String   @id @default(cuid())
+  userId       String
+  title        String
+  category     String
+  description  String?
+  steps        Json
+  materials    Json
+  equipment    String[]
+  safetyNotes  String[]
+  aiGenerated  Boolean  @default(true)
+  sourceInputs Json?
+  duration     String?
+  difficulty   String?
+  validated    Boolean  @default(false)
+  creditsUsed  Int      @default(8)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([category])
+  @@map("protocols")
+}
+
+model KnowledgeArticle {
+  id          String   @id @default(cuid())
+  title       String
+  authors     String[]
+  abstract    String
+  journal     String
+  year        Int
+  doi         String?  @unique
+  url         String?
+  tags        String[]
+  category    String
+  keywords    String[]
+  embedding   Float[]
+  chunkCount  Int      @default(0)
+  isPublic    Boolean  @default(true)
+  accessCount Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([year])
+  @@map("knowledge_articles")
+}
+
+model ChatSession {
+  id           String        @id @default(cuid())
+  userId       String
+  title        String        @default("Nova Conversa")
+  isActive     Boolean       @default(true)
+  context      String?
+  messageCount Int           @default(0)
+  totalCredits Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  messages     ChatMessage[]
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id          String      @id @default(cuid())
+  sessionId   String
+  role        String
+  content     String
+  model       String?
+  tokens      Int?
+  creditsUsed Int         @default(0)
+  sources     Json?
+  createdAt   DateTime    @default(now())
+  session     ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([createdAt])
+  @@map("chat_messages")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String?
+  entityId  String?
+  metadata  Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
 
 enum UserRole {
   USER
@@ -75,463 +379,4 @@ enum OrganoidType {
   PANCREAS
   RETINA
   CUSTOM
-}
-
-// ============================================
-// AUTH TABLES (NextAuth.js)
-// ============================================
-
-model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  password      String?
-  role          UserRole  @default(USER)
-
-  // Profile
-  institution   String?
-  researchArea  String?
-  bio           String?
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  accounts       Account[]
-  sessions       Session[]
-  subscription   Subscription?
-  creditBalance  CreditBalance?
-  creditTxns     CreditTransaction[]
-  pipelineProjects PipelineProject[]
-  chatSessions   ChatSession[]
-  protocols      Protocol[]
-
-  @@map("users")
-}
-
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@map("accounts")
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("sessions")
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-  @@map("verification_tokens")
-}
-
-// ============================================
-// SUBSCRIPTION & BILLING
-// ============================================
-
-model Subscription {
-  id     String @id @default(cuid())
-  userId String @unique
-
-  plan   SubscriptionPlan   @default(FREE)
-  status SubscriptionStatus @default(ACTIVE)
-
-  // Billing cycle
-  currentPeriodStart DateTime @default(now())
-  currentPeriodEnd   DateTime @default(dbgenerated("NOW() + INTERVAL '7 days'"))
-  trialEndsAt        DateTime?
-  cancelledAt        DateTime?
-
-  // Credits config
-  monthlyCredits Int @default(10)  // FREE plan gets 10 demo credits
-  
-  // External billing
-  externalId String? // Stripe/payment ID (future)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("subscriptions")
-}
-
-// ============================================
-// CREDITS SYSTEM
-// ============================================
-
-model CreditBalance {
-  id     String @id @default(cuid())
-  userId String @unique
-
-  balance      Int @default(10) // Current balance
-  totalEarned  Int @default(10) // Lifetime earned
-  totalSpent   Int @default(0)  // Lifetime spent
-
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("credit_balances")
-}
-
-model CreditTransaction {
-  id     String @id @default(cuid())
-  userId String
-
-  type        TransactionType
-  amount      Int               // Positive = credit, Negative = debit
-  balance     Int               // Balance AFTER this transaction
-  description String
-  metadata    Json?             // { action: "pipeline_stage", projectId: "..." }
-
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([createdAt])
-  @@map("credit_transactions")
-}
-
-// ============================================
-// PIPELINE MODULE
-// ============================================
-
-model PipelineProject {
-  id          String         @id @default(cuid())
-  userId      String
-  name        String
-  description String?
-  tissueType  String
-  status      PipelineStatus @default(DRAFT)
-  currentStage Int           @default(1)
-
-  // AI context
-  targetApplication String?   // e.g., "cartilage replacement", "skin graft"
-  cellSource        String?   // e.g., "iPSC, MSC"
-  patientProfile    String?   // e.g., "adult, 45yo, knee cartilage defect"
-  
-  // Computed
-  completionRate Float @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  stages PipelineStage[]
-
-  @@index([userId])
-  @@index([status])
-  @@map("pipeline_projects")
-}
-
-model PipelineStage {
-  id        String @id @default(cuid())
-  projectId String
-  stageNumber Int  // 1-12
-
-  name        String
-  description String
-  status      StageStatus @default(PENDING)
-
-  // Stage data
-  inputs     Json?   // User inputs for this stage
-  outputs    Json?   // Results/recommendations
-  aiAnalysis String? @db.Text // AI-generated analysis
-
-  // Credits & timing
-  creditsUsed Int?
-  completedAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  project PipelineProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@unique([projectId, stageNumber])
-  @@index([projectId])
-  @@map("pipeline_stages")
-}
-
-// ============================================
-// BIOMATERIALS MODULE
-// ============================================
-
-model Biomaterial {
-  id       String              @id @default(cuid())
-  name     String
-  category BiomaterialCategory
-  
-  // Composition
-  components   String[]    // List of components
-  composition  Json        // Detailed composition { component: %, notes: "" }
-  concentration String?    // e.g., "5% w/v"
-  
-  // Properties
-  elasticity      Float?   // kPa
-  porosity        Float?   // %
-  degradationTime String?  // e.g., "4-8 weeks"
-  biocompatibility String  // HIGH, MEDIUM, LOW
-  printable       Boolean  @default(false)
-  crosslinking    String?  // e.g., "UV, ionic, enzymatic"
-  gelTime         String?  // e.g., "5-10 min"
-  
-  // Applications
-  applications String[]
-  tissueTypes  String[]  // Compatible tissue types
-  
-  // Scientific
-  references String[]
-  doi        String[]
-  tags       String[]
-  
-  // Meta
-  isPublic  Boolean @default(true)
-  isActive  Boolean @default(true)
-  verified  Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  formulations FormulationRecord[]
-
-  @@index([category])
-  @@index([biocompatibility])
-  @@map("biomaterials")
-}
-
-model FormulationRecord {
-  id           String @id @default(cuid())
-  userId       String?
-  biomaterialId String?
-
-  // AI Formulation
-  application  String?
-  tissueType   String?
-  formulation  Json?   // Full AI-generated formulation object
-
-  // Customization
-  customInputs Json?   // User-specific parameters
-  aiSuggestion String? @db.Text // AI recommendation
-  notes        String?
-
-  // Credits
-  creditsUsed Int @default(10)
-
-  createdAt DateTime @default(now())
-
-  biomaterial Biomaterial? @relation(fields: [biomaterialId], references: [id])
-
-  @@index([biomaterialId])
-  @@map("formulation_records")
-}
-
-// ============================================
-// ORGANOID BUILDER MODULE
-// ============================================
-
-model OrganoidDesign {
-  id     String @id @default(cuid())
-  userId String
-
-  name        String
-  organoidType OrganoidType
-  purpose      String?  @db.Text
-  cellSource   String?
-  
-  // Design parameters
-  cellTypes   String[]
-  scaffold    String?
-  dimensions  Json?   // { diameter: mm, layers: n }
-  protocol    String? @db.Text
-  
-  // AI outputs
-  aiDesign     String? @db.Text
-  predictions  Json?   // viability, maturation time, etc.
-  
-  creditsUsed Int @default(15)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-  @@map("organoid_designs")
-}
-
-// ============================================
-// PROTOCOLS MODULE
-// ============================================
-
-model Protocol {
-  id     String @id @default(cuid())
-  userId String
-
-  title       String
-  category    String   // "cell_culture", "bioprinting", "scaffold_prep"
-  description String?
-  
-  // Content
-  content     String? @db.Text  // Full generated content
-  steps       Json     // Array of { stepNumber, title, duration, materials, procedure }
-  materials   Json     // List of required materials/reagents
-  equipment   String[]
-  safetyNotes String[]
-  
-  // Source
-  aiGenerated Boolean  @default(true)
-  sourceInputs Json?   // What was used to generate
-  
-  // Meta
-  duration    String?  // Total estimated time
-  difficulty  String?  // BEGINNER, INTERMEDIATE, ADVANCED
-  validated   Boolean  @default(false)
-  
-  creditsUsed Int @default(8)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([category])
-  @@map("protocols")
-}
-
-// ============================================
-// KNOWLEDGE BASE MODULE
-// ============================================
-
-model KnowledgeArticle {
-  id String @id @default(cuid())
-
-  title    String
-  authors  String[]
-  abstract String  @db.Text
-  journal  String
-  year     Int
-  doi      String? @unique
-  url      String?
-
-  // Classification
-  tags     String[]
-  category String   // "biomaterials", "tissue_engineering", "organoids", etc.
-  keywords String[]
-
-  // RAG
-  embedding  Float[]   // Vector embedding for similarity search
-  chunkCount Int       @default(0)
-
-  // Meta
-  isPublic    Boolean @default(true)
-  accessCount Int     @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([category])
-  @@index([year])
-  @@map("knowledge_articles")
-}
-
-// ============================================
-// CHAT MODULE
-// ============================================
-
-model ChatSession {
-  id     String @id @default(cuid())
-  userId String
-
-  title     String  @default("Nova Conversa")
-  isActive  Boolean @default(true)
-  
-  // Context
-  context   String? // e.g., "pipeline:proj123", "biomaterial:gel001"
-  
-  // Stats
-  messageCount Int @default(0)
-  totalCredits Int @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages ChatMessage[]
-
-  @@index([userId])
-  @@map("chat_sessions")
-}
-
-model ChatMessage {
-  id        String @id @default(cuid())
-  sessionId String
-
-  role    String  // "user" | "assistant" | "system"
-  content String  @db.Text
-  
-  // Metadata
-  model       String?  // gemini-2.0-flash
-  tokens      Int?
-  creditsUsed Int      @default(0)
-  
-  // RAG sources
-  sources Json?   // Articles referenced
-
-  createdAt DateTime @default(now())
-
-  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@index([sessionId])
-  @@index([createdAt])
-  @@map("chat_messages")
-}
-
-// ============================================
-// SYSTEM / AUDIT
-// ============================================
-
-model AuditLog {
-  id     String @id @default(cuid())
-  userId String?
-
-  action   String  // "login", "subscribe", "credit_spend", etc.
-  entity   String? // "pipeline", "biomaterial", etc.
-  entityId String?
-  metadata Json?
-  ip       String?
-
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([action])
-  @@index([createdAt])
-  @@map("audit_logs")
 }

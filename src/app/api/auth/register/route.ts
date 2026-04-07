@@ -56,18 +56,18 @@ export async function POST(req: NextRequest) {
         },
       })
 
-      // Create FREE subscription (demo: 10 credits)
+      // Create DISCOVERY subscription (10 welcome credits)
       await tx.subscription.create({
         data: {
           userId: newUser.id,
-          plan: "FREE",
+          plan: "DISCOVERY",
           status: "ACTIVE",
           currentPeriodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
           monthlyCredits: 10,
         },
       })
 
-      // Create initial credit balance (10 demo credits)
+      // Create initial credit balance (10 boas-vindas)
       await tx.creditBalance.create({
         data: {
           userId: newUser.id,
@@ -84,8 +84,8 @@ export async function POST(req: NextRequest) {
           type: "CREDIT",
           amount: 10,
           balance: 10,
-          description: "Créditos de demonstração BIA",
-          metadata: { action: "demo_credits", plan: "FREE" },
+          description: "Créditos de boas-vindas — Plano Discovery BIA",
+          metadata: { action: "welcome_credits", plan: "DISCOVERY" },
         },
       })
 

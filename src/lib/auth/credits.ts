@@ -5,12 +5,15 @@ import { NextResponse } from "next/server"
 
 // Credit costs per action
 export const CREDIT_COSTS = {
-  PIPELINE_STAGE: 5,
-  BIOMATERIAL_FORMULATION: 10,
-  ORGANOID_DESIGN: 15,
-  PROTOCOL_GENERATION: 8,
-  CHAT_MESSAGE: 2,
-  KNOWLEDGE_SEARCH: 1,
+  PIPELINE_STAGE:         5,
+  BIOMATERIAL_FORMULATION:10,
+  ORGANOID_DESIGN:        15,
+  PROTOCOL_GENERATION:    8,
+  REGULATORY_DOSSIER:     20,
+  ANALYSIS_RUN:           12,
+  STL_GCODE:              6,
+  CHAT_MESSAGE:           2,
+  KNOWLEDGE_SEARCH:       1,
 } as const
 
 export type CreditAction = keyof typeof CREDIT_COSTS

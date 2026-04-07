@@ -1,8 +1,14 @@
+/**
+ * Prisma Client — BIA v4
+ * Usa PrismaNeon adapter para conexão HTTP com Neon PostgreSQL
+ * Funciona em Node.js (local/Vercel) e Edge runtime
+ */
+
 import { PrismaClient } from "@prisma/client"
 import { PrismaNeon } from "@prisma/adapter-neon"
 import { neonConfig } from "@neondatabase/serverless"
 
-// Required for Node.js environments (local dev + Vercel serverless)
+// Node.js precisa de ws como WebSocket (Edge já tem nativo)
 if (typeof WebSocket === "undefined") {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   neonConfig.webSocketConstructor = require("ws")
@@ -13,26 +19,34 @@ function createPrismaClient() {
 
   if (!connectionString) {
     throw new Error(
-      "DATABASE_URL not set. Please configure your Neon database URL in .env.local\n" +
-      "Get your URL at: https://neon.tech"
+      "[BIA] DATABASE_URL não configurada.\n" +
+      "Adicione em .env.local: DATABASE_URL=\"postgresql://...\"\n" +
+      "Obtenha em: https://neon.tech"
     )
   }
 
-  // PrismaNeon takes the PoolConfig directly (not a Pool instance)
   const adapter = new PrismaNeon({ connectionString })
 
   return new PrismaClient({
     adapter,
-    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+    log:
+      process.env.NODE_ENV === "development"
+        ? ["error", "warn"]
+        : ["error"],
   })
 }
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
+// Singleton para hot-reload em dev (evita "too many connections")
+declare global {
+  // eslint-disable-next-line no-var
+  var __prisma: PrismaClient | undefined
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient()
+export const prisma: PrismaClient =
+  globalThis.__prisma ?? createPrismaClient()
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma
+if (process.env.NODE_ENV !== "production") {
+  globalThis.__prisma = prisma
+}
 
 export default prisma

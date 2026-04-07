@@ -8,7 +8,7 @@ import { useSession } from "next-auth/react"
 import {
   LayoutDashboard, GitBranch, FlaskConical, CircleDot,
   FileText, BookOpen, MessageSquare, CreditCard, Settings,
-  LogOut, Zap, ChevronRight, Shield, Menu, X, Printer,
+  LogOut, Zap, ChevronRight, Shield, Menu, X, Printer, Microscope,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
@@ -40,7 +40,8 @@ export const NAV_ITEMS = [
   { href: "/dashboard/biomaterials",  label: "Formulador Bio",      icon: FlaskConical,     exact: false },
   { href: "/dashboard/bioprinting",   label: "Bioimpressão 3D",     icon: Printer,          exact: false },
   { href: "/dashboard/organoids",     label: "Organoid Builder",    icon: CircleDot,        exact: false },
-  { href: "/dashboard/protocols",     label: "Protocolos",          icon: FileText,         exact: false },
+  { href: "/dashboard/protocols",     label: "Protocolos GLP/GMP",  icon: FileText,         exact: false },
+  { href: "/dashboard/analyses",      label: "Análises & Dossiês",  icon: Microscope,       exact: false },
   { href: "/dashboard/knowledge",     label: "Base de Conhecimento",icon: BookOpen,         exact: false },
   { href: "/dashboard/chat",          label: "Chat IA",             icon: MessageSquare,    exact: false },
 ]
