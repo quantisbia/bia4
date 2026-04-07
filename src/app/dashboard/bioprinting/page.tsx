@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import React, { useState, useCallback, useEffect } from "react"
 import {
   Printer, Layers, Zap, Settings2, FlaskConical, ChevronDown, ChevronUp,
   Play, Download, RefreshCw, Info, AlertTriangle, CheckCircle2, Loader2,
   Sliders, Droplets, Thermometer, Wind, BarChart3, FileCode2, Microscope,
   Activity, Target, Shield, BookOpen, Database, Star, TrendingUp,
-  ArrowRight, Beaker,
+  ArrowRight, Beaker, MonitorDown, Cpu, Globe, ExternalLink,
+  Box, Lightbulb,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
@@ -208,7 +209,7 @@ G1 X5 Y5 Z${slicer.layerHeight / 1000} E0.5
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function BioprintingPage() {
-  const [activeTab, setActiveTab] = useState<"slicer" | "bioink" | "db" | "rheology" | "ai" | "regulatory">("slicer")
+  const [activeTab, setActiveTab] = useState<"slicer" | "bioink" | "db" | "rheology" | "ai" | "regulatory" | "softwares">("slicer")
   const [loading, setLoading] = useState(false)
   const [aiResult, setAiResult] = useState<AIAnalysis | null>(null)
   const [rheoResult, setRheoResult] = useState<RheologyResult | null>(null)
@@ -364,6 +365,7 @@ export default function BioprintingPage() {
         <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none">
           {[
             { id: "slicer",     label: "Fatiamento",  icon: Sliders },
+            { id: "softwares",  label: "Softwares",   icon: MonitorDown },
             { id: "bioink",     label: "Biotinta",    icon: Droplets },
             { id: "db",         label: "DB 807",      icon: Database },
             { id: "rheology",   label: "Reologia",    icon: BarChart3 },
@@ -576,14 +578,430 @@ export default function BioprintingPage() {
             </div>
 
             {/* STL tip */}
-            <div className="bg-blue-500/5 border border-blue-500/15 rounded-xl p-4 flex gap-3">
-              <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-              <div className="text-xs text-gray-400 leading-relaxed">
-                <span className="text-blue-300 font-semibold">Preparação STL:</span> exporte como mesh manifold sólido · sem normais invertidas ·
-                resolução ≥ 0.01 mm · tolerância ≤ 0.001 mm · recomendar escala 1:1 em mm.
-                Para bioimpressão use <span className="text-blue-300">BioCAD</span> ou <span className="text-blue-300">Mimics</span> para segmentação médica.
+            <div className="bg-blue-500/5 border border-blue-500/15 rounded-xl p-4 space-y-3">
+              <div className="flex gap-3">
+                <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                <div className="text-xs text-gray-400 leading-relaxed">
+                  <span className="text-blue-300 font-semibold">Preparação STL:</span> exporte como mesh <span className="text-white font-medium">manifold sólido</span> · sem normais invertidas ·
+                  resolução <span className="text-white font-medium">≥ 0.01 mm</span> · tolerância <span className="text-white font-medium">≤ 0.001 mm</span> · escala <span className="text-white font-medium">1:1 em mm</span>.
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                <div className="bg-violet-500/8 border border-violet-500/15 rounded-lg p-2.5">
+                  <div className="text-[10px] text-violet-400 font-semibold mb-1.5 flex items-center gap-1">
+                    <Layers className="w-3 h-3" /> Fatiadores Recomendados
+                  </div>
+                  <div className="space-y-1">
+                    {[
+                      { name: "PrusaSlicer", url: "https://www.prusa3d.com/page/prusaslicer_424/" },
+                      { name: "Ultimaker Cura", url: "https://ultimaker.com/software/ultimaker-cura/" },
+                      { name: "Simplify3D", url: "https://www.simplify3d.com/" },
+                    ].map(s => (
+                      <a key={s.name} href={s.url} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-[10px] text-gray-300 hover:text-violet-300 transition-colors">
+                        <ExternalLink className="w-2.5 h-2.5 shrink-0" /> {s.name}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+                <div className="bg-emerald-500/8 border border-emerald-500/15 rounded-lg p-2.5">
+                  <div className="text-[10px] text-emerald-400 font-semibold mb-1.5 flex items-center gap-1">
+                    <MonitorDown className="w-3 h-3" /> Host / Pronterface
+                  </div>
+                  <div className="space-y-1">
+                    {[
+                      { name: "Pronterface (Printrun)", url: "https://github.com/kliment/Printrun/releases" },
+                      { name: "PrusaSlicer Host", url: "https://www.prusa3d.com/page/prusaslicer_424/" },
+                      { name: "Cura Monitor", url: "https://ultimaker.com/software/ultimaker-cura/" },
+                    ].map(s => (
+                      <a key={s.name} href={s.url} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-[10px] text-gray-300 hover:text-emerald-300 transition-colors">
+                        <ExternalLink className="w-2.5 h-2.5 shrink-0" /> {s.name}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+                <div className="bg-amber-500/8 border border-amber-500/15 rounded-lg p-2.5">
+                  <div className="text-[10px] text-amber-400 font-semibold mb-1.5 flex items-center gap-1">
+                    <Box className="w-3 h-3" /> Modelagem 3D
+                  </div>
+                  <div className="space-y-1">
+                    {[
+                      { name: "Tinkercad (online)", url: "https://www.tinkercad.com/" },
+                      { name: "Blender", url: "https://www.blender.org/download/" },
+                      { name: "Thingiverse STLs", url: "https://www.thingiverse.com/" },
+                    ].map(s => (
+                      <a key={s.name} href={s.url} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-[10px] text-gray-300 hover:text-amber-300 transition-colors">
+                        <ExternalLink className="w-2.5 h-2.5 shrink-0" /> {s.name}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => setActiveTab("softwares")}
+                className="w-full text-[10px] text-blue-400 hover:text-blue-300 flex items-center justify-center gap-1 pt-1 transition-colors">
+                <Lightbulb className="w-3 h-3" /> Ver guia completo de softwares para biofabricação →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── SOFTWARES TAB ───────────────────────────────────────────────────── */}
+        {activeTab === "softwares" && (
+          <div className="space-y-5">
+
+            {/* Intro banner */}
+            <div className="bg-gradient-to-r from-violet-500/10 to-blue-500/10 border border-violet-500/20 rounded-2xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-violet-500/20 flex items-center justify-center shrink-0">
+                  <Cpu className="w-5 h-5 text-violet-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white mb-1">Ecossistema de Software para Biofabricação</h3>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    A biofabricação requer uma cadeia de ferramentas que vai da <span className="text-violet-300">modelagem 3D</span> ao <span className="text-blue-300">fatiamento</span>,
+                    passando pelo <span className="text-emerald-300">controle do host</span>. Abaixo estão as ferramentas mais recomendadas por especialistas,
+                    todas com links diretos de download gratuito ou trial.
+                  </p>
+                </div>
               </div>
             </div>
+
+            {/* ── Slicers ── */}
+            <SoftwareSection
+              title="Fatiadores (Slicers)"
+              subtitle="Convertem STL/OBJ em G-Code para a bioimpressora"
+              color="violet"
+              icon={<Layers className="w-4 h-4 text-violet-400" />}
+              items={[
+                {
+                  name: "PrusaSlicer",
+                  version: "v2.9.4",
+                  free: true,
+                  platforms: ["Windows", "macOS", "Linux"],
+                  url: "https://www.prusa3d.com/page/prusaslicer_424/",
+                  description: "Slicer open-source de alto desempenho com suporte a múltiplos perfis de impressão, calibração automática de extrusão, suportes avançados e compatibilidade com firmware Marlin/Klipper. Ideal para bioimpressão por extrusão.",
+                  highlights: ["Controle de temperatura por camada", "Perfis customizados por material", "Multi-extrusão (IDEX)", "Ironing / top surface smooth"],
+                  bioNote: "⭐ Recomendado para biotintas à base de PCL e GelMA. Controle fino de velocidade e temperatura por seção.",
+                },
+                {
+                  name: "Ultimaker Cura",
+                  version: "v5.x",
+                  free: true,
+                  platforms: ["Windows", "macOS", "Linux"],
+                  url: "https://ultimaker.com/software/ultimaker-cura/",
+                  description: "Slicer líder de mercado com mais de 400 parâmetros configuráveis. Suporte a plugins da comunidade, integração com nuvem Ultimaker Digital Factory e perfis especializados para materiais flexíveis.",
+                  highlights: ["400+ parâmetros de fatiamento", "Plugin marketplace", "Suporte tree supports avançado", "Simulação de impressão por camada"],
+                  bioNote: "⭐ Excelente para scaffolds porosos (Gyroid, Honeycomb). Compatível com impressoras Creality, Prusa, E3D e outros.",
+                },
+                {
+                  name: "Simplify3D",
+                  version: "v5.x",
+                  free: false,
+                  platforms: ["Windows", "macOS", "Linux"],
+                  url: "https://www.simplify3d.com/",
+                  description: "Slicer profissional pago com melhor suporte a múltiplos processos em uma única impressão. Permite diferentes configurações de fatiamento por região do modelo — essencial para estruturas heterogêneas em bioimpressão.",
+                  highlights: ["Multi-process por região", "Suporte manual fino", "Preview 3D detalhado por camada", "Compatível com 900+ impressoras"],
+                  bioNote: "💼 Recomendado para projetos avançados com gradientes de porosidade ou materiais diferentes em regiões distintas.",
+                },
+              ]}
+            />
+
+            {/* ── Host Software ── */}
+            <SoftwareSection
+              title="Host Software (Controle da Impressora)"
+              subtitle="Interface de comunicação e monitoramento em tempo real"
+              color="emerald"
+              icon={<MonitorDown className="w-4 h-4 text-emerald-400" />}
+              items={[
+                {
+                  name: "Pronterface (Printrun)",
+                  version: "2.0.1+",
+                  free: true,
+                  platforms: ["Windows", "macOS", "Linux"],
+                  url: "https://github.com/kliment/Printrun/releases",
+                  description: "Host open-source leve para envio de G-Code, monitoramento de temperatura, controle manual de eixos e impressão direta via USB/Serial. Ideal para bioimpressoras customizadas baseadas em firmware Marlin.",
+                  highlights: ["Interface gráfica simples", "Console G-Code ao vivo", "Monitoramento de temperatura", "Pronterface + Printcore + Pronsole"],
+                  bioNote: "⭐ Padrão na comunidade de bioimpressão DIY. Ótimo para validação de protocolos e teste de G-Code customizado.",
+                },
+                {
+                  name: "PrusaSlicer (Host integrado)",
+                  version: "v2.9.4",
+                  free: true,
+                  platforms: ["Windows", "macOS", "Linux"],
+                  url: "https://www.prusa3d.com/page/prusaslicer_424/",
+                  description: "Além de slicer, o PrusaSlicer inclui integração via PrusaConnect para monitoramento remoto, envio de jobs por Wi-Fi e câmera de acompanhamento. Elimina a necessidade de software host separado para impressoras Prusa.",
+                  highlights: ["Monitor via PrusaConnect", "Envio por Wi-Fi/Octoprint", "Câmera integrada", "Controle de fila de impressão"],
+                  bioNote: "✅ Fluxo completo slicer→host em um único software. Recomendado para setups Prusa MK4/XL.",
+                },
+                {
+                  name: "Cura (Monitor + Octoprint)",
+                  version: "Cura + Plugin",
+                  free: true,
+                  platforms: ["Windows", "macOS", "Linux"],
+                  url: "https://ultimaker.com/software/ultimaker-cura/",
+                  description: "Cura integra com Octoprint via plugin para monitoramento remoto, controle de temperatura em tempo real e câmera. Permite iniciar impressões remotamente sem contato com a impressora — importante em ambientes de biossegurança.",
+                  highlights: ["Integração Octoprint/Moonraker", "Envio direto de jobs", "Monitoramento temperatura/umidade", "Acesso web seguro"],
+                  bioNote: "🔬 Recomendado para laboratórios de biossegurança nível 2+ onde o acesso físico é limitado.",
+                },
+              ]}
+            />
+
+            {/* ── Modelagem 3D ── */}
+            <SoftwareSection
+              title="Modelagem e Design 3D"
+              subtitle="Criação e edição de modelos para bioimpressão"
+              color="amber"
+              icon={<Box className="w-4 h-4 text-amber-400" />}
+              items={[
+                {
+                  name: "Tinkercad",
+                  version: "Online (gratuito)",
+                  free: true,
+                  platforms: ["Navegador web"],
+                  url: "https://www.tinkercad.com/",
+                  description: "Modelagem 3D online baseada em geometrias primitivas (CSG). Ideal para iniciantes: scaffolds simples, suportes geométricos, membranas retangulares e cilindros. Exporta diretamente para STL. Sem instalação.",
+                  highlights: ["Zero configuração (browser)", "Interface drag-and-drop", "Formas primitivas + booleanas", "Export STL, OBJ, SVG"],
+                  bioNote: "⭐ Ponto de entrada recomendado para pesquisadores sem experiência em CAD. Crie seu primeiro scaffold em 10 minutos.",
+                },
+                {
+                  name: "3D Builder (Microsoft)",
+                  version: "Windows Store",
+                  free: true,
+                  platforms: ["Windows 10/11"],
+                  url: "https://apps.microsoft.com/detail/9wzdncrfj3t6",
+                  description: "Aplicativo nativo do Windows para visualização, reparo e edição básica de modelos STL. Excelente para verificar manifold, reparar normais invertidas e redimensionar modelos antes de fatiar.",
+                  highlights: ["Reparo automático de mesh", "Verificação de manifold", "Merge e subtract booleano", "Integração com Paint 3D"],
+                  bioNote: "🔧 Use para reparar STLs com normais invertidas antes de importar no fatiador. Gratuito no Windows.",
+                },
+                {
+                  name: "Blender",
+                  version: "v4.x",
+                  free: true,
+                  platforms: ["Windows", "macOS", "Linux"],
+                  url: "https://www.blender.org/download/",
+                  description: "Suite de modelagem 3D profissional open-source. Suporta sculpting orgânico (estruturas anatômicas), modificadores paramétricos, script Python para automação de geometrias e add-ons especializados como BioBlender.",
+                  highlights: ["Sculpting para estruturas orgânicas", "Script Python paramétrico", "Add-on BioBlender (biomol)", "Export STL/OBJ/FBX"],
+                  bioNote: "🔬 Curva de aprendizado maior, mas essencial para modelos anatômicos complexos (nariz, orelha, tecido trabecular).",
+                },
+                {
+                  name: "Rhinoceros 3D",
+                  version: "v8 (trial 90 dias)",
+                  free: false,
+                  platforms: ["Windows", "macOS"],
+                  url: "https://www.rhino3d.com/download/",
+                  description: "CAD profissional NURBS com plugin Grasshopper para design generativo e paramétrico. Muito usado em bioengenharia para scaffolds com geometria precisa, gradientes de porosidade controlados e estruturas lattice customizadas.",
+                  highlights: ["NURBS de alta precisão", "Grasshopper (design generativo)", "Plugin Dendro (lattice)", "Export para todos os formatos"],
+                  bioNote: "💼 Padrão industrial para biofabricação avançada. Grasshopper permite criar scaffolds paramétricos com densidade variável.",
+                },
+                {
+                  name: "FreeCAD",
+                  version: "v1.0",
+                  free: true,
+                  platforms: ["Windows", "macOS", "Linux"],
+                  url: "https://www.freecad.org/downloads.php",
+                  description: "CAD paramétrico open-source com workbench de Part Design e FEM (análise de elementos finitos). Alternativa gratuita ao SolidWorks para modelagem de implantes com especificações dimensionais precisas.",
+                  highlights: ["Modelagem paramétrica histórica", "Análise FEM integrada", "Part Design workbench", "Script Python completo"],
+                  bioNote: "✅ Ótima alternativa gratuita para implantes ósseos onde a precisão dimensional é crítica.",
+                },
+                {
+                  name: "MeshMixer",
+                  version: "v3.5 (grátis)",
+                  free: true,
+                  platforms: ["Windows", "macOS"],
+                  url: "https://meshmixer.com/download.html",
+                  description: "Software da Autodesk para edição avançada de mesh, geração de suportes customizados, análise de espessura, sculpting e reparo de STL. Perfeito para preparar modelos anatômicos de imagens médicas.",
+                  highlights: ["Suportes arvore customizados", "Análise de espessura de parede", "Hollowing (paredes ocas)", "Reparo e remesh automático"],
+                  bioNote: "🔧 Essencial para preparar modelos derivados de DICOM/CT-Scan para bioimpressão.",
+                },
+              ]}
+            />
+
+            {/* ── Repositórios de Modelos ── */}
+            <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Globe className="w-4 h-4 text-cyan-400" />
+                <h3 className="text-sm font-semibold text-white">Repositórios de Modelos 3D para Bioimpressão</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  {
+                    name: "Thingiverse",
+                    url: "https://www.thingiverse.com/",
+                    desc: "Maior repositório open-source de modelos 3D. Busque por 'scaffold', 'bone implant', 'tissue engineering' para encontrar modelos prontos.",
+                    tag: "Gratuito · Open-source",
+                    color: "cyan",
+                  },
+                  {
+                    name: "NIH 3D Print Exchange",
+                    url: "https://3dprint.nih.gov/",
+                    desc: "Repositório oficial do NIH com modelos anatômicos, dispositivos médicos e estruturas moleculares validados para uso científico e educacional.",
+                    tag: "Gratuito · Validado NIH",
+                    color: "blue",
+                  },
+                  {
+                    name: "GrabCAD Community",
+                    url: "https://grabcad.com/library",
+                    desc: "Biblioteca de modelos CAD profissionais incluindo anatomia, implantes e dispositivos médicos. Requer cadastro gratuito.",
+                    tag: "Gratuito · CAD profissional",
+                    color: "violet",
+                  },
+                  {
+                    name: "Embodi3D / e-NABLE",
+                    url: "https://www.embodi3d.com/",
+                    desc: "Plataforma especializada em modelos médicos derivados de imagens DICOM. Muitos modelos anatômicos de alta fidelidade para pesquisa.",
+                    tag: "Freemium · Médico",
+                    color: "emerald",
+                  },
+                ].map(repo => (
+                  <a key={repo.name} href={repo.url} target="_blank" rel="noopener noreferrer"
+                    className="block bg-white/[0.02] border border-white/[0.07] rounded-xl p-3 hover:border-cyan-500/30 hover:bg-cyan-500/5 transition-all group">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-semibold text-white group-hover:text-cyan-300 transition-colors">{repo.name}</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-gray-500 bg-white/[0.05] px-2 py-0.5 rounded-full">{repo.tag}</span>
+                        <ExternalLink className="w-3 h-3 text-gray-600 group-hover:text-cyan-400 transition-colors" />
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-gray-400 leading-relaxed">{repo.desc}</p>
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Guia do Agente de Biofabricação ── */}
+            <div className="bg-gradient-to-b from-violet-500/8 to-blue-500/8 border border-violet-500/20 rounded-2xl p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center">
+                  <Lightbulb className="w-4 h-4 text-violet-300" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Guia do Agente de Biofabricação</h3>
+                  <p className="text-[11px] text-gray-500">Como criar modelos personalizados do zero</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {[
+                  {
+                    step: "1",
+                    title: "Definir a geometria alvo",
+                    content: "Antes de modelar, decida: qual tecido ou implante você quer reproduzir? Para pele → membrana retangular 2D. Para osso → cilindro com Gyroid interno. Para vaso → tubo oco com parede de 0.5–1 mm. Use o Gerador STL/OBJ desta plataforma para geometrias prontas.",
+                    color: "violet",
+                  },
+                  {
+                    step: "2",
+                    title: "Escolher a ferramenta certa",
+                    content: "Iniciante: comece pelo Tinkercad (browser, gratuito). Intermediário: Blender para formas orgânicas. Avançado: Rhinoceros + Grasshopper para scaffolds paramétricos com porosidade controlada. Para reparos: 3D Builder ou MeshMixer.",
+                    color: "blue",
+                  },
+                  {
+                    step: "3",
+                    title: "Parâmetros críticos do modelo",
+                    content: "Espessura mínima de parede: ≥ 0.4 mm (limitada pelo nozzle). Porosidade alvo: 40–70% para scaffolds ósseos. Tamanho de poros: 200–600 µm (osteocondução). Escala: sempre 1:1 em mm. Após modelar, verifique manifold no 3D Builder ou Meshmixer.",
+                    color: "emerald",
+                  },
+                  {
+                    step: "4",
+                    title: "Exportar e verificar o STL",
+                    content: "Exporte como STL binário (menor arquivo). Verifique: mesh manifold sólido · sem normais invertidas · resolução ≥ 0.01 mm · tolerância ≤ 0.001 mm. Use 3D Builder (reparo automático) ou Meshmixer (análise detalhada) antes de fatiar.",
+                    color: "amber",
+                  },
+                  {
+                    step: "5",
+                    title: "Fatiar e gerar G-Code",
+                    content: "Importe o STL no PrusaSlicer ou Cura. Configure: camada 100–300 µm · velocidade 5–20 mm/s para biotintas · temperatura conforme biotinta (colágeno 4°C, GelMA 25°C, PCL 90°C). Ative suporte se necessário. Exporte G-Code.",
+                    color: "rose",
+                  },
+                  {
+                    step: "6",
+                    title: "Conectar e imprimir com Pronterface",
+                    content: "Abra Pronterface → conecte via USB/Serial (baudrate 115200 para Marlin). Carregue o G-Code. Pré-aqueça nozzle e plataforma. Monitore temperatura e pressão em tempo real. Para bioimpressoras customizadas, adicione comando M280 P0 S90 para controle de servoválvula.",
+                    color: "cyan",
+                  },
+                ].map(item => (
+                  <div key={item.step} className="flex gap-3">
+                    <div className={cn(
+                      "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
+                      item.color === "violet" && "bg-violet-500/20 text-violet-300",
+                      item.color === "blue" && "bg-blue-500/20 text-blue-300",
+                      item.color === "emerald" && "bg-emerald-500/20 text-emerald-300",
+                      item.color === "amber" && "bg-amber-500/20 text-amber-300",
+                      item.color === "rose" && "bg-rose-500/20 text-rose-300",
+                      item.color === "cyan" && "bg-cyan-500/20 text-cyan-300",
+                    )}>
+                      {item.step}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs font-semibold text-white mb-1">{item.title}</h4>
+                      <p className="text-[11px] text-gray-400 leading-relaxed">{item.content}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Especialistas em Bioimpressão ── */}
+            <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Star className="w-4 h-4 text-amber-400" />
+                <h3 className="text-sm font-semibold text-white">Referências e Especialistas em Bioimpressão</h3>
+              </div>
+              <div className="space-y-3">
+                {[
+                  {
+                    name: "Adam Feinberg — Carnegie Mellon University",
+                    role: "Inventor da técnica FRESH · Bioimpressão de coração humano em escala real",
+                    url: "https://www.cmu.edu/bme/People/Faculty/profile/afeinberg.html",
+                    lab: "COBI Lab (CMU)",
+                    highlight: "Técnica FRESH — bioimpressão em suporte de gelatina, permite imprimir tecidos moles sem colapso estrutural",
+                  },
+                  {
+                    name: "Jennifer Lewis — Harvard University",
+                    role: "Pioneira em bioimpressão de tecidos vascularizados · Harvard Wyss Institute",
+                    url: "https://lewisgroup.seas.harvard.edu/",
+                    lab: "Lewis Lab (Harvard)",
+                    highlight: "Desenvolvimento de biotintas com canais vasculares perfundíveis — vascularização in vitro de tecidos espessos",
+                  },
+                  {
+                    name: "Ali Khademhosseini — Houston Methodist",
+                    role: "Biomateriais + Microfabricação + Bioimpressão de órgãos on-chip",
+                    url: "https://khademlab.org/",
+                    lab: "Khademhosseini Lab",
+                    highlight: "Hydrogels fotocrosslinked (GelMA, HAMA) para bioimpressão de alta resolução — artigos com >50.000 citações",
+                  },
+                  {
+                    name: "Revista Biofabrication (IOP Publishing)",
+                    role: "Principal periódico científico da área — factor de impacto ~8.5",
+                    url: "https://iopscience.iop.org/journal/1758-5082",
+                    lab: "IOP Publishing",
+                    highlight: "Referência obrigatória: publicações sobre bioimpressão, scaffold design, biotintas e terapia celular",
+                  },
+                  {
+                    name: "Wake Forest Institute for Regenerative Medicine",
+                    role: "Pioneiro em bioimpressão de órgãos para transplante — Dr. Anthony Atala",
+                    url: "https://wfirm.wakehealth.edu/",
+                    lab: "WFIRM",
+                    highlight: "Primeiro grupo a imprimir bexiga urinária implantada em humanos. Referência global em engenharia tecidual translacional",
+                  },
+                ].map(expert => (
+                  <a key={expert.name} href={expert.url} target="_blank" rel="noopener noreferrer"
+                    className="block bg-white/[0.02] border border-white/[0.07] rounded-xl p-3 hover:border-amber-500/30 hover:bg-amber-500/5 transition-all group">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="text-xs font-semibold text-white group-hover:text-amber-300 transition-colors">{expert.name}</span>
+                          <ExternalLink className="w-3 h-3 text-gray-600 group-hover:text-amber-400 shrink-0" />
+                        </div>
+                        <div className="text-[10px] text-gray-500 mb-1.5">{expert.role} · <span className="text-amber-500/70">{expert.lab}</span></div>
+                        <p className="text-[11px] text-gray-400 leading-relaxed">{expert.highlight}</p>
+                      </div>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+
           </div>
         )}
 
@@ -1276,6 +1694,89 @@ export default function BioprintingPage() {
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
+
+interface SoftwareItem {
+  name: string
+  version: string
+  free: boolean
+  platforms: string[]
+  url: string
+  description: string
+  highlights: string[]
+  bioNote: string
+}
+
+function SoftwareSection({
+  title, subtitle, color, icon, items
+}: {
+  title: string
+  subtitle: string
+  color: "violet" | "emerald" | "amber" | "blue"
+  icon: React.ReactNode
+  items: SoftwareItem[]
+}) {
+  const [open, setOpen] = useState(true)
+  const colorMap = {
+    violet: { bg: "bg-violet-500/8",  border: "border-violet-500/15", text: "text-violet-400", badge: "bg-violet-500/15 text-violet-300" },
+    emerald:{ bg: "bg-emerald-500/8", border: "border-emerald-500/15", text: "text-emerald-400", badge: "bg-emerald-500/15 text-emerald-300" },
+    amber:  { bg: "bg-amber-500/8",   border: "border-amber-500/15",   text: "text-amber-400",  badge: "bg-amber-500/15 text-amber-300" },
+    blue:   { bg: "bg-blue-500/8",    border: "border-blue-500/15",    text: "text-blue-400",   badge: "bg-blue-500/15 text-blue-300" },
+  }
+  const c = colorMap[color]
+  return (
+    <div className={cn("border rounded-2xl overflow-hidden", c.border, c.bg)}>
+      <button onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between p-4 hover:bg-white/[0.02] transition-colors">
+        <div className="flex items-center gap-2">
+          {icon}
+          <div className="text-left">
+            <div className="text-sm font-bold text-white">{title}</div>
+            <div className="text-[11px] text-gray-500">{subtitle}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-gray-500">{items.length} ferramentas</span>
+          {open ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+        </div>
+      </button>
+      {open && (
+        <div className="px-4 pb-4 border-t border-white/[0.06] space-y-3 pt-3">
+          {items.map((item, i) => (
+            <div key={i} className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3.5 hover:border-white/10 transition-colors">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-bold text-white">{item.name}</span>
+                  <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-mono", c.badge)}>{item.version}</span>
+                  <span className={cn(
+                    "text-[10px] px-2 py-0.5 rounded-full font-semibold",
+                    item.free ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-400"
+                  )}>
+                    {item.free ? "Gratuito" : "Pago/Trial"}
+                  </span>
+                  <span className="text-[10px] text-gray-600">{item.platforms.join(" · ")}</span>
+                </div>
+                <a href={item.url} target="_blank" rel="noopener noreferrer"
+                  className={cn("flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-all shrink-0", c.border, c.text, "hover:bg-white/[0.05]")}>
+                  <Download className="w-3 h-3" /> Download
+                </a>
+              </div>
+              <p className="text-[11px] text-gray-400 leading-relaxed mb-2">{item.description}</p>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {item.highlights.map((h, j) => (
+                  <span key={j} className="text-[10px] bg-white/[0.04] border border-white/[0.07] text-gray-400 px-2 py-0.5 rounded-full">{h}</span>
+                ))}
+              </div>
+              <div className={cn("text-[11px] rounded-lg px-3 py-2", c.bg, c.text)}>
+                {item.bioNote}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex gap-2 text-xs">
