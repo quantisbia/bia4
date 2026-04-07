@@ -15,6 +15,8 @@ const registerSchema = z.object({
 })
 
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "unknown"
+
   try {
     const body = await req.json()
     const parsed = registerSchema.safeParse(body)
@@ -82,8 +84,24 @@ export async function POST(req: NextRequest) {
           type: "CREDIT",
           amount: 10,
           balance: 10,
-          description: "Créditos de demonstração BIA v4",
-          metadata: { action: "demo_credits" },
+          description: "Créditos de demonstração BIA",
+          metadata: { action: "demo_credits", plan: "FREE" },
+        },
+      })
+
+      // Audit log: user registration
+      await tx.auditLog.create({
+        data: {
+          userId: newUser.id,
+          action: "user_register",
+          entity: "user",
+          entityId: newUser.id,
+          ip,
+          metadata: {
+            institution: institution || null,
+            researchArea: researchArea || null,
+            registeredAt: new Date().toISOString(),
+          },
         },
       })
 
@@ -100,9 +118,19 @@ export async function POST(req: NextRequest) {
     )
   } catch (error) {
     console.error("[REGISTER] Error:", error)
+    // Log failed attempt
+    await prisma.auditLog.create({
+      data: {
+        action: "user_register_failed",
+        ip,
+        metadata: { error: String(error).slice(0, 200) },
+      },
+    }).catch(() => {})
+
     return NextResponse.json(
       { error: "Erro interno. Tente novamente." },
       { status: 500 }
     )
   }
 }
+

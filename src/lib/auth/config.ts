@@ -100,9 +100,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           create: {
             userId: user.id,
             plan: "FREE",
-            status: "TRIALING",
-            currentPeriodEnd: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-            monthlyCredits: 50,
+            status: "ACTIVE",
+            currentPeriodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+            monthlyCredits: 10,
           },
         }),
         prisma.creditBalance.upsert({
@@ -110,12 +110,44 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           update: {},
           create: {
             userId: user.id,
-            balance: 50,
-            totalEarned: 50,
+            balance: 10,
+            totalEarned: 10,
             totalSpent: 0,
           },
         }),
+        prisma.auditLog.create({
+          data: {
+            userId: user.id,
+            action: "user_created",
+            entity: "user",
+            entityId: user.id,
+            metadata: { email: user.email },
+          },
+        }),
       ])
+    },
+    async signIn({ user }) {
+      if (!user.id) return
+      await prisma.auditLog.create({
+        data: {
+          userId: user.id,
+          action: "user_login",
+          entity: "session",
+          metadata: { email: user.email },
+        },
+      }).catch(() => {})
+    },
+    async signOut(message) {
+      const token = "token" in message ? message.token : null
+      if (!token?.sub) return
+      await prisma.auditLog.create({
+        data: {
+          userId: token.sub as string,
+          action: "user_logout",
+          entity: "session",
+          metadata: { email: token.email },
+        },
+      }).catch(() => {})
     },
   },
   trustHost: true,

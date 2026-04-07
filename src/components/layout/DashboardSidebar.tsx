@@ -17,6 +17,7 @@ import {
   LogOut,
   Zap,
   ChevronRight,
+  Shield,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
@@ -161,6 +162,18 @@ export function DashboardSidebar() {
 
       {/* Bottom */}
       <div className="p-3 border-t border-white/5 space-y-0.5">
+        {/* Admin Panel Link — only for ADMIN role */}
+        {(user as { role?: string })?.role === "ADMIN" && (
+          <Link
+            href="/admin"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-red-400 hover:bg-red-500/5 border border-red-500/10 hover:border-red-500/20"
+          >
+            <Shield className="w-4 h-4 shrink-0 text-red-400" />
+            <span className="flex-1">Painel Admin</span>
+            <span className="text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded font-bold">ADMIN</span>
+          </Link>
+        )}
+
         {BOTTOM_ITEMS.map((item) => {
           const active = isActive(item.href)
           return (
