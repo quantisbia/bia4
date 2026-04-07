@@ -10,9 +10,10 @@ const loginSchema = z.object({
   password: z.string().min(6, "Senha muito curta"),
 })
 
+// Detecta se está em HTTPS (sandbox ou produção)
+const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith("https://") ?? false
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  // IMPORTANTE: Sem PrismaAdapter quando usamos JWT + Credentials
-  // O PrismaAdapter tenta gravar Sessions no DB o que conflita com JWT strategy
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 dias
@@ -22,33 +23,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     error: "/auth/error",
     newUser: "/dashboard",
   },
-  // Cookies mais permissivos para funcionar com proxy/sandbox
+  // Cookies configurados corretamente para HTTPS sandbox
   cookies: {
     sessionToken: {
-      name: `next-auth.session-token`,
+      name: useSecureCookies ? "__Secure-next-auth.session-token" : "next-auth.session-token",
       options: {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        secure: false, // Permite HTTP no sandbox
+        secure: useSecureCookies,
       },
     },
     callbackUrl: {
-      name: `next-auth.callback-url`,
+      name: useSecureCookies ? "__Secure-next-auth.callback-url" : "next-auth.callback-url",
       options: {
         httpOnly: false,
         sameSite: "lax",
         path: "/",
-        secure: false,
+        secure: useSecureCookies,
       },
     },
     csrfToken: {
-      name: `next-auth.csrf-token`,
+      name: useSecureCookies ? "__Host-next-auth.csrf-token" : "next-auth.csrf-token",
       options: {
         httpOnly: false,
         sameSite: "lax",
         path: "/",
-        secure: false,
+        secure: useSecureCookies,
       },
     },
   },
@@ -61,21 +62,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials) {
         try {
-          // Validate input
           const parsed = loginSchema.safeParse(credentials)
           if (!parsed.success) return null
 
           const { email, password } = parsed.data
 
-          // Find user
           const user = await getUserByEmail(email)
           if (!user || !user.password) return null
 
-          // Verify password
           const valid = await bcrypt.compare(password, user.password)
           if (!valid) return null
 
-          // Log login (fire-and-forget — não bloqueia o login)
+          // Log login (fire-and-forget)
           prisma.auditLog.create({
             data: {
               userId: user.id,
@@ -85,7 +83,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             },
           }).catch(() => {})
 
-          // Mapear FREE → DISCOVERY (plan legado sem créditos)
           const rawPlan = user.subscription?.plan ?? "FREE"
           const plan = rawPlan === "FREE" ? "DISCOVERY" : rawPlan
 
@@ -106,7 +103,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    // Auth.js v5: authorized callback é usado pelo middleware para proteger rotas
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user
       const pathname = nextUrl.pathname
@@ -117,12 +113,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const isProtected = protectedPaths.some((p) => pathname.startsWith(p))
       const isAuthPage = authPaths.some((p) => pathname.startsWith(p))
 
-      // Proteger rotas: redirecionar para login se não autenticado
       if (isProtected && !isLoggedIn) {
-        return false // Auth.js v5 redireciona automaticamente para signIn page
+        return false
       }
 
-      // Redirecionar para dashboard se já logado e tentar acessar auth pages
       if (isAuthPage && isLoggedIn) {
         return Response.redirect(new URL("/dashboard", nextUrl))
       }
@@ -131,7 +125,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
 
     async jwt({ token, user, trigger, session }) {
-      // No sign-in: attach user data to token
       if (user) {
         token.id = user.id
         token.role = (user as { role?: string }).role ?? "USER"
@@ -139,7 +132,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.credits = (user as { credits?: number }).credits ?? 0
       }
 
-      // On session update trigger: refresh user data from DB
       if (trigger === "update" && session) {
         try {
           const freshUser = await getUserByEmail(token.email as string)
