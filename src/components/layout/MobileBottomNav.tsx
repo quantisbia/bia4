@@ -65,7 +65,7 @@ export function MobileBottomNav() {
       )}
 
       {/* Bottom nav bar */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 h-[68px] bg-[#080412]/95 backdrop-blur-2xl border-t border-white/[0.07] safe-bottom">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 h-[68px] bg-[#080412]/95 backdrop-blur-2xl border-t border-white/[0.07] safe-area-bottom">
         <div className="flex h-full items-center justify-around px-1">
           {PRIMARY_TABS.map(tab => {
             const active = isActive(tab.href, tab.exact)
