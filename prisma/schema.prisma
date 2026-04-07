@@ -27,6 +27,7 @@ model User {
   protocols        Protocol[]
   sessions         Session[]
   subscription     Subscription?
+  notebookEntries  NotebookEntry[]
 
   @@map("users")
 }
@@ -303,6 +304,46 @@ model ChatMessage {
   @@index([sessionId])
   @@index([createdAt])
   @@map("chat_messages")
+}
+
+// ─── Notebook do Pesquisador ──────────────────────────────────────────────────
+model NotebookEntry {
+  id           String            @id @default(cuid())
+  userId       String
+  title        String
+  content      String            @db.Text
+  entryType    NotebookEntryType @default(NOTE)
+  category     String?           // ex: "Protocolo", "Formulação", "Pipeline"
+  tags         String[]          @default([])
+  sourceType   String?           // "protocol", "pipeline", "biomaterial", "chat", "manual"
+  sourceId     String?           // ID do item de origem
+  isPinned     Boolean           @default(false)
+  isPublic     Boolean           @default(false)
+  visibility   String            @default("private") // "private", "institution", "public"
+  generatedDoc Json?             // artigo, patente, livro gerado por IA
+  metadata     Json?             // dados extras (parâmetros, referências, etc.)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([entryType])
+  @@index([isPinned])
+  @@index([createdAt])
+  @@map("notebook_entries")
+}
+
+enum NotebookEntryType {
+  NOTE
+  PROTOCOL
+  FORMULATION
+  PIPELINE_SUMMARY
+  ARTICLE_DRAFT
+  PATENT_DRAFT
+  BOOK_CHAPTER
+  RESEARCH_LOG
+  REFERENCE
+  STL_GEOMETRY
 }
 
 model AuditLog {

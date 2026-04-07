@@ -8,7 +8,7 @@ import { useSession } from "next-auth/react"
 import {
   LayoutDashboard, GitBranch, FlaskConical, CircleDot,
   FileText, BookOpen, MessageSquare, CreditCard, Settings,
-  LogOut, Zap, ChevronRight, Shield, Menu, X, Printer, Microscope, Box, ClipboardCheck,
+  LogOut, Zap, ChevronRight, Shield, Menu, X, Printer, Microscope, Box, ClipboardCheck, BookMarked,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
@@ -46,6 +46,7 @@ export const NAV_ITEMS = [
   { href: "/dashboard/chat",          label: "Chat IA",             icon: MessageSquare,    exact: false },
   { href: "/dashboard/stl",            label: "Gerador STL/OBJ",     icon: Box,              exact: false },
   { href: "/dashboard/protocol-total", label: "Protocolo Total",      icon: ClipboardCheck,   exact: false },
+  { href: "/dashboard/notebook",       label: "Notebook Científico",   icon: BookMarked,       exact: false },
 ]
 
 const BOTTOM_ITEMS = [
