@@ -1,13 +1,56 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import {
   Printer, Layers, Zap, Settings2, FlaskConical, ChevronDown, ChevronUp,
   Play, Download, RefreshCw, Info, AlertTriangle, CheckCircle2, Loader2,
   Sliders, Droplets, Thermometer, Wind, BarChart3, FileCode2, Microscope,
-  Activity, Target, Shield, BookOpen,
+  Activity, Target, Shield, BookOpen, Database, Star, TrendingUp,
+  ArrowRight, Beaker,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
+
+// ─── DB Suggestion Types ─────────────────────────────────────────────────────
+interface DBSuggestion {
+  material: string
+  score: number
+  n: number
+  cellFriendly: number
+  typicalPressure: number | null
+  typicalTemp: number | null
+  typicalSpeed: number | null
+  typicalNeedle: number | null
+  concentrations: string[]
+  sampleFormulation: string
+}
+
+interface DBMaterialDetails {
+  found: boolean
+  material: string
+  n: number
+  parameters: {
+    pressure_kpa: { min: number | null; max: number | null; typical: number | null }
+    temp_c: { min: number | null; max: number | null; typical: number | null }
+    speed_mms: { min: number | null; max: number | null; typical: number | null }
+    needle_um: { min: number | null; max: number | null; typical: number | null }
+  }
+  withCellsCount: number
+  cellFriendly: number
+  concentrations: string[]
+  sampleFormulations: string[]
+  dois: string[]
+  recommended: {
+    pressure_kpa: number
+    temp_c: number
+    speed_mms: number
+    needle_um: number
+    infill_percent: number
+    layer_height_um: number
+    skirt_loops: number
+    retraction_mm: number
+    notes: string[]
+  }
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface SlicerParams {
@@ -165,7 +208,7 @@ G1 X5 Y5 Z${slicer.layerHeight / 1000} E0.5
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function BioprintingPage() {
-  const [activeTab, setActiveTab] = useState<"slicer" | "bioink" | "rheology" | "ai" | "regulatory">("slicer")
+  const [activeTab, setActiveTab] = useState<"slicer" | "bioink" | "db" | "rheology" | "ai" | "regulatory">("slicer")
   const [loading, setLoading] = useState(false)
   const [aiResult, setAiResult] = useState<AIAnalysis | null>(null)
   const [rheoResult, setRheoResult] = useState<RheologyResult | null>(null)
@@ -200,6 +243,60 @@ export default function BioprintingPage() {
 
   const [tissue, setTissue] = useState("")
   const [application, setApplication] = useState("")
+
+  // DB suggestions state
+  const [dbSuggestions, setDbSuggestions] = useState<DBSuggestion[]>([])
+  const [dbDetails, setDbDetails]         = useState<DBMaterialDetails | null>(null)
+  const [dbLoading, setDbLoading]         = useState(false)
+
+  // Auto-fetch suggestions when tissue changes
+  useEffect(() => {
+    if (!tissue || tissue.length < 3) { setDbSuggestions([]); return }
+    const t = setTimeout(async () => {
+      setDbLoading(true)
+      try {
+        const res = await fetch(`/api/bioprint/suggest?tissue=${encodeURIComponent(tissue)}&cells=${bioink.hasCells}`)
+        if (res.ok) {
+          const data = await res.json()
+          setDbSuggestions(data.suggestions ?? [])
+        }
+      } catch { /* ignore */ }
+      finally { setDbLoading(false) }
+    }, 600)
+    return () => clearTimeout(t)
+  }, [tissue, bioink.hasCells])
+
+  // Fetch details when material changes
+  useEffect(() => {
+    if (!bioink.material || bioink.material === "custom") { setDbDetails(null); return }
+    const matMap: Record<string, string> = {
+      gelma: "gelma", alginate: "alginate", fibrin: "fibrinogen",
+      collagen: "collagen", chitosan: "chitosan", hama: "hama",
+      pcl: "pcl",
+    }
+    const q = matMap[bioink.material] ?? bioink.material
+    fetch(`/api/bioprint/suggest?material=${encodeURIComponent(q)}&tech=${slicer.technology}&cells=${bioink.hasCells}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.found) setDbDetails(data) })
+      .catch(() => {})
+  }, [bioink.material, bioink.hasCells, slicer.technology])
+
+  // Apply DB recommended parameters
+  const applyRecommended = useCallback(() => {
+    if (!dbDetails?.recommended) return
+    const r = dbDetails.recommended
+    setSlicer(s => ({
+      ...s,
+      pressure: r.pressure_kpa,
+      nozzleTemp: r.temp_c,
+      printSpeed: r.speed_mms,
+      nozzleDiameter: r.needle_um,
+      infillPercent: r.infill_percent,
+      layerHeight: r.layer_height_um,
+      skirtLoops: r.skirt_loops,
+      retraction: r.retraction_mm,
+    }))
+  }, [dbDetails])
 
   const runRheology = useCallback(() => {
     const result = estimateRheology(bioink, slicer)
@@ -268,6 +365,7 @@ export default function BioprintingPage() {
           {[
             { id: "slicer",     label: "Fatiamento",  icon: Sliders },
             { id: "bioink",     label: "Biotinta",    icon: Droplets },
+            { id: "db",         label: "DB 807",      icon: Database },
             { id: "rheology",   label: "Reologia",    icon: BarChart3 },
             { id: "ai",         label: "Análise IA",  icon: Zap },
             { id: "regulatory", label: "Regulatório", icon: Shield },
@@ -284,6 +382,7 @@ export default function BioprintingPage() {
               {tab.label}
               {tab.id === "ai" && aiResult && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-0.5" />}
               {tab.id === "rheology" && rheoResult && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 ml-0.5" />}
+              {tab.id === "db" && dbSuggestions.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 ml-0.5" />}
             </button>
           ))}
         </div>
@@ -641,6 +740,192 @@ export default function BioprintingPage() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ── DB SUGGESTIONS TAB ──────────────────────────────────────────────── */}
+        {activeTab === "db" && (
+          <div className="space-y-4">
+            {/* Header */}
+            <div className="bg-cyan-500/5 border border-cyan-500/15 rounded-2xl p-4 flex gap-3">
+              <Database className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-white mb-0.5">Banco de Dados CECT — 807 Formulações Validadas</p>
+                <p className="text-xs text-gray-400 leading-relaxed">
+                  Parâmetros reais extraídos de literatura científica peer-reviewed.
+                  Preencha o <span className="text-cyan-300 font-semibold">Tipo de Tecido</span> na aba Fatiamento para ver sugestões ranqueadas por adequação.
+                </p>
+              </div>
+            </div>
+
+            {/* DB details para material selecionado */}
+            {dbDetails && (
+              <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                    <Beaker className="w-4 h-4 text-cyan-400" />
+                    {dbDetails.material} — Dados do DB
+                    <span className="text-[10px] text-gray-500 bg-white/[0.05] px-2 py-0.5 rounded-full">{dbDetails.n} estudos</span>
+                  </h3>
+                  <button
+                    onClick={applyRecommended}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-xl text-xs font-semibold hover:bg-cyan-500/20 transition-all">
+                    <ArrowRight className="w-3.5 h-3.5" /> Aplicar Parâmetros
+                  </button>
+                </div>
+
+                {/* Parameter ranges */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                  {[
+                    { label: "Pressão", val: dbDetails.parameters.pressure_kpa, unit: "kPa" },
+                    { label: "Temperatura", val: dbDetails.parameters.temp_c, unit: "°C" },
+                    { label: "Velocidade", val: dbDetails.parameters.speed_mms, unit: "mm/s" },
+                    { label: "Bico (nozzle)", val: dbDetails.parameters.needle_um, unit: "µm" },
+                  ].map(item => (
+                    <div key={item.label} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
+                      <p className="text-[10px] text-gray-500 mb-1">{item.label}</p>
+                      <p className="text-xs font-bold text-cyan-300">{item.val.typical ?? "—"} {item.unit}</p>
+                      <p className="text-[10px] text-gray-600 mt-0.5">
+                        {item.val.min ?? "?"} – {item.val.max ?? "?"} {item.unit}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Cell friendliness + concentrations */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                  <div className="bg-violet-500/5 border border-violet-500/15 rounded-xl p-3">
+                    <p className="text-[10px] text-violet-400 font-semibold mb-1">Estudos com células</p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 bg-white/[0.08] rounded-full overflow-hidden">
+                        <div className="h-full bg-violet-500 rounded-full" style={{ width: `${dbDetails.cellFriendly}%` }} />
+                      </div>
+                      <span className="text-xs font-bold text-violet-300">{dbDetails.cellFriendly}%</span>
+                    </div>
+                    <p className="text-[10px] text-gray-600 mt-1">{dbDetails.withCellsCount}/{dbDetails.n} estudos</p>
+                  </div>
+                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
+                    <p className="text-[10px] text-gray-400 font-semibold mb-1">Concentrações encontradas</p>
+                    <div className="flex flex-wrap gap-1">
+                      {dbDetails.concentrations.slice(0, 5).map((c, i) => (
+                        <span key={i} className="text-[10px] bg-white/[0.05] text-gray-300 px-2 py-0.5 rounded-full">{c}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notes */}
+                {dbDetails.recommended.notes.length > 0 && (
+                  <div className="space-y-1.5">
+                    {dbDetails.recommended.notes.map((note, i) => (
+                      <p key={i} className="text-xs text-gray-300">{note}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tissue-based suggestions */}
+            {tissue ? (
+              dbLoading ? (
+                <div className="text-center py-8">
+                  <Loader2 className="w-6 h-6 text-cyan-400 mx-auto animate-spin mb-2" />
+                  <p className="text-xs text-gray-400">Consultando banco de 807 formulações...</p>
+                </div>
+              ) : dbSuggestions.length > 0 ? (
+                <div>
+                  <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-cyan-400" />
+                    Materiais Recomendados para: <span className="text-cyan-300">{tissue}</span>
+                  </h3>
+                  <div className="space-y-2">
+                    {dbSuggestions.map((s, idx) => (
+                      <div key={s.material}
+                        className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-3 flex items-start gap-3 hover:border-cyan-500/30 transition-all">
+                        <div className="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0 font-bold text-xs text-cyan-400">
+                          {idx + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-semibold text-white">{s.material}</span>
+                            <div className="flex items-center gap-1.5">
+                              {Array.from({ length: Math.min(5, Math.round(s.score / 2)) }).map((_, i) => (
+                                <Star key={i} className="w-3 h-3 text-amber-400 fill-amber-400" />
+                              ))}
+                              <span className="text-[9px] text-gray-600 ml-1">{s.n} estudos</span>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px]">
+                            {s.typicalPressure && <span className="text-gray-400">💧 {s.typicalPressure} kPa</span>}
+                            {s.typicalTemp     && <span className="text-gray-400">🌡️ {s.typicalTemp}°C</span>}
+                            {s.typicalSpeed    && <span className="text-gray-400">⚡ {s.typicalSpeed} mm/s</span>}
+                            {s.typicalNeedle   && <span className="text-gray-400">🎯 {s.typicalNeedle} µm</span>}
+                          </div>
+                          {s.cellFriendly > 0 && (
+                            <div className="flex items-center gap-1.5 mt-1.5">
+                              <Microscope className="w-3 h-3 text-violet-400" />
+                              <span className="text-[10px] text-violet-300">{s.cellFriendly}% estudos com células</span>
+                            </div>
+                          )}
+                          {s.sampleFormulation && (
+                            <p className="text-[10px] text-gray-500 mt-1 line-clamp-1">Ex: {s.sampleFormulation}</p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => {
+                            const matMap: Record<string, string> = {
+                              "GelMA": "gelma", "Alginate": "alginate", "Gelatin": "gelatin",
+                              "PCL": "pcl", "Chitosan": "chitosan", "Collagen": "collagen",
+                              "Fibrinogen": "fibrin", "Hyaluronic Acid": "hama", "dECM": "custom",
+                            }
+                            const matId = matMap[s.material] ?? "custom"
+                            setBioink(b => ({ ...b, material: matId }))
+                            if (s.typicalPressure) setSlicer(sl => ({ ...sl, pressure: s.typicalPressure! }))
+                            if (s.typicalTemp) setSlicer(sl => ({ ...sl, nozzleTemp: s.typicalTemp! }))
+                            if (s.typicalSpeed) setSlicer(sl => ({ ...sl, printSpeed: s.typicalSpeed! }))
+                            if (s.typicalNeedle) setSlicer(sl => ({ ...sl, nozzleDiameter: s.typicalNeedle! }))
+                            setActiveTab("slicer")
+                          }}
+                          className="shrink-0 px-2.5 py-1.5 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-lg text-[10px] font-semibold hover:bg-cyan-500/20 transition-all">
+                          Usar
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-6 text-gray-500 text-sm">
+                  <Database className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                  Nenhuma sugestão encontrada para &quot;{tissue}&quot;
+                </div>
+              )
+            ) : (
+              <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 text-center">
+                <Database className="w-10 h-10 text-gray-600 mx-auto mb-3" />
+                <p className="text-sm text-gray-400 mb-2">
+                  Preencha o <span className="text-cyan-400 font-semibold">Tipo de Tecido Alvo</span> na aba Fatiamento
+                </p>
+                <p className="text-xs text-gray-600">
+                  A IA buscará nos 807 estudos validados os melhores materiais para seu tecido específico
+                </p>
+                <button
+                  onClick={() => setActiveTab("slicer")}
+                  className="mt-3 flex items-center gap-1.5 px-3 py-2 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-xl text-xs font-semibold hover:bg-cyan-500/20 transition-all mx-auto">
+                  <ArrowRight className="w-3.5 h-3.5" /> Ir para Fatiamento
+                </button>
+              </div>
+            )}
+
+            {/* Reference info */}
+            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 flex gap-2">
+              <Info className="w-3.5 h-3.5 text-gray-500 shrink-0 mt-0.5" />
+              <p className="text-[10px] text-gray-600 leading-relaxed">
+                Dados do <span className="text-gray-400">CECT 3D Printing Materials Database</span> —
+                807 estudos peer-reviewed compilados por pesquisadores europeus.
+                Parâmetros típicos calculados a partir da mediana dos estudos disponíveis.
+                Sempre valide com ensaio reológico antes de produção.
+              </p>
             </div>
           </div>
         )}
