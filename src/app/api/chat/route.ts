@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
           await addChatMessage(chatSessionId, {
             role: "assistant",
             content: fullResponse,
-            model: "gemini-2.0-flash",
+            model: "gemini-2.5-flash",
             creditsUsed: 0, // Já cobrado na mensagem do usuário
           }).catch(console.error)
         }
@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
   await addChatMessage(chatSessionId, {
     role: "assistant",
     content: text,
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     tokens,
   })
 

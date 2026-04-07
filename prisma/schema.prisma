@@ -121,6 +121,7 @@ model PipelineProject {
   name              String
   description       String?
   tissueType        String
+  cellSource        String?
   status            PipelineStatus  @default(DRAFT)
   currentStage      Int             @default(1)
   targetApplication String?
@@ -210,6 +211,8 @@ model OrganoidDesign {
   protocol     String?
   aiDesign     String?
   predictions  Json?
+  purpose      String?
+  cellSource   String?
   creditsUsed  Int          @default(15)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
@@ -224,6 +227,7 @@ model Protocol {
   title        String
   category     String
   description  String?
+  content      String?
   steps        Json
   materials    Json
   equipment    String[]

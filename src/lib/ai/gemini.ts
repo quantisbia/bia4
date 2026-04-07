@@ -726,7 +726,7 @@ export async function generateContent(
   options: GeminiOptions = {}
 ): Promise<{ text: string; tokens: number }> {
   const model = getGenAI().getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     systemInstruction: options.systemPrompt ?? SYSTEM_PROMPTS.BIOFAB_EXPERT,
     safetySettings: SAFETY_SETTINGS,
     generationConfig: {
@@ -747,7 +747,7 @@ export async function generateChat(
   options: GeminiOptions = {}
 ): Promise<{ text: string; tokens: number }> {
   const model = getGenAI().getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     systemInstruction: options.systemPrompt ?? SYSTEM_PROMPTS.BIOFAB_EXPERT,
     safetySettings: SAFETY_SETTINGS,
     generationConfig: {
@@ -774,7 +774,7 @@ export async function generateChatStream(
   options: GeminiOptions = {}
 ): Promise<ReadableStream<Uint8Array>> {
   const model = getGenAI().getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     systemInstruction: options.systemPrompt ?? SYSTEM_PROMPTS.BIOFAB_EXPERT,
     safetySettings: SAFETY_SETTINGS,
     generationConfig: {
