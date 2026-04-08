@@ -1,0 +1,113 @@
+{
+  "resumo": {
+    "total_artigos": 100,
+    "total_patentes": 100,
+    "total_regulatorio": 12
+  },
+  "tecidos": {
+    "artigos": {
+      "Geral": 9,
+      "Fígado": 8,
+      "Osso": 8,
+      "Pele": 7,
+      "Cartilagem": 7,
+      "Pâncreas": 7,
+      "Cérebro": 7,
+      "Córnea": 7,
+      "Rim": 7,
+      "Músculo cardíaco": 6,
+      "Medula óssea": 6,
+      "Ovário": 4,
+      "Tendão / Ligamento": 4,
+      "Mama / organoides": 4,
+      "Mama / implante mamário": 3,
+      "Vértebra / disco intervertebral": 2,
+      "Geral / esferoides": 2,
+      "Cristalino": 1,
+      "Geral / organoides": 1
+    },
+    "patentes": {
+      "Bioprinting": 6,
+      "Osso": 5,
+      "Rim": 5,
+      "Medula óssea": 5,
+      "Pele": 4,
+      "Bioink": 4,
+      "Fígado": 4,
+      "Córnea": 4,
+      "Músculo cardíaco": 4,
+      "Ovário": 4,
+      "Organoides": 3,
+      "Cartilagem": 3,
+      "Esferoides": 3,
+      "Scaffold": 3,
+      "Plataforma": 2,
+      "Scaffold geral": 2,
+      "Sistema multiórgão": 2,
+      "Bioprinter": 2,
+      "Cérebro": 2,
+      "Pâncreas": 2
+    }
+  },
+  "trl_distribuicao": {
+    "3": 46,
+    "7": 5,
+    "4": 37,
+    "2": 12
+  },
+  "biomateriais": {
+    "ECM (Matriz Extracelular)": 2
+  },
+  "tecnologias": {
+    "DLP/SLA": 2,
+    "Laser (LIFT)": 1
+  },
+  "estrategias_maturacao": {
+    "Organoides": 32,
+    "Esferoides": 6,
+    "Scaffolds": 5,
+    "Biorreator/Perfusão": 1,
+    "Vascularização": 1
+  },
+  "oportunidades_quantis": {
+    "tecidos_subexplorados": [
+      {
+        "tecido": "Geral",
+        "artigos": 9,
+        "patentes": 0
+      },
+      {
+        "tecido": "Pâncreas",
+        "artigos": 7,
+        "patentes": 2
+      },
+      {
+        "tecido": "Cérebro",
+        "artigos": 7,
+        "patentes": 2
+      },
+      {
+        "tecido": "Mama / organoides",
+        "artigos": 4,
+        "patentes": 0
+      },
+      {
+        "tecido": "Tendão / Ligamento",
+        "artigos": 4,
+        "patentes": 0
+      },
+      {
+        "tecido": "Mama / implante mamário",
+        "artigos": 3,
+        "patentes": 0
+      }
+    ],
+    "gaps_regulatorios": [
+      "Guidelines específicos para bio-impressão celular",
+      "Harmonização FDA/ANVISA/EMA para ATMP",
+      "Validação GMP de bioimpressoras",
+      "Rastreabilidade celular",
+      "Testes de esterilidade específicos"
+    ]
+  }
+}

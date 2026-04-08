@@ -1,0 +1,902 @@
+[
+  {
+    "ID": 1,
+    "Tecido/Plataforma": "Pele",
+    "Publicação": "WO2020249814A1",
+    "Título": "3d bioprinted skin tissue model",
+    "Tipo": "Modelo / pele",
+    "URL": "https://patents.google.com/patent/WO2020249814A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 2,
+    "Tecido/Plataforma": "Dispositivo / processo",
+    "Publicação": "US20240367382A1",
+    "Título": "3d bioprinting a medical device through freeform reversible embedding of suspended hydrogels",
+    "Tipo": "Processo / dispositivo",
+    "URL": "https://patents.google.com/patent/US20240367382A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 3,
+    "Tecido/Plataforma": "Órgãos / organoides",
+    "Publicação": "US10513691B2",
+    "Título": "Methods for printing organs and organoids",
+    "Tipo": "Método",
+    "URL": "https://patents.google.com/patent/US10513691B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 4,
+    "Tecido/Plataforma": "Bioink",
+    "Publicação": "US20170368225A1",
+    "Título": "Cellulose nanofibrillar bioink for 3d bioprinting for cell culture and tissue growth",
+    "Tipo": "Bioink",
+    "URL": "https://patents.google.com/patent/US20170368225A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 5,
+    "Tecido/Plataforma": "Fígado",
+    "Publicação": "US9222932B2",
+    "Título": "Engineered liver tissues, arrays thereof, and methods of making and using the same",
+    "Tipo": "Tecido / modelo",
+    "URL": "https://patents.google.com/patent/US9222932B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 6,
+    "Tecido/Plataforma": "Organoides",
+    "Publicação": "WO2022125585A1",
+    "Título": "Tissue organoid bioprinting and high-throughput screening methods",
+    "Tipo": "Modelo / triagem",
+    "URL": "https://patents.google.com/patent/WO2022125585A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 7,
+    "Tecido/Plataforma": "Osso",
+    "Publicação": "WO2022204276A1",
+    "Título": "3d printing bone-regeneration scaffolds composed of composite biomaterials",
+    "Tipo": "Scaffold",
+    "URL": "https://patents.google.com/patent/WO2022204276A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 8,
+    "Tecido/Plataforma": "Fígado",
+    "Publicação": "WO2023070060A1",
+    "Título": "Generating and utilizing adult hepatocyte organoids",
+    "Tipo": "Organoide",
+    "URL": "https://patents.google.com/patent/WO2023070060A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 9,
+    "Tecido/Plataforma": "Pele / anexos",
+    "Publicação": "WO2018089750A1",
+    "Título": "Bioprinted hair follicles and uses thereof",
+    "Tipo": "Modelo / implante",
+    "URL": "https://patents.google.com/patent/WO2018089750A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 10,
+    "Tecido/Plataforma": "Cartilagem",
+    "Publicação": "US20170348458A1",
+    "Título": "Graft scaffold for cartilage repair and methods of making and using same",
+    "Tipo": "Scaffold",
+    "URL": "https://patents.google.com/patent/US20170348458A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 11,
+    "Tecido/Plataforma": "Fígado",
+    "Publicação": "US20220275338A1",
+    "Título": "Liver organoid and preparation method therefor",
+    "Tipo": "Organoide",
+    "URL": "https://patents.google.com/patent/US20220275338A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 12,
+    "Tecido/Plataforma": "Bioink",
+    "Publicação": "US11629329B2",
+    "Título": "Bioink compositions and methods of preparing and using the same",
+    "Tipo": "Bioink",
+    "URL": "https://patents.google.com/patent/US11629329B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 13,
+    "Tecido/Plataforma": "Bioink específico",
+    "Publicação": "WO2019122351A1",
+    "Título": "Tissue-specific human bioinks for physiological 3d-bioprinting",
+    "Tipo": "Bioink",
+    "URL": "https://patents.google.com/patent/WO2019122351A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 14,
+    "Tecido/Plataforma": "Fígado",
+    "Publicação": "WO2018094522A1",
+    "Título": "Encapsulated liver tissue",
+    "Tipo": "Tecido encapsulado",
+    "URL": "https://patents.google.com/patent/WO2018094522A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 15,
+    "Tecido/Plataforma": "Tumor / modelo",
+    "Publicação": "WO2024188290A1",
+    "Título": "3d bioprinting of tumor tissue for mechanistic study and drug screening",
+    "Tipo": "Modelo de doença",
+    "URL": "https://patents.google.com/patent/WO2024188290A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 16,
+    "Tecido/Plataforma": "Plataforma",
+    "Publicação": "US11773357B2",
+    "Título": "Perfusion plate for microarray 3D bioprinting",
+    "Tipo": "Plataforma / perfusão",
+    "URL": "https://patents.google.com/patent/US11773357B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 17,
+    "Tecido/Plataforma": "Bioink",
+    "Publicação": "US20190160203A1",
+    "Título": "Preparation and applications of RGD conjugated polysaccharide bioinks",
+    "Tipo": "Bioink",
+    "URL": "https://patents.google.com/patent/US20190160203A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 18,
+    "Tecido/Plataforma": "Osso",
+    "Publicação": "WO2018078130A1",
+    "Título": "Preparation and applications of 3d bioprinting bioinks for repair of bone defects",
+    "Tipo": "Bioink / reparo",
+    "URL": "https://patents.google.com/patent/WO2018078130A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 19,
+    "Tecido/Plataforma": "Tecido biossintético",
+    "Publicação": "US20210330864A1",
+    "Título": "Methods for creating three-dimensional biosynthetic tissue",
+    "Tipo": "Tecido / método",
+    "URL": "https://patents.google.com/patent/US20210330864A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 20,
+    "Tecido/Plataforma": "Scaffold geral",
+    "Publicação": "US20180055643A1",
+    "Título": "Three-dimensionally printed tissue engineering scaffolds and methods of use",
+    "Tipo": "Scaffold",
+    "URL": "https://patents.google.com/patent/US20180055643A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 21,
+    "Tecido/Plataforma": "Sistema multiórgão",
+    "Publicação": "WO2025024339A9",
+    "Título": "Human vascularized integrated organ system and methods of manufacture",
+    "Tipo": "Sistema integrado",
+    "URL": "https://patents.google.com/patent/WO2025024339A9/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 22,
+    "Tecido/Plataforma": "Tecido multicamada",
+    "Publicação": "WO2016201577A1",
+    "Título": "Continuously bioprinted multilayer tissue structure",
+    "Tipo": "Tecido multicamada",
+    "URL": "https://patents.google.com/patent/WO2016201577A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 23,
+    "Tecido/Plataforma": "Osso",
+    "Publicação": "US20170143831A1",
+    "Título": "In vivo live 3d printing of regenerative bone healing structures",
+    "Tipo": "Regeneração óssea",
+    "URL": "https://patents.google.com/patent/US20170143831A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 24,
+    "Tecido/Plataforma": "Rim",
+    "Publicação": "CA3148202A1",
+    "Título": "Bio-printed kidney tissue",
+    "Tipo": "Tecido / rim",
+    "URL": "https://patents.google.com/patent/CA3148202A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 25,
+    "Tecido/Plataforma": "Córnea",
+    "Publicação": "WO2016049345A1",
+    "Título": "Three-dimensional bioprinted artificial cornea",
+    "Tipo": "Implante / córnea",
+    "URL": "https://patents.google.com/patent/WO2016049345A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 26,
+    "Tecido/Plataforma": "Bioprinter",
+    "Publicação": "WO2015066705A1",
+    "Título": "Bioprinter and methods of using same",
+    "Tipo": "Equipamento",
+    "URL": "https://patents.google.com/patent/WO2015066705A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 27,
+    "Tecido/Plataforma": "Córnea",
+    "Publicação": "WO2019198086A1",
+    "Título": "Bioengineered corneal graft and methods of preparation and use thereof",
+    "Tipo": "Enxerto",
+    "URL": "https://patents.google.com/patent/WO2019198086A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 28,
+    "Tecido/Plataforma": "Bioprinter",
+    "Publicação": "US11903612B2",
+    "Título": "Bioprinter and methods of using same",
+    "Tipo": "Equipamento",
+    "URL": "https://patents.google.com/patent/US11903612B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 29,
+    "Tecido/Plataforma": "Rim",
+    "Publicação": "US20190032020A1",
+    "Título": "Differentiation of pluripotent stem cells to form renal organoids",
+    "Tipo": "Organoide",
+    "URL": "https://patents.google.com/patent/US20190032020A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 30,
+    "Tecido/Plataforma": "Rim",
+    "Publicação": "US20200291361A1",
+    "Título": "Composition and method for bioprinted renal tissue",
+    "Tipo": "Tecido / método",
+    "URL": "https://patents.google.com/patent/US20200291361A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 31,
+    "Tecido/Plataforma": "Oftalmologia",
+    "Publicação": "EP4227399A1",
+    "Título": "Artificial constructs for use in ophthalmology",
+    "Tipo": "Construto",
+    "URL": "https://patents.google.com/patent/EP4227399A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 32,
+    "Tecido/Plataforma": "Scaffold geral",
+    "Publicação": "CN119345463A",
+    "Título": "A 3D bioprinted tissue engineering scaffold and its application",
+    "Tipo": "Scaffold",
+    "URL": "https://patents.google.com/patent/CN119345463A/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 33,
+    "Tecido/Plataforma": "Cartilagem",
+    "Publicação": "US11707554B2",
+    "Título": "Cartilage mimetic gels",
+    "Tipo": "Hidrogel",
+    "URL": "https://patents.google.com/patent/US11707554B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 34,
+    "Tecido/Plataforma": "Rim",
+    "Publicação": "AU2018360620A1",
+    "Título": "Composition and method for kidney tissue engineering",
+    "Tipo": "Método / tecido",
+    "URL": "https://patents.google.com/patent/AU2018360620A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 35,
+    "Tecido/Plataforma": "Córnea",
+    "Publicação": "WO2017189832A1",
+    "Título": "An artificial silk based innervated cornea",
+    "Tipo": "Implante",
+    "URL": "https://patents.google.com/patent/WO2017189832A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 36,
+    "Tecido/Plataforma": "Osso",
+    "Publicação": "US20250172541A1",
+    "Título": "In vitro bioprinted bone models and bioinks for bone disease research",
+    "Tipo": "Modelo / bioink",
+    "URL": "https://patents.google.com/patent/US20250172541A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 37,
+    "Tecido/Plataforma": "Plataforma",
+    "Publicação": "US9315043B2",
+    "Título": "Automated devices, systems, and methods for fabrication of tissue constructs",
+    "Tipo": "Equipamento",
+    "URL": "https://patents.google.com/patent/US9315043B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 38,
+    "Tecido/Plataforma": "Rim",
+    "Publicação": "WO2018227101A1",
+    "Título": "Methods of enhancing development of renal organoids",
+    "Tipo": "Organoide",
+    "URL": "https://patents.google.com/patent/WO2018227101A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 39,
+    "Tecido/Plataforma": "Córnea",
+    "Publicação": "WO2019211873A2",
+    "Título": "A liquid cornea composition",
+    "Tipo": "Composição",
+    "URL": "https://patents.google.com/patent/WO2019211873A2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 40,
+    "Tecido/Plataforma": "Scaffold / implante",
+    "Publicação": "US20250090727A1",
+    "Título": "Integrated biomaterial scaffold with 3d printed lattice for tissue repair",
+    "Tipo": "Implante / scaffold",
+    "URL": "https://patents.google.com/patent/US20250090727A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 41,
+    "Tecido/Plataforma": "Cartilagem",
+    "Publicação": "US20110274742A1",
+    "Título": "Cartilage Repair Systems and Applications Utilizing Tissue Engineering",
+    "Tipo": "Reparo / sistema",
+    "URL": "https://patents.google.com/patent/US20110274742A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 42,
+    "Tecido/Plataforma": "Esferoides / organoides",
+    "Publicação": "US11718823B2",
+    "Título": "Methods and materials for rapid preparation of 3D spheroids/organoids",
+    "Tipo": "Modelo 3D",
+    "URL": "https://patents.google.com/patent/US11718823B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 43,
+    "Tecido/Plataforma": "Tendão / osso",
+    "Publicação": "US10668183B2",
+    "Título": "Bone-tendon graft biomaterial, use as a medical implant",
+    "Tipo": "Implante",
+    "URL": "https://patents.google.com/patent/US10668183B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 44,
+    "Tecido/Plataforma": "Medula óssea",
+    "Publicação": "WO2023156774A1",
+    "Título": "Generating bone marrow organoids",
+    "Tipo": "Organoide",
+    "URL": "https://patents.google.com/patent/WO2023156774A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 45,
+    "Tecido/Plataforma": "Cérebro",
+    "Publicação": "US20190390165A1",
+    "Título": "Composition for culturing brain organoid based on extracellular matrix",
+    "Tipo": "Organoide",
+    "URL": "https://patents.google.com/patent/US20190390165A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 46,
+    "Tecido/Plataforma": "Bioprinting",
+    "Publicação": "US10538725B1",
+    "Título": "Multi-dimensional bioprinting system",
+    "Tipo": "Equipamento",
+    "URL": "https://patents.google.com/patent/US10538725B1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 47,
+    "Tecido/Plataforma": "Medula óssea",
+    "Publicação": "LU501820B1",
+    "Título": "Bone marrow organoids produced from induced pluripotent stem cells and uses thereof",
+    "Tipo": "Organoide",
+    "URL": "https://patents.google.com/patent/LU501820B1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 48,
+    "Tecido/Plataforma": "Bioink",
+    "Publicação": "EP3326661A1",
+    "Título": "Bio-ink composition having improved printability",
+    "Tipo": "Bioink",
+    "URL": "https://patents.google.com/patent/EP3326661A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 49,
+    "Tecido/Plataforma": "Medula óssea",
+    "Publicação": "US20250243467A1",
+    "Título": "Bone marrow organoids produced from induced pluripotent stem cells and uses thereof",
+    "Tipo": "Organoide",
+    "URL": "https://patents.google.com/patent/US20250243467A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 50,
+    "Tecido/Plataforma": "Bioprinting",
+    "Publicação": "US20130017564A1",
+    "Título": "Bioprinting station, assembly comprising such station and method for bioprinting",
+    "Tipo": "Equipamento",
+    "URL": "https://patents.google.com/patent/US20130017564A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 51,
+    "Tecido/Plataforma": "Bioprinting",
+    "Publicação": "US9855369B2",
+    "Título": "Method of printing a three-dimensional structure",
+    "Tipo": "Método",
+    "URL": "https://patents.google.com/patent/US9855369B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 52,
+    "Tecido/Plataforma": "Organoides",
+    "Publicação": "WO2020132055A1",
+    "Título": "Methods for generating and using organoids and tissue models",
+    "Tipo": "Organoide / modelo",
+    "URL": "https://patents.google.com/patent/WO2020132055A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 53,
+    "Tecido/Plataforma": "Medula óssea",
+    "Publicação": "WO2025073655A2",
+    "Título": "Use of artificial marrow organoid for generating NK cells",
+    "Tipo": "Organoide / célula",
+    "URL": "https://patents.google.com/patent/WO2025073655A2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 54,
+    "Tecido/Plataforma": "Esferoides",
+    "Publicação": "US10889799B2",
+    "Título": "Methods of making spheroids including biologically-relevant materials",
+    "Tipo": "Esferoide",
+    "URL": "https://patents.google.com/patent/US10889799B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 55,
+    "Tecido/Plataforma": "Tecido",
+    "Publicação": "US20200289709A1",
+    "Título": "Tissue construct, methods of producing and using the same",
+    "Tipo": "Construto",
+    "URL": "https://patents.google.com/patent/US20200289709A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 56,
+    "Tecido/Plataforma": "Órgão-em-chip",
+    "Publicação": "US20220259534A1",
+    "Título": "Multilayered organ-on-a-chip systems and methods of use thereof",
+    "Tipo": "Organ-on-chip",
+    "URL": "https://patents.google.com/patent/US20220259534A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 57,
+    "Tecido/Plataforma": "Biomateriais",
+    "Publicação": "WO2021174073A1",
+    "Título": "Biomaterials and related methods and kits",
+    "Tipo": "Biomateriais",
+    "URL": "https://patents.google.com/patent/WO2021174073A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 58,
+    "Tecido/Plataforma": "Medula óssea",
+    "Publicação": "WO2020231839A1",
+    "Título": "Engineered bone marrow model",
+    "Tipo": "Modelo",
+    "URL": "https://patents.google.com/patent/WO2020231839A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 59,
+    "Tecido/Plataforma": "Esferoides",
+    "Publicação": "WO2018005477A1",
+    "Título": "Spheroids including biologically-relevant materials and methods of use",
+    "Tipo": "Esferoide",
+    "URL": "https://patents.google.com/patent/WO2018005477A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 60,
+    "Tecido/Plataforma": "Órgãos linfoides",
+    "Publicação": "EP4448722A1",
+    "Título": "Three-dimensional synthetic lymphoid organs and methods of making same",
+    "Tipo": "Órgão sintético",
+    "URL": "https://patents.google.com/patent/EP4448722A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 61,
+    "Tecido/Plataforma": "Bioprinting",
+    "Publicação": "US20240084237A1",
+    "Título": "A device having a support structure for creating a hollow biological structure",
+    "Tipo": "Dispositivo",
+    "URL": "https://patents.google.com/patent/US20240084237A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 62,
+    "Tecido/Plataforma": "Músculo cardíaco",
+    "Publicação": "US12029832B2",
+    "Título": "Three-dimensional bioprinting of cardiac patch with anisotropic structure",
+    "Tipo": "Patch cardíaco",
+    "URL": "https://patents.google.com/patent/US12029832B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 63,
+    "Tecido/Plataforma": "Músculo cardíaco",
+    "Publicação": "US11339361B2",
+    "Título": "Additive manufacturing of functional myocardial tissue",
+    "Tipo": "Tecido cardíaco",
+    "URL": "https://patents.google.com/patent/US11339361B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 64,
+    "Tecido/Plataforma": "Pâncreas",
+    "Publicação": "WO2021003352A1",
+    "Título": "Methods of functional vascularization of pancreatic islets and organoids",
+    "Tipo": "Ilhotas / organoides",
+    "URL": "https://patents.google.com/patent/WO2021003352A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 65,
+    "Tecido/Plataforma": "Pele",
+    "Publicação": "US11564790B2",
+    "Título": "Skin printer",
+    "Tipo": "Equipamento",
+    "URL": "https://patents.google.com/patent/US11564790B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 66,
+    "Tecido/Plataforma": "Bioprinting",
+    "Publicação": "US10464307B2",
+    "Título": "Layerless bioprinting via dynamic optical projection",
+    "Tipo": "Método",
+    "URL": "https://patents.google.com/patent/US10464307B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 67,
+    "Tecido/Plataforma": "Scaffold",
+    "Publicação": "EP4568715A1",
+    "Título": "3d printed bioactive scaffolds",
+    "Tipo": "Scaffold",
+    "URL": "https://patents.google.com/patent/EP4568715A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 68,
+    "Tecido/Plataforma": "Músculo cardíaco",
+    "Publicação": "CN118048298A",
+    "Título": "Method/application promoting bioprinting myocardial tissue morphology induction",
+    "Tipo": "Método",
+    "URL": "https://patents.google.com/patent/CN118048298A/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 69,
+    "Tecido/Plataforma": "Pâncreas",
+    "Publicação": "US10767164B2",
+    "Título": "Microenvironments for self-assembly of islet organoids",
+    "Tipo": "Organoide",
+    "URL": "https://patents.google.com/patent/US10767164B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 70,
+    "Tecido/Plataforma": "Esferoides",
+    "Publicação": "US9752116B2",
+    "Título": "Self-assembling cell aggregates and methods of making and using same",
+    "Tipo": "Agregados celulares",
+    "URL": "https://patents.google.com/patent/US9752116B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 71,
+    "Tecido/Plataforma": "Bioprinting",
+    "Publicação": "US20170087766A1",
+    "Título": "Layerless bioprinting via dynamic optical projection and computed tomography",
+    "Tipo": "Método",
+    "URL": "https://patents.google.com/patent/US20170087766A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 72,
+    "Tecido/Plataforma": "Osso",
+    "Publicação": "US11642849B2",
+    "Título": "In vivo live 3D printing of regenerative bone healing structures",
+    "Tipo": "Regeneração óssea",
+    "URL": "https://patents.google.com/patent/US11642849B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 73,
+    "Tecido/Plataforma": "Músculo cardíaco",
+    "Publicação": "JP6490869B2",
+    "Título": "Three-dimensional structure for myocardial tissue production",
+    "Tipo": "Tecido cardíaco",
+    "URL": "https://patents.google.com/patent/JP6490869B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 74,
+    "Tecido/Plataforma": "Sistema multiórgão",
+    "Publicação": "US20240110137A1",
+    "Título": "Multiorgan-on-a-chip device with integrated perfusion",
+    "Tipo": "Multi-organ-chip",
+    "URL": "https://patents.google.com/patent/US20240110137A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 75,
+    "Tecido/Plataforma": "Pele",
+    "Publicação": "WO2019106695A1",
+    "Título": "A 3d bioprinted scar tissue model",
+    "Tipo": "Modelo de cicatriz",
+    "URL": "https://patents.google.com/patent/WO2019106695A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 76,
+    "Tecido/Plataforma": "Agregados celulares",
+    "Publicação": "US11518978B2",
+    "Título": "Self-assembling multicellular bodies and methods of making and using same",
+    "Tipo": "Agregado celular",
+    "URL": "https://patents.google.com/patent/US11518978B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 77,
+    "Tecido/Plataforma": "Retina / ocular",
+    "Publicação": "US20230077412A1",
+    "Título": "3d printed micro-millifluidic bioreactors for long-term retinal tissue culture",
+    "Tipo": "Bioreator",
+    "URL": "https://patents.google.com/patent/US20230077412A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 78,
+    "Tecido/Plataforma": "Multi-organ-chip",
+    "Publicação": "WO2014048637A1",
+    "Título": "Multi-organ-chip with improved life time and homeostasis",
+    "Tipo": "Multi-organ-chip",
+    "URL": "https://patents.google.com/patent/WO2014048637A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 79,
+    "Tecido/Plataforma": "Scaffold",
+    "Publicação": "US20200324021A1",
+    "Título": "3D Printed Scaffold Structures and Methods of Fabrication",
+    "Tipo": "Scaffold",
+    "URL": "https://patents.google.com/patent/US20200324021A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 80,
+    "Tecido/Plataforma": "Vértebra / disco intervertebral",
+    "Publicação": "CN112155794A",
+    "Título": "Method for preparing human cervical intervertebral disc by 3D bioprinting",
+    "Tipo": "Disco intervertebral",
+    "URL": "https://patents.google.com/patent/CN112155794A/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 81,
+    "Tecido/Plataforma": "Biomanufatura",
+    "Publicação": "US20170029765A1",
+    "Título": "Biomanufacturing System, Method, and Articles Thereof",
+    "Tipo": "Sistema",
+    "URL": "https://patents.google.com/patent/US20170029765A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 82,
+    "Tecido/Plataforma": "Substitutos corporais",
+    "Publicação": "US20190002836A1",
+    "Título": "Method for Manufacturing Body Substitutes by Additive Manufacturing",
+    "Tipo": "Substituto / implante",
+    "URL": "https://patents.google.com/patent/US20190002836A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 83,
+    "Tecido/Plataforma": "Ovário",
+    "Publicação": "CN109749980B",
+    "Título": "3D printing artificial ovary biological stent and application thereof",
+    "Tipo": "Ovário artificial",
+    "URL": "https://patents.google.com/patent/CN109749980B/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 84,
+    "Tecido/Plataforma": "Organoides",
+    "Publicação": "WO2024203833A1",
+    "Título": "Organoid and method for producing same",
+    "Tipo": "Organoide",
+    "URL": "https://patents.google.com/patent/WO2024203833A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 85,
+    "Tecido/Plataforma": "Scaffold",
+    "Publicação": "US11839699B2",
+    "Título": "3D printed scaffolds of peptide conjugate polymer",
+    "Tipo": "Scaffold",
+    "URL": "https://patents.google.com/patent/US11839699B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 86,
+    "Tecido/Plataforma": "Ovário",
+    "Publicação": "US10479980B2",
+    "Título": "Artificial ovary",
+    "Tipo": "Ovário artificial",
+    "URL": "https://patents.google.com/patent/US10479980B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 87,
+    "Tecido/Plataforma": "Neural / ocular",
+    "Publicação": "US20180164279A1",
+    "Título": "Tunable neuronal network and an artificial eye",
+    "Tipo": "Rede neuronal / olho",
+    "URL": "https://patents.google.com/patent/US20180164279A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 88,
+    "Tecido/Plataforma": "Implante mamário / tecidos moles",
+    "Publicação": "AU2020340547A1",
+    "Título": "Soft tissue reconstruction implants and related methods",
+    "Tipo": "Reconstrução",
+    "URL": "https://patents.google.com/patent/AU2020340547A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 89,
+    "Tecido/Plataforma": "Pele",
+    "Publicação": "US9545302B2",
+    "Título": "Skin printing and auto-grafting",
+    "Tipo": "Autoenxerto",
+    "URL": "https://patents.google.com/patent/US9545302B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 90,
+    "Tecido/Plataforma": "Ovário",
+    "Publicação": "WO2016123362A8",
+    "Título": "Artificial ovary",
+    "Tipo": "Ovário artificial",
+    "URL": "https://patents.google.com/patent/WO2016123362A8/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 91,
+    "Tecido/Plataforma": "Biopolímero",
+    "Publicação": "US10617787B2",
+    "Título": "Biopolymer compositions, scaffolds and tissue constructs",
+    "Tipo": "Scaffold",
+    "URL": "https://patents.google.com/patent/US10617787B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 92,
+    "Tecido/Plataforma": "Implante mamário",
+    "Publicação": "US20220079741A1",
+    "Título": "Full contour breast implant",
+    "Tipo": "Implante mamário",
+    "URL": "https://patents.google.com/patent/US20220079741A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 93,
+    "Tecido/Plataforma": "Microtecidos",
+    "Publicação": "WO2019092667A1",
+    "Título": "Method for preparing three-dimensional scaffold-free and stratified microtissues",
+    "Tipo": "Microtecidos",
+    "URL": "https://patents.google.com/patent/WO2019092667A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 94,
+    "Tecido/Plataforma": "Ocular",
+    "Publicação": "US20190290803A1",
+    "Título": "3d vascularized human ocular tissue and methods of making same",
+    "Tipo": "Tecido ocular",
+    "URL": "https://patents.google.com/patent/US20190290803A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 95,
+    "Tecido/Plataforma": "Tendão / ligamento",
+    "Publicação": "EP3021791A1",
+    "Título": "Tissue interface augmentation device for ligament/tendon repair",
+    "Tipo": "Implante",
+    "URL": "https://patents.google.com/patent/EP3021791A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 96,
+    "Tecido/Plataforma": "Implante médico",
+    "Publicação": "AU2015314239A1",
+    "Título": "Medical/surgical implant",
+    "Tipo": "Implante",
+    "URL": "https://patents.google.com/patent/AU2015314239A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 97,
+    "Tecido/Plataforma": "Sistema de entrega",
+    "Publicação": "US20110172611A1",
+    "Título": "Delivery system",
+    "Tipo": "Sistema",
+    "URL": "https://patents.google.com/patent/US20110172611A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 98,
+    "Tecido/Plataforma": "Ovário",
+    "Publicação": "US11045244B2",
+    "Título": "Methods and systems for the manipulation of ovarian tissues",
+    "Tipo": "Manipulação tecidual",
+    "URL": "https://patents.google.com/patent/US11045244B2/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 99,
+    "Tecido/Plataforma": "Cérebro",
+    "Publicação": "WO2017123791A1",
+    "Título": "A neural organoid composition and methods of use",
+    "Tipo": "Organoide neural",
+    "URL": "https://patents.google.com/patent/WO2017123791A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  },
+  {
+    "ID": 100,
+    "Tecido/Plataforma": "Scaffold 3D",
+    "Publicação": "US20180085493A1",
+    "Título": "Spatiotemporal delivery system embedded in 3d-printing",
+    "Tipo": "Sistema de entrega",
+    "URL": "https://patents.google.com/patent/US20180085493A1/en",
+    "Observação": "Publicação de patente/família relevante a bioimpressão, organoides, bioinks, scaffolds ou plataformas correlatas."
+  }
+]

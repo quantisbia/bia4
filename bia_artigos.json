@@ -1,0 +1,902 @@
+[
+  {
+    "ID": 1,
+    "Tecido_Foco": "Geral",
+    "Modalidade": "Bioprinting",
+    "Título": "3D bioprinting of tissues and organs",
+    "Citações_aprox_snippet": 5990,
+    "URL": "https://www.semanticscholar.org/search?q=3D+bioprinting+of+tissues+and+organs",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 2,
+    "Tecido_Foco": "Geral",
+    "Modalidade": "Bioprinting",
+    "Título": "3D bioprinting of tissues and organs for regenerative medicine",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=3D+bioprinting+of+tissues+and+organs+for+regenerative+medicine",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 3,
+    "Tecido_Foco": "Geral",
+    "Modalidade": "Bioprinting",
+    "Título": "Organ bioprinting: progress, challenges and outlook",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Organ+bioprinting%3A+progress%2C+challenges+and+outlook",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 4,
+    "Tecido_Foco": "Geral",
+    "Modalidade": "Bioprinting",
+    "Título": "3D Bioprinting of Human Tissues: Biofabrication, Bioinks, and Bioreactors",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=3D+Bioprinting+of+Human+Tissues%3A+Biofabrication%2C+Bioinks%2C+and+Bioreactors",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 5,
+    "Tecido_Foco": "Geral",
+    "Modalidade": "Bioprinting",
+    "Título": "3D bioprinting in tissue engineering: current state-of-the-art and challenges towards system standardization and clinical translation",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=3D+bioprinting+in+tissue+engineering%3A+current+state-of-the-art+and+challenges+towards+system+standardization+and+clinical+translation",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 6,
+    "Tecido_Foco": "Geral",
+    "Modalidade": "Bioprinting",
+    "Título": "Advances in 3D Bioprinting: Techniques, Applications, and Future Directions",
+    "Citações_aprox_snippet": 90,
+    "URL": "https://www.semanticscholar.org/search?q=Advances+in+3D+Bioprinting%3A+Techniques%2C+Applications%2C+and+Future+Directions",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 7,
+    "Tecido_Foco": "Geral",
+    "Modalidade": "Bioprinting",
+    "Título": "Complex 3D bioprinting methods",
+    "Citações_aprox_snippet": 101,
+    "URL": "https://www.semanticscholar.org/search?q=Complex+3D+bioprinting+methods",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 8,
+    "Tecido_Foco": "Geral",
+    "Modalidade": "Bioprinting + organoides",
+    "Título": "Transformative potential of three-dimensional bioprinting with dECM and organoid culture",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Transformative+potential+of+three-dimensional+bioprinting+with+dECM+and+organoid+culture",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 9,
+    "Tecido_Foco": "Pele",
+    "Modalidade": "Bioprinting",
+    "Título": "3D bioprinting for skin tissue engineering: Current status and perspectives",
+    "Citações_aprox_snippet": 331,
+    "URL": "https://www.semanticscholar.org/search?q=3D+bioprinting+for+skin+tissue+engineering%3A+Current+status+and+perspectives",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 10,
+    "Tecido_Foco": "Pele",
+    "Modalidade": "Bioprinting",
+    "Título": "3D bioprinting of skin tissue: From pre-processing to final product evaluation",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=3D+bioprinting+of+skin+tissue%3A+From+pre-processing+to+final+product+evaluation",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 11,
+    "Tecido_Foco": "Pele",
+    "Modalidade": "Bioprinting",
+    "Título": "Three-dimensional bioprinting of tissue-engineered skin",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Three-dimensional+bioprinting+of+tissue-engineered+skin",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 12,
+    "Tecido_Foco": "Pele",
+    "Modalidade": "Bioprinting",
+    "Título": "3D Bioprinting of Functional Skin Substitutes: From Current Achievements to Future Goals",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=3D+Bioprinting+of+Functional+Skin+Substitutes%3A+From+Current+Achievements+to+Future+Goals",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 13,
+    "Tecido_Foco": "Pele",
+    "Modalidade": "Bioprinting",
+    "Título": "Direct 3D bioprinted full-thickness skin constructs recapitulate regulatory signaling pathways and physiology of human skin",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Direct+3D+bioprinted+full-thickness+skin+constructs+recapitulate+regulatory+signaling+pathways+and+physiology+of+human+skin",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 14,
+    "Tecido_Foco": "Pele",
+    "Modalidade": "Bioprinting",
+    "Título": "3D bioprinting applications for the printing of skin: A brief review",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=3D+bioprinting+applications+for+the+printing+of+skin%3A+A+brief+review",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 15,
+    "Tecido_Foco": "Pele",
+    "Modalidade": "Bioprinting",
+    "Título": "A digital light processing 3D-printed artificial skin model",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=A+digital+light+processing+3D-printed+artificial+skin+model",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 16,
+    "Tecido_Foco": "Fígado",
+    "Modalidade": "Bioprinting + organoides",
+    "Título": "Bioprinting functional hepatocyte organoids derived from human induced pluripotent stem cells",
+    "Citações_aprox_snippet": 22,
+    "URL": "https://www.semanticscholar.org/search?q=Bioprinting+functional+hepatocyte+organoids+derived+from+human+induced+pluripotent+stem+cells",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 17,
+    "Tecido_Foco": "Fígado",
+    "Modalidade": "Bioprinting + esferoides",
+    "Título": "A liver-on-a-chip platform with bioprinted hepatic spheroids",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=A+liver-on-a-chip+platform+with+bioprinted+hepatic+spheroids",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 18,
+    "Tecido_Foco": "Fígado",
+    "Modalidade": "Organoides",
+    "Título": "Liver organoids",
+    "Citações_aprox_snippet": 18,
+    "URL": "https://www.semanticscholar.org/search?q=Liver+organoids",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 19,
+    "Tecido_Foco": "Fígado",
+    "Modalidade": "Bioprinting",
+    "Título": "Bioprinting for Liver Transplantation",
+    "Citações_aprox_snippet": 80,
+    "URL": "https://www.semanticscholar.org/search?q=Bioprinting+for+Liver+Transplantation",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 20,
+    "Tecido_Foco": "Fígado",
+    "Modalidade": "Bioprinting + organoides",
+    "Título": "Bioprinting of Human Liver-derived Epithelial Organoids for Toxicity Studies",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Bioprinting+of+Human+Liver-derived+Epithelial+Organoids+for+Toxicity+Studies",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 21,
+    "Tecido_Foco": "Fígado",
+    "Modalidade": "Organoides",
+    "Título": "Hepatic organoids for microfluidic drug screening",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Hepatic+organoids+for+microfluidic+drug+screening",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 22,
+    "Tecido_Foco": "Fígado",
+    "Modalidade": "Organoides",
+    "Título": "Bioengineered Organoids Offer New Possibilities for Liver and Bile Duct Disease Modeling and Therapy",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Bioengineered+Organoids+Offer+New+Possibilities+for+Liver+and+Bile+Duct+Disease+Modeling+and+Therapy",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 23,
+    "Tecido_Foco": "Fígado",
+    "Modalidade": "Organoides",
+    "Título": "Current Landscape and Opportunities in the Development of Liver Organoids",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Current+Landscape+and+Opportunities+in+the+Development+of+Liver+Organoids",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 24,
+    "Tecido_Foco": "Osso",
+    "Modalidade": "Bioprinting",
+    "Título": "3D Bioprinted Scaffolds for Bone Tissue Engineering",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=3D+Bioprinted+Scaffolds+for+Bone+Tissue+Engineering",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 25,
+    "Tecido_Foco": "Osso",
+    "Modalidade": "Bioprinting",
+    "Título": "Application of 3D printing technology in bone tissue engineering",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Application+of+3D+printing+technology+in+bone+tissue+engineering",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 26,
+    "Tecido_Foco": "Osso",
+    "Modalidade": "Bioprinting",
+    "Título": "3D-Bioprinting Strategies Based on In Situ Bone-Healing Mechanisms",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=3D-Bioprinting+Strategies+Based+on+In+Situ+Bone-Healing+Mechanisms",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 27,
+    "Tecido_Foco": "Osso",
+    "Modalidade": "Bioprinting",
+    "Título": "3D Printing of Bioceramics for Bone Tissue Engineering",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=3D+Printing+of+Bioceramics+for+Bone+Tissue+Engineering",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 28,
+    "Tecido_Foco": "Osso",
+    "Modalidade": "Bioprinting",
+    "Título": "Bone Tissue Engineering through 3D Bioprinting of Bioceramic Constructs",
+    "Citações_aprox_snippet": 114,
+    "URL": "https://www.semanticscholar.org/search?q=Bone+Tissue+Engineering+through+3D+Bioprinting+of+Bioceramic+Constructs",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 29,
+    "Tecido_Foco": "Osso",
+    "Modalidade": "Bioprinting",
+    "Título": "Advances in 3D printing technology for preparing bone regeneration scaffolds",
+    "Citações_aprox_snippet": 48,
+    "URL": "https://www.semanticscholar.org/search?q=Advances+in+3D+printing+technology+for+preparing+bone+regeneration+scaffolds",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 30,
+    "Tecido_Foco": "Osso",
+    "Modalidade": "Bioprinting",
+    "Título": "A 3D-Printed Scaffold for Repairing Bone Defects",
+    "Citações_aprox_snippet": 38,
+    "URL": "https://www.semanticscholar.org/search?q=A+3D-Printed+Scaffold+for+Repairing+Bone+Defects",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 31,
+    "Tecido_Foco": "Osso",
+    "Modalidade": "Organoides",
+    "Título": "Bone organoid 3D bioprinting: Construction and application",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Bone+organoid+3D+bioprinting%3A+Construction+and+application",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 32,
+    "Tecido_Foco": "Cartilagem",
+    "Modalidade": "Bioprinting",
+    "Título": "Three-Dimensional Bioprinting of Articular Cartilage",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Three-Dimensional+Bioprinting+of+Articular+Cartilage",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 33,
+    "Tecido_Foco": "Cartilagem",
+    "Modalidade": "Bioprinting",
+    "Título": "3D bioprinting for the repair of articular cartilage and osteochondral tissue",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=3D+bioprinting+for+the+repair+of+articular+cartilage+and+osteochondral+tissue",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 34,
+    "Tecido_Foco": "Cartilagem",
+    "Modalidade": "Bioprinting",
+    "Título": "Translational Application of 3D Bioprinting for Cartilage Tissue Engineering",
+    "Citações_aprox_snippet": 39,
+    "URL": "https://www.semanticscholar.org/search?q=Translational+Application+of+3D+Bioprinting+for+Cartilage+Tissue+Engineering",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 35,
+    "Tecido_Foco": "Cartilagem",
+    "Modalidade": "Bioprinting",
+    "Título": "3D Printing Bioink Preparation and Application in Cartilage Tissue Engineering",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=3D+Printing+Bioink+Preparation+and+Application+in+Cartilage+Tissue+Engineering",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 36,
+    "Tecido_Foco": "Cartilagem",
+    "Modalidade": "Bioprinting",
+    "Título": "Advances in 3D printing techniques for cartilage regeneration",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Advances+in+3D+printing+techniques+for+cartilage+regeneration",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 37,
+    "Tecido_Foco": "Cartilagem",
+    "Modalidade": "Bioprinting",
+    "Título": "Cartilage Tissue Engineering: What Have We Learned in 3D Bioprinting?",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Cartilage+Tissue+Engineering%3A+What+Have+We+Learned+in+3D+Bioprinting%3F",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 38,
+    "Tecido_Foco": "Cartilagem",
+    "Modalidade": "Bioprinting",
+    "Título": "Three-dimensionally printed scaffolds and drug delivery for cartilage repair",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Three-dimensionally+printed+scaffolds+and+drug+delivery+for+cartilage+repair",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 39,
+    "Tecido_Foco": "Músculo cardíaco",
+    "Modalidade": "Bioprinting",
+    "Título": "State-of-the-Art Review of 3D Bioprinting for Cardiovascular Tissue Engineering",
+    "Citações_aprox_snippet": 229,
+    "URL": "https://www.semanticscholar.org/search?q=State-of-the-Art+Review+of+3D+Bioprinting+for+Cardiovascular+Tissue+Engineering",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 40,
+    "Tecido_Foco": "Músculo cardíaco",
+    "Modalidade": "Bioprinting",
+    "Título": "Advances in 3D Bioprinted Cardiac Tissue Using Stem Cells",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Advances+in+3D+Bioprinted+Cardiac+Tissue+Using+Stem+Cells",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 41,
+    "Tecido_Foco": "Músculo cardíaco",
+    "Modalidade": "Bioprinting",
+    "Título": "Current Progress of 3D Bioprinting of Cardiac Tissues",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Current+Progress+of+3D+Bioprinting+of+Cardiac+Tissues",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 42,
+    "Tecido_Foco": "Músculo cardíaco",
+    "Modalidade": "Bioprinting",
+    "Título": "3D-bioprinted cardiac tissues and their potential for cardiac repair",
+    "Citações_aprox_snippet": 10,
+    "URL": "https://www.semanticscholar.org/search?q=3D-bioprinted+cardiac+tissues+and+their+potential+for+cardiac+repair",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 43,
+    "Tecido_Foco": "Músculo cardíaco",
+    "Modalidade": "Bioprinting",
+    "Título": "3D and 4D Bioprinting of the Myocardium",
+    "Citações_aprox_snippet": 96,
+    "URL": "https://www.semanticscholar.org/search?q=3D+and+4D+Bioprinting+of+the+Myocardium",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 44,
+    "Tecido_Foco": "Músculo cardíaco",
+    "Modalidade": "Bioprinting",
+    "Título": "Patient-Specific 3D Bioprinted Models of Developing Human Heart",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Patient-Specific+3D+Bioprinted+Models+of+Developing+Human+Heart",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 45,
+    "Tecido_Foco": "Pâncreas",
+    "Modalidade": "Organoides",
+    "Título": "Pancreatic 3D Organoids and Microfluidic Systems—A Review",
+    "Citações_aprox_snippet": 3,
+    "URL": "https://www.semanticscholar.org/search?q=Pancreatic+3D+Organoids+and+Microfluidic+Systems%E2%80%94A+Review",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 46,
+    "Tecido_Foco": "Pâncreas",
+    "Modalidade": "Esferoides",
+    "Título": "A spheroid-based 3-D culture model for pancreatic cancer development",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=A+spheroid-based+3-D+culture+model+for+pancreatic+cancer+development",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 47,
+    "Tecido_Foco": "Pâncreas",
+    "Modalidade": "Bioprinting / revisão",
+    "Título": "Bioprinting Technology in Skin, Heart, Pancreas and Other Tissues",
+    "Citações_aprox_snippet": 31,
+    "URL": "https://www.semanticscholar.org/search?q=Bioprinting+Technology+in+Skin%2C+Heart%2C+Pancreas+and+Other+Tissues",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 48,
+    "Tecido_Foco": "Pâncreas",
+    "Modalidade": "Organoides",
+    "Título": "Recent advances in the development of bioartificial pancreas",
+    "Citações_aprox_snippet": 12,
+    "URL": "https://www.semanticscholar.org/search?q=Recent+advances+in+the+development+of+bioartificial+pancreas",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 49,
+    "Tecido_Foco": "Pâncreas",
+    "Modalidade": "Organoides",
+    "Título": "Organoids from the Human Fetal and Adult Pancreas",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Organoids+from+the+Human+Fetal+and+Adult+Pancreas",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 50,
+    "Tecido_Foco": "Pâncreas",
+    "Modalidade": "Organoides",
+    "Título": "Diabetes through a 3D lens: organoid models",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Diabetes+through+a+3D+lens%3A+organoid+models",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 51,
+    "Tecido_Foco": "Pâncreas",
+    "Modalidade": "Bioprinting + esferoides",
+    "Título": "Selection and Optimization of a Bioink Based on PANC-1 Spheroids for Bioprinting Pancreatic Cancer Models",
+    "Citações_aprox_snippet": 6,
+    "URL": "https://www.semanticscholar.org/search?q=Selection+and+Optimization+of+a+Bioink+Based+on+PANC-1+Spheroids+for+Bioprinting+Pancreatic+Cancer+Models",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 52,
+    "Tecido_Foco": "Ovário",
+    "Modalidade": "Organoides",
+    "Título": "Generation of offspring-producing 3D ovarian organoids",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Generation+of+offspring-producing+3D+ovarian+organoids",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 53,
+    "Tecido_Foco": "Ovário",
+    "Modalidade": "Biomateriais / fertilidade",
+    "Título": "Enhancing female fertility by biomaterial-based strategies",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Enhancing+female+fertility+by+biomaterial-based+strategies",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 54,
+    "Tecido_Foco": "Ovário",
+    "Modalidade": "Organs-on-chip",
+    "Título": "Organ-on-a-Chip Models of the Female Reproductive System",
+    "Citações_aprox_snippet": 7,
+    "URL": "https://www.semanticscholar.org/search?q=Organ-on-a-Chip+Models+of+the+Female+Reproductive+System",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 55,
+    "Tecido_Foco": "Ovário",
+    "Modalidade": "Revisão clínica/engenharia",
+    "Título": "3D Printing and Its Current Status of Application in Obstetrics and Gynecology",
+    "Citações_aprox_snippet": 18,
+    "URL": "https://www.semanticscholar.org/search?q=3D+Printing+and+Its+Current+Status+of+Application+in+Obstetrics+and+Gynecology",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 56,
+    "Tecido_Foco": "Cérebro",
+    "Modalidade": "Organoides",
+    "Título": "An Alternative Approach for Mini-Brain In Vitro Modeling: 3D-Bioprinted Cerebral Organoids",
+    "Citações_aprox_snippet": 3,
+    "URL": "https://www.semanticscholar.org/search?q=An+Alternative+Approach+for+Mini-Brain+In+Vitro+Modeling%3A+3D-Bioprinted+Cerebral+Organoids",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 57,
+    "Tecido_Foco": "Cérebro",
+    "Modalidade": "Modelos 3D",
+    "Título": "Unlocking Neural Function with 3D In Vitro Models",
+    "Citações_aprox_snippet": 39,
+    "URL": "https://www.semanticscholar.org/search?q=Unlocking+Neural+Function+with+3D+In+Vitro+Models",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 58,
+    "Tecido_Foco": "Cérebro",
+    "Modalidade": "Modelos 3D",
+    "Título": "In Vitro 3D Modeling of Neurodegenerative Diseases",
+    "Citações_aprox_snippet": 32,
+    "URL": "https://www.semanticscholar.org/search?q=In+Vitro+3D+Modeling+of+Neurodegenerative+Diseases",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 59,
+    "Tecido_Foco": "Cérebro",
+    "Modalidade": "Bioprinting",
+    "Título": "Layer-By-Layer: The Case for 3D Bioprinting Neurons to Create Neurologically Relevant Tissue Models",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Layer-By-Layer%3A+The+Case+for+3D+Bioprinting+Neurons+to+Create+Neurologically+Relevant+Tissue+Models",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 60,
+    "Tecido_Foco": "Cérebro",
+    "Modalidade": "Bioprinting",
+    "Título": "A review on 3D printing functional brain model",
+    "Citações_aprox_snippet": 42,
+    "URL": "https://www.semanticscholar.org/search?q=A+review+on+3D+printing+functional+brain+model",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 61,
+    "Tecido_Foco": "Cérebro",
+    "Modalidade": "Esferoides / tumoroides / bioprinting",
+    "Título": "Advanced Spheroid, Tumouroid and 3D Bioprinted In-Vitro Models of Glioblastoma",
+    "Citações_aprox_snippet": 32,
+    "URL": "https://www.semanticscholar.org/search?q=Advanced+Spheroid%2C+Tumouroid+and+3D+Bioprinted+In-Vitro+Models+of+Glioblastoma",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 62,
+    "Tecido_Foco": "Cérebro",
+    "Modalidade": "Organoides",
+    "Título": "Brain organoid model systems of neurodegenerative disease",
+    "Citações_aprox_snippet": 13,
+    "URL": "https://www.semanticscholar.org/search?q=Brain+organoid+model+systems+of+neurodegenerative+disease",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 63,
+    "Tecido_Foco": "Córnea",
+    "Modalidade": "Bioprinting",
+    "Título": "3D bioprinting of corneal models: A review of the current state of the art",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=3D+bioprinting+of+corneal+models%3A+A+review+of+the+current+state+of+the+art",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 64,
+    "Tecido_Foco": "Córnea",
+    "Modalidade": "Bioprinting + regulatório",
+    "Título": "Comprehensive review of the state-of-the-art in corneal 3D bioprinting",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Comprehensive+review+of+the+state-of-the-art+in+corneal+3D+bioprinting",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 65,
+    "Tecido_Foco": "Córnea",
+    "Modalidade": "Bioprinting",
+    "Título": "Bioprinted Membranes for Corneal Tissue Engineering",
+    "Citações_aprox_snippet": 27,
+    "URL": "https://www.semanticscholar.org/search?q=Bioprinted+Membranes+for+Corneal+Tissue+Engineering",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 66,
+    "Tecido_Foco": "Córnea",
+    "Modalidade": "Bioprinting",
+    "Título": "Human stem cell based corneal tissue mimicking structures using laser-assisted bioprinting",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Human+stem+cell+based+corneal+tissue+mimicking+structures+using+laser-assisted+bioprinting",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 67,
+    "Tecido_Foco": "Córnea",
+    "Modalidade": "Bioprinting",
+    "Título": "Development of a novel bioartificial cornea using 3D bioprinting",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Development+of+a+novel+bioartificial+cornea+using+3D+bioprinting",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 68,
+    "Tecido_Foco": "Córnea",
+    "Modalidade": "Bioprinting",
+    "Título": "Stem cells in 3D bioprinting of corneal grafts",
+    "Citações_aprox_snippet": 9,
+    "URL": "https://www.semanticscholar.org/search?q=Stem+cells+in+3D+bioprinting+of+corneal+grafts",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 69,
+    "Tecido_Foco": "Córnea",
+    "Modalidade": "Organoides",
+    "Título": "Single-cell RNA-seq of human cornea organoids identifies cell fate dynamics",
+    "Citações_aprox_snippet": 27,
+    "URL": "https://www.semanticscholar.org/search?q=Single-cell+RNA-seq+of+human+cornea+organoids+identifies+cell+fate+dynamics",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 70,
+    "Tecido_Foco": "Cristalino",
+    "Modalidade": "Organoides",
+    "Título": "Eye Lens Organoids Made Simple: Characterization of a New 3D Culture Model",
+    "Citações_aprox_snippet": 8,
+    "URL": "https://www.semanticscholar.org/search?q=Eye+Lens+Organoids+Made+Simple%3A+Characterization+of+a+New+3D+Culture+Model",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 71,
+    "Tecido_Foco": "Rim",
+    "Modalidade": "Organoides + bioprinting",
+    "Título": "Bioprinting better kidney organoids",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Bioprinting+better+kidney+organoids",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 72,
+    "Tecido_Foco": "Rim",
+    "Modalidade": "Organoides",
+    "Título": "Design and strategy for manufacturing kidney organoids",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Design+and+strategy+for+manufacturing+kidney+organoids",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 73,
+    "Tecido_Foco": "Rim",
+    "Modalidade": "Organoides",
+    "Título": "Kidney organoids",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Kidney+organoids",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 74,
+    "Tecido_Foco": "Rim",
+    "Modalidade": "Bioprinting",
+    "Título": "Developments and Opportunities for 3D Bioprinted Kidney Models",
+    "Citações_aprox_snippet": 148,
+    "URL": "https://www.semanticscholar.org/search?q=Developments+and+Opportunities+for+3D+Bioprinted+Kidney+Models",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 75,
+    "Tecido_Foco": "Rim",
+    "Modalidade": "Organoides",
+    "Título": "Applications of kidney organoids derived from human pluripotent stem cells",
+    "Citações_aprox_snippet": 42,
+    "URL": "https://www.semanticscholar.org/search?q=Applications+of+kidney+organoids+derived+from+human+pluripotent+stem+cells",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 76,
+    "Tecido_Foco": "Rim",
+    "Modalidade": "Organoides",
+    "Título": "A Focus on Kidney Organoids",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=A+Focus+on+Kidney+Organoids",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 77,
+    "Tecido_Foco": "Rim",
+    "Modalidade": "Bioprinting",
+    "Título": "Bioprinting of kidney in vitro models: cells, biomaterials, and manufacturing",
+    "Citações_aprox_snippet": 73,
+    "URL": "https://www.semanticscholar.org/search?q=Bioprinting+of+kidney+in+vitro+models%3A+cells%2C+biomaterials%2C+and+manufacturing",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 78,
+    "Tecido_Foco": "Tendão / Ligamento",
+    "Modalidade": "Bioprinting",
+    "Título": "3D bioprinting patient-specific grafts for tendon/ligament reconstruction",
+    "Citações_aprox_snippet": 7,
+    "URL": "https://www.semanticscholar.org/search?q=3D+bioprinting+patient-specific+grafts+for+tendon%2Fligament+reconstruction",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 79,
+    "Tecido_Foco": "Tendão / Ligamento",
+    "Modalidade": "Bioprinting",
+    "Título": "Exploring the Frontier of 3D Bioprinting for Tendon Regeneration",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Exploring+the+Frontier+of+3D+Bioprinting+for+Tendon+Regeneration",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 80,
+    "Tecido_Foco": "Tendão / Ligamento",
+    "Modalidade": "Bioprinting",
+    "Título": "3-Dimensional Bioprinting of a Tendon Stem Cell–Derived Biomimetic Composite",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=3-Dimensional+Bioprinting+of+a+Tendon+Stem+Cell%E2%80%93Derived+Biomimetic+Composite",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 81,
+    "Tecido_Foco": "Tendão / Ligamento",
+    "Modalidade": "Bioprinting",
+    "Título": "Decellularized Extracellular Matrix-Based Bioinks for Tendon Regeneration",
+    "Citações_aprox_snippet": 22,
+    "URL": "https://www.semanticscholar.org/search?q=Decellularized+Extracellular+Matrix-Based+Bioinks+for+Tendon+Regeneration",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 82,
+    "Tecido_Foco": "Vértebra / disco intervertebral",
+    "Modalidade": "Bioprinting",
+    "Título": "Intervertebral Disc Tissue Engineering Using Additive Manufacturing",
+    "Citações_aprox_snippet": 3,
+    "URL": "https://www.semanticscholar.org/search?q=Intervertebral+Disc+Tissue+Engineering+Using+Additive+Manufacturing",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 83,
+    "Tecido_Foco": "Vértebra / disco intervertebral",
+    "Modalidade": "Bioprinting",
+    "Título": "Engineering patient-specific bioprinted constructs for intervertebral disc regeneration",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Engineering+patient-specific+bioprinted+constructs+for+intervertebral+disc+regeneration",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 84,
+    "Tecido_Foco": "Medula óssea",
+    "Modalidade": "Organoides",
+    "Título": "Generating human bone marrow organoids for disease modeling",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Generating+human+bone+marrow+organoids+for+disease+modeling",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 85,
+    "Tecido_Foco": "Medula óssea",
+    "Modalidade": "Modelos 3D",
+    "Título": "3D models of the bone marrow in health and disease",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=3D+models+of+the+bone+marrow+in+health+and+disease",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 86,
+    "Tecido_Foco": "Medula óssea",
+    "Modalidade": "Organoides",
+    "Título": "Three-Dimensional Human Bone Marrow Organoids for the Study of Hematopoiesis",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Three-Dimensional+Human+Bone+Marrow+Organoids+for+the+Study+of+Hematopoiesis",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 87,
+    "Tecido_Foco": "Medula óssea",
+    "Modalidade": "Organoides",
+    "Título": "Human bone marrow organoids: emerging progress but remaining challenges",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Human+bone+marrow+organoids%3A+emerging+progress+but+remaining+challenges",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 88,
+    "Tecido_Foco": "Medula óssea",
+    "Modalidade": "Organoides",
+    "Título": "Generation of complex bone marrow organoids from induced pluripotent stem cells",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Generation+of+complex+bone+marrow+organoids+from+induced+pluripotent+stem+cells",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 89,
+    "Tecido_Foco": "Medula óssea",
+    "Modalidade": "Organoides",
+    "Título": "Human Bone Marrow Organoids Enable the Study of Hematopoiesis and Leukemia",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Human+Bone+Marrow+Organoids+Enable+the+Study+of+Hematopoiesis+and+Leukemia",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 90,
+    "Tecido_Foco": "Mama / implante mamário",
+    "Modalidade": "Reconstrução / 3D printing",
+    "Título": "State of Research on Tissue Engineering with 3D Printing for Breast Reconstruction",
+    "Citações_aprox_snippet": 1,
+    "URL": "https://www.semanticscholar.org/search?q=State+of+Research+on+Tissue+Engineering+with+3D+Printing+for+Breast+Reconstruction",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 91,
+    "Tecido_Foco": "Mama / organoides",
+    "Modalidade": "Bioprinting + organoides",
+    "Título": "Integrating 3D Bioprinting with Organoid Technology in Breast Cancer Research",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Integrating+3D+Bioprinting+with+Organoid+Technology+in+Breast+Cancer+Research",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 92,
+    "Tecido_Foco": "Mama / organoides",
+    "Modalidade": "Organoides",
+    "Título": "Clinical applications of 3D normal and breast cancer organoids",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Clinical+applications+of+3D+normal+and+breast+cancer+organoids",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 93,
+    "Tecido_Foco": "Mama / implante mamário",
+    "Modalidade": "Biomateriais / reconstrução",
+    "Título": "Advances in Biomaterials for Breast Reconstruction",
+    "Citações_aprox_snippet": 16,
+    "URL": "https://www.semanticscholar.org/search?q=Advances+in+Biomaterials+for+Breast+Reconstruction",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 94,
+    "Tecido_Foco": "Mama / organoides",
+    "Modalidade": "Bibliometria / organoides",
+    "Título": "Evolution and hotspots in breast cancer organoid research",
+    "Citações_aprox_snippet": 1,
+    "URL": "https://www.semanticscholar.org/search?q=Evolution+and+hotspots+in+breast+cancer+organoid+research",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 95,
+    "Tecido_Foco": "Mama / implante mamário",
+    "Modalidade": "Bioprinting + organoides",
+    "Título": "Three-dimensional bioprinting adipose tissue and mammary organoids feasible for artificial breast reconstruction",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=Three-dimensional+bioprinting+adipose+tissue+and+mammary+organoids+feasible+for+artificial+breast+reconstruction",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 96,
+    "Tecido_Foco": "Mama / organoides",
+    "Modalidade": "Organoides",
+    "Título": "Human Breast Organoid Models for Lactation Research",
+    "Citações_aprox_snippet": 11,
+    "URL": "https://www.semanticscholar.org/search?q=Human+Breast+Organoid+Models+for+Lactation+Research",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 97,
+    "Tecido_Foco": "Geral / esferoides",
+    "Modalidade": "Esferoides",
+    "Título": "Using Spheroids as Building Blocks Towards 3D Bioprinting",
+    "Citações_aprox_snippet": 95,
+    "URL": "https://www.semanticscholar.org/search?q=Using+Spheroids+as+Building+Blocks+Towards+3D+Bioprinting",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 98,
+    "Tecido_Foco": "Geral / esferoides",
+    "Modalidade": "Esferoides",
+    "Título": "Advancing 3D Spheroid Research through 3D Scaffolds",
+    "Citações_aprox_snippet": 6,
+    "URL": "https://www.semanticscholar.org/search?q=Advancing+3D+Spheroid+Research+through+3D+Scaffolds",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 99,
+    "Tecido_Foco": "Geral / organoides",
+    "Modalidade": "Organoides",
+    "Título": "The application of organoids in toxicity testing of environmental pollutants",
+    "Citações_aprox_snippet": null,
+    "URL": "https://www.semanticscholar.org/search?q=The+application+of+organoids+in+toxicity+testing+of+environmental+pollutants",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  },
+  {
+    "ID": 100,
+    "Tecido_Foco": "Geral",
+    "Modalidade": "Bioinks",
+    "Título": "Natural Hydrogel-Based Bio-Inks for 3D Bioprinting in Tissue Engineering",
+    "Citações_aprox_snippet": 295,
+    "URL": "https://www.semanticscholar.org/search?q=Natural+Hydrogel-Based+Bio-Inks+for+3D+Bioprinting+in+Tissue+Engineering",
+    "Observação": "Link de descoberta por título; contagem de citações só quando apareceu no snippet da busca."
+  }
+]

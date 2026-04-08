@@ -1,49 +1,46 @@
-import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth/config"
-import { requireCredits } from "@/lib/auth/credits"
-import { searchKnowledgeArticles } from "@/lib/db/queries"
-import { searchKnowledgeWithAI } from "@/lib/ai/biomaterials"
-import { Prisma } from "@prisma/client"
+import { NextRequest, NextResponse } from 'next/server'
+import knowledgeData from '../../../../bia_knowledge_base.json'
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
-  const query = searchParams.get("q") ?? ""
-  const category = searchParams.get("category") ?? ""
-  const limit = parseInt(searchParams.get("limit") ?? "12")
-  const aiSearch = searchParams.get("ai") === "true"
-
-  if (!query && !category) {
-    // Retornar artigos mais recentes
-    const articles = await searchKnowledgeArticles("", limit)
-    return NextResponse.json({ articles, total: articles.length })
+export async function GET() {
+  try {
+    // Simply return the full knowledge base
+    // Frontend can handle filtering
+    return NextResponse.json({
+      success: true,
+      data: knowledgeData
+    })
+  } catch (error) {
+    console.error('Knowledge API error:', error)
+    return NextResponse.json(
+      { success: false, error: 'Failed to load knowledge base' },
+      { status: 500 }
+    )
   }
+}
 
-  const articles = await searchKnowledgeArticles(query || category, limit)
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { query } = body
 
-  // Se AI search solicitado
-  if (aiSearch && query && articles.length > 0) {
-    const session = await auth()
-    if (session?.user?.id) {
-      const userRole = (session.user as { role?: string }).role
-      // Gastar 1 crédito para busca com IA — ADMIN tem bypass
-      const creditCheck = await requireCredits(
-        session.user.id,
-        "KNOWLEDGE_SEARCH",
-        `Busca IA: ${query}`,
-        { query } as Prisma.InputJsonValue,
-        userRole
-      )
+    // Here you could integrate with AI to answer specific questions about the knowledge base
+    // For now, return a simple response
 
-      if (!creditCheck) {
-        const aiResult = await searchKnowledgeWithAI(query, articles.map((a) => ({
-          title: a.title,
-          abstract: a.abstract ?? "",
-          doi: a.doi ?? "",
-        })))
-        return NextResponse.json({ articles, total: articles.length, aiSummary: aiResult.summary })
-      }
-    }
+    return NextResponse.json({
+      success: true,
+      answer: `Analisando sua pergunta: "${query}"...`,
+      suggestions: [
+        'Quais tecidos têm mais artigos publicados?',
+        'Qual a distribuição de TRL nos estudos?',
+        'Quais biomateriais são mais usados?',
+        'Onde estão as oportunidades para Quantis?'
+      ]
+    })
+  } catch (error) {
+    console.error('Knowledge query error:', error)
+    return NextResponse.json(
+      { success: false, error: 'Failed to process query' },
+      { status: 500 }
+    )
   }
-
-  return NextResponse.json({ articles, total: articles.length })
 }

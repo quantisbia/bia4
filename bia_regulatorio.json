@@ -1,0 +1,110 @@
+[
+  {
+    "ID": 1,
+    "Tipo": "Guidance",
+    "Item": "Technical Considerations for Additive Manufactured Medical Devices",
+    "Status": "Guia final",
+    "Jurisdição": "EUA / FDA",
+    "Ponto-chave": "Guia oficial da FDA para dispositivos médicos impressos em 3D; cobre caracterização, testes e processo de fabricação.",
+    "URL": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/technical-considerations-additive-manufactured-medical-devices"
+  },
+  {
+    "ID": 2,
+    "Tipo": "Regulatório",
+    "Item": "21 CFR Part 1271 — Human Cells, Tissues, and Cellular and Tissue-Based Products",
+    "Status": "Regra vigente",
+    "Jurisdição": "EUA / FDA",
+    "Ponto-chave": "Base regulatória para HCT/Ps; relevante para construtos vivos baseados em células/tecidos.",
+    "URL": "https://www.ecfr.gov/current/title-21/chapter-I/subchapter-L/part-1271"
+  },
+  {
+    "ID": 3,
+    "Tipo": "Regulatório",
+    "Item": "21 CFR 1271.10 — minimal manipulation / homologous use",
+    "Status": "Critério de enquadramento",
+    "Jurisdição": "EUA / FDA",
+    "Ponto-chave": "Determina quando um HCT/P pode ser regulado apenas sob a seção 361; ponto crítico para bioimpressão celular.",
+    "URL": "https://www.ecfr.gov/current/title-21/chapter-I/subchapter-L/part-1271/subpart-A/section-1271.10"
+  },
+  {
+    "ID": 4,
+    "Tipo": "Regulatório",
+    "Item": "Regulation (EC) No 1394/2007 on Advanced Therapy Medicinal Products",
+    "Status": "Regra vigente",
+    "Jurisdição": "União Europeia",
+    "Ponto-chave": "Muitos produtos bioprintados vivos tendem a cair no guarda-chuva de ATMP / tissue engineered products.",
+    "URL": "https://eur-lex.europa.eu/eli/reg/2007/1394/oj/eng"
+  },
+  {
+    "ID": 5,
+    "Tipo": "NAMs",
+    "Item": "FDA Announces Plan to Phase Out Animal Testing Requirement for Monoclonal Antibodies and Other Drugs",
+    "Status": "Roadmap",
+    "Jurisdição": "EUA / FDA",
+    "Ponto-chave": "A FDA passou a incentivar NAMs, incluindo toxicologia com organoides e outras metodologias humanas-relevantes.",
+    "URL": "https://www.fda.gov/news-events/press-announcements/fda-announces-plan-phase-out-animal-testing-requirement-monoclonal-antibodies-and-other-drugs"
+  },
+  {
+    "ID": 6,
+    "Tipo": "NAMs",
+    "Item": "General Considerations for the Use of New Approach Methodologies in Drug Development",
+    "Status": "Draft guidance",
+    "Jurisdição": "EUA / FDA / CDER",
+    "Ponto-chave": "Draft guidance de 2026 para validação de NAMs, incluindo organoides, esferoides e organ-on-chip.",
+    "URL": "https://www.fda.gov/media/191589/download"
+  },
+  {
+    "ID": 7,
+    "Tipo": "Caso real",
+    "Item": "AuriNovo for Auricular Reconstruction (NCT04399239)",
+    "Status": "Fase 1/2a; investigacional",
+    "Jurisdição": "EUA / ClinicalTrials.gov",
+    "Ponto-chave": "Implante auricular bioprintado com células autólogas para microtia; estudo primeiro-em-humanos; não aprovado.",
+    "URL": "https://clinicaltrials.gov/study/NCT04399239"
+  },
+  {
+    "ID": 8,
+    "Tipo": "Caso real",
+    "Item": "3DBio Therapeutics — Rare Pediatric Disease Designation for AuriNovo",
+    "Status": "Designation",
+    "Jurisdição": "EUA / FDA / empresa",
+    "Ponto-chave": "AuriNovo recebeu Rare Pediatric Disease designation; reforça maturidade regulatória, mas não equivale a aprovação.",
+    "URL": "https://ir.printbio.com/3dbio-therapeutics-receives-fda-rare-pediatric-disease-designation-for-aurinovo-for-ear-reconstruction-in-microtia-patients/"
+  },
+  {
+    "ID": 9,
+    "Tipo": "Caso real",
+    "Item": "Poieskin preclinical proof-of-concept",
+    "Status": "Pré-clínico sob condições GMP-compatíveis",
+    "Jurisdição": "França / UE",
+    "Ponto-chave": "Estudo com Poieskin relatou fabricação compatível com diretrizes farmacêuticas e suporte para ensaio clínico fase I.",
+    "URL": "https://pubmed.ncbi.nlm.nih.gov/37560537/"
+  },
+  {
+    "ID": 10,
+    "Tipo": "Caso real",
+    "Item": "Poietis + AP-HM clinical research collaboration",
+    "Status": "Preparação de Fase I",
+    "Jurisdição": "França / UE",
+    "Ponto-chave": "Parceria anunciada para preparar o primeiro ensaio clínico de pele bioprintada como ATMP.",
+    "URL": "https://www.poietis.com/poietis-signs-a-clinical-research-collaboration-contract-with-the-assistance-publique-hopitaux-de-marseille-ap-hm/"
+  },
+  {
+    "ID": 11,
+    "Tipo": "Caso real",
+    "Item": "Poieskin as ATMP tissue engineering product",
+    "Status": "Classificação/posicionamento",
+    "Jurisdição": "França / UE",
+    "Ponto-chave": "Caso industrial frequentemente descrito como Tissue Engineering Product / ATMP.",
+    "URL": "https://cellbox-solutions.com/usecases/bioprinted-dermo-epidermal-subsitute-poieskin"
+  },
+  {
+    "ID": 12,
+    "Tipo": "Panorama",
+    "Item": "Assessing the landscape of clinical trials involving bioprinting",
+    "Status": "Revisão do pipeline clínico",
+    "Jurisdição": "Global",
+    "Ponto-chave": "Panorama útil para comparar ensaios reais já registrados em bioimpressão.",
+    "URL": "https://assets-eu.researchsquare.com/files/rs-4919310/v1_covered_341aba14-c7ed-47e3-af50-3e555154fdeb.pdf"
+  }
+]
