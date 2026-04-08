@@ -435,6 +435,12 @@
     <a href="#cap-knowledge" class="nav-item"><i class="fas fa-book-open" style="width:14px;"></i>Base de Conhecimento</a>
     <a href="#cap-admin" class="nav-item"><i class="fas fa-shield-alt" style="width:14px;"></i>Painel Admin</a>
 
+    <div class="nav-section-title">Novidades v4</div>
+    <a href="#cap17" class="nav-item"><i class="fas fa-cube" style="width:14px;"></i>Gerador STL/OBJ</a>
+    <a href="#cap18" class="nav-item"><i class="fas fa-clipboard-check" style="width:14px;"></i>Protocolo Total</a>
+    <a href="#cap19" class="nav-item"><i class="fas fa-book-bookmark" style="width:14px;"></i>Notebook Científico</a>
+    <a href="#cap20" class="nav-item"><i class="fas fa-crown" style="width:14px;"></i>Admin Dashboard</a>
+
     <div class="nav-section-title">Referência</div>
     <a href="#cap-creditos-ref" class="nav-item"><i class="fas fa-coins" style="width:14px;"></i>Tabela de Créditos</a>
     <a href="#cap-fluxo" class="nav-item"><i class="fas fa-sitemap" style="width:14px;"></i>Fluxo de Trabalho</a>
@@ -2381,6 +2387,150 @@
         </tr>
       </tbody>
     </table>
+    </div>
+  </section>
+
+  <hr class="section-divider" />
+
+  <!-- CHAPTER 17: GERADOR STL/OBJ -->
+  <section id="cap17">
+    <div class="chapter-header">
+      <div class="chapter-number">17</div>
+      <div>
+        <h2 class="chapter-title">Gerador STL/OBJ — Modelos 3D para Bioimpressão</h2>
+        <p class="chapter-subtitle">12 geometrias biológicas paramétricas prontas para fatiamento e impressão</p>
+      </div>
+    </div>
+
+    <p class="text-body">Gera arquivos STL binário/ASCII ou OBJ para bioimpressão, com preview SVG e parâmetros customizáveis.</p>
+
+    <h3 class="subsection-title"><i class="fas fa-cube" style="color:#06b6d4;"></i> Geometrias Disponíveis</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;">
+      <div class="card card-accent-cyan">
+        <h4 style="font-weight:700;margin-bottom:8px;">🧩 Membranas 2D/3D</h4>
+        <p style="font-size:13px;color:#9090b0;">Retângulo (pele 2D), Disco (pele 3D cilíndrica), Cubo Poroso</p>
+      </div>
+      <div class="card card-accent-violet">
+        <h4 style="font-weight:700;margin-bottom:8px;">🦴 Estruturas Ósseas</h4>
+        <p style="font-size:13px;color:#9090b0;">Bloco Gyroid (trabecular), Fêmur simplificado educacional</p>
+      </div>
+      <div class="card card-accent-emerald">
+        <h4 style="font-weight:700;margin-bottom:8px;">🫁 Órgãos e Tecidos</h4>
+        <p style="font-size:13px;color:#9090b0;">Tubo oco (vaso), Hexágono (fígado), Meia-lua (menisco, córnea), Esfera (organoide)</p>
+      </div>
+    </div>
+
+    <div class="info-box info-box-cyan">
+      <strong>💡 Uso:</strong> Navegue até <strong>/dashboard/stl</strong>, escolha geometria, ajuste parâmetros (raio, espessura, porosidade) e exporte STL/OBJ. Compatível com PrusaSlicer, Cura e Simplify3D.
+    </div>
+  </section>
+
+  <hr class="section-divider" />
+
+  <!-- CHAPTER 18: PROTOCOLO TOTAL -->
+  <section id="cap18">
+    <div class="chapter-header">
+      <div class="chapter-number">18</div>
+      <div>
+        <h2 class="chapter-title">Protocolo Total — SOP Completo GLP/GMP</h2>
+        <p class="chapter-subtitle">13 seções científicas geradas por IA com metodologia, regulatório e qualidade</p>
+      </div>
+    </div>
+
+    <p class="text-body">Gera protocolo científico-industrial completo baseado em projeto pipeline, incluindo: fundamento, materiais, SOP detalhado (7 sub-etapas), controle de qualidade com hold points, análise bioquímica, tradução clínica (ANVISA/FDA/EMA), glossário e apêndices com STL e G-Code.</p>
+
+    <div class="info-box info-box-amber">
+      <strong>⚡ Custo:</strong> 20 créditos. <strong>Tempo de geração:</strong> ~60 segundos. Exportação em <code>.md</code>, <code>.txt</code>, PDF profissional e cópia para área de transferência.
+    </div>
+
+    <h3 class="subsection-title"><i class="fas fa-list-check" style="color:#f59e0b;"></i> Estrutura do Protocolo</h3>
+    <table class="data-table">
+      <thead><tr><th>#</th><th>Seção</th><th>Conteúdo</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td class="td-name">Identificação</td><td>Título, objetivo, responsável, versão</td></tr>
+        <tr><td>2</td><td class="td-name">Fundamento Científico</td><td>Contexto + 3 referências acadêmicas</td></tr>
+        <tr><td>3</td><td class="td-name">Materiais & Reagentes</td><td>Lista BPL/GMP + EPIs</td></tr>
+        <tr><td>4</td><td class="td-name">Parâmetros Críticos</td><td>Temperatura, pH, concentração, tempo</td></tr>
+        <tr><td>5</td><td class="td-name">SOP Detalhado</td><td>7 sub-etapas com hold points</td></tr>
+        <tr><td>6</td><td class="td-name">Controle de Qualidade</td><td>Checkpoints + critérios de aceitação</td></tr>
+        <tr><td>7–13</td><td class="td-name">Desvios, Análises, Regulatório, etc.</td><td>CAPA, biossegurança, tradução clínica, glossário</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <hr class="section-divider" />
+
+  <!-- CHAPTER 19: NOTEBOOK CIENTÍFICO -->
+  <section id="cap19">
+    <div class="chapter-header">
+      <div class="chapter-number">19</div>
+      <div>
+        <h2 class="chapter-title">Notebook Científico do Pesquisador</h2>
+        <p class="chapter-subtitle">Histórico de elite, geração de artigos/patentes/livros e exportação profissional</p>
+      </div>
+    </div>
+
+    <p class="text-body">Plugin de histórico científico que centraliza protocolos, formulações, pipelines, referências e geometrias 3D. Permite gerar documentos científicos assistidos por IA (artigos, patentes, capítulos de livro) com preview Markdown e exportação PDF profissional.</p>
+
+    <h3 class="subsection-title"><i class="fas fa-file-pen" style="color:#8b5cf6;"></i> Tipos de Entrada</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;">
+      {["Nota", "Protocolo", "Formulação", "Pipeline", "Artigo Draft", "Patente Draft", "Cap. Livro", "Log Pesquisa", "Referência", "STL/Geometry"].map(t => (
+        <div key={t} style="background:var(--bg-card);border:1px solid var(--border);padding:12px;border-radius:12px;font-size:13px;color:#9090b0;">{t}</div>
+      ))}
+    </div>
+
+    <h3 class="subsection-title"><i class="fas fa-sparkles" style="color:#10b981;"></i> Documentos Geráveis por IA</h3>
+    <table class="data-table">
+      <thead><tr><th>Documento</th><th>Créditos</th><th>Conteúdo</th></tr></thead>
+      <tbody>
+        <tr><td class="td-name">Artigo Científico</td><td>20</td><td>Introdução, Metodologia, Resultados, Discussão, Conclusões, Referências</td></tr>
+        <tr><td class="td-name">Rascunho de Patente</td><td>20</td><td>Campo, Estado da técnica, Problema, Solução, Reivindicações, Exemplos</td></tr>
+        <tr><td class="td-name">Capítulo de Livro</td><td>12</td><td>Revisão narrativa estruturada para livro técnico-científico</td></tr>
+        <tr><td class="td-name">Artigo de Revisão</td><td>20</td><td>Revisão sistemática com análise crítica</td></tr>
+      </tbody>
+    </table>
+
+    <div class="info-box info-box-violet">
+      <strong>📊 Dashboard:</strong> Estatísticas em tempo real (total entradas, tipos, fixados), busca avançada, filtro por tipo, seleção múltipla para geração combinada e exportação PDF editorial.
+    </div>
+  </section>
+
+  <hr class="section-divider" />
+
+  <!-- CHAPTER 20: ADMIN DASHBOARD -->
+  <section id="cap20">
+    <div class="chapter-header">
+      <div class="chapter-number">20</div>
+      <div>
+        <h2 class="chapter-title">👑 Admin Dashboard — Gestão de Elite</h2>
+        <p class="chapter-subtitle">Controle total de usuários, planos, créditos e auditoria (acesso exclusivo Quantis)</p>
+      </div>
+    </div>
+
+    <p class="text-body">Painel administrativo de alto nível para gestão completa da plataforma BIA v4. <strong>Acesso exclusivo:</strong> janaina.dernowsek@quantis.bio</p>
+
+    <h3 class="subsection-title"><i class="fas fa-chart-line" style="color:#f59e0b;"></i> Funcionalidades</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;">
+      <div class="card card-accent-amber">
+        <h4 style="font-weight:700;margin-bottom:8px;">📊 Visão Geral</h4>
+        <p style="font-size:13px;color:#9090b0;">KPIs: Total usuários, ativos 7 dias, MRR estimado, créditos em circulação. Gráficos de planos e uso da plataforma.</p>
+      </div>
+      <div class="card card-accent-blue">
+        <h4 style="font-weight:700;margin-bottom:8px;">👥 Gestão de Usuários</h4>
+        <p style="font-size:13px;color:#9090b0;">Busca, filtro, ordenação. Painel lateral com histórico de créditos, sessões e ações: ➕ Adicionar créditos, 👑 Upgrade plano, 🛡️ Alterar role.</p>
+      </div>
+      <div class="card card-accent-violet">
+        <h4 style="font-weight:700;margin-bottom:8px;">⚡ Créditos & Transações</h4>
+        <p style="font-size:13px;color:#9090b0;">KPIs de emissão/consumo. Tabela detalhada de fluxo com usuário, tipo, valor e timestamp.</p>
+      </div>
+      <div class="card card-accent-emerald">
+        <h4 style="font-weight:700;margin-bottom:8px;">🔍 Audit Log</h4>
+        <p style="font-size:13px;color:#9090b0;">Registro completo de ações administrativas (admin_add_credits, admin_upgrade_plan, etc.) com metadata JSON e timestamp.</p>
+      </div>
+    </div>
+
+    <div class="info-box info-box-rose">
+      <strong>🔐 Segurança:</strong> Middleware de autenticação dupla (email verificado + role ADMIN). Toda ação administrativa é registrada no audit log com email do admin e motivo.
     </div>
   </section>
 

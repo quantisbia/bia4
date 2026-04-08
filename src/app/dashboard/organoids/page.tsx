@@ -1,7 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { CircleDot, Loader2, Zap, CheckCircle2, ChevronDown, History, Plus, X } from "lucide-react"
+import { CircleDot, Loader2, Zap, CheckCircle2, ChevronDown, History, Plus, X,
+  ArrowRight, Beaker, Clock, AlertCircle, Target, FlaskConical, MessageCircle, ExternalLink,
+} from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
 interface OrganoidDesign {
@@ -33,6 +35,139 @@ const CELL_SOURCES = [
   { value: "Adult_Stem",   label: "Células-Tronco Adultas" },
   { value: "Primary",      label: "Células Primárias" },
 ]
+
+// ── Organoid Protocol Viewer Component ───────────────────────────────────────
+function OrganoidProtocolViewer({ protocol, organoidType }: { protocol: string; organoidType: string }) {
+  // Parse protocolo em seções
+  const sections = protocol.split(/\n\n+/).filter(Boolean)
+  
+  // Detectar seções por palavras-chave
+  const parseSection = (text: string) => {
+    const lower = text.toLowerCase()
+    if (lower.includes("objetivo") || lower.includes("fundamento")) return { type: "objective", icon: Target, color: "blue" }
+    if (lower.includes("materiais") || lower.includes("reagentes")) return { type: "materials", icon: FlaskConical, color: "violet" }
+    if (lower.includes("preparo") || lower.includes("preparação")) return { type: "prep", icon: Beaker, color: "amber" }
+    if (lower.includes("etapa") || lower.includes("passo") || lower.includes("dia")) return { type: "steps", icon: ArrowRight, color: "emerald" }
+    if (lower.includes("crítico") || lower.includes("parâmetro")) return { type: "critical", icon: AlertCircle, color: "rose" }
+    if (lower.includes("checkpoint") || lower.includes("qualidade") || lower.includes("controle")) return { type: "quality", icon: CheckCircle2, color: "cyan" }
+    if (lower.includes("timeline") || lower.includes("tempo")) return { type: "timeline", icon: Clock, color: "indigo" }
+    return { type: "general", icon: ArrowRight, color: "gray" }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="rounded-xl border border-teal-500/20 bg-gradient-to-r from-teal-500/10 to-cyan-500/10 p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center">
+            <CircleDot className="w-4 h-4 text-teal-400" />
+          </div>
+          <h3 className="text-sm font-bold text-white">Protocolo de Diferenciação — {organoidType.charAt(0).toUpperCase() + organoidType.slice(1)} Organoid</h3>
+        </div>
+        <p className="text-xs text-gray-400 leading-relaxed">
+          Protocolo assistido por IA para formação e maturação de organoides. Siga rigorosamente os parâmetros críticos e checkpoints de qualidade.
+        </p>
+      </div>
+
+      {/* Seções dinâmicas */}
+      <div className="space-y-3">
+        {sections.map((sec, i) => {
+          const parsed = parseSection(sec)
+          const colorMap = {
+            blue:    { bg: "bg-blue-500/8",    border: "border-blue-500/15",    icon: "text-blue-400",    title: "text-blue-300" },
+            violet:  { bg: "bg-violet-500/8",  border: "border-violet-500/15",  icon: "text-violet-400",  title: "text-violet-300" },
+            amber:   { bg: "bg-amber-500/8",   border: "border-amber-500/15",   icon: "text-amber-400",   title: "text-amber-300" },
+            emerald: { bg: "bg-emerald-500/8", border: "border-emerald-500/15", icon: "text-emerald-400", title: "text-emerald-300" },
+            rose:    { bg: "bg-rose-500/8",    border: "border-rose-500/15",    icon: "text-rose-400",    title: "text-rose-300" },
+            cyan:    { bg: "bg-cyan-500/8",    border: "border-cyan-500/15",    icon: "text-cyan-400",    title: "text-cyan-300" },
+            indigo:  { bg: "bg-indigo-500/8",  border: "border-indigo-500/15",  icon: "text-indigo-400",  title: "text-indigo-300" },
+            gray:    { bg: "bg-white/[0.02]",  border: "border-white/8",        icon: "text-gray-400",    title: "text-white" },
+          }
+          const colors = colorMap[parsed.color as keyof typeof colorMap] ?? colorMap.gray
+          
+          const Icon = parsed.icon
+
+          return (
+            <div key={i} className={cn("rounded-xl border p-4", colors.bg, colors.border)}>
+              <div className="flex items-start gap-3">
+                <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", colors.bg)}>
+                  <Icon className={cn("w-4 h-4", colors.icon)} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm text-gray-300 leading-relaxed whitespace-pre-line">{sec}</p>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* QMatrix Section */}
+      <div className="rounded-xl border border-violet-500/20 bg-gradient-to-br from-violet-500/10 via-purple-500/8 to-blue-500/10 p-5 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-violet-500/10 rounded-full blur-3xl" />
+        <div className="relative z-10">
+          <div className="flex items-start gap-3 mb-3">
+            <div className="w-9 h-9 rounded-xl bg-violet-500/20 flex items-center justify-center shrink-0">
+              <Zap className="w-5 h-5 text-violet-400" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-white mb-1">Bioativar com QMatrix™</h4>
+              <p className="text-[11px] text-gray-400 leading-relaxed">
+                Acelere formação de esferoides, melhore adesão celular e organização tecidual com o peptídeo bioativo patenteado Quantis.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+            {[
+              { title: "Revestimento de Superfície", desc: "10–25 µg/mL — pré-cobertura de placas ultra-low attachment" },
+              { title: "Aditivo de Adesão", desc: "5–15 µg/mL — adicionar no meio de agregação (Dia 0–3)" },
+              { title: "Biotinta / Hidrogel", desc: "50–100 µg/mL — melhor adesão e proliferação em scaffolds 3D" },
+              { title: "Maturação Avançada", desc: "2–5 µg/mL — meio de diferenciação (Dia 7+) para organização" },
+            ].map((item, i) => (
+              <div key={i} className="bg-white/[0.03] border border-white/[0.06] rounded-lg p-2.5">
+                <div className="text-[11px] font-semibold text-violet-300 mb-0.5">{item.title}</div>
+                <div className="text-[10px] text-gray-500 leading-tight">{item.desc}</div>
+              </div>
+            ))}
+          </div>
+          <a href="https://www.quantis.bio/product-page/qmatrix-bioactive?lang=pt"
+            target="_blank" rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-violet-500/25 active:scale-[0.98]">
+            <Beaker className="w-4 h-4" />
+            Usar QMatrix™ neste Protocolo
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
+      </div>
+
+      {/* Acelere com especialistas */}
+      <div className="rounded-xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-teal-500/8 to-cyan-500/10 p-5">
+        <div className="flex items-start gap-3 mb-3">
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0">
+            <MessageCircle className="w-5 h-5 text-emerald-400" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold text-white mb-1">Acelere com Especialistas Quantis</h4>
+            <p className="text-[11px] text-gray-400 leading-relaxed mb-2">
+              A IA <span className="text-white font-semibold">guia, explica e gera protocolos</span> para direcionar sua pesquisa.
+              Entregamos dossiês técnicos e estratégias regulatórias.
+            </p>
+            <p className="text-[11px] text-emerald-300 leading-relaxed">
+              💡 Porém, a <span className="font-semibold">validação experimental e otimização avançada</span> podem ser feitas com nossa equipe especializada em biofabricação.
+            </p>
+          </div>
+        </div>
+        <a href="https://wa.me/5511968632231"
+          target="_blank" rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/25 active:scale-[0.98]">
+          <MessageCircle className="w-4 h-4" />
+          Falar com Especialistas da Quantis
+          <ExternalLink className="w-3 h-3" />
+        </a>
+      </div>
+    </div>
+  )
+}
 
 export default function OrganoidsPage() {
   const [designs, setDesigns]         = useState<OrganoidDesign[]>([])
@@ -308,12 +443,7 @@ export default function OrganoidsPage() {
 
               <div className="space-y-3 sm:space-y-4">
                 {result.protocol && (
-                  <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4 sm:p-5">
-                    <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-1.5">
-                      📋 Protocolo de Diferenciação
-                    </h3>
-                    <p className="text-xs sm:text-sm text-gray-300 leading-relaxed whitespace-pre-line">{result.protocol}</p>
-                  </div>
+                  <OrganoidProtocolViewer protocol={result.protocol} organoidType={result.organoidType} />
                 )}
 
                 {result.timeline && (
