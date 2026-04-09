@@ -14,7 +14,13 @@
     "db:seed": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset --force && npm run db:seed",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "deploy": "./deploy-vercel.sh",
+    "deploy:preview": "vercel",
+    "deploy:prod": "vercel --prod",
+    "vercel:env": "vercel env pull .env.vercel",
+    "vercel:logs": "vercel logs",
+    "vercel:status": "vercel ls"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
