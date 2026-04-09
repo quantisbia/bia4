@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { CircleDot, Loader2, Zap, CheckCircle2, ChevronDown, History, Plus, X,
   ArrowRight, Beaker, Clock, AlertCircle, Target, FlaskConical, MessageCircle, ExternalLink,
+  BookOpen, Layers, Microscope, ThumbsUp, ChevronRight,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
@@ -35,6 +36,336 @@ const CELL_SOURCES = [
   { value: "Adult_Stem",   label: "Células-Tronco Adultas" },
   { value: "Primary",      label: "Células Primárias" },
 ]
+
+// ── QMicroNiche Section ───────────────────────────────────────────────────────
+// Baseado no artigo JoVE: Charelli, Dernowsek & Balbino, e63814 (2022)
+// Dispositivo QMicroNiche desenvolvido por Janaína Dernowsek / Quantis
+function QMicroNicheSection() {
+  const [expanded, setExpanded] = useState(false)
+  const [activeTab, setActiveTab] = useState<"protocolo" | "parametros" | "dicas">("protocolo")
+
+  const steps = [
+    {
+      phase: "Preparo do Agarose",
+      time: "30–45 min",
+      color: "blue",
+      icon: "🧪",
+      items: [
+        "Preparar solução de agarose 2% (p/v) em PBS 1× — homogeneizar com movimentos circulares",
+        "Aquecer em micro-ondas: 30 s, parando a cada 5 s para homogeneizar — repetir até estado líquido-lúcido",
+        "Alternativamente: placa aquecedora a 80–90 °C com agitação contínua",
+        "Manter a solução a ≥ 60 °C durante o uso (evitar solidificação prematura)",
+      ],
+    },
+    {
+      phase: "Montagem do Molde com QMicroNiche",
+      time: "35–50 min",
+      color: "teal",
+      icon: "🖨️",
+      items: [
+        "Esterilizar o dispositivo QMicroNiche: álcool 70% + UV por 15 min",
+        "Adicionar 1–2 mL da solução de agarose quente no poço da placa (6-well, 12-well etc.)",
+        "Inserir o dispositivo QMicroNiche CUIDADOSAMENTE sobre o agarose líquido — evitar bolhas de ar na interface",
+        "Aguardar ≥ 30 min até solidificação completa (placa de resfriamento reduz o tempo)",
+        "Remover o dispositivo com delicadeza para preservar a geometria das micro-recessões",
+      ],
+    },
+    {
+      phase: "Equilíbrio e Condicionamento",
+      time: "40 min",
+      color: "amber",
+      icon: "⚗️",
+      items: [
+        "Adicionar 2 mL de meio DMEM ao molde de agarose; aguardar 10 min e descartar — repetir 3×",
+        "Substituir por 2 mL de meio de cultura completo",
+        "Incubar a 37 °C, 5% CO₂ e 80% umidade até o momento do plaqueamento celular",
+      ],
+    },
+    {
+      phase: "Plaqueamento Celular",
+      time: "30 min",
+      color: "emerald",
+      icon: "🔬",
+      items: [
+        "Cultivar células em monocamada até 80% de confluência em DMEM (baixa glicose) + 10% SFB + 100 µg/mL pen/estrep",
+        "Lavar com PBS 1×; dissociar com tripsina 0,125% + EDTA 0,78 mM por 2–5 min a 37 °C",
+        "Neutralizar com meio + SFB; centrifugar 400 × g por 5 min; contar células",
+        "Preparar 50 × 10⁵ células em 1 mL de meio de cultura completo",
+        "Remover 2 mL do meio do poço e adicionar 1 mL da suspensão celular sobre o molde de agarose",
+        "Aguardar 20–30 min (sedimentação nas micro-recessões); adicionar 1 mL de meio lentamente pela parede do poço",
+      ],
+    },
+    {
+      phase: "Formação e Maturação dos Esferoides",
+      time: "24–48 h",
+      color: "violet",
+      icon: "🧬",
+      items: [
+        "Incubar a 37 °C, 5% CO₂, 80% umidade por 24–48 h (varia conforme o tipo celular)",
+        "Cada QMicroNiche gera: 750 micro-recessões/poço · até 4.716 esferoides por placa de 6 poços",
+        "Tamanho alvo: 123 ± 3 µm de diâmetro com forma homogênea e uniforme",
+        "Viabilidade esperada: > 95% (L929, fibroblastos; ajustar para tipo celular específico)",
+        "Esferoides podem ser mantidos em cultura por meses sem perda estrutural",
+      ],
+    },
+    {
+      phase: "Coleta e Análise",
+      time: "15 min",
+      color: "rose",
+      icon: "📊",
+      items: [
+        "Remover esferoides por jato direto com pipeta carregada com meio ou PBS",
+        "Análises disponíveis: microscopia de fase, microscopia eletrônica, citometria, histologia",
+        "Para bioimpressão 3D: esferoides funcionam como building blocks — usar protocolo de fusão de esferoides",
+      ],
+    },
+  ]
+
+  const params = [
+    { label: "Concentração de agarose", value: "2% (p/v)", nota: "Em PBS 1×; não usar água destilada" },
+    { label: "Volume por poço (6-well)", value: "1–2 mL", nota: "Suficiente para cobrir os micropinos" },
+    { label: "Tempo de solidificação", value: "≥ 30 min", nota: "Retirar antes = ruptura do molde" },
+    { label: "Densidade celular inicial", value: "50 × 10⁵ céls/mL", nota: "Ajusta o diâmetro final do esferoide" },
+    { label: "Esferoides / placa 6-well", value: "4.716", nota: "750 micro-recessões × 6 poços" },
+    { label: "Diâmetro médio esperado", value: "123 ± 3 µm", nota: "Homogêneo quando parâmetros seguidos" },
+    { label: "Viabilidade celular", value: "> 95%", nota: "L929; verificar em tipo celular alvo" },
+    { label: "Temperatura de incubação", value: "37 °C / 5% CO₂", nota: "80% umidade para estabilidade" },
+    { label: "Tempo de formação", value: "24–48 h", nota: "Depende da cinética de auto-montagem celular" },
+    { label: "Micropinos (QMicroNiche)", value: "Ø 650 µm × 1,3 mm alt.", nota: "SLA – resina fotocurável" },
+  ]
+
+  const dicas = [
+    { icon: "⚠️", text: "Inserir o dispositivo no agarose SOMENTE quando ele ainda estiver completamente líquido. Bolhas de ar na interface comprometem a geometria das recessões." },
+    { icon: "⏳", text: "Aguardar solidificação COMPLETA (≥ 30 min) antes de remover o dispositivo. Remoção prematura deforma ou rompe as micro-recessões." },
+    { icon: "💧", text: "Ao adicionar meio após o plaqueamento celular, pipete lentamente pela parede do poço — correntes de líquido deslocam as células antes da sedimentação." },
+    { icon: "🔄", text: "O dispositivo QMicroNiche é reutilizável: esterilize com álcool 70% + UV a cada ciclo. Pode ser usado por longos períodos sem perda de precisão geométrica." },
+    { icon: "🔬", text: "Tipos celulares com baixa expressão de E-caderina ou integrina podem não compactar adequadamente. Validar com a linhagem de interesse antes de escalar." },
+    { icon: "🧬", text: "Para co-culturas: misturar as duas populações celulares antes do plaqueamento na proporção desejada — o processo de auto-montagem integra as células." },
+    { icon: "🏗️", text: "Para bioimpressão: esferoides formados no QMicroNiche funcionam como building blocks — coletar e usar diretamente no protocolo de impressão por fusão de esferoides." },
+    { icon: "🧫", text: "Alternativa ao agarose: PDMS (polidimetilsiloxano) é mais resistente, transparente e reutilizável com preservação geométrica superior — indicado para protocolos de longa duração." },
+  ]
+
+  const colorMap = {
+    blue:    { ring: "ring-blue-500/30",    bg: "bg-blue-500/10",    text: "text-blue-300",    dot: "bg-blue-400" },
+    teal:    { ring: "ring-teal-500/30",    bg: "bg-teal-500/10",    text: "text-teal-300",    dot: "bg-teal-400" },
+    amber:   { ring: "ring-amber-500/30",   bg: "bg-amber-500/10",   text: "text-amber-300",   dot: "bg-amber-400" },
+    emerald: { ring: "ring-emerald-500/30", bg: "bg-emerald-500/10", text: "text-emerald-300", dot: "bg-emerald-400" },
+    violet:  { ring: "ring-violet-500/30",  bg: "bg-violet-500/10",  text: "text-violet-300",  dot: "bg-violet-400" },
+    rose:    { ring: "ring-rose-500/30",    bg: "bg-rose-500/10",    text: "text-rose-300",    dot: "bg-rose-400" },
+  }
+
+  return (
+    <div className="rounded-xl border border-teal-500/25 bg-gradient-to-br from-[#071a17] via-[#09201c] to-[#060f1a] overflow-hidden">
+      {/* Header — sempre visível */}
+      <div className="p-4 sm:p-5">
+        {/* Badge publicação */}
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-500/15 border border-teal-500/25 text-[10px] font-semibold text-teal-300 uppercase tracking-wide">
+            <BookOpen className="w-3 h-3" />
+            JoVE · e63814 · Set 2022
+          </span>
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] text-gray-400">
+            DOI: 10.3791/63814
+          </span>
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-semibold text-amber-300">
+            ⭐ Método Quantis
+          </span>
+        </div>
+
+        {/* Título + subtítulo */}
+        <div className="flex items-start gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl bg-teal-500/15 border border-teal-500/20 flex items-center justify-center shrink-0">
+            <Layers className="w-5 h-5 text-teal-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="text-sm sm:text-base font-bold text-white leading-snug mb-1">
+              Protocolo QMicroNiche™ — Moldes Não-Adesivos para Esferoides e Organoides
+            </h4>
+            <p className="text-[11px] text-gray-400 leading-relaxed">
+              Metodologia publicada por{" "}
+              <span className="text-teal-300 font-semibold">Janaína A. Dernowsek</span>
+              , Letícia E. Charelli & Tiago A. Balbino (UFRJ / BioEdTech).
+              Geração em larga escala de esferoides homogêneos via dispositivo 3D impresso por SLA como molde mestre em agarose não-adesiva.
+            </p>
+          </div>
+        </div>
+
+        {/* Métricas rápidas */}
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          {[
+            { v: "4.716", label: "esferoides/placa", color: "text-teal-300" },
+            { v: ">95%", label: "viabilidade celular", color: "text-emerald-300" },
+            { v: "123 µm", label: "diâmetro homogêneo", color: "text-violet-300" },
+          ].map((m, i) => (
+            <div key={i} className="text-center py-2.5 px-2 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+              <div className={cn("text-base sm:text-lg font-bold", m.color)}>{m.v}</div>
+              <div className="text-[9px] text-gray-500 leading-tight mt-0.5">{m.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* CTA + expandir */}
+        <div className="flex gap-2">
+          <a
+            href="https://www.quantis.bio/product-page/qmicroniche"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-teal-500/20 active:scale-[0.98]"
+          >
+            <Microscope className="w-4 h-4" />
+            Conhecer o QMicroNiche™
+            <ExternalLink className="w-3 h-3" />
+          </a>
+          <button
+            onClick={() => setExpanded(v => !v)}
+            className="flex items-center gap-1.5 px-3 py-2.5 bg-white/5 border border-white/10 hover:border-white/20 text-gray-400 hover:text-white text-xs rounded-xl transition-all"
+          >
+            {expanded ? "Ocultar" : "Ver protocolo"}
+            <ChevronRight className={cn("w-3.5 h-3.5 transition-transform", expanded && "rotate-90")} />
+          </button>
+        </div>
+      </div>
+
+      {/* Corpo expandível */}
+      {expanded && (
+        <div className="border-t border-white/[0.06]">
+          {/* Tabs */}
+          <div className="flex gap-0 border-b border-white/[0.06]">
+            {[
+              { key: "protocolo", label: "📋 Protocolo Completo" },
+              { key: "parametros", label: "⚙️ Parâmetros" },
+              { key: "dicas",     label: "💡 Dicas Críticas" },
+            ].map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setActiveTab(t.key as typeof activeTab)}
+                className={cn(
+                  "flex-1 py-3 text-[11px] font-semibold transition-all border-b-2",
+                  activeTab === t.key
+                    ? "text-teal-300 border-teal-500 bg-teal-500/5"
+                    : "text-gray-500 border-transparent hover:text-gray-300"
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="p-4 sm:p-5">
+            {/* ─── Tab: Protocolo ─── */}
+            {activeTab === "protocolo" && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="flex-1 h-px bg-white/5" />
+                  <span className="text-[10px] text-gray-500 uppercase tracking-widest">Fluxo metodológico</span>
+                  <div className="flex-1 h-px bg-white/5" />
+                </div>
+                {steps.map((step, idx) => {
+                  const c = colorMap[step.color as keyof typeof colorMap]
+                  return (
+                    <div key={idx} className={cn("rounded-xl border p-4", `ring-1 ${c.ring}`, c.bg.replace("bg-", "bg-").replace("/10", "/[0.05]"))}>
+                      {/* Header da etapa */}
+                      <div className="flex items-center gap-2.5 mb-3">
+                        <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center text-base shrink-0", c.bg)}>
+                          {step.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-white">
+                              {String(idx + 1).padStart(2, "0")} — {step.phase}
+                            </span>
+                            <span className={cn("text-[10px] font-medium px-2 py-0.5 rounded-full", c.bg, c.text)}>
+                              ⏱ {step.time}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Itens */}
+                      <div className="space-y-1.5 pl-2">
+                        {step.items.map((item, j) => (
+                          <div key={j} className="flex items-start gap-2">
+                            <div className={cn("w-1.5 h-1.5 rounded-full shrink-0 mt-1.5", c.dot)} />
+                            <p className="text-[11px] text-gray-300 leading-relaxed">{item}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {/* Rodapé citação */}
+                <div className="mt-4 rounded-lg bg-white/[0.02] border border-white/[0.05] p-3">
+                  <p className="text-[10px] text-gray-500 leading-relaxed">
+                    <span className="text-gray-400 font-semibold">Referência: </span>
+                    Charelli, L.E., Dernowsek, J.A., Balbino, T.A.{" "}
+                    <span className="italic">Generation of Tissue Spheroids via a 3D Printed Stamp-Like Device.</span>{" "}
+                    J. Vis. Exp. (2022). DOI:{" "}
+                    <a href="https://doi.org/10.3791/63814" target="_blank" rel="noopener noreferrer"
+                      className="text-teal-400 hover:underline">10.3791/63814</a>
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* ─── Tab: Parâmetros ─── */}
+            {activeTab === "parametros" && (
+              <div>
+                <p className="text-[11px] text-gray-400 mb-4 leading-relaxed">
+                  Parâmetros críticos validados no artigo JoVE (2022) para o dispositivo QMicroNiche com placa 6-well.
+                  Ajuste conforme tipo celular e formato de placa utilizado.
+                </p>
+                <div className="space-y-2">
+                  {params.map((p, i) => (
+                    <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-white/[0.02] border border-white/[0.05] hover:border-teal-500/15 transition-colors">
+                      <div className="w-5 h-5 rounded bg-teal-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                        <ThumbsUp className="w-3 h-3 text-teal-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className="text-xs text-gray-300">{p.label}</span>
+                          <span className="text-xs font-bold text-teal-300 shrink-0">{p.value}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-0.5">{p.nota}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Formatos compatíveis */}
+                <div className="mt-4 rounded-xl bg-white/[0.02] border border-white/[0.05] p-4">
+                  <h5 className="text-xs font-semibold text-white mb-2">Formatos de Placa Compatíveis</h5>
+                  <div className="flex flex-wrap gap-2">
+                    {["Petri 35 mm", "Petri 60 mm", "Petri 90 mm", "Petri 150 mm",
+                      "6-well", "12-well", "24-well", "96-well"].map((f) => (
+                      <span key={f} className="px-2.5 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-[10px] text-teal-300">
+                        {f}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ─── Tab: Dicas Críticas ─── */}
+            {activeTab === "dicas" && (
+              <div className="space-y-2.5">
+                <p className="text-[11px] text-gray-400 mb-3 leading-relaxed">
+                  Pontos críticos identificados no artigo JoVE e na experiência prática da equipe Quantis.
+                </p>
+                {dicas.map((d, i) => (
+                  <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-white/[0.02] border border-white/[0.05]">
+                    <span className="text-base shrink-0">{d.icon}</span>
+                    <p className="text-[11px] text-gray-300 leading-relaxed">{d.text}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ── Organoid Protocol Viewer Component ───────────────────────────────────────
 function OrganoidProtocolViewer({ protocol, organoidType }: { protocol: string; organoidType: string }) {
@@ -101,6 +432,9 @@ function OrganoidProtocolViewer({ protocol, organoidType }: { protocol: string; 
           )
         })}
       </div>
+
+      {/* ── QMicroNiche Section (JoVE Protocol - Janaína Dernowsek) ── */}
+      <QMicroNicheSection />
 
       {/* QMatrix Section */}
       <div className="rounded-xl border border-violet-500/20 bg-gradient-to-br from-violet-500/10 via-purple-500/8 to-blue-500/10 p-5 relative overflow-hidden">
@@ -420,6 +754,37 @@ export default function OrganoidsPage() {
                     <><Zap className="w-4 h-4" /> Gerar Design (15 créditos)</>
                   )}
                 </button>
+
+                {/* QMicroNiche highlight — tela inicial */}
+                <div className="rounded-xl border border-teal-500/20 bg-gradient-to-r from-teal-500/5 to-cyan-500/5 p-4">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="w-8 h-8 rounded-lg bg-teal-500/15 flex items-center justify-center shrink-0">
+                      <Layers className="w-4 h-4 text-teal-400" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-white mb-1">
+                        💡 Método Recomendado: Moldes Não-Adesivos QMicroNiche™
+                      </h4>
+                      <p className="text-[11px] text-gray-400 leading-relaxed">
+                        Metodologia Quantis (publicada na{" "}
+                        <span className="text-teal-300">JoVE, 2022</span>) para geração de
+                        esferoides e organoides em larga escala — 4.716 esferoides por placa de 6 poços,
+                        homogêneos, viabilidade {">"}95%. O protocolo IA irá integrar automaticamente
+                        esta abordagem quando aplicável.
+                      </p>
+                    </div>
+                  </div>
+                  <a
+                    href="https://www.quantis.bio/product-page/qmicroniche"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1.5 w-full py-2 border border-teal-500/25 text-teal-300 hover:bg-teal-500/10 text-xs font-semibold rounded-lg transition-all"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    Saiba mais sobre o QMicroNiche™
+                  </a>
+                </div>
+
               </div>
             </div>
           ) : (
