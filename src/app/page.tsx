@@ -3,7 +3,7 @@ import {
   ArrowRight, FlaskConical, Brain, Layers, Microscope, Zap,
   Shield, BarChart3, CheckCircle2, Star,
   Pill, Heart, Leaf, Building2, GraduationCap, TestTube2,
-  TrendingUp, AlertCircle, Crown,
+  TrendingUp, AlertCircle, Crown, CircleDot,
   ChevronRight
 } from "lucide-react"
 
@@ -359,6 +359,51 @@ export default function HomePage() {
                 className="block w-full text-center py-2.5 px-4 rounded-xl font-medium text-sm border border-white/10 text-gray-300 hover:bg-white/5 transition-all">
                 Criar conta grátis
               </Link>
+            </div>
+          </div>
+
+          {/* Organoid Lab highlight — plano especialista */}
+          <div className="max-w-3xl mx-auto mb-8 rounded-2xl border border-teal-500/30 bg-gradient-to-br from-teal-500/8 via-cyan-500/4 to-transparent p-5 sm:p-6 hover:border-teal-500/50 transition-all">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="flex items-center gap-3 sm:flex-1">
+                <div className="w-11 h-11 rounded-2xl bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0">
+                  <CircleDot className="w-5 h-5 text-teal-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base font-bold text-white">Organoid Builder</h3>
+                    <span className="px-2 py-0.5 rounded-full bg-teal-600 text-white text-[10px] font-bold">ESPECIALISTA</span>
+                  </div>
+                  <p className="text-xs text-teal-200/70 mt-0.5">
+                    Construa organoides e esferoides com orientação inteligente, seleção celular guiada e protocolos personalizados.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 sm:shrink-0">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-white">R$ 150</div>
+                  <div className="text-[10px] text-gray-400">/mês · 300 créditos</div>
+                </div>
+                <Link href="https://www.asaas.com/c/24p0skdjkpacozta" target="_blank"
+                  className="px-5 py-2.5 rounded-xl bg-teal-500 text-white text-sm font-semibold hover:bg-teal-400 transition-all whitespace-nowrap shadow-lg shadow-teal-900/40">
+                  Assinar →
+                </Link>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {[
+                "Builder de organoides guiado",
+                "Builder de esferoides monocelulares",
+                "Seleção celular inteligente",
+                "Protocolos automatizados por IA",
+                "Sugestões de biomateriais",
+                "Estratégia experimental guiada",
+              ].map((f) => (
+                <div key={f} className="flex items-center gap-1.5 text-xs text-teal-200/80">
+                  <CheckCircle2 className="w-3 h-3 text-teal-400 shrink-0" />
+                  <span>{f}</span>
+                </div>
+              ))}
             </div>
           </div>
 

@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { CircleDot, Loader2, Zap, CheckCircle2, ChevronDown, History, Plus, X,
+import { CircleDot, Loader2, Zap, CheckCircle2, History, Plus, X,
   ArrowRight, Beaker, Clock, AlertCircle, Target, FlaskConical, MessageCircle, ExternalLink,
-  BookOpen, Layers, Microscope, ThumbsUp, ChevronRight,
+  BookOpen, Layers, Microscope, ThumbsUp, ChevronRight, Dna,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
@@ -20,14 +20,216 @@ interface OrganoidDesign {
   createdAt?: string
 }
 
+/* ── Ícones SVG científicos inline ────────────────────────────────────── */
+function LungIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 12c0-3.31 2.69-6 6-6V4" />
+      <path d="M6 12c0 2.21-1.79 4-4 4s-1-1.5-1-3V9c0-1.66 1.34-3 3-3h2" />
+      <path d="M18 12c0-3.31-2.69-6-6-6" />
+      <path d="M18 12c0 2.21 1.79 4 4 4s1-1.5 1-3V9c0-1.66-1.34-3-3-3h-2" />
+      <path d="M9 20c0 1.1.9 2 2 2h2a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v6z" />
+    </svg>
+  )
+}
+
+function IntestineIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 6c0-1.1.9-2 2-2h1a2 2 0 0 1 2 2v3a2 2 0 0 0 2 2 2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H9a2 2 0 0 0-2 2v1a2 2 0 0 0 2 2h6" />
+      <path d="M15 20a2 2 0 0 0 2-2v-2a2 2 0 0 1 2-2 2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-1" />
+    </svg>
+  )
+}
+
+function LiverIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 8c0-3.31-2.69-6-6-6-2.49 0-4.63 1.52-5.59 3.71A4 4 0 0 0 4 9.5a4 4 0 0 0 4 4c.55 0 1.07-.11 1.55-.31" />
+      <path d="M9.5 13.5C8.84 15.5 7 18 7 20h10c0-2-1.84-4.5-2.5-6.5" />
+      <path d="M12 6v3" />
+    </svg>
+  )
+}
+
+function SkinIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="20" height="4" rx="1" />
+      <rect x="2" y="10" width="20" height="4" rx="1" />
+      <rect x="2" y="17" width="20" height="4" rx="1" />
+      <line x1="6" y1="7" x2="6" y2="10" />
+      <line x1="12" y1="7" x2="12" y2="10" />
+      <line x1="18" y1="7" x2="18" y2="10" />
+      <line x1="9" y1="14" x2="9" y2="17" />
+      <line x1="15" y1="14" x2="15" y2="17" />
+    </svg>
+  )
+}
+
+function SpheroidIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="3" />
+      <circle cx="8" cy="9" r="1.5" />
+      <circle cx="16" cy="9" r="1.5" />
+      <circle cx="8" cy="15" r="1.5" />
+      <circle cx="16" cy="15" r="1.5" />
+      <circle cx="12" cy="6" r="1" />
+      <circle cx="12" cy="18" r="1" />
+    </svg>
+  )
+}
+
+/* ── Tipos de organoides com ícones científicos ────────────────────────── */
 const ORGANOID_TYPES = [
-  { value: "intestinal",   label: "Intestinal",   icon: "🫁", desc: "Cripta-vilo, absorção, barreira" },
-  { value: "hepatico",     label: "Hepático",     icon: "🫀", desc: "Metabolismo, detox, bile" },
-  { value: "neural",       label: "Neural",       icon: "🧠", desc: "Córtex cerebral, mini-brain" },
-  { value: "cardiaco",     label: "Cardíaco",     icon: "❤️", desc: "Cardiomiócitos, contratilidade" },
-  { value: "renal",        label: "Renal",        icon: "🫘", desc: "Néfrons, filtração glomerular" },
-  { value: "pancreatico",  label: "Pancreático",  icon: "🔬", desc: "Ilhotas, insulina, glucagon" },
-  { value: "pulmonar",     label: "Pulmonar",     icon: "🌬️", desc: "Alvéolos, surfactante, barreira" },
+  {
+    value: "intestinal",
+    label: "Intestinal",
+    icon: <IntestineIcon className="w-5 h-5" />,
+    emoji: "🫁",
+    desc: "Cripta-vilo, absorção, barreira intestinal",
+    color: "emerald",
+    category: "organoid",
+  },
+  {
+    value: "hepatico",
+    label: "Hepático",
+    icon: <LiverIcon className="w-5 h-5" />,
+    emoji: "🟤",
+    desc: "Metabolismo, detoxificação, produção de bile",
+    color: "amber",
+    category: "organoid",
+  },
+  {
+    value: "neural",
+    label: "Neural",
+    icon: <Dna className="w-5 h-5" />,
+    emoji: "🧠",
+    desc: "Córtex cerebral, mini-brain, neurônios",
+    color: "violet",
+    category: "organoid",
+  },
+  {
+    value: "cardiaco",
+    label: "Cardíaco",
+    icon: <Beaker className="w-5 h-5" />,
+    emoji: "❤️",
+    desc: "Cardiomiócitos, contratilidade, arritmia",
+    color: "rose",
+    category: "organoid",
+  },
+  {
+    value: "renal",
+    label: "Renal",
+    icon: <FlaskConical className="w-5 h-5" />,
+    emoji: "🫘",
+    desc: "Néfrons, filtração glomerular, tubular",
+    color: "blue",
+    category: "organoid",
+  },
+  {
+    value: "pancreatico",
+    label: "Pancreático",
+    icon: <Target className="w-5 h-5" />,
+    emoji: "🔬",
+    desc: "Ilhotas de Langerhans, insulina, glucagon",
+    color: "orange",
+    category: "organoid",
+  },
+  {
+    value: "pulmonar",
+    label: "Pulmonar",
+    icon: <LungIcon className="w-5 h-5" />,
+    emoji: "💨",
+    desc: "Alvéolos, surfactante, barreira ar-sangue",
+    color: "sky",
+    category: "organoid",
+  },
+  {
+    value: "dermico",
+    label: "Dérmico",
+    icon: <SkinIcon className="w-5 h-5" />,
+    emoji: "🩹",
+    desc: "Epiderme, derme, pele completa, cicatrização",
+    color: "pink",
+    category: "organoid",
+    isNew: true,
+  },
+]
+
+/* ── Tipo esferóide ─────────────────────────────────────────────────────── */
+const SPHEROID_ITEM = {
+  value: "esferoide",
+  label: "Esferoides Monocelulares",
+  icon: <SpheroidIcon className="w-5 h-5" />,
+  emoji: "⚪",
+  desc: "Agregados 3D de um único tipo celular",
+  color: "teal",
+  category: "spheroid",
+  isNew: true,
+}
+
+/* ── Tipos celulares para esferoides ─────────────────────────────────── */
+const SPHEROID_CELL_TYPES = [
+  { value: "fibroblastos",    label: "Fibroblastos",              group: "Tecido Conjuntivo" },
+  { value: "queratinócitos",  label: "Queratinócitos",            group: "Pele" },
+  { value: "MSC",             label: "MSC (Mesenquimais)",        group: "Tronco" },
+  { value: "celulas_tumorais",label: "Células Tumorais",          group: "Oncologia" },
+  { value: "hepatocitos",     label: "Hepatócitos",               group: "Fígado" },
+  { value: "endoteliais",     label: "Células Endoteliais",       group: "Vascular" },
+  { value: "cardiomiocitos",  label: "Cardiomiócitos",            group: "Coração" },
+  { value: "neuronios",       label: "Neurônios",                 group: "Neural" },
+  { value: "iPSC",            label: "iPSC",                      group: "Tronco" },
+  { value: "condrocitos",     label: "Condrócitos",               group: "Cartilagem" },
+  { value: "osteoblastos",    label: "Osteoblastos",              group: "Osso" },
+  { value: "epiteliais",      label: "Células Epiteliais",        group: "Epitelial" },
+  { value: "beta_pancreatico",label: "Células Pancreáticas (β)",  group: "Pâncreas" },
+  { value: "alveolares",      label: "Células Alveolares",        group: "Pulmão" },
+  { value: "renais",          label: "Células Renais",            group: "Rim" },
+]
+
+/* ── Dados campo dérmico ────────────────────────────────────────────────── */
+const DERMIC_CELL_TYPES = [
+  { value: "queratinocitosDerm", label: "Queratinócitos" },
+  { value: "fibroblastosDerm",   label: "Fibroblastos" },
+  { value: "endoteliais",        label: "Células Endoteliais (opcional)" },
+  { value: "melanocitos",        label: "Melanócitos (opcional)" },
+  { value: "imunes",             label: "Células Imunes (opcional)" },
+]
+
+const DERMIC_STRUCTURES = [
+  { value: "epiderme",         label: "Epiderme" },
+  { value: "derme",            label: "Derme" },
+  { value: "full_thickness",   label: "Full Thickness Skin" },
+  { value: "skin_equivalent",  label: "Skin Equivalent" },
+]
+
+const DERMIC_OBJECTIVES = [
+  { value: "cosmetico",        label: "Cosmético" },
+  { value: "regenerativo",     label: "Regenerativo" },
+  { value: "doenca",           label: "Modelagem de Doença" },
+  { value: "screening",        label: "Screening de Drogas" },
+  { value: "biomaterial",      label: "Teste de Biomateriais" },
+]
+
+/* ── Métodos de formação de esferoides ─────────────────────────────────── */
+const SPHEROID_METHODS = [
+  { value: "nao_aderente",  label: "Não Aderente (agarose)", desc: "QMicroNiche™ recomendado" },
+  { value: "micropinos",    label: "Micropinos / QMicroNiche™", desc: "Método validado JoVE 2022" },
+  { value: "hanging_drop",  label: "Hanging Drop", desc: "Gotas suspensas" },
+  { value: "hidrogel",      label: "Hidrogel/Matrigel", desc: "Encapsulamento 3D" },
+  { value: "spinner",       label: "Spinner Flask", desc: "Agitação contínua" },
+]
+
+const SPHEROID_OBJECTIVES = [
+  { value: "screening",    label: "Screening de Compostos" },
+  { value: "regeneracao",  label: "Regeneração Tecidual" },
+  { value: "tumor",        label: "Modelo Tumoral" },
+  { value: "co_cultura",   label: "Co-cultura Futura" },
+  { value: "ecm",          label: "Produção de ECM" },
+  { value: "implante",     label: "Implante Experimental" },
 ]
 
 const CELL_SOURCES = [
@@ -36,6 +238,19 @@ const CELL_SOURCES = [
   { value: "Adult_Stem",   label: "Células-Tronco Adultas" },
   { value: "Primary",      label: "Células Primárias" },
 ]
+
+/* ── Mapa de cores por tipo ──────────────────────────────────────────────── */
+const COLOR_MAP: Record<string, string> = {
+  emerald: "border-emerald-500/25 bg-emerald-500/8 text-emerald-300",
+  amber:   "border-amber-500/25 bg-amber-500/8 text-amber-300",
+  violet:  "border-violet-500/25 bg-violet-500/8 text-violet-300",
+  rose:    "border-rose-500/25 bg-rose-500/8 text-rose-300",
+  blue:    "border-blue-500/25 bg-blue-500/8 text-blue-300",
+  orange:  "border-orange-500/25 bg-orange-500/8 text-orange-300",
+  sky:     "border-sky-500/25 bg-sky-500/8 text-sky-300",
+  pink:    "border-pink-500/25 bg-pink-500/8 text-pink-300",
+  teal:    "border-teal-500/25 bg-teal-500/8 text-teal-300",
+}
 
 // ── QMicroNiche Section ───────────────────────────────────────────────────────
 // Baseado no artigo JoVE: Charelli, Dernowsek & Balbino, e63814 (2022)
@@ -503,6 +718,354 @@ function OrganoidProtocolViewer({ protocol, organoidType }: { protocol: string; 
   )
 }
 
+/* ── Builder de esferoides ────────────────────────────────────────────── */
+function SpheroidBuilder({
+  onResult,
+}: {
+  onResult: (r: OrganoidDesign) => void
+}) {
+  const [cellType, setCellType]       = useState("")
+  const [diameter, setDiameter]       = useState("200")
+  const [cellsPerSphere, setCellsPerSphere] = useState("5000")
+  const [method, setMethod]           = useState("micropinos")
+  const [objective, setObjective]     = useState("screening")
+  const [building, setBuilding]       = useState(false)
+
+  async function buildSpheroide() {
+    if (!cellType) return
+    setBuilding(true)
+    try {
+      const purpose = `Esferoide monocelular de ${cellType} — diâmetro alvo ${diameter} µm, ` +
+        `${cellsPerSphere} células/esferoide, método: ${method}, objetivo: ${objective}. ` +
+        `Integrar sugestão de uso de QMicroNiche™ para produção padronizada e escalável.`
+      const res = await fetch("/api/organoids", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organoidType: "esferoide",
+          purpose,
+          cellSource: cellType,
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        onResult({ ...data, organoidType: `Esferoide · ${cellType}` })
+      } else {
+        const err = await res.json()
+        alert(err.error)
+      }
+    } finally { setBuilding(false) }
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="rounded-xl border border-teal-500/20 bg-gradient-to-r from-teal-500/8 to-cyan-500/5 p-4">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-8 h-8 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center">
+            <SpheroidIcon className="w-4 h-4 text-teal-400" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-white">Builder de Esferoides Monocelulares</h3>
+            <p className="text-[10px] text-teal-300/70">Agregados 3D de um único tipo celular — protocolo gerado por IA</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tipo celular */}
+      <div>
+        <label className="text-xs font-semibold text-gray-400 block mb-2 uppercase tracking-wide">
+          Tipo Celular
+        </label>
+        <div className="grid grid-cols-1 gap-1.5 max-h-56 overflow-y-auto pr-1">
+          {SPHEROID_CELL_TYPES.map((ct) => (
+            <button
+              key={ct.value}
+              onClick={() => setCellType(ct.value)}
+              className={cn(
+                "w-full text-left flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all active:scale-[0.98] group",
+                cellType === ct.value
+                  ? "border-teal-500/30 bg-teal-500/10 text-white"
+                  : "border-white/5 bg-white/2 text-gray-300 hover:border-white/15 hover:bg-white/4"
+              )}
+            >
+              <span className="text-xs font-medium">{ct.label}</span>
+              <span className={cn(
+                "text-[9px] px-1.5 py-0.5 rounded-md font-semibold",
+                cellType === ct.value
+                  ? "bg-teal-500/20 text-teal-300"
+                  : "bg-white/5 text-gray-600 group-hover:text-gray-500"
+              )}>
+                {ct.group}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Diâmetro e nº células */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-semibold text-gray-400 block mb-1.5 uppercase tracking-wide">
+            Diâmetro Alvo (µm)
+          </label>
+          <input
+            type="number"
+            value={diameter}
+            onChange={e => setDiameter(e.target.value)}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500/40"
+          />
+          <p className="text-[10px] text-gray-600 mt-1">Padrão QMicroNiche: 123 µm</p>
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-gray-400 block mb-1.5 uppercase tracking-wide">
+            Células / Esferoide
+          </label>
+          <input
+            type="number"
+            value={cellsPerSphere}
+            onChange={e => setCellsPerSphere(e.target.value)}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500/40"
+          />
+          <p className="text-[10px] text-gray-600 mt-1">Ajuste por tipo celular</p>
+        </div>
+      </div>
+
+      {/* Método de formação */}
+      <div>
+        <label className="text-xs font-semibold text-gray-400 block mb-2 uppercase tracking-wide">
+          Método de Formação
+        </label>
+        <div className="space-y-1.5">
+          {SPHEROID_METHODS.map((m) => (
+            <label
+              key={m.value}
+              className={cn(
+                "flex items-center justify-between p-3 rounded-xl cursor-pointer border transition-all",
+                method === m.value
+                  ? "border-teal-500/25 bg-teal-500/8"
+                  : "border-white/5 bg-white/2 hover:border-white/10"
+              )}
+            >
+              <div className="flex items-center gap-2.5">
+                <input type="radio" value={m.value} checked={method === m.value}
+                  onChange={() => setMethod(m.value)} className="accent-teal-500" />
+                <div>
+                  <p className="text-xs font-medium text-white">{m.label}</p>
+                  <p className="text-[10px] text-gray-500">{m.desc}</p>
+                </div>
+              </div>
+              {(m.value === "micropinos" || m.value === "nao_aderente") && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-teal-500/20 text-teal-300 shrink-0">
+                  QUANTIS
+                </span>
+              )}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Objetivo */}
+      <div>
+        <label className="text-xs font-semibold text-gray-400 block mb-2 uppercase tracking-wide">
+          Objetivo
+        </label>
+        <div className="grid grid-cols-2 gap-1.5">
+          {SPHEROID_OBJECTIVES.map((obj) => (
+            <button
+              key={obj.value}
+              onClick={() => setObjective(obj.value)}
+              className={cn(
+                "py-2.5 px-3 rounded-xl text-xs font-medium border transition-all active:scale-[0.98]",
+                objective === obj.value
+                  ? "border-teal-500/30 bg-teal-500/10 text-teal-300"
+                  : "border-white/5 bg-white/2 text-gray-400 hover:border-white/15 hover:text-gray-300"
+              )}
+            >
+              {obj.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* QMicroNiche hint */}
+      <div className="rounded-xl border border-teal-500/15 bg-teal-500/5 p-3 flex items-start gap-2.5">
+        <div className="w-6 h-6 rounded-lg bg-teal-500/20 flex items-center justify-center shrink-0 mt-0.5">
+          <Layers className="w-3.5 h-3.5 text-teal-400" />
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-teal-300 mb-0.5">QMicroNiche™ recomendado</p>
+          <p className="text-[10px] text-gray-400 leading-relaxed">
+            A IA BIA integrará automaticamente o protocolo de moldes não-adesivos de agarose 2% (JoVE 2022, Dernowsek) — até 4.716 esferoides/placa, &gt;95% viabilidade.
+          </p>
+        </div>
+      </div>
+
+      {/* Botão gerar */}
+      <button
+        onClick={buildSpheroide}
+        disabled={building || !cellType}
+        className="w-full py-3.5 rounded-xl bg-teal-500 text-white text-sm font-semibold hover:bg-teal-400 transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] shadow-lg shadow-teal-900/30"
+      >
+        {building ? (
+          <><Loader2 className="w-4 h-4 animate-spin" /> Gerando protocolo...</>
+        ) : (
+          <><Zap className="w-4 h-4" /> Gerar Protocolo (15 créditos)</>
+        )}
+      </button>
+    </div>
+  )
+}
+
+/* ── Builder dérmico ─────────────────────────────────────────────────── */
+function DermicBuilder({
+  onResult,
+}: {
+  onResult: (r: OrganoidDesign) => void
+}) {
+  const [cellTypes, setCellTypes]     = useState<string[]>([])
+  const [structure, setStructure]     = useState("full_thickness")
+  const [objective, setObjective]     = useState("cosmetico")
+  const [building, setBuilding]       = useState(false)
+
+  function toggleCell(v: string) {
+    setCellTypes(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v])
+  }
+
+  async function buildDermico() {
+    if (cellTypes.length === 0) return
+    setBuilding(true)
+    try {
+      const purpose = `Organoide dérmico com células: ${cellTypes.join(", ")}. ` +
+        `Estrutura: ${structure}. Objetivo: ${objective}. ` +
+        `Incluir estratégias de vascularização quando aplicável, uso de QMatrix™ e biomateriais dérmicos validados. ` +
+        `Gerar protocolo completo de montagem de pele artificial.`
+      const res = await fetch("/api/organoids", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organoidType: "dermico",
+          purpose,
+          cellSource: cellTypes[0] || "Primary",
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        onResult({ ...data, organoidType: `Dérmico · ${structure}` })
+      } else {
+        const err = await res.json()
+        alert(err.error)
+      }
+    } finally { setBuilding(false) }
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="rounded-xl border border-pink-500/20 bg-gradient-to-r from-pink-500/8 to-rose-500/5 p-4">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-8 h-8 rounded-lg bg-pink-500/15 border border-pink-500/25 flex items-center justify-center">
+            <SkinIcon className="w-4 h-4 text-pink-400" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-white">Organoide Dérmico</h3>
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-pink-500/20 text-pink-300">NOVO</span>
+            </div>
+            <p className="text-[10px] text-pink-300/70">Modelos de pele — epiderme, derme, cicatrização, cosmético</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Células */}
+      <div>
+        <label className="text-xs font-semibold text-gray-400 block mb-2 uppercase tracking-wide">
+          Tipo Celular Principal <span className="text-gray-600 normal-case">(selecione um ou mais)</span>
+        </label>
+        <div className="space-y-1.5">
+          {DERMIC_CELL_TYPES.map((ct) => (
+            <label
+              key={ct.value}
+              className={cn(
+                "flex items-center gap-2.5 p-3 rounded-xl cursor-pointer border transition-all",
+                cellTypes.includes(ct.value)
+                  ? "border-pink-500/25 bg-pink-500/8"
+                  : "border-white/5 bg-white/2 hover:border-white/10"
+              )}
+            >
+              <input
+                type="checkbox"
+                checked={cellTypes.includes(ct.value)}
+                onChange={() => toggleCell(ct.value)}
+                className="accent-pink-500 w-3.5 h-3.5"
+              />
+              <span className="text-xs text-gray-200">{ct.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Estrutura */}
+      <div>
+        <label className="text-xs font-semibold text-gray-400 block mb-2 uppercase tracking-wide">
+          Estrutura Desejada
+        </label>
+        <div className="grid grid-cols-2 gap-1.5">
+          {DERMIC_STRUCTURES.map((s) => (
+            <button
+              key={s.value}
+              onClick={() => setStructure(s.value)}
+              className={cn(
+                "py-2.5 px-3 rounded-xl text-xs font-medium border transition-all active:scale-[0.98]",
+                structure === s.value
+                  ? "border-pink-500/30 bg-pink-500/10 text-pink-300"
+                  : "border-white/5 bg-white/2 text-gray-400 hover:border-white/15 hover:text-gray-300"
+              )}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Objetivo */}
+      <div>
+        <label className="text-xs font-semibold text-gray-400 block mb-2 uppercase tracking-wide">
+          Objetivo do Modelo
+        </label>
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+          {DERMIC_OBJECTIVES.map((obj) => (
+            <button
+              key={obj.value}
+              onClick={() => setObjective(obj.value)}
+              className={cn(
+                "py-2.5 px-3 rounded-xl text-xs font-medium border transition-all active:scale-[0.98]",
+                objective === obj.value
+                  ? "border-pink-500/30 bg-pink-500/10 text-pink-300"
+                  : "border-white/5 bg-white/2 text-gray-400 hover:border-white/15 hover:text-gray-300"
+              )}
+            >
+              {obj.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <button
+        onClick={buildDermico}
+        disabled={building || cellTypes.length === 0}
+        className="w-full py-3.5 rounded-xl bg-pink-600 text-white text-sm font-semibold hover:bg-pink-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] shadow-lg shadow-pink-900/30"
+      >
+        {building ? (
+          <><Loader2 className="w-4 h-4 animate-spin" /> Gerando protocolo...</>
+        ) : (
+          <><Zap className="w-4 h-4" /> Gerar Protocolo Dérmico (15 créditos)</>
+        )}
+      </button>
+    </div>
+  )
+}
+
 export default function OrganoidsPage() {
   const [designs, setDesigns]         = useState<OrganoidDesign[]>([])
   const [selectedType, setSelectedType] = useState("")
@@ -511,7 +1074,9 @@ export default function OrganoidsPage() {
   const [designing, setDesigning]     = useState(false)
   const [result, setResult]           = useState<OrganoidDesign | null>(null)
   const [showHistory, setShowHistory] = useState(false)  // mobile history drawer
-  const [showTypeMenu, setShowTypeMenu] = useState(false) // mobile type picker
+
+  // builder mode: "organoid" | "spheroid" | "dermic"
+  const [builderMode, setBuilderMode] = useState<"organoid" | "spheroid" | "dermic">("organoid")
 
   useEffect(() => { loadDesigns() }, [])
 
@@ -541,7 +1106,10 @@ export default function OrganoidsPage() {
     } finally { setDesigning(false) }
   }
 
-  const selectedTypeObj = ORGANOID_TYPES.find(t => t.value === selectedType)
+  function handleSpecialResult(r: OrganoidDesign) {
+    setResult(r)
+    loadDesigns()
+  }
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -551,7 +1119,11 @@ export default function OrganoidsPage() {
         <SidebarContent
           designs={designs}
           selectedType={selectedType}
-          onSelectType={setSelectedType}
+          onSelectType={(v) => {
+            if (v === "esferoide") { setBuilderMode("spheroid"); setSelectedType("") }
+            else if (v === "dermico") { setBuilderMode("dermic"); setSelectedType("") }
+            else { setBuilderMode("organoid"); setSelectedType(v) }
+          }}
           onSelectDesign={(d) => setResult(d)}
         />
       </div>
@@ -614,178 +1186,246 @@ export default function OrganoidsPage() {
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {!result ? (
             <div className="max-w-xl mx-auto">
-              <div className="hidden md:block mb-6">
+
+              {/* Header */}
+              <div className="hidden md:block mb-5">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-1">
                   <CircleDot className="w-5 h-5 text-teal-400" />
                   Organoid Builder
                 </h2>
                 <p className="text-sm text-gray-400">
-                  Design assistido por IA para protocolos de diferenciação
+                  Design assistido por IA — organoides, esferoides e tecidos
                 </p>
               </div>
 
-              <div className="space-y-4 sm:space-y-5">
+              {/* ── Tabs de modo ─────────────────────────────────────── */}
+              <div className="flex gap-1 p-1 bg-white/5 rounded-2xl mb-5 border border-white/5">
+                {[
+                  { key: "organoid", label: "Organoides", icon: <CircleDot className="w-3.5 h-3.5" /> },
+                  { key: "spheroid", label: "Esferoides", icon: <SpheroidIcon className="w-3.5 h-3.5" /> },
+                  { key: "dermic",   label: "Dérmico",    icon: <SkinIcon className="w-3.5 h-3.5" /> },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setBuilderMode(tab.key as "organoid" | "spheroid" | "dermic")}
+                    className={cn(
+                      "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all",
+                      builderMode === tab.key
+                        ? tab.key === "spheroid"
+                          ? "bg-teal-500/20 text-teal-300 shadow-sm"
+                          : tab.key === "dermic"
+                            ? "bg-pink-500/20 text-pink-300 shadow-sm"
+                            : "bg-teal-500/20 text-teal-300 shadow-sm"
+                        : "text-gray-500 hover:text-gray-300"
+                    )}
+                  >
+                    {tab.icon}
+                    {tab.label}
+                    {(tab.key === "spheroid" || tab.key === "dermic") && (
+                      <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-teal-500/30 text-teal-300 leading-none">NEW</span>
+                    )}
+                  </button>
+                ))}
+              </div>
 
-                {/* Type selector — mobile uses dropdown, desktop uses full list in sidebar */}
-                <div>
-                  <label className="text-xs font-medium text-gray-400 block mb-2 uppercase tracking-wide">
-                    Tipo de Organoide
-                  </label>
+              {/* ── Modo ESFEROIDES ─────────────────────────────────── */}
+              {builderMode === "spheroid" && (
+                <SpheroidBuilder onResult={handleSpecialResult} />
+              )}
 
-                  {/* Mobile: dropdown button */}
-                  <div className="md:hidden">
-                    <button
-                      onClick={() => setShowTypeMenu(!showTypeMenu)}
-                      className={cn(
-                        "w-full flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all",
-                        selectedType
-                          ? "border-teal-500/30 bg-teal-500/5"
-                          : "border-white/10 bg-white/5"
-                      )}
-                    >
-                      {selectedTypeObj ? (
-                        <>
-                          <span className="text-lg">{selectedTypeObj.icon}</span>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-white">{selectedTypeObj.label}</p>
-                            <p className="text-[10px] text-gray-500">{selectedTypeObj.desc}</p>
-                          </div>
-                        </>
-                      ) : (
-                        <span className="text-sm text-gray-500 flex-1">Selecione o tipo...</span>
-                      )}
-                      <ChevronDown className={cn("w-4 h-4 text-gray-500 shrink-0 transition-transform", showTypeMenu && "rotate-180")} />
-                    </button>
+              {/* ── Modo DÉRMICO ────────────────────────────────────── */}
+              {builderMode === "dermic" && (
+                <DermicBuilder onResult={handleSpecialResult} />
+              )}
 
-                    {showTypeMenu && (
-                      <div className="mt-1 rounded-xl border border-white/10 bg-[#0d0720] overflow-hidden shadow-xl">
-                        {ORGANOID_TYPES.map((type) => (
+              {/* ── Modo ORGANOIDES (padrão) ─────────────────────────── */}
+              {builderMode === "organoid" && (
+                <div className="space-y-4 sm:space-y-5">
+
+                  {/* Seção: Organoides */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="h-px flex-1 bg-white/5" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-gray-600">Organoides</span>
+                      <div className="h-px flex-1 bg-white/5" />
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-2 gap-2">
+                      {ORGANOID_TYPES.filter(t => t.value !== "dermico").map((type) => {
+                        const colors = COLOR_MAP[type.color] || COLOR_MAP.teal
+                        const isSelected = selectedType === type.value
+                        return (
                           <button
                             key={type.value}
-                            onClick={() => { setSelectedType(type.value); setShowTypeMenu(false) }}
+                            onClick={() => setSelectedType(type.value)}
                             className={cn(
-                              "w-full text-left flex items-center gap-3 px-4 py-3 transition-all",
-                              selectedType === type.value
-                                ? "bg-teal-500/10 text-teal-300"
-                                : "text-gray-300 hover:bg-white/5"
+                              "relative group text-left p-3 rounded-xl border transition-all duration-200 active:scale-[0.97]",
+                              isSelected
+                                ? colors
+                                : "border-white/5 bg-white/2 hover:border-white/15 hover:bg-white/4 hover:shadow-lg hover:shadow-black/20"
                             )}
                           >
-                            <span className="text-base">{type.icon}</span>
-                            <div>
-                              <p className="text-xs font-medium">{type.label}</p>
-                              <p className="text-[10px] text-gray-500">{type.desc}</p>
+                            {type.isNew && (
+                              <span className="absolute top-1.5 right-1.5 text-[8px] font-bold px-1 py-0.5 rounded bg-teal-500/30 text-teal-300 leading-none">NEW</span>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <div className={cn(
+                                "w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-all",
+                                isSelected
+                                  ? "bg-white/10"
+                                  : "bg-white/5 group-hover:bg-white/8"
+                              )}>
+                                <span className={cn(
+                                  "transition-colors",
+                                  isSelected ? "" : "text-gray-400 group-hover:text-gray-300"
+                                )}>
+                                  {type.icon}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="text-xs font-semibold text-white">{type.label}</p>
+                                <p className="text-[9px] text-gray-500 leading-tight mt-0.5">{type.desc}</p>
+                              </div>
                             </div>
                           </button>
-                        ))}
-                      </div>
-                    )}
+                        )
+                      })}
+                    </div>
                   </div>
 
-                  {/* Desktop: type grid */}
-                  <div className="hidden md:grid grid-cols-2 gap-2">
-                    {ORGANOID_TYPES.map((type) => (
-                      <button
-                        key={type.value}
-                        onClick={() => setSelectedType(type.value)}
-                        className={cn(
-                          "text-left p-3 rounded-xl border transition-all active:scale-[0.98]",
-                          selectedType === type.value
-                            ? "bg-teal-500/10 border-teal-500/20"
-                            : "border-white/5 bg-white/2 hover:border-white/10"
-                        )}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">{type.icon}</span>
-                          <div>
-                            <p className="text-xs font-medium text-white">{type.label}</p>
-                            <p className="text-[10px] text-gray-500">{type.desc}</p>
-                          </div>
+                  {/* Seção: Dérmico separado */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="h-px flex-1 bg-white/5" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-gray-600">Tecidos Especializados</span>
+                      <div className="h-px flex-1 bg-white/5" />
+                    </div>
+                    <button
+                      onClick={() => setBuilderMode("dermic")}
+                      className="w-full group text-left p-3 rounded-xl border border-pink-500/15 bg-pink-500/5 hover:border-pink-500/30 hover:bg-pink-500/8 transition-all duration-200 active:scale-[0.98]"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-pink-500/15 border border-pink-500/20 flex items-center justify-center shrink-0">
+                          <SkinIcon className="w-4 h-4 text-pink-400" />
                         </div>
-                      </button>
-                    ))}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs font-semibold text-pink-300">Dérmico / Pele</p>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-pink-500/20 text-pink-300">NOVO</span>
+                          </div>
+                          <p className="text-[10px] text-gray-500 mt-0.5">Epiderme, derme, full thickness, cicatrização, cosmético</p>
+                        </div>
+                        <ArrowRight className="w-3.5 h-3.5 text-pink-400 shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                      </div>
+                    </button>
                   </div>
-                </div>
 
-                {/* Purpose textarea */}
-                <div>
-                  <label className="text-xs font-medium text-gray-400 block mb-1.5 uppercase tracking-wide">
-                    Finalidade / Propósito
-                  </label>
-                  <textarea
-                    value={purpose}
-                    onChange={e => setPurpose(e.target.value)}
-                    placeholder="ex: Modelagem de doença de Crohn para triagem de drogas; Estudo de infecção por SARS-CoV-2"
-                    rows={3}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-teal-500/40 resize-none leading-relaxed"
-                  />
-                </div>
-
-                {/* Cell source */}
-                <div>
-                  <label className="text-xs font-medium text-gray-400 block mb-2 uppercase tracking-wide">
-                    Fonte Celular
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                    {CELL_SOURCES.map((cs) => (
-                      <label key={cs.value}
-                        className={cn(
-                          "flex items-center gap-2.5 p-3 rounded-xl cursor-pointer border transition-all",
-                          cellSource === cs.value
-                            ? "border-teal-500/25 bg-teal-500/5"
-                            : "border-white/5 bg-white/2 hover:border-white/10"
-                        )}>
-                        <input type="radio" value={cs.value} checked={cellSource === cs.value}
-                          onChange={() => setCellSource(cs.value)} className="accent-teal-500" />
-                        <span className="text-xs text-gray-300 leading-tight">{cs.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Submit */}
-                <button
-                  onClick={designOrganoid}
-                  disabled={designing || !selectedType || !purpose}
-                  className="w-full py-3.5 rounded-xl bg-teal-500 text-white text-sm font-semibold hover:bg-teal-400 transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
-                >
-                  {designing ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Gerando protocolo com IA...</>
-                  ) : (
-                    <><Zap className="w-4 h-4" /> Gerar Design (15 créditos)</>
-                  )}
-                </button>
-
-                {/* QMicroNiche highlight — tela inicial */}
-                <div className="rounded-xl border border-teal-500/20 bg-gradient-to-r from-teal-500/5 to-cyan-500/5 p-4">
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="w-8 h-8 rounded-lg bg-teal-500/15 flex items-center justify-center shrink-0">
-                      <Layers className="w-4 h-4 text-teal-400" />
+                  {/* Seção: Esferoides */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="h-px flex-1 bg-white/5" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-gray-600">Esferoides</span>
+                      <div className="h-px flex-1 bg-white/5" />
                     </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-white mb-1">
-                        💡 Método Recomendado: Moldes Não-Adesivos QMicroNiche™
-                      </h4>
-                      <p className="text-[11px] text-gray-400 leading-relaxed">
-                        Metodologia Quantis (publicada na{" "}
-                        <span className="text-teal-300">JoVE, 2022</span>) para geração de
-                        esferoides e organoides em larga escala — 4.716 esferoides por placa de 6 poços,
-                        homogêneos, viabilidade {">"}95%. O protocolo IA irá integrar automaticamente
-                        esta abordagem quando aplicável.
-                      </p>
+                    <button
+                      onClick={() => setBuilderMode("spheroid")}
+                      className="w-full group text-left p-3 rounded-xl border border-teal-500/15 bg-teal-500/5 hover:border-teal-500/30 hover:bg-teal-500/8 transition-all duration-200 active:scale-[0.98]"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-teal-500/15 border border-teal-500/20 flex items-center justify-center shrink-0">
+                          <SpheroidIcon className="w-4 h-4 text-teal-400" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs font-semibold text-teal-300">Esferoides Monocelulares</p>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-teal-500/20 text-teal-300">NOVO</span>
+                          </div>
+                          <p className="text-[10px] text-gray-500 mt-0.5">15 tipos celulares — fibroblastos, MSC, tumorais, hepatócitos e mais</p>
+                        </div>
+                        <ArrowRight className="w-3.5 h-3.5 text-teal-400 shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Finalidade */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-400 block mb-1.5 uppercase tracking-wide">
+                      Finalidade / Propósito
+                    </label>
+                    <textarea
+                      value={purpose}
+                      onChange={e => setPurpose(e.target.value)}
+                      placeholder="ex: Modelagem de doença de Crohn para triagem de drogas; Estudo de infecção por SARS-CoV-2"
+                      rows={3}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-teal-500/40 resize-none leading-relaxed"
+                    />
+                  </div>
+
+                  {/* Fonte celular */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-400 block mb-2 uppercase tracking-wide">
+                      Fonte Celular
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                      {CELL_SOURCES.map((cs) => (
+                        <label key={cs.value}
+                          className={cn(
+                            "flex items-center gap-2.5 p-3 rounded-xl cursor-pointer border transition-all",
+                            cellSource === cs.value
+                              ? "border-teal-500/25 bg-teal-500/5"
+                              : "border-white/5 bg-white/2 hover:border-white/10"
+                          )}>
+                          <input type="radio" value={cs.value} checked={cellSource === cs.value}
+                            onChange={() => setCellSource(cs.value)} className="accent-teal-500" />
+                          <span className="text-xs text-gray-300 leading-tight">{cs.label}</span>
+                        </label>
+                      ))}
                     </div>
                   </div>
-                  <a
-                    href="https://www.quantis.bio/product-page/qmicroniche"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-1.5 w-full py-2 border border-teal-500/25 text-teal-300 hover:bg-teal-500/10 text-xs font-semibold rounded-lg transition-all"
+
+                  {/* Submit */}
+                  <button
+                    onClick={designOrganoid}
+                    disabled={designing || !selectedType || !purpose}
+                    className="w-full py-3.5 rounded-xl bg-teal-500 text-white text-sm font-semibold hover:bg-teal-400 transition-all disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] shadow-lg shadow-teal-900/30"
                   >
-                    <ExternalLink className="w-3 h-3" />
-                    Saiba mais sobre o QMicroNiche™
-                  </a>
-                </div>
+                    {designing ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Gerando protocolo com IA...</>
+                    ) : (
+                      <><Zap className="w-4 h-4" /> Gerar Design (15 créditos)</>
+                    )}
+                  </button>
 
-              </div>
+                  {/* QMicroNiche highlight */}
+                  <div className="rounded-xl border border-teal-500/20 bg-gradient-to-r from-teal-500/5 to-cyan-500/5 p-4">
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="w-8 h-8 rounded-lg bg-teal-500/15 flex items-center justify-center shrink-0">
+                        <Layers className="w-4 h-4 text-teal-400" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white mb-1">
+                          💡 Método Recomendado: Moldes Não-Adesivos QMicroNiche™
+                        </h4>
+                        <p className="text-[11px] text-gray-400 leading-relaxed">
+                          Metodologia Quantis (publicada na{" "}
+                          <span className="text-teal-300">JoVE, 2022</span>) para geração de
+                          esferoides e organoides em larga escala — 4.716 esferoides por placa de 6 poços,
+                          homogêneos, viabilidade {">"}95%.
+                        </p>
+                      </div>
+                    </div>
+                    <a
+                      href="https://www.quantis.bio/product-page/qmicroniche"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-1.5 w-full py-2 border border-teal-500/25 text-teal-300 hover:bg-teal-500/10 text-xs font-semibold rounded-lg transition-all"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      Saiba mais sobre o QMicroNiche™
+                    </a>
+                  </div>
+
+                </div>
+              )}
             </div>
           ) : (
             /* ── Result ── */
@@ -879,6 +1519,11 @@ function SidebarContent({
 }) {
   const [tab, setTab] = useState<"new" | "history">("new")
 
+  const allItems = [
+    ...ORGANOID_TYPES,
+    SPHEROID_ITEM,
+  ]
+
   return (
     <>
       <div className="p-4 border-b border-white/5">
@@ -897,28 +1542,95 @@ function SidebarContent({
 
       <div className="flex-1 overflow-y-auto p-3">
         {tab === "new" ? (
-          <div>
-            <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold mb-2 px-1">
-              Tipo de Organoide
-            </p>
-            <div className="space-y-1">
-              {ORGANOID_TYPES.map((type) => (
-                <button key={type.value} onClick={() => onSelectType(type.value)}
-                  className={cn(
-                    "w-full text-left p-3 rounded-xl transition-all active:scale-[0.98]",
-                    selectedType === type.value
-                      ? "bg-teal-500/10 border border-teal-500/20"
-                      : "hover:bg-white/3 border border-transparent"
-                  )}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">{type.icon}</span>
-                    <div>
-                      <p className="text-xs font-medium text-white">{type.label}</p>
-                      <p className="text-[10px] text-gray-500">{type.desc}</p>
-                    </div>
+          <div className="space-y-3">
+            {/* Organoides */}
+            <div>
+              <p className="text-[9px] text-gray-600 uppercase tracking-widest font-bold mb-1.5 px-1">
+                Organoides
+              </p>
+              <div className="space-y-0.5">
+                {allItems.filter(t => t.category === "organoid" && t.value !== "dermico").map((type) => {
+                  const colors = COLOR_MAP[type.color] || COLOR_MAP.teal
+                  const isSelected = selectedType === type.value
+                  return (
+                    <button key={type.value} onClick={() => onSelectType(type.value)}
+                      className={cn(
+                        "w-full text-left p-2.5 rounded-xl transition-all active:scale-[0.97] group",
+                        isSelected
+                          ? colors + " border"
+                          : "hover:bg-white/4 border border-transparent"
+                      )}>
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          "w-6 h-6 flex items-center justify-center shrink-0",
+                          isSelected ? "" : "text-gray-500 group-hover:text-gray-300"
+                        )}>
+                          {type.icon}
+                        </span>
+                        <div>
+                          <p className="text-xs font-medium text-white">{type.label}</p>
+                          <p className="text-[9px] text-gray-600">{type.desc.split(",")[0]}</p>
+                        </div>
+                        {type.isNew && (
+                          <span className="ml-auto text-[8px] font-bold px-1 py-0.5 rounded bg-teal-500/20 text-teal-400 shrink-0">NEW</span>
+                        )}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Tecidos Especializados */}
+            <div>
+              <p className="text-[9px] text-gray-600 uppercase tracking-widest font-bold mb-1.5 px-1">
+                Tecidos
+              </p>
+              <button onClick={() => onSelectType("dermico")}
+                className={cn(
+                  "w-full text-left p-2.5 rounded-xl transition-all active:scale-[0.97] group",
+                  selectedType === "dermico"
+                    ? "border border-pink-500/25 bg-pink-500/8 text-pink-300"
+                    : "hover:bg-white/4 border border-transparent"
+                )}>
+                <div className="flex items-center gap-2">
+                  <span className={cn("w-6 h-6 flex items-center justify-center shrink-0",
+                    selectedType === "dermico" ? "text-pink-400" : "text-gray-500 group-hover:text-gray-300")}>
+                    <SkinIcon className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <p className="text-xs font-medium text-white">Dérmico</p>
+                    <p className="text-[9px] text-gray-600">Epiderme · Derme · Pele</p>
                   </div>
-                </button>
-              ))}
+                  <span className="ml-auto text-[8px] font-bold px-1 py-0.5 rounded bg-pink-500/20 text-pink-400 shrink-0">NEW</span>
+                </div>
+              </button>
+            </div>
+
+            {/* Esferoides */}
+            <div>
+              <p className="text-[9px] text-gray-600 uppercase tracking-widest font-bold mb-1.5 px-1">
+                Esferoides
+              </p>
+              <button onClick={() => onSelectType("esferoide")}
+                className={cn(
+                  "w-full text-left p-2.5 rounded-xl transition-all active:scale-[0.97] group",
+                  selectedType === "esferoide"
+                    ? "border border-teal-500/25 bg-teal-500/8 text-teal-300"
+                    : "hover:bg-white/4 border border-transparent"
+                )}>
+                <div className="flex items-center gap-2">
+                  <span className={cn("w-6 h-6 flex items-center justify-center shrink-0",
+                    selectedType === "esferoide" ? "text-teal-400" : "text-gray-500 group-hover:text-gray-300")}>
+                    <SpheroidIcon className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <p className="text-xs font-medium text-white">Esferoides Mono.</p>
+                    <p className="text-[9px] text-gray-600">15 tipos celulares</p>
+                  </div>
+                  <span className="ml-auto text-[8px] font-bold px-1 py-0.5 rounded bg-teal-500/20 text-teal-400 shrink-0">NEW</span>
+                </div>
+              </button>
             </div>
           </div>
         ) : (
