@@ -6,19 +6,21 @@ import { Prisma, SubscriptionPlan, SubscriptionStatus } from "@prisma/client"
 // ============================================
 
 export const PLAN_CREDITS: Record<SubscriptionPlan, number> = {
-  FREE: 10,
-  DISCOVERY: 500,
-  ADVANCED: 1500,
-  ENTERPRISE: 5000,
-  ACADEMY: 20000,
+  FREE:         10,
+  ORGANOID_LAB: 300,
+  DISCOVERY:    500,
+  ADVANCED:     1500,
+  ENTERPRISE:   5000,
+  ACADEMY:      20000,
 }
 
 export const PLAN_PRICES: Record<SubscriptionPlan, number> = {
-  FREE: 0,
-  DISCOVERY: 270,
-  ADVANCED: 490,
-  ENTERPRISE: 990,
-  ACADEMY: 4970,
+  FREE:         0,
+  ORGANOID_LAB: 150,
+  DISCOVERY:    270,
+  ADVANCED:     490,
+  ENTERPRISE:   990,
+  ACADEMY:      4970,
 }
 
 // ============================================

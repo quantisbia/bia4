@@ -57,15 +57,16 @@ const BOTTOM_ITEMS = [
 ]
 
 const PLAN_CREDITS: Record<string, number> = {
-  DISCOVERY: 500, ADVANCED: 1500, ENTERPRISE: 5000, ACADEMY: 20000,
+  ORGANOID_LAB: 300, DISCOVERY: 500, ADVANCED: 1500, ENTERPRISE: 5000, ACADEMY: 20000,
 }
 
 const PLAN_COLORS: Record<string, string> = {
-  FREE:       "bg-gray-500/10 border-gray-500/20 text-gray-400",
-  DISCOVERY:  "bg-violet-500/10 border-violet-500/20 text-violet-400",
-  ADVANCED:   "bg-blue-500/10 border-blue-500/20 text-blue-400",
-  ENTERPRISE: "bg-purple-500/10 border-purple-500/20 text-purple-400",
-  ACADEMY:    "bg-amber-500/10 border-amber-500/20 text-amber-400",
+  FREE:         "bg-gray-500/10 border-gray-500/20 text-gray-400",
+  ORGANOID_LAB: "bg-teal-500/10 border-teal-500/20 text-teal-400",
+  DISCOVERY:    "bg-violet-500/10 border-violet-500/20 text-violet-400",
+  ADVANCED:     "bg-blue-500/10 border-blue-500/20 text-blue-400",
+  ENTERPRISE:   "bg-purple-500/10 border-purple-500/20 text-purple-400",
+  ACADEMY:      "bg-amber-500/10 border-amber-500/20 text-amber-400",
 }
 
 /* ──────────────────────────────────────────────────────────────────────────

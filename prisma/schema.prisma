@@ -370,6 +370,7 @@ enum UserRole {
 
 enum SubscriptionPlan {
   FREE
+  ORGANOID_LAB
   DISCOVERY
   ADVANCED
   ENTERPRISE

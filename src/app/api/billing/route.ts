@@ -30,7 +30,7 @@ export async function GET() {
 
 // POST /api/billing — simular upgrade de plano (mock — sem Stripe ainda)
 const upgradeSchema = z.object({
-  plan: z.enum(["FREE", "DISCOVERY", "ADVANCED", "ENTERPRISE", "ACADEMY"]),
+  plan: z.enum(["FREE", "ORGANOID_LAB", "DISCOVERY", "ADVANCED", "ENTERPRISE", "ACADEMY"]),
 })
 
 export async function POST(req: NextRequest) {

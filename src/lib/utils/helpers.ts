@@ -68,11 +68,12 @@ export function getCreditCost(action: string): number {
 
 export function getPlanColor(plan: string): string {
   const colors: Record<string, string> = {
-    FREE: "gray",
-    DISCOVERY: "emerald",
-    ADVANCED: "blue",
-    ENTERPRISE: "purple",
-    ACADEMY: "amber",
+    FREE:         "gray",
+    ORGANOID_LAB: "teal",
+    DISCOVERY:    "emerald",
+    ADVANCED:     "blue",
+    ENTERPRISE:   "purple",
+    ACADEMY:      "amber",
   }
   return colors[plan] || "gray"
 }

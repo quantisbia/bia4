@@ -19,11 +19,12 @@ export const siteConfig = {
 
 // ─── Créditos por plano ────────────────────────────────────────────────────────
 export const PLAN_CREDITS: Record<string, number> = {
-  FREE:       10,
-  DISCOVERY:  500,
-  ADVANCED:   1500,
-  ENTERPRISE: 5000,
-  ACADEMY:    20000,
+  FREE:         10,
+  ORGANOID_LAB: 300,
+  DISCOVERY:    500,
+  ADVANCED:     1500,
+  ENTERPRISE:   5000,
+  ACADEMY:      20000,
 }
 
 // ─── Custo de cada ação ────────────────────────────────────────────────────────
@@ -45,15 +46,18 @@ export type CreditAction = keyof typeof CREDIT_COSTS
 // Cada feature define quais planos têm acesso.
 // "todos" = FREE+, "discovery+" = DISCOVERY ou acima, etc.
 
-type PlanTier = "FREE" | "DISCOVERY" | "ADVANCED" | "ENTERPRISE" | "ACADEMY"
+type PlanTier = "FREE" | "ORGANOID_LAB" | "DISCOVERY" | "ADVANCED" | "ENTERPRISE" | "ACADEMY"
 
-const PLAN_ORDER: PlanTier[] = ["FREE", "DISCOVERY", "ADVANCED", "ENTERPRISE", "ACADEMY"]
+const PLAN_ORDER: PlanTier[] = ["FREE", "ORGANOID_LAB", "DISCOVERY", "ADVANCED", "ENTERPRISE", "ACADEMY"]
 
 export const PLAN_FEATURES: Record<string, PlanTier> = {
   // ── Módulos básicos ──────────────────────────────────────
   dashboard:                "FREE",
   chat_ia:                  "FREE",
   knowledge_search:         "FREE",
+
+  // ── Organoid Lab (plano focado) ──────────────────────────
+  organoids:                "ORGANOID_LAB",  // Organoid Builder incluso neste plano
 
   // ── Módulos intermediários ───────────────────────────────
   pipeline:                 "DISCOVERY",
@@ -64,7 +68,6 @@ export const PLAN_FEATURES: Record<string, PlanTier> = {
   // ── Módulos avançados ────────────────────────────────────
   biomaterials_advanced:    "ADVANCED",       // 807+ formulações
   protocols_advanced:       "ADVANCED",       // dossiê regulatório completo
-  organoids:                "ADVANCED",
   bioprinting_advanced:     "ADVANCED",       // STL/GCode avançado + reologia CFD
   electrospinning:          "ADVANCED",
 
@@ -108,17 +111,39 @@ export function canAccess(userPlan: string, feature: string): boolean {
 export function requiredPlanLabel(feature: string): string {
   const tier = PLAN_FEATURES[feature]
   const LABELS: Record<string, string> = {
-    FREE:       "Gratuito",
-    DISCOVERY:  "Discovery",
-    ADVANCED:   "Advanced",
-    ENTERPRISE: "Enterprise",
-    ACADEMY:    "Academy",
+    FREE:         "Gratuito",
+    ORGANOID_LAB: "Organoid Lab",
+    DISCOVERY:    "Discovery",
+    ADVANCED:     "Advanced",
+    ENTERPRISE:   "Enterprise",
+    ACADEMY:      "Academy",
   }
   return LABELS[tier ?? "FREE"] ?? "Discovery"
 }
 
 // ─── Descrição dos planos (para UI) ──────────────────────────────────────────
 export const PLAN_INFO = {
+  ORGANOID_LAB: {
+    name: "Organoid Lab",
+    price: 150,
+    credits: 300,
+    badge: "ESPECIALISTA" as string | null,
+    color: "teal",
+    paymentUrl: "https://www.asaas.com/c/24p0skdjkpacozta",
+    highlight: "Desenvolvedor de esferoides e organoides — foco total, custo acessível",
+    features: [
+      "300 créditos/mês",
+      "Organoid Builder completo",
+      "Protocolo QMicroNiche™ integrado",
+      "Geração de protocolos de diferenciação por IA",
+      "7 tipos de organoides (intestinal, hepático, neural, cardíaco, renal, pancreático, pulmonar)",
+      "Integração QMatrix™ e moldes não-adesivos",
+      "Histórico e gestão de designs",
+      "Chat IA BIA (contexto organoides)",
+      "Base de conhecimento científica",
+    ],
+    limits: { projects: 3, protocols: 10, pipelines: 0 },
+  },
   DISCOVERY: {
     name: "BIA Discovery",
     price: 270,
