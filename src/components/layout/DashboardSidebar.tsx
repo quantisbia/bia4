@@ -57,7 +57,7 @@ const BOTTOM_ITEMS = [
 ]
 
 const PLAN_CREDITS: Record<string, number> = {
-  ORGANOID_LAB: 300, DISCOVERY: 500, ADVANCED: 1500, ENTERPRISE: 5000, ACADEMY: 20000,
+  FREE: 30, ORGANOID_LAB: 300, DISCOVERY: 500, ADVANCED: 1500, ENTERPRISE: 5000, ACADEMY: 20000,
 }
 
 const PLAN_COLORS: Record<string, string> = {
@@ -204,7 +204,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             )} style={{ width: `${pct}%` }} />
           </div>
           <div className="flex justify-between mt-1.5">
-            <span className="text-[10px] text-gray-600">{pct.toFixed(0)}% utilizado</span>
+            <span className="text-[10px] text-gray-600">{pct.toFixed(0)}% restante</span>
             <Link href="/dashboard/billing" onClick={onNavigate}
               className={cn(
                 "text-[10px] font-medium transition-colors",

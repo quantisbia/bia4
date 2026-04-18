@@ -2,21 +2,10 @@ import { auth } from "@/lib/auth/config"
 import { getCreditBalance, spendCredits } from "@/lib/db/queries"
 import { Prisma } from "@prisma/client"
 import { NextResponse } from "next/server"
+import { CREDIT_COSTS, type CreditAction } from "@/lib/config"
 
-// Credit costs per action
-export const CREDIT_COSTS = {
-  PIPELINE_STAGE:         5,
-  BIOMATERIAL_FORMULATION:10,
-  ORGANOID_DESIGN:        15,
-  PROTOCOL_GENERATION:    8,
-  REGULATORY_DOSSIER:     20,
-  ANALYSIS_RUN:           12,
-  STL_GCODE:              6,
-  CHAT_MESSAGE:           2,
-  KNOWLEDGE_SEARCH:       1,
-} as const
-
-export type CreditAction = keyof typeof CREDIT_COSTS
+export { CREDIT_COSTS }
+export type { CreditAction }
 
 /**
  * Check if user is ADMIN — admins bypass ALL credit and plan restrictions

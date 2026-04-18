@@ -156,7 +156,7 @@ const COLOR = {
 }
 
 const PLAN_CREDITS_MAX: Record<string, number> = {
-  FREE: 10, ORGANOID_LAB: 300, DISCOVERY: 500, ADVANCED: 1500, ENTERPRISE: 5000, ACADEMY: 20000,
+  FREE: 30, ORGANOID_LAB: 300, DISCOVERY: 500, ADVANCED: 1500, ENTERPRISE: 5000, ACADEMY: 20000,
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

@@ -17,9 +17,9 @@ export const siteConfig = {
   version: "4.0.0",
 }
 
-// ─── Créditos por plano ────────────────────────────────────────────────────────
+// ─── Créditos por plano (FREE aumentado para 30 créditos trial) ─────────────────
 export const PLAN_CREDITS: Record<string, number> = {
-  FREE:         10,
+  FREE:         30,
   ORGANOID_LAB: 300,
   DISCOVERY:    500,
   ADVANCED:     1500,
@@ -48,7 +48,7 @@ export type CreditAction = keyof typeof CREDIT_COSTS
 
 type PlanTier = "FREE" | "ORGANOID_LAB" | "DISCOVERY" | "ADVANCED" | "ENTERPRISE" | "ACADEMY"
 
-const PLAN_ORDER: PlanTier[] = ["FREE", "ORGANOID_LAB", "DISCOVERY", "ADVANCED", "ENTERPRISE", "ACADEMY"]
+// Hierarquia de planos definida dentro de canAccess()
 
 export const PLAN_FEATURES: Record<string, PlanTier> = {
   // ── Módulos básicos ──────────────────────────────────────
@@ -95,13 +95,33 @@ export const PLAN_FEATURES: Record<string, PlanTier> = {
 
 /**
  * Verifica se um plano tem acesso a uma feature.
+ * ORGANOID_LAB é tratado como plano LATERAL — tem acesso às features FREE
+ * + organoids, mas NÃO tem acesso a features DISCOVERY+.
+ * Para hierarquia geral: FREE < DISCOVERY < ADVANCED < ENTERPRISE < ACADEMY.
  */
 export function canAccess(userPlan: string, feature: string): boolean {
   const required = PLAN_FEATURES[feature]
   if (!required) return true // feature não mapeada = livre
-  const userIdx   = PLAN_ORDER.indexOf(userPlan as PlanTier)
-  const reqIdx    = PLAN_ORDER.indexOf(required)
+
+  // ORGANOID_LAB: acesso especial — plano lateral
+  if (userPlan === "ORGANOID_LAB") {
+    // Tem acesso a features FREE + organoids
+    if (required === "FREE" || required === "ORGANOID_LAB") return true
+    return false
+  }
+
+  // Hierarquia padrão (sem ORGANOID_LAB no meio)
+  const MAIN_HIERARCHY: PlanTier[] = ["FREE", "DISCOVERY", "ADVANCED", "ENTERPRISE", "ACADEMY"]
+  const userIdx = MAIN_HIERARCHY.indexOf(userPlan as PlanTier)
   if (userIdx === -1) return false
+
+  // Para features que requerem ORGANOID_LAB, planos ADVANCED+ também têm acesso
+  if (required === "ORGANOID_LAB") {
+    return userIdx >= MAIN_HIERARCHY.indexOf("ADVANCED")
+  }
+
+  const reqIdx = MAIN_HIERARCHY.indexOf(required)
+  if (reqIdx === -1) return false
   return userIdx >= reqIdx
 }
 

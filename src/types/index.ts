@@ -3,7 +3,7 @@
 // ============================================
 
 export type UserRole = "USER" | "ADMIN" | "RESEARCHER"
-export type SubscriptionPlan = "FREE" | "DISCOVERY" | "ADVANCED" | "ENTERPRISE" | "ACADEMY"
+export type SubscriptionPlan = "FREE" | "ORGANOID_LAB" | "DISCOVERY" | "ADVANCED" | "ENTERPRISE" | "ACADEMY"
 export type SubscriptionStatus = "ACTIVE" | "INACTIVE" | "CANCELLED" | "PAST_DUE"
 export type TransactionType = "CREDIT" | "DEBIT"
 export type PipelineStatus = "DRAFT" | "IN_PROGRESS" | "COMPLETED" | "ARCHIVED"
@@ -50,19 +50,33 @@ export interface PlanConfig {
 
 export const PLANS: PlanConfig[] = [
   {
+    id: "ORGANOID_LAB",
+    name: "Organoid Lab",
+    price: 150,
+    credits: 300,
+    color: "teal",
+    features: [
+      "300 créditos/mês",
+      "Organoid Builder completo",
+      "Protocolo QMicroNiche™",
+      "7 tipos de organoides por IA",
+      "QMatrix™ integrado",
+      "Chat IA (contexto organoides)",
+    ],
+  },
+  {
     id: "DISCOVERY",
     name: "Discovery",
     price: 270,
     credits: 500,
     color: "violet",
-    popular: true,
     features: [
       "500 créditos/mês",
       "Pipeline de 12 etapas",
-      "Formulador básico (50 formulações)",
-      "Chat IA (limitado)",
-      "Base de conhecimento (20 artigos)",
-      "Suporte por email",
+      "Formulador básico de biomateriais",
+      "Chat IA BIA",
+      "Base de conhecimento",
+      "5 projetos ativos",
     ],
   },
   {
@@ -71,15 +85,16 @@ export const PLANS: PlanConfig[] = [
     price: 490,
     credits: 1500,
     color: "blue",
+    popular: true,
     features: [
       "1.500 créditos/mês",
-      "Pipeline completo",
-      "Formulador avançado (400 formulações)",
-      "Organoid Builder",
-      "Chat IA ilimitado",
-      "Base de conhecimento completa",
-      "Gerador de protocolos",
-      "Suporte prioritário",
+      "Todos os módulos",
+      "Formulador avançado (807+ formulações)",
+      "Organoid Builder completo",
+      "Bioimpressão 3D + STL/G-Code",
+      "Reologia CFD",
+      "Análises: molecular, bioquímica, celular",
+      "20 projetos ativos",
     ],
   },
   {
@@ -91,12 +106,12 @@ export const PLANS: PlanConfig[] = [
     features: [
       "5.000 créditos/mês",
       "Tudo do Advanced",
-      "Formulador completo (807+ formulações)",
-      "RAG personalizado",
-      "API access",
-      "Relatórios avançados",
-      "Gerenciamento de equipe",
-      "Suporte dedicado",
+      "Dossiê Regulatório (FDA/ANVISA/EMA)",
+      "Análises in vivo e pré-clínicas",
+      "Inteligência de mercado",
+      "Acesso à API",
+      "Projetos ilimitados",
+      "Suporte prioritário",
     ],
   },
   {
@@ -104,28 +119,23 @@ export const PLANS: PlanConfig[] = [
     name: "Academy",
     price: 4970,
     credits: 20000,
-    color: "indigo",
+    color: "amber",
     features: [
       "20.000 créditos/mês",
       "Tudo do Enterprise",
-      "Treinamento dedicado",
-      "Personalização de IA",
+      "Workspace para equipes",
+      "Treinamento IA personalizado",
       "Integração ERP/LIMS",
-      "SLA garantido 99.9%",
+      "SLA garantido 99,9%",
       "Gerente de conta dedicado",
       "Acesso beta features",
     ],
   },
 ]
 
-export const CREDIT_COSTS = {
-  PIPELINE_STAGE: 5,
-  BIOMATERIAL_FORMULATION: 10,
-  ORGANOID_DESIGN: 15,
-  PROTOCOL_GENERATION: 8,
-  CHAT_MESSAGE: 2,
-  KNOWLEDGE_SEARCH: 1,
-}
+// CREDIT_COSTS importar de @/lib/config.ts — fonte única de verdade
+// Reexportando para compatibilidade:
+export { CREDIT_COSTS } from "@/lib/config"
 
 // Pipeline Types
 export interface PipelineProject {
