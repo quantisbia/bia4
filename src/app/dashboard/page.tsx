@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import {
   TrendingUp, Zap, GitBranch, FlaskConical,
   MessageSquare, BookOpen, ArrowRight, Activity,
-  Clock, CheckCircle2, AlertCircle, CircleDot, FileText, Printer, Microscope, Box
+  Clock, CheckCircle2, AlertCircle, CircleDot, FileText, Printer, Microscope, Box, Wrench
 } from "lucide-react"
 import Link from "next/link"
 
@@ -47,6 +47,7 @@ export default async function DashboardPage() {
     { title: "Chat com IA",          desc: "Dúvidas científicas",    href: "/dashboard/chat",          icon: MessageSquare,color: "indigo" },
     { title: "Gerador STL/OBJ",      desc: "12 geometrias 3D",        href: "/dashboard/stl",           icon: Box,          color: "violet" },
     { title: "Base de Conhecimento", desc: "Pesquisar artigos",      href: "/dashboard/knowledge",     icon: BookOpen,     color: "blue"   },
+    { title: "Ferramentas BIA",     desc: "Comparador · Custos · PDF", href: "/dashboard/tools",         icon: Wrench,       color: "amber"  },
   ]
 
   return (

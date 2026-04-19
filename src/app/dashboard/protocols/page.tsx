@@ -255,6 +255,63 @@ export default function ProtocolsPage() {
     const win = window.open("", "_blank")
     if (!win) return
     const typeInfo = PROTOCOL_TYPES.find(t => t.value === p.type)
+    
+    // Simple markdown to HTML converter
+    function md2html(md: string): string {
+      let html = md
+        .replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        // Headers
+        .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        // Bold and italic
+        .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        // Blockquotes
+        .replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>')
+        // Horizontal rules
+        .replace(/^---+$/gm, '<hr/>')
+        // Code blocks
+        .replace(/```[\s\S]*?```/g, (match) => {
+          const code = match.replace(/```\w*\n?/, '').replace(/\n?```$/, '')
+          return `<pre><code>${code}</code></pre>`
+        })
+        // Inline code
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        // Unordered lists
+        .replace(/^[\-\*] (.+)$/gm, '<li>$1</li>')
+        // Ordered lists
+        .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+        // Tables (basic)
+        .replace(/\|(.+)\|/g, (match) => {
+          const cells = match.split('|').filter(c => c.trim())
+          if (cells.every(c => /^[\s\-:]+$/.test(c))) return ''
+          const isHeader = cells.some(c => /^\s*\*\*/.test(c))
+          const tag = isHeader ? 'th' : 'td'
+          return `<tr>${cells.map(c => `<${tag}>${c.trim().replace(/\*\*/g, '')}</${tag}>`).join('')}</tr>`
+        })
+        // Line breaks
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br/>')
+      
+      // Wrap in paragraphs
+      html = `<p>${html}</p>`
+      
+      // Clean up consecutive list items
+      html = html.replace(/(<li>.*?<\/li>(<br\/>)?)+/g, (match) => {
+        return `<ul>${match.replace(/<br\/>/g, '')}</ul>`
+      })
+      
+      // Wrap table rows
+      html = html.replace(/(<tr>.*?<\/tr>(<br\/>)?)+/g, (match) => {
+        return `<table>${match.replace(/<br\/>/g, '')}</table>`
+      })
+      
+      return html
+    }
+    
     win.document.write(`<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -275,38 +332,42 @@ export default function ProtocolsPage() {
     h4 { font-size: 11pt; color: #3730a3; margin: 10px 0 4px; }
     p { margin: 6px 0; color: #374151; }
     table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 10pt; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 6px; overflow: hidden; }
-    thead tr { background: #1e3a8a; color: white; }
-    thead th { padding: 8px 12px; text-align: left; font-weight: 600; font-size: 10pt; }
-    tbody tr:nth-child(even) { background: #f0f4ff; }
-    tbody tr:nth-child(odd) { background: white; }
-    tbody td { padding: 7px 12px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
-    tbody td:first-child { font-weight: 600; color: #1e3a8a; }
+    thead tr, tr:first-child { background: #1e3a8a; color: white; }
+    th { padding: 8px 12px; text-align: left; font-weight: 600; font-size: 10pt; }
+    tr:nth-child(even) { background: #f0f4ff; }
+    tr:nth-child(odd) { background: white; }
+    td { padding: 7px 12px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
     blockquote { border-left: 4px solid #f59e0b; padding: 8px 16px; background: #fffbeb; margin: 10px 0; color: #92400e; font-style: italic; border-radius: 0 6px 6px 0; }
     code { font-family: 'Consolas', monospace; background: #f3f4f6; padding: 2px 6px; border-radius: 3px; font-size: 9.5pt; color: #1e40af; border: 1px solid #e5e7eb; }
     pre { background: #0f172a; color: #a5f3fc; padding: 12px 16px; border-radius: 6px; font-size: 9pt; font-family: 'Consolas', monospace; overflow-x: auto; margin: 10px 0; }
-    ul { margin: 6px 0 6px 20px; }
+    pre code { background: none; border: none; padding: 0; color: inherit; }
+    ul, ol { margin: 6px 0 6px 24px; }
     li { margin-bottom: 4px; color: #374151; }
-    ol { margin: 6px 0 6px 24px; }
-    ol li { margin-bottom: 6px; }
     hr { border: none; border-top: 1px solid #e5e7eb; margin: 16px 0; }
     strong { color: #1e3a8a; }
-    .footer { margin-top: 36px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 9pt; color: #9ca3af; text-align: center; }
+    em { color: #4338ca; }
+    .content { margin-top: 8px; }
+    .footer { margin-top: 36px; padding-top: 12px; border-top: 2px solid #4338ca; font-size: 9pt; color: #9ca3af; text-align: center; }
+    .footer .disclaimer { color: #f59e0b; font-weight: 600; margin-bottom: 4px; }
     @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } @page { margin: 1.5cm; } .header { margin: -1.5cm -1.5cm 24px; } }
   </style>
 </head>
 <body>
 <div class="page">
   <div class="header">
-    <h1>📋 ${p.title}</h1>
+    <h1>${p.title}</h1>
     <div class="meta">
       <span class="badge">${typeInfo?.label ?? p.type}</span>
-      <span>Versão ${p.version}</span>
+      <span>Versao ${p.version}</span>
       <span>Gerado em ${new Date(p.createdAt).toLocaleDateString("pt-BR")}</span>
-      <span>BIA v4 — Biofabricação</span>
+      <span>BIA v4 — Biofabrication Intelligent Assistant</span>
     </div>
   </div>
-  <pre style="white-space: pre-wrap; font-family: inherit; font-size: 11pt; line-height: 1.65; background: none; color: #374151; padding: 0; border: none;">${p.content.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
-  <div class="footer">Protocolo gerado por BIA v4 — Validação por profissional habilitado obrigatória | ${new Date().toLocaleDateString("pt-BR")}</div>
+  <div class="content">${md2html(p.content)}</div>
+  <div class="footer">
+    <p class="disclaimer">Protocolo gerado por IA — Validacao por profissional habilitado obrigatoria</p>
+    <p>BIA v4 — Biofabrication Intelligent Assistant | Quantis Biotecnologia | ${new Date().toLocaleDateString("pt-BR")}</p>
+  </div>
 </div>
 <script>window.onload = function() { window.print(); }</script>
 </body>

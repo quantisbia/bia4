@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import {
   LayoutDashboard, GitBranch, MessageSquare, FlaskConical,
   BookOpen, FileText, MoreHorizontal, Printer, CircleDot, Microscope, Box,
-  X, CreditCard, ClipboardCheck, BookMarked
+  X, CreditCard, ClipboardCheck, BookMarked, Wrench
 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { cn } from "@/lib/utils/helpers"
@@ -26,6 +26,7 @@ const MORE_TABS = [
   { href: "/dashboard/stl",            label: "Gerador STL/OBJ",    icon: Box },
   { href: "/dashboard/protocol-total", label: "Protocolo Total",    icon: ClipboardCheck },
   { href: "/dashboard/notebook",       label: "Notebook",           icon: BookMarked },
+  { href: "/dashboard/tools",          label: "Ferramentas",        icon: Wrench },
   { href: "/dashboard/billing",        label: "Assinatura",         icon: CreditCard },
 ]
 

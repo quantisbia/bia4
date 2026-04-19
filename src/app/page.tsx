@@ -146,7 +146,7 @@ export default function HomePage() {
               { value: "807+", label: "Formulações bio" },
               { value: "12",   label: "Etapas pipeline" },
               { value: "120+", label: "Artigos científicos" },
-              { value: "6",    label: "Módulos IA" },
+              { value: "10",   label: "Biomateriais no comparador" },
             ].map((stat) => (
               <div key={stat.label} className="text-center">
                 <div className="text-2xl sm:text-3xl font-bold text-violet-400 mb-1">{stat.value}</div>

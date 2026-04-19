@@ -9,7 +9,7 @@ import {
   LayoutDashboard, GitBranch, FlaskConical, CircleDot,
   FileText, BookOpen, MessageSquare, CreditCard, Settings,
   LogOut, Zap, ChevronRight, Menu, X, Printer, Microscope, Box, ClipboardCheck, BookMarked,
-  Crown,
+  Crown, Wrench,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { isSuperAdmin } from "@/lib/auth/admin-shared"
@@ -49,6 +49,7 @@ export const NAV_ITEMS = [
   { href: "/dashboard/stl",            label: "Gerador STL/OBJ",     icon: Box,              exact: false },
   { href: "/dashboard/protocol-total", label: "Protocolo Total",      icon: ClipboardCheck,   exact: false },
   { href: "/dashboard/notebook",       label: "Notebook Científico",   icon: BookMarked,       exact: false },
+  { href: "/dashboard/tools",          label: "Ferramentas",            icon: Wrench,           exact: false },
 ]
 
 const BOTTOM_ITEMS = [
