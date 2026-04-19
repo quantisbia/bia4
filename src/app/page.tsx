@@ -145,7 +145,7 @@ export default function HomePage() {
             {[
               { value: "807+", label: "Formulações bio" },
               { value: "12",   label: "Etapas pipeline" },
-              { value: "110+", label: "Artigos científicos" },
+              { value: "120+", label: "Artigos científicos" },
               { value: "6",    label: "Módulos IA" },
             ].map((stat) => (
               <div key={stat.label} className="text-center">
@@ -277,7 +277,7 @@ export default function HomePage() {
               { icon: Layers,       title: "Pipeline Estruturado", desc: "12 etapas metodológicas validadas por especialistas, desde o tecido-alvo até a escalabilidade",           color: "blue"   },
               { icon: FlaskConical, title: "807+ Formulações",     desc: "Base de biomateriais com propriedades mecânicas, biocompatibilidade e aplicações mapeadas",                color: "purple" },
               { icon: Microscope,   title: "Organoid Builder",     desc: "Design assistido por IA de mini-órgãos funcionais para modelos de doenças e testes pré-clínicos",          color: "indigo" },
-              { icon: Shield,       title: "Base RAG Científica",  desc: "Recuperação aumentada com mais de 110 artigos científicos indexados e atualizados",                         color: "blue"   },
+              { icon: Shield,       title: "Base RAG Científica",  desc: "Recuperação aumentada com mais de 120 artigos científicos indexados e atualizados",                         color: "blue"   },
               { icon: BarChart3,    title: "Analytics & Reports",  desc: "Dashboard com métricas de projeto, consumo de créditos e relatórios exportáveis",                           color: "violet" },
             ].map((f) => (
               <div key={f.title}
@@ -306,7 +306,7 @@ export default function HomePage() {
               { num:"02", title:"Formulador de Biomateriais", desc:"Database com 807+ formulações e propriedades detalhadas",                tags:["Hidrogéis","Bioinks"],     color:"blue"   },
               { num:"03", title:"Organoid Builder",           desc:"Design de mini-órgãos: cerebral, cardíaco, hepático e mais",             tags:["Brain","Heart","Liver"],   color:"purple" },
               { num:"04", title:"Gerador de Protocolos",      desc:"Protocolos laboratoriais personalizados com base nas suas specs",        tags:["SOP","Reagentes"],         color:"indigo" },
-              { num:"05", title:"Base de Conhecimento",       desc:"110+ artigos científicos com busca semântica RAG",                      tags:["PubMed","Nature"],         color:"blue"   },
+              { num:"05", title:"Base de Conhecimento",       desc:"120+ artigos científicos com busca semântica RAG",                      tags:["PubMed","Nature"],         color:"blue"   },
               { num:"06", title:"Chat IA Especializado",      desc:"Assistente com contexto científico profundo em biofabricação",           tags:["Gemini","RAG"],            color:"violet" },
             ].map((m) => (
               <div key={m.num}

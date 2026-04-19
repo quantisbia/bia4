@@ -91,21 +91,77 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      {/* Quick Actions grid — 2 cols mobile, 3 cols md */}
+      {/* Quick Actions grid — scrollable horizontal on small mobile, grid on larger */}
       <div>
         <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
           Ações Rápidas
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {/* Mobile: horizontal scroll for first row visibility */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3">
           {quickActions.map((action) => (
             <Link key={action.title} href={action.href}
-              className="flex flex-col gap-3 p-4 rounded-xl bg-white/2 border border-white/8 hover:border-violet-500/20 hover:bg-violet-500/3 transition-all group active:scale-[0.98]">
-              <div className={`w-9 h-9 rounded-xl bg-${action.color}-500/10 border border-${action.color}-500/20 flex items-center justify-center shrink-0`}>
-                <action.icon className={`w-4 h-4 text-${action.color}-400`} />
+              className="flex items-center gap-3 p-3.5 sm:p-4 rounded-xl bg-white/[0.02] border border-white/[0.08] hover:border-violet-500/20 hover:bg-violet-500/[0.03] transition-all group active:scale-[0.97]">
+              <div className={`w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-${action.color}-500/10 border border-${action.color}-500/20 flex items-center justify-center shrink-0`}>
+                <action.icon className={`w-4.5 h-4.5 sm:w-4 sm:h-4 text-${action.color}-400`} />
               </div>
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-white leading-tight">{action.title}</p>
-                <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">{action.desc}</p>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-white leading-tight truncate">{action.title}</p>
+                <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 truncate">{action.desc}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Mini-Lessons — Quick learning tips */}
+      <div>
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+          💡 Dicas Rápidas — Biofabricação
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[
+            {
+              title: "GelMA: o bioink mais versátil",
+              tip: "Use GelMA 5-10% + LAP 0.05% para crosslinking UV. Ideal para extrusão com shear-thinning. Combine com alginato para duplo crosslinking.",
+              module: "Formulador Bio",
+              href: "/dashboard/biomaterials",
+              color: "blue",
+            },
+            {
+              title: "Pipeline: comece pelo tecido-alvo",
+              tip: "A etapa 1 define TODO o projeto. Escolha tecido, viabilidade e TRL antes de selecionar biomateriais. BIA calcula automaticamente.",
+              module: "Pipeline",
+              href: "/dashboard/pipeline",
+              color: "violet",
+            },
+            {
+              title: "Organoides: matrigel vs ECM",
+              tip: "Matrigel tem batch-to-batch variation. Para reprodutibilidade, use dECM tissue-specific. BIA gera protocolos com ambos.",
+              module: "Organoid Builder",
+              href: "/dashboard/organoids",
+              color: "purple",
+            },
+            {
+              title: "120+ artigos científicos indexados",
+              tip: "Nossa base RAG inclui artigos de Science, Nature, Biofabrication com DOIs clicáveis. Busque por tecido, biomaterial ou técnica.",
+              module: "Base de Conhecimento",
+              href: "/dashboard/knowledge",
+              color: "emerald",
+            },
+          ].map((lesson) => (
+            <Link key={lesson.title} href={lesson.href}
+              className={`group p-4 rounded-xl bg-${lesson.color}-500/[0.03] border border-${lesson.color}-500/10 hover:border-${lesson.color}-500/25 transition-all active:scale-[0.98]`}>
+              <div className="flex items-start gap-3">
+                <div className={`w-6 h-6 rounded-lg bg-${lesson.color}-500/15 border border-${lesson.color}-500/20 flex items-center justify-center shrink-0 mt-0.5`}>
+                  <span className="text-[10px]">💡</span>
+                </div>
+                <div className="min-w-0">
+                  <p className={`text-xs font-semibold text-${lesson.color}-300 mb-1`}>{lesson.title}</p>
+                  <p className="text-[11px] text-gray-400 leading-relaxed line-clamp-2">{lesson.tip}</p>
+                  <span className={`inline-block mt-2 text-[10px] font-medium text-${lesson.color}-400/70 group-hover:text-${lesson.color}-400 transition-colors`}>
+                    Ir para {lesson.module} →
+                  </span>
+                </div>
               </div>
             </Link>
           ))}

@@ -376,8 +376,8 @@ export default function ChatPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input area */}
-        <div className="p-3 sm:p-4 border-t border-white/5 shrink-0">
+        {/* Input area — safe area bottom padding for mobile */}
+        <div className="p-3 sm:p-4 border-t border-white/5 shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:pb-4">
           <div className="flex gap-2 sm:gap-3 items-end">
             <div className="flex-1 relative">
               <textarea
@@ -387,7 +387,7 @@ export default function ChatPage() {
                 onKeyDown={handleKeyDown}
                 placeholder={`Pergunte sobre ${currentMode?.desc.toLowerCase()}…`}
                 rows={1}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-purple-500/40 resize-none min-h-[42px] sm:min-h-[44px] max-h-32"
+                className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-purple-500/40 focus:ring-1 focus:ring-purple-500/20 resize-none min-h-[44px] sm:min-h-[44px] max-h-32 transition-all"
                 onInput={(e) => {
                   const el = e.currentTarget
                   el.style.height = "auto"
@@ -398,7 +398,7 @@ export default function ChatPage() {
             <button
               onClick={sendMessage}
               disabled={!input.trim() || sending}
-              className="w-10 h-10 rounded-xl bg-purple-500 flex items-center justify-center hover:bg-purple-400 transition-colors disabled:opacity-50 shrink-0 active:scale-95"
+              className="w-11 h-11 sm:w-10 sm:h-10 rounded-xl bg-purple-500 flex items-center justify-center hover:bg-purple-400 transition-all disabled:opacity-50 shrink-0 active:scale-90 shadow-lg shadow-purple-900/30"
             >
               {sending
                 ? <Loader2 className="w-4 h-4 text-white animate-spin" />
@@ -406,7 +406,7 @@ export default function ChatPage() {
               }
             </button>
           </div>
-          <p className="text-[10px] text-gray-700 text-center mt-2">
+          <p className="hidden sm:block text-[10px] text-gray-700 text-center mt-2">
             Enter para enviar · Shift+Enter para nova linha
           </p>
         </div>

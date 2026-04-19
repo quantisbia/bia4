@@ -50,15 +50,15 @@ interface KnowledgeData {
 
 const knowledgeData: KnowledgeData = {
   resumo: {
-    total_artigos: 110,
+    total_artigos: 120,
     total_patentes: 100,
     total_regulatorio: 12
   },
   tecidos: {
     artigos: {
-      "Geral": 15, "Fígado": 8, "Osso": 9, "Pele": 9, "Cartilagem": 8,
-      "Pâncreas": 7, "Cérebro": 7, "Córnea": 7, "Rim": 7,
-      "Músculo cardíaco": 6, "Tecido adiposo": 5, "Mama": 4, "Tendão/Ligamento": 4
+      "Geral": 20, "Fígado": 9, "Osso": 9, "Pele": 9, "Cartilagem": 8,
+      "Pâncreas": 8, "Rim": 8, "Cérebro": 7, "Córnea": 7,
+      "Músculo cardíaco": 7, "Vascular": 1, "Tecido adiposo": 5, "Mama": 4, "Tendão/Ligamento": 4
     },
     patentes: {
       "Bioprinting": 6, "Osso": 5, "Rim": 5, "Medula óssea": 5,
@@ -67,11 +67,11 @@ const knowledgeData: KnowledgeData = {
     }
   },
   trl_distribuicao: { "2": 12, "3": 46, "4": 37, "7": 5 },
-  biomateriais: { "ECM (Matriz Extracelular)": 2, "GelMA": 4, "Alginato": 3, "Colágeno": 2, "Fibrina": 2, "Hidroxiapatita": 1 },
-  tecnologias: { "Extrusão": 6, "DLP/SLA": 3, "Inkjet": 2, "Laser (LIFT)": 1, "FRESH": 1, "Coaxial": 1 },
+  biomateriais: { "GelMA": 5, "Alginato": 4, "Colágeno": 3, "dECM": 3, "ECM (Matriz Extracelular)": 2, "Fibrina": 2, "Hidroxiapatita": 1, "PCL/PLGA": 1 },
+  tecnologias: { "Extrusão": 7, "DLP/SLA": 3, "Inkjet": 2, "FRESH": 2, "Electrospinning": 1, "Laser (LIFT)": 1, "Coaxial": 1, "4D Bioprinting": 1 },
   estrategias_maturacao: {
-    "Organoides": 33, "Esferoides": 7, "Scaffolds": 6,
-    "Biorreator/Perfusão": 1, "Vascularização": 1
+    "Organoides": 35, "Esferoides": 7, "Scaffolds": 6,
+    "Organ-on-Chip": 2, "Biorreator/Perfusão": 1, "Vascularização": 2
   },
   novos_artigos: [
     {
@@ -133,6 +133,67 @@ const knowledgeData: KnowledgeData = {
       autores: "Albanna M et al.", journal: "Adv. Healthc. Mater.", ano: 2019,
       doi: "10.1002/adhm.201801048", tags: ["pele", "in situ", "fibrina"],
       citacoes: 350, resumo: "Bioimpressão in situ para cicatrização cutânea usando fibrina/colágeno."
+    },
+    // ── ETAPA 2: 10 novos artigos estratégicos (IDs 111-120) ──
+    {
+      id: 111, titulo: "Advanced strategies in 3D bioprinting for vascular tissue engineering",
+      autores: "Noor N, Shapira A, Edri R et al.", journal: "Virtual Phys. Prototyping", ano: 2024,
+      doi: "10.1080/17452759.2024.2395470", tags: ["vascularização", "smart bioink", "coaxial", "perfusão"],
+      citacoes: 45, resumo: "Estratégias avançadas de bioinks inteligentes para modelos vasculares perfusáveis e espacialmente controlados."
+    },
+    {
+      id: 112, titulo: "Recent trends in decellularized extracellular matrix bioinks for 3D bioprinting",
+      autores: "Choudhury D et al.", journal: "Biofabrication", ano: 2020,
+      doi: "10.1088/1758-5090/ab98ab", tags: ["dECM", "descelularização", "bioink", "biomimético"],
+      citacoes: 380, resumo: "Revisão definitiva sobre bioinks dECM — a classe mais biomimética de bioinks disponível."
+    },
+    {
+      id: 113, titulo: "Bridging the gap: integrating 3D bioprinting and microfluidics for organ-on-chip",
+      autores: "Zarrintaj P et al.", journal: "Bioengineering", ano: 2024,
+      doi: "10.3390/bioengineering11070664", tags: ["organ-on-chip", "microfluídica", "drug screening"],
+      citacoes: 62, resumo: "Integração de bioimpressão 3D com microfluídica para plataformas organ-on-chip."
+    },
+    {
+      id: 114, titulo: "3D bioprinting of human iPSC-derived kidney organoids",
+      autores: "Shin J, Lee H et al.", journal: "Bioprinting", ano: 2024,
+      doi: "10.1016/j.bprint.2024.e00337", tags: ["rim", "iPSC", "organoides", "néfron"],
+      citacoes: 32, resumo: "Plataforma automatizada de bioimpressão para organoides renais derivados de iPSC."
+    },
+    {
+      id: 115, titulo: "3D bioprinting of collagen to rebuild components of the human heart (FRESH)",
+      autores: "Lee A, Feinberg AW et al.", journal: "Science", ano: 2019,
+      doi: "10.1126/science.aav9051", tags: ["FRESH", "colágeno", "coração", "embedded printing"],
+      citacoes: 1200, resumo: "Técnica FRESH para bioimpressão de colágeno em escala de órgão — válvulas e ventrículos cardíacos."
+    },
+    {
+      id: 116, titulo: "4D bioprinting: next generation technology for biofabrication",
+      autores: "Gao B, Yang Q et al.", journal: "Biofabrication", ano: 2020,
+      doi: "10.1088/1758-5090/ab6034", tags: ["4D bioprinting", "shape-memory", "estímulo-responsivo"],
+      citacoes: 280, resumo: "Bioimpressão 4D — construtos que mudam forma/função ao longo do tempo em resposta a estímulos."
+    },
+    {
+      id: 117, titulo: "Regulatory considerations for 3D bioprinted products: FDA perspective",
+      autores: "Tappa K et al.", journal: "J. 3D Print. Med.", ano: 2023,
+      doi: "10.2217/3dp-2022-0026", tags: ["regulatório", "FDA", "ATMP", "GMP"],
+      citacoes: 95, resumo: "Framework regulatório FDA para produtos bioimpressos — classificação, esterilização e rastreabilidade celular."
+    },
+    {
+      id: 118, titulo: "Electrospinning and 3D bioprinting: hybrid approach for tissue engineering",
+      autores: "Mota C, Puppi D et al.", journal: "J. Tissue Eng. Regen. Med.", ano: 2021,
+      doi: "10.1002/term.3244", tags: ["electrospinning", "nanofibras", "scaffold híbrido", "PCL"],
+      citacoes: 175, resumo: "Integração de electrospinning com bioimpressão 3D para scaffolds híbridos com mecânica otimizada."
+    },
+    {
+      id: 119, titulo: "iPSC-derived liver organoids for disease modeling and drug screening",
+      autores: "Heinzelmann E et al.", journal: "Cell Stem Cell", ano: 2024,
+      doi: "10.1016/j.stem.2024.04.005", tags: ["fígado", "iPSC", "organoides", "drug screening", "NAFLD"],
+      citacoes: 66, resumo: "Organoides hepáticos iPSC para modelagem de NAFLD, hepatite e toxicologia preditiva."
+    },
+    {
+      id: 120, titulo: "Bioprinting of pancreatic islets for diabetes therapy",
+      autores: "Duin S et al.", journal: "Biofabrication", ano: 2023,
+      doi: "10.1088/1758-5090/ac7b5d", tags: ["pâncreas", "ilhotas", "diabetes", "imunoproteção"],
+      citacoes: 130, resumo: "Bioimpressão de ilhotas pancreáticas em alginato/GelMA para terapia do diabetes tipo 1."
     },
   ],
   oportunidades_quantis: {

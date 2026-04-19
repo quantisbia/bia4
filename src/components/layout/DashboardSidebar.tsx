@@ -277,7 +277,7 @@ function MobileHeader() {
   return (
     <>
       {/* ── Top bar ── */}
-      <header className="md:hidden fixed top-0 inset-x-0 z-40 h-14 flex items-center px-4 bg-[#080412]/95 backdrop-blur-2xl border-b border-white/[0.06]">
+      <header className="md:hidden fixed top-0 inset-x-0 z-40 h-14 flex items-center px-3 gap-2 bg-[#080412]/95 backdrop-blur-2xl border-b border-white/[0.06]">
         <button
           onClick={() => setOpen(true)}
           className="w-9 h-9 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center text-gray-300 active:scale-95 transition-all"
@@ -286,18 +286,18 @@ function MobileHeader() {
           <Menu className="w-4 h-4" />
         </button>
 
-        <div className="flex-1 flex items-center justify-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center">
+        <div className="flex-1 flex items-center justify-center gap-2 min-w-0">
+          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center shrink-0">
             <BiaLogoIcon size={15} />
           </div>
-          <span className="text-sm font-semibold text-white">
+          <span className="text-sm font-semibold text-white truncate">
             {currentItem?.label ?? "BIA"}
           </span>
         </div>
 
         <Link href="/dashboard/billing"
           className={cn(
-            "flex items-center gap-1 rounded-lg px-2.5 py-1.5 active:scale-95 transition-all border",
+            "flex items-center gap-1 rounded-lg px-2.5 py-1.5 active:scale-95 transition-all border shrink-0",
             isLow
               ? "bg-red-500/10 border-red-500/25 text-red-400"
               : "bg-violet-500/10 border-violet-500/20 text-violet-400"
