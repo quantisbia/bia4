@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import {
   Zap, Star, CheckCircle2, Clock, TrendingDown, TrendingUp,
   CreditCard, RefreshCw, ExternalLink, Calendar, Crown,
-  ChevronDown, ChevronUp, Sparkles, CircleDot, Layers, FlaskConical,
-  Brain, Microscope, Dna,
+  ChevronDown, ChevronUp, CircleDot, Layers, FlaskConical,
+  Brain, Microscope, Dna, Package, Gift, Percent, ArrowRight,
+  ShieldCheck, Tag, Timer, Info,
 } from "lucide-react"
 import { CreditProgressBar, CreditBadge } from "@/components/credits/CreditWidgets"
 import { useToast } from "@/components/ui/Toast"
@@ -20,10 +21,12 @@ const PLANS = [
     id: "ORGANOID_LAB",
     name: "Organoid Lab",
     price: 150,
+    annualPrice: 120,       // 20% desconto
     credits: 300,
     color: "teal",
     badge: "ESPECIALISTA",
     paymentUrl: "https://www.asaas.com/c/24p0skdjkpacozta",
+    annualPaymentUrl: "https://www.asaas.com/c/24p0skdjkpacozta",
     features: [
       "300 créditos/mês",
       "Organoid Builder completo",
@@ -37,10 +40,12 @@ const PLANS = [
     id: "DISCOVERY",
     name: "BIA Discovery",
     price: 270,
+    annualPrice: 216,
     credits: 500,
     color: "violet",
     badge: null,
     paymentUrl: "https://www.asaas.com/c/rneusgbvs6mvm2kg",
+    annualPaymentUrl: "https://www.asaas.com/c/rneusgbvs6mvm2kg",
     features: [
       "500 créditos/mês",
       "10 créditos iniciais grátis",
@@ -54,10 +59,12 @@ const PLANS = [
     id: "ADVANCED",
     name: "BIA Advanced",
     price: 490,
+    annualPrice: 392,
     credits: 1500,
     color: "blue",
     badge: "POPULAR",
     paymentUrl: "https://www.asaas.com/c/qsnp08rvpuwlj8ip",
+    annualPaymentUrl: "https://www.asaas.com/c/qsnp08rvpuwlj8ip",
     features: [
       "1.500 créditos/mês",
       "Todos os módulos",
@@ -72,10 +79,12 @@ const PLANS = [
     name: "BIA Enterprise / Global Pharma",
     name_short: "Enterprise",
     price: 990,
+    annualPrice: 792,
     credits: 5000,
     color: "purple",
     badge: null,
     paymentUrl: "https://www.asaas.com/c/j983il0upnkiab2w",
+    annualPaymentUrl: "https://www.asaas.com/c/j983il0upnkiab2w",
     features: [
       "5.000 créditos/mês",
       "Tudo do Advanced",
@@ -89,10 +98,12 @@ const PLANS = [
     id: "ACADEMY",
     name: "BIA Academy",
     price: 4970,
+    annualPrice: 3976,
     credits: 20000,
     color: "amber",
     badge: "PREMIUM",
     paymentUrl: "https://www.asaas.com/c/9nvzkrlezi7ht2u5",
+    annualPaymentUrl: "https://www.asaas.com/c/9nvzkrlezi7ht2u5",
     features: [
       "20.000 créditos/mês",
       "Tudo do Enterprise",
@@ -105,9 +116,75 @@ const PLANS = [
 ]
 
 /* ─────────────────────────────────────────────────────────────────────────
+   PACOTES DE CRÉDITOS AVULSOS
+───────────────────────────────────────────────────────────────────────── */
+const CREDIT_PACKS = [
+  {
+    id: "pack_50",
+    name: "Starter",
+    credits: 50,
+    price: 29,
+    pricePerCredit: 0.58,
+    color: "gray",
+    icon: Package,
+    popular: false,
+    bonus: null,
+    paymentUrl: "https://www.asaas.com/c/24p0skdjkpacozta",
+  },
+  {
+    id: "pack_150",
+    name: "Researcher",
+    credits: 150,
+    price: 79,
+    pricePerCredit: 0.53,
+    color: "violet",
+    icon: FlaskConical,
+    popular: false,
+    bonus: "+10 bônus",
+    paymentUrl: "https://www.asaas.com/c/24p0skdjkpacozta",
+  },
+  {
+    id: "pack_500",
+    name: "Lab Pro",
+    credits: 500,
+    price: 229,
+    pricePerCredit: 0.46,
+    color: "blue",
+    icon: Microscope,
+    popular: true,
+    bonus: "+50 bônus",
+    paymentUrl: "https://www.asaas.com/c/24p0skdjkpacozta",
+  },
+  {
+    id: "pack_1500",
+    name: "Institute",
+    credits: 1500,
+    price: 599,
+    pricePerCredit: 0.40,
+    color: "purple",
+    icon: Brain,
+    popular: false,
+    bonus: "+200 bônus",
+    paymentUrl: "https://www.asaas.com/c/24p0skdjkpacozta",
+  },
+  {
+    id: "pack_5000",
+    name: "Enterprise",
+    credits: 5000,
+    price: 1799,
+    pricePerCredit: 0.36,
+    color: "amber",
+    icon: Crown,
+    popular: false,
+    bonus: "+750 bônus",
+    paymentUrl: "https://www.asaas.com/c/24p0skdjkpacozta",
+  },
+]
+
+/* ─────────────────────────────────────────────────────────────────────────
    Estilos por cor
 ───────────────────────────────────────────────────────────────────────── */
-const COLOR = {
+const COLOR: Record<string, { border: string; bg: string; ring: string; text: string; badgeBg: string; btn: string; glow: string }> = {
   teal: {
     border:   "border-teal-500/25",
     bg:       "bg-teal-500/5",
@@ -153,10 +230,189 @@ const COLOR = {
     btn:      "bg-amber-600 hover:bg-amber-500 shadow-amber-900/40",
     glow:     "shadow-amber-500/20",
   },
+  gray: {
+    border:   "border-gray-500/25",
+    bg:       "bg-gray-500/5",
+    ring:     "ring-gray-500/30",
+    text:     "text-gray-400",
+    badgeBg:  "bg-gray-600",
+    btn:      "bg-gray-600 hover:bg-gray-500 shadow-gray-900/40",
+    glow:     "shadow-gray-500/20",
+  },
 }
 
 const PLAN_CREDITS_MAX: Record<string, number> = {
   FREE: 30, ORGANOID_LAB: 300, DISCOVERY: 500, ADVANCED: 1500, ENTERPRISE: 5000, ACADEMY: 20000,
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Annual Savings Calculator
+───────────────────────────────────────────────────────────────────────── */
+function AnnualSavingsBanner({ billingCycle }: { billingCycle: "monthly" | "annual" }) {
+  if (billingCycle !== "annual") return null
+
+  return (
+    <div className="flex items-center gap-3 bg-emerald-500/[0.06] border border-emerald-500/15 rounded-xl px-4 py-3 mb-4 animate-fadeIn">
+      <div className="w-8 h-8 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
+        <Percent className="w-4 h-4 text-emerald-400" />
+      </div>
+      <div>
+        <p className="text-sm text-emerald-300 font-semibold">Economize 20% com plano anual</p>
+        <p className="text-[11px] text-gray-400">Pague 10 meses e ganhe 12. Cancele quando quiser.</p>
+      </div>
+      <Tag className="w-5 h-5 text-emerald-400/50 shrink-0 ml-auto" />
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Billing Cycle Toggle
+───────────────────────────────────────────────────────────────────────── */
+function BillingCycleToggle({
+  billingCycle, setBillingCycle,
+}: {
+  billingCycle: "monthly" | "annual"
+  setBillingCycle: (v: "monthly" | "annual") => void
+}) {
+  return (
+    <div className="flex items-center justify-center gap-3 mb-5">
+      <button
+        onClick={() => setBillingCycle("monthly")}
+        className={cn(
+          "px-4 py-2 rounded-xl text-sm font-medium transition-all",
+          billingCycle === "monthly"
+            ? "bg-violet-500/15 text-violet-300 border border-violet-500/25"
+            : "text-gray-500 hover:text-gray-300"
+        )}
+      >
+        Mensal
+      </button>
+      <button
+        onClick={() => setBillingCycle("annual")}
+        className={cn(
+          "px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2",
+          billingCycle === "annual"
+            ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/25"
+            : "text-gray-500 hover:text-gray-300"
+        )}
+      >
+        Anual
+        <span className="text-[10px] font-bold bg-emerald-500 text-white px-1.5 py-0.5 rounded-full">
+          -20%
+        </span>
+      </button>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Credit Packs Section
+───────────────────────────────────────────────────────────────────────── */
+function CreditPacksSection() {
+  const [selectedPack, setSelectedPack] = useState<string | null>(null)
+
+  return (
+    <div className="space-y-4 animate-fadeIn">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="w-8 h-8 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+          <Package className="w-4 h-4 text-violet-400" />
+        </div>
+        <div>
+          <h3 className="text-sm font-bold text-white">Pacotes de Créditos Avulsos</h3>
+          <p className="text-[11px] text-gray-500">Compre créditos extras sem mudar de plano</p>
+        </div>
+      </div>
+
+      {/* Packs grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+        {CREDIT_PACKS.map(pack => {
+          const c = COLOR[pack.color] ?? COLOR.gray
+          const isSelected = selectedPack === pack.id
+          return (
+            <div
+              key={pack.id}
+              onClick={() => setSelectedPack(isSelected ? null : pack.id)}
+              className={cn(
+                "relative rounded-2xl border p-4 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]",
+                isSelected
+                  ? `${c.border} ${c.bg} ring-2 ${c.ring} shadow-lg`
+                  : "border-white/[0.08] bg-white/[0.02] hover:border-white/15"
+              )}
+            >
+              {/* Popular badge */}
+              {pack.popular && (
+                <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-[9px] font-bold px-2.5 py-0.5 rounded-full shadow-lg">
+                  MAIS VENDIDO
+                </span>
+              )}
+
+              {/* Bonus badge */}
+              {pack.bonus && (
+                <span className={cn(
+                  "absolute -top-2 right-3 text-[9px] font-bold px-2 py-0.5 rounded-full",
+                  "bg-emerald-500 text-white shadow-lg"
+                )}>
+                  {pack.bonus}
+                </span>
+              )}
+
+              <div className="flex flex-col items-center text-center gap-2">
+                <div className={cn(
+                  "w-10 h-10 rounded-xl flex items-center justify-center border",
+                  c.bg, c.border
+                )}>
+                  <pack.icon className={cn("w-5 h-5", c.text)} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-300">{pack.name}</p>
+                  <p className={cn("text-2xl font-bold mt-1", c.text)}>
+                    {pack.credits.toLocaleString("pt-BR")}
+                  </p>
+                  <p className="text-[10px] text-gray-500">créditos</p>
+                </div>
+                <div className="w-full pt-2 border-t border-white/[0.05]">
+                  <p className="text-lg font-bold text-white">
+                    R$ {pack.price.toLocaleString("pt-BR")}
+                  </p>
+                  <p className="text-[10px] text-gray-500">
+                    R$ {pack.pricePerCredit.toFixed(2)}/crédito
+                  </p>
+                </div>
+
+                {/* CTA */}
+                <a
+                  href={pack.paymentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className={cn(
+                    "w-full py-2.5 rounded-xl text-xs font-semibold text-white transition-all",
+                    "flex items-center justify-center gap-1.5 shadow-lg active:scale-[0.97]",
+                    c.btn
+                  )}
+                >
+                  <Zap className="w-3 h-3" />
+                  Comprar
+                </a>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Info banner */}
+      <div className="flex items-start gap-3 bg-blue-500/[0.04] border border-blue-500/10 rounded-xl px-4 py-3">
+        <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+        <div>
+          <p className="text-xs text-blue-300 font-medium">Créditos avulsos não expiram</p>
+          <p className="text-[11px] text-gray-500 mt-0.5">
+            Créditos comprados em pacotes são adicionados ao saldo e nunca expiram. 
+            Diferente dos créditos mensais do plano, que renovam a cada ciclo.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -330,6 +586,80 @@ function OrganoidLabValueCard({ currentPlan }: { currentPlan: string }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
+   Usage Insights - Quick Analytics
+───────────────────────────────────────────────────────────────────────── */
+function UsageInsights({
+  balance, totalSpent, plan,
+}: {
+  balance: number; totalEarned?: number; totalSpent: number; plan: string
+}) {
+  const maxCredits = PLAN_CREDITS_MAX[plan] ?? 30
+  const usagePercent = maxCredits > 0 ? Math.min(((maxCredits - balance) / maxCredits) * 100, 100) : 0
+  const burnRate = totalSpent > 0 ? Math.round(totalSpent / Math.max(1, Math.ceil((Date.now() - new Date("2026-01-01").getTime()) / (1000 * 60 * 60 * 24)))) : 0
+  const daysRemaining = burnRate > 0 ? Math.round(balance / burnRate) : balance > 0 ? 99 : 0
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fadeIn">
+      <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3.5">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-6 h-6 rounded-lg bg-violet-500/10 flex items-center justify-center">
+            <TrendingUp className="w-3 h-3 text-violet-400" />
+          </div>
+          <span className="text-[10px] text-gray-500 font-medium">Uso do ciclo</span>
+        </div>
+        <p className="text-xl font-bold text-white">{usagePercent.toFixed(0)}%</p>
+        <div className="w-full h-1 bg-white/[0.06] rounded-full mt-2 overflow-hidden">
+          <div
+            className={cn(
+              "h-full rounded-full transition-all duration-700",
+              usagePercent > 80 ? "bg-red-500" : usagePercent > 50 ? "bg-amber-500" : "bg-emerald-500"
+            )}
+            style={{ width: `${usagePercent}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3.5">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-6 h-6 rounded-lg bg-blue-500/10 flex items-center justify-center">
+            <Timer className="w-3 h-3 text-blue-400" />
+          </div>
+          <span className="text-[10px] text-gray-500 font-medium">Créditos/dia</span>
+        </div>
+        <p className="text-xl font-bold text-white">{burnRate}</p>
+        <p className="text-[10px] text-gray-600 mt-1">taxa de consumo</p>
+      </div>
+
+      <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3.5">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-6 h-6 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+            <Calendar className="w-3 h-3 text-emerald-400" />
+          </div>
+          <span className="text-[10px] text-gray-500 font-medium">Dias restantes</span>
+        </div>
+        <p className={cn("text-xl font-bold", daysRemaining < 5 ? "text-red-400" : "text-white")}>
+          {daysRemaining > 90 ? "90+" : daysRemaining}
+        </p>
+        <p className="text-[10px] text-gray-600 mt-1">no ritmo atual</p>
+      </div>
+
+      <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3.5">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-6 h-6 rounded-lg bg-amber-500/10 flex items-center justify-center">
+            <Zap className="w-3 h-3 text-amber-400" />
+          </div>
+          <span className="text-[10px] text-gray-500 font-medium">Eficiência</span>
+        </div>
+        <p className="text-xl font-bold text-white">
+          {totalSpent > 0 ? `R$ ${((plan === "FREE" ? 0 : (PLANS.find(p => p.id === plan)?.price ?? 0)) / Math.max(1, totalSpent)).toFixed(2)}` : "—"}
+        </p>
+        <p className="text-[10px] text-gray-600 mt-1">custo/crédito</p>
+      </div>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
    Props
 ───────────────────────────────────────────────────────────────────────── */
 interface BillingClientProps {
@@ -352,9 +682,29 @@ export function BillingClient({
 }: BillingClientProps) {
   const { update } = useSession()
   const { success, error: toastError, info } = useToast()
-  const [upgrading, setUpgrading]       = useState<string | null>(null)
-  const [activeTab, setActiveTab]       = useState<"plans" | "history">("plans")
-  const [expandedPlan, setExpandedPlan] = useState<string | null>(null)
+  const [upgrading, setUpgrading]           = useState<string | null>(null)
+  const [activeTab, setActiveTab]           = useState<"plans" | "packs" | "history" | "insights">("plans")
+  const [expandedPlan, setExpandedPlan]     = useState<string | null>(null)
+  const [billingCycle, setBillingCycle]     = useState<"monthly" | "annual">("monthly")
+
+  // Animated counter for balance
+  const [displayBalance, setDisplayBalance] = useState(0)
+  const animateBalance = useCallback(() => {
+    const start = 0
+    const end = balance
+    const duration = 1200
+    const startTime = Date.now()
+    const animate = () => {
+      const elapsed = Date.now() - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 3) // ease-out cubic
+      setDisplayBalance(Math.round(start + (end - start) * eased))
+      if (progress < 1) requestAnimationFrame(animate)
+    }
+    requestAnimationFrame(animate)
+  }, [balance])
+
+  useEffect(() => { animateBalance() }, [animateBalance])
 
   const maxCredits = PLAN_CREDITS_MAX[currentPlan] ?? 10
 
@@ -382,53 +732,73 @@ export function BillingClient({
   }
 
   /* For paid plans: redirect to Asaas payment */
-  const handlePaymentRedirect = (planId: string, paymentUrl: string) => {
+  const handlePaymentRedirect = (planId: string, plan: typeof PLANS[0]) => {
     if (planId === currentPlan) { info("Plano atual", "Você já está neste plano."); return }
-    window.open(paymentUrl, "_blank", "noopener,noreferrer")
+    const url = billingCycle === "annual" ? plan.annualPaymentUrl : plan.paymentUrl
+    window.open(url, "_blank", "noopener,noreferrer")
   }
 
   const planIndex = (id: string) => PLANS.findIndex(p => p.id === id)
   const currentIdx = planIndex(currentPlan)
 
+  const getPrice = (plan: typeof PLANS[0]) =>
+    billingCycle === "annual" ? plan.annualPrice : plan.price
+
+  const getAnnualSavings = (plan: typeof PLANS[0]) =>
+    (plan.price - plan.annualPrice) * 12
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-5 sm:space-y-7 max-w-5xl mx-auto w-full">
 
       {/* ── Header ── */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-white mb-0.5">Assinatura & Créditos</h1>
-        <p className="text-xs sm:text-sm text-gray-400">Gerencie seu plano e acompanhe o uso de créditos</p>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-white mb-0.5">Assinatura & Créditos</h1>
+          <p className="text-xs sm:text-sm text-gray-400">Gerencie seu plano, compre créditos e acompanhe o uso</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-gray-600 uppercase tracking-wider font-medium">Saldo</span>
+          <div className="flex items-center gap-1.5 bg-violet-500/10 border border-violet-500/20 rounded-xl px-3 py-1.5">
+            <Zap className="w-3.5 h-3.5 text-violet-400" />
+            <span className="text-sm font-bold text-violet-300">{displayBalance.toLocaleString("pt-BR")}</span>
+          </div>
+        </div>
       </div>
 
       {/* ── Current plan card + stats ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {/* Plan overview */}
-        <div className="col-span-2 bg-white/[0.03] border border-white/[0.08] rounded-2xl p-4 sm:p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <Crown className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Plano Atual</span>
-          </div>
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div>
-              <p className="text-xl sm:text-2xl font-bold text-white">{currentPlan}</p>
-              {periodEnd && (
-                <div className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-500 mt-1">
-                  <Calendar className="w-3 h-3" />
-                  <span>Renova em {new Date(periodEnd).toLocaleDateString("pt-BR")}</span>
-                </div>
-              )}
+        <div className="col-span-2 bg-white/[0.03] border border-white/[0.08] rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+          {/* Subtle gradient bg */}
+          <div className="absolute inset-0 bg-gradient-to-br from-violet-500/[0.03] to-transparent pointer-events-none" />
+          <div className="relative">
+            <div className="flex items-center gap-2 mb-3">
+              <Crown className="w-4 h-4 text-amber-400" />
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Plano Atual</span>
             </div>
-            <CreditBadge balance={balance} size="md" />
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <p className="text-xl sm:text-2xl font-bold text-white">{currentPlan}</p>
+                {periodEnd && (
+                  <div className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-500 mt-1">
+                    <Calendar className="w-3 h-3" />
+                    <span>Renova em {new Date(periodEnd).toLocaleDateString("pt-BR")}</span>
+                  </div>
+                )}
+              </div>
+              <CreditBadge balance={balance} size="md" />
+            </div>
+            <CreditProgressBar balance={balance} maxCredits={maxCredits} showLabels />
           </div>
-          <CreditProgressBar balance={balance} maxCredits={maxCredits} showLabels />
         </div>
 
         {/* Stats */}
         {[
-          { label: "Saldo",  value: balance,      icon: Zap,         color: "text-violet-400 bg-violet-500/10 border-violet-500/20" },
+          { label: "Saldo",  value: displayBalance,  icon: Zap,         color: "text-violet-400 bg-violet-500/10 border-violet-500/20" },
           { label: "Ganho",  value: totalEarned,  icon: TrendingUp,  color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
           { label: "Gasto",  value: totalSpent,   icon: TrendingDown,color: "text-red-400 bg-red-500/10 border-red-500/20" },
         ].map(s => (
-          <div key={s.label} className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-4 flex flex-col justify-between">
+          <div key={s.label} className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-4 flex flex-col justify-between hover:border-white/15 transition-colors">
             <div className={cn("w-8 h-8 rounded-xl border flex items-center justify-center mb-2.5", s.color)}>
               <s.icon className="w-4 h-4" />
             </div>
@@ -441,16 +811,22 @@ export function BillingClient({
       </div>
 
       {/* ── Tabs ── */}
-      <div className="flex border-b border-white/[0.08]">
-        {(["plans", "history"] as const).map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)}
+      <div className="flex border-b border-white/[0.08] overflow-x-auto scrollbar-hide">
+        {([
+          { id: "plans",    label: "Planos",               icon: Star },
+          { id: "packs",    label: "Pacotes de Créditos",  icon: Package },
+          { id: "insights", label: "Insights",             icon: TrendingUp },
+          { id: "history",  label: "Histórico",            icon: Clock },
+        ] as const).map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={cn(
-              "px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all",
-              activeTab === tab
+              "flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium border-b-2 -mb-px transition-all whitespace-nowrap",
+              activeTab === tab.id
                 ? "border-violet-500 text-violet-400"
                 : "border-transparent text-gray-500 hover:text-gray-300"
             )}>
-            {tab === "plans" ? "Planos disponíveis" : "Histórico de créditos"}
+            <tab.icon className="w-3.5 h-3.5" />
+            {tab.label}
           </button>
         ))}
       </div>
@@ -460,46 +836,72 @@ export function BillingClient({
       ══════════════════════════════════════════════════════════════════ */}
       {activeTab === "plans" && (
         <>
-          {/* Desktop: grid 4 cols */}
-          <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Billing cycle toggle */}
+          <BillingCycleToggle billingCycle={billingCycle} setBillingCycle={setBillingCycle} />
+
+          {/* Annual savings banner */}
+          <AnnualSavingsBanner billingCycle={billingCycle} />
+
+          {/* Desktop: grid */}
+          <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             {PLANS.map(plan => {
               const c       = COLOR[plan.color as keyof typeof COLOR]
               const isCur   = plan.id === currentPlan
               const isDown  = planIndex(plan.id) < currentIdx
               const isUp    = upgrading === plan.id
+              const price   = getPrice(plan)
+              const savings = getAnnualSavings(plan)
 
               return (
                 <div key={plan.id}
                   className={cn(
-                    "relative rounded-2xl border flex flex-col transition-all",
+                    "relative rounded-2xl border flex flex-col transition-all hover:scale-[1.01]",
                     isCur ? `${c.border} ${c.bg} ring-1 ${c.ring}` : "border-white/[0.08] bg-white/[0.02] hover:border-white/15"
                   )}>
                   {/* Badge */}
                   {plan.badge && (
                     <span className={cn(
-                      "absolute -top-3 left-1/2 -translate-x-1/2 text-white text-[10px] font-bold px-3 py-0.5 rounded-full shadow-lg",
+                      "absolute -top-3 left-1/2 -translate-x-1/2 text-white text-[10px] font-bold px-3 py-0.5 rounded-full shadow-lg z-10",
                       c.badgeBg
                     )}>
                       {plan.badge}
                     </span>
                   )}
                   {isCur && (
-                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-[10px] font-bold px-3 py-0.5 rounded-full flex items-center gap-1 shadow-lg">
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-[10px] font-bold px-3 py-0.5 rounded-full flex items-center gap-1 shadow-lg z-10">
                       <CheckCircle2 className="w-2.5 h-2.5" /> ATUAL
                     </span>
                   )}
 
-                  <div className="p-5 flex flex-col flex-1 gap-4">
+                  <div className="p-4 sm:p-5 flex flex-col flex-1 gap-3">
                     {/* Plan name + price */}
                     <div>
                       <div className={cn("flex items-center gap-1.5 mb-1", c.text)}>
                         <Star className="w-3.5 h-3.5" />
                         <span className="text-sm font-bold">{plan.name_short ?? plan.name}</span>
                       </div>
-                      <p className="text-2xl font-bold text-white">
-                        R$ {plan.price.toLocaleString("pt-BR")}
+                      <div className="flex items-baseline gap-1.5">
+                        <p className="text-2xl font-bold text-white">
+                          R$ {price.toLocaleString("pt-BR")}
+                        </p>
                         <span className="text-xs text-gray-500 font-normal">/mês</span>
-                      </p>
+                      </div>
+                      {billingCycle === "annual" && (
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className="text-[10px] line-through text-gray-600">
+                            R$ {plan.price.toLocaleString("pt-BR")}
+                          </span>
+                          <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
+                            -20%
+                          </span>
+                        </div>
+                      )}
+                      {billingCycle === "annual" && savings > 0 && (
+                        <p className="text-[10px] text-emerald-400 mt-1 flex items-center gap-1">
+                          <Gift className="w-3 h-3" />
+                          Economize R$ {savings.toLocaleString("pt-BR")}/ano
+                        </p>
+                      )}
                       <p className={cn("text-xs mt-1 font-medium", c.text)}>
                         <Zap className="w-3 h-3 inline mr-0.5" />
                         {plan.credits.toLocaleString("pt-BR")} créditos/mês
@@ -527,11 +929,11 @@ export function BillingClient({
                       </div>
                     ) : (
                       <button
-                        onClick={() => handlePaymentRedirect(plan.id, plan.paymentUrl)}
+                        onClick={() => handlePaymentRedirect(plan.id, plan)}
                         disabled={isUp}
                         className={cn(
                           "w-full py-2.5 rounded-xl text-xs font-semibold text-white transition-all flex items-center justify-center gap-1.5 shadow-lg active:scale-[0.98]",
-                          c.btn, `shadow-${c.glow}`
+                          c.btn
                         )}>
                         {isUp
                           ? <><RefreshCw className="w-3 h-3 animate-spin" /> Processando...</>
@@ -551,7 +953,8 @@ export function BillingClient({
               const c       = COLOR[plan.color as keyof typeof COLOR]
               const isCur   = plan.id === currentPlan
               const isDown  = planIndex(plan.id) < currentIdx
-              void upgrading // used for UI state in desktop grid above
+              const price   = getPrice(plan)
+              const savings = getAnnualSavings(plan)
               const isExp   = expandedPlan === plan.id
 
               return (
@@ -562,12 +965,12 @@ export function BillingClient({
                   )}>
                   {/* Badges */}
                   {plan.badge && !isCur && (
-                    <div className={cn("absolute top-0 right-0 text-white text-[9px] font-bold px-2.5 py-1 rounded-bl-xl", c.badgeBg)}>
+                    <div className={cn("absolute top-0 right-0 text-white text-[9px] font-bold px-2.5 py-1 rounded-bl-xl z-10", c.badgeBg)}>
                       {plan.badge}
                     </div>
                   )}
                   {isCur && (
-                    <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[9px] font-bold px-2.5 py-1 rounded-bl-xl flex items-center gap-1">
+                    <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[9px] font-bold px-2.5 py-1 rounded-bl-xl flex items-center gap-1 z-10">
                       <CheckCircle2 className="w-2.5 h-2.5" /> ATUAL
                     </div>
                   )}
@@ -584,11 +987,18 @@ export function BillingClient({
                       <p className="text-sm font-semibold text-white leading-none truncate pr-6">
                         {plan.name}
                       </p>
-                      <p className={cn("text-xs mt-0.5 font-medium", c.text)}>
-                        R$ {plan.price.toLocaleString("pt-BR")}/mês
-                        <span className="text-gray-600 ml-2 font-normal">·</span>
-                        <span className={cn("ml-2", c.text)}>{plan.credits.toLocaleString("pt-BR")} cr</span>
-                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className={cn("text-xs font-medium", c.text)}>
+                          R$ {price.toLocaleString("pt-BR")}/mês
+                        </p>
+                        {billingCycle === "annual" && (
+                          <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
+                            -20%
+                          </span>
+                        )}
+                        <span className="text-gray-600">·</span>
+                        <span className={cn("text-xs", c.text)}>{plan.credits.toLocaleString("pt-BR")} cr</span>
+                      </div>
                     </div>
                     {isExp
                       ? <ChevronUp className="w-4 h-4 text-gray-500 shrink-0" />
@@ -599,7 +1009,15 @@ export function BillingClient({
                   {/* Expanded content */}
                   {isExp && (
                     <div className={cn("px-4 pb-4 border-t border-white/[0.05]", c.bg)}>
-                      <ul className="space-y-2 mt-4 mb-4">
+                      {billingCycle === "annual" && savings > 0 && (
+                        <div className="flex items-center gap-2 mt-3 mb-2 bg-emerald-500/[0.06] border border-emerald-500/15 rounded-lg px-3 py-2">
+                          <Gift className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span className="text-[11px] text-emerald-300 font-medium">
+                            Economize R$ {savings.toLocaleString("pt-BR")}/ano
+                          </span>
+                        </div>
+                      )}
+                      <ul className="space-y-2 mt-3 mb-4">
                         {plan.features.map(f => (
                           <li key={f} className="flex items-start gap-2 text-sm text-gray-300">
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
@@ -618,7 +1036,7 @@ export function BillingClient({
                         </div>
                       ) : (
                         <a
-                          href={plan.paymentUrl}
+                          href={billingCycle === "annual" ? plan.annualPaymentUrl : plan.paymentUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className={cn(
@@ -642,24 +1060,60 @@ export function BillingClient({
 
           {/* Payment info notice */}
           <div className="bg-violet-500/[0.05] border border-violet-500/15 rounded-xl px-4 py-4 flex gap-3">
-            <Sparkles className="w-4 h-4 text-violet-400 shrink-0 mt-0.5" />
+            <ShieldCheck className="w-5 h-5 text-violet-400 shrink-0 mt-0.5" />
             <div>
               <p className="text-sm text-violet-300 font-semibold mb-1">Pagamento seguro via Asaas</p>
               <p className="text-xs text-gray-400 leading-relaxed">
                 Ao clicar em &quot;Assinar agora&quot;, você será redirecionado para o checkout seguro do Asaas.
                 Após a confirmação do pagamento, seu plano será ativado automaticamente em até 24h.
-                Em caso de dúvidas, entre em contato pelo suporte.
+                {billingCycle === "annual" && " Planos anuais são cobrados em uma única parcela com 20% de desconto."}
+                {" "}Em caso de dúvidas, entre em contato pelo suporte.
               </p>
             </div>
           </div>
+
+          {/* Quick link to credit packs */}
+          <button
+            onClick={() => setActiveTab("packs")}
+            className="w-full flex items-center justify-between gap-3 bg-white/[0.02] border border-white/[0.08] rounded-xl px-4 py-3.5 hover:border-violet-500/20 hover:bg-violet-500/[0.03] transition-all group active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+                <Package className="w-4 h-4 text-violet-400" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-medium text-white">Precisa de mais créditos?</p>
+                <p className="text-[11px] text-gray-500">Compre pacotes avulsos a partir de R$ 29</p>
+              </div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-gray-600 group-hover:text-violet-400 transition-colors" />
+          </button>
         </>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          CREDIT PACKS TAB
+      ══════════════════════════════════════════════════════════════════ */}
+      {activeTab === "packs" && (
+        <CreditPacksSection />
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          INSIGHTS TAB
+      ══════════════════════════════════════════════════════════════════ */}
+      {activeTab === "insights" && (
+        <UsageInsights
+          balance={balance}
+          totalSpent={totalSpent}
+          plan={currentPlan}
+        />
       )}
 
       {/* ══════════════════════════════════════════════════════════════════
           HISTORY TAB
       ══════════════════════════════════════════════════════════════════ */}
       {activeTab === "history" && (
-        <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl overflow-hidden">
+        <div className="bg-white/[0.02] border border-white/[0.08] rounded-2xl overflow-hidden animate-fadeIn">
           {history.length === 0 ? (
             <div className="py-12 sm:py-16 text-center">
               <CreditCard className="w-8 h-8 text-gray-700 mx-auto mb-3" />

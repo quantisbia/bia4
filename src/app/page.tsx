@@ -146,7 +146,7 @@ export default function HomePage() {
               { value: "807+", label: "Formulações bio" },
               { value: "12",   label: "Etapas pipeline" },
               { value: "120+", label: "Artigos científicos" },
-              { value: "10",   label: "Biomateriais no comparador" },
+              { value: "5",    label: "Pacotes de créditos" },
             ].map((stat) => (
               <div key={stat.label} className="text-center">
                 <div className="text-2xl sm:text-3xl font-bold text-violet-400 mb-1">{stat.value}</div>
@@ -340,9 +340,15 @@ export default function HomePage() {
             <p className="text-gray-400 text-sm sm:text-base max-w-xl mx-auto">
               Do pesquisador independente às maiores instituições
             </p>
-            <div className="mt-4 inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-2 text-xs sm:text-sm text-blue-300">
-              <Zap className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-              <span><strong className="text-blue-200">30 créditos grátis</strong> para começar</span>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+              <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-2 text-xs sm:text-sm text-blue-300">
+                <Zap className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span><strong className="text-blue-200">30 créditos grátis</strong> para começar</span>
+              </div>
+              <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-2 text-xs sm:text-sm text-emerald-300">
+                <Star className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span><strong className="text-emerald-200">20% OFF</strong> plano anual</span>
+              </div>
             </div>
           </div>
 

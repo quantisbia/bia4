@@ -70,7 +70,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stats — 2 cols mobile, 4 cols desktop */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 stagger-children">
         {[
           { label: "Créditos",   value: stats.credits.toLocaleString("pt-BR"), icon: Zap,          color: "violet", sub: `${stats.creditsSpent} gastos` },
           { label: "Pipelines",  value: stats.pipelineCount.toString(),         icon: GitBranch,    color: "blue",   sub: "projetos" },
@@ -98,7 +98,7 @@ export default async function DashboardPage() {
           Ações Rápidas
         </h2>
         {/* Mobile: horizontal scroll for first row visibility */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 stagger-children">
           {quickActions.map((action) => (
             <Link key={action.title} href={action.href}
               className="flex items-center gap-3 p-3.5 sm:p-4 rounded-xl bg-white/[0.02] border border-white/[0.08] hover:border-violet-500/20 hover:bg-violet-500/[0.03] transition-all group active:scale-[0.97]">
