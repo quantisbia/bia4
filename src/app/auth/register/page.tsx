@@ -267,7 +267,7 @@ export default function RegisterPage() {
               { name: "Discovery", price: "R$ 270/mês", color: "text-violet-400" },
               { name: "Advanced",  price: "R$ 490/mês", color: "text-blue-400" },
               { name: "Enterprise",price: "R$ 990/mês", color: "text-purple-400" },
-              { name: "Academy",   price: "R$ 4.970/mês",color: "text-amber-400" },
+              { name: "Academy",   price: "R$ 4.970 · 6 meses",color: "text-amber-400" },
             ].map(p => (
               <div key={p.name} className="flex items-center gap-2 p-2 rounded-lg bg-white/[0.03]">
                 <FlaskConical className={`w-3 h-3 shrink-0 ${p.color}`} />

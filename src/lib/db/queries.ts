@@ -14,13 +14,14 @@ export const PLAN_CREDITS: Record<SubscriptionPlan, number> = {
   ACADEMY:      20000,
 }
 
+// Preços em BRL. Todos mensais EXCETO ACADEMY (pacote único 6 meses + curso presencial)
 export const PLAN_PRICES: Record<SubscriptionPlan, number> = {
   FREE:         0,
   ORGANOID_LAB: 150,
   DISCOVERY:    270,
   ADVANCED:     490,
   ENTERPRISE:   990,
-  ACADEMY:      4970,
+  ACADEMY:      4970, // R$ 4.970 · 6 meses (curso + certificação + 20k créditos)
 }
 
 // ============================================

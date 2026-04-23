@@ -522,11 +522,11 @@ export default function HomePage() {
               </div>
               <div className="mb-4">
                 <span className="text-2xl sm:text-3xl font-bold">R$ 4.970</span>
-                <span className="text-gray-400 text-sm">/mês</span>
-                <div className="credit-pill mt-2 w-fit text-xs bg-indigo-500/10 border-indigo-500/20 text-indigo-400"><Zap className="w-3 h-3" />20.000 créditos/mês</div>
+                <span className="text-gray-400 text-sm"> · 6 meses</span>
+                <div className="credit-pill mt-2 w-fit text-xs bg-indigo-500/10 border-indigo-500/20 text-indigo-400"><Zap className="w-3 h-3" />Curso completo + 20.000 créditos</div>
               </div>
               <ul className="space-y-2 mb-6 flex-1 text-xs sm:text-sm text-gray-300">
-                {["20.000 créditos/mês","Turmas de até 50 alunos","LMS integrado","Avaliações automáticas","Certificados","Relatórios pedagógicos","Suporte institucional"].map((f) => (
+                {["6 meses de acesso completo à plataforma","Curso presencial incluso","Turmas de até 10 alunos","Certificação oficial","Materiais personalizados","Aulas práticas em laboratório","Suporte pedagógico dedicado"].map((f) => (
                   <li key={f} className="flex items-start gap-2">
                     <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400 mt-0.5 shrink-0" />
                     <span>{f}</span>

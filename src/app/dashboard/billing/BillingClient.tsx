@@ -7,7 +7,7 @@ import {
   CreditCard, RefreshCw, ExternalLink, Calendar, Crown,
   ChevronDown, ChevronUp, CircleDot, Layers, FlaskConical,
   Brain, Microscope, Dna, Package, Gift, Percent, ArrowRight,
-  ShieldCheck, Tag, Timer, Info,
+  ShieldCheck, Tag, Timer, Info, GraduationCap,
 } from "lucide-react"
 import { CreditProgressBar, CreditBadge } from "@/components/credits/CreditWidgets"
 import { useToast } from "@/components/ui/Toast"
@@ -98,19 +98,21 @@ const PLANS = [
     id: "ACADEMY",
     name: "BIA Academy",
     price: 4970,
-    annualPrice: 3976,
+    annualPrice: 4970,
     credits: 20000,
     color: "amber",
-    badge: "PREMIUM",
+    badge: "6 MESES + CURSO",
     paymentUrl: "https://www.asaas.com/c/9nvzkrlezi7ht2u5",
     annualPaymentUrl: "https://www.asaas.com/c/9nvzkrlezi7ht2u5",
     features: [
-      "20.000 créditos/mês",
-      "Tudo do Enterprise",
-      "Treinamento dedicado",
-      "Personalização de IA",
-      "SLA 99,9% garantido",
-      "Gerente de conta exclusivo",
+      "6 meses de acesso completo",
+      "Curso presencial incluso",
+      "Turmas de até 10 alunos",
+      "Certificação oficial",
+      "Materiais personalizados",
+      "Aulas práticas em laboratório",
+      "20.000 créditos inclusos",
+      "Suporte pedagógico dedicado",
     ],
   },
 ]
@@ -884,9 +886,11 @@ export function BillingClient({
                         <p className="text-2xl font-bold text-white">
                           R$ {price.toLocaleString("pt-BR")}
                         </p>
-                        <span className="text-xs text-gray-500 font-normal">/mês</span>
+                        <span className="text-xs text-gray-500 font-normal">
+                          {plan.id === "ACADEMY" ? "· 6 meses" : "/mês"}
+                        </span>
                       </div>
-                      {billingCycle === "annual" && (
+                      {billingCycle === "annual" && plan.id !== "ACADEMY" && (
                         <div className="flex items-center gap-1.5 mt-1">
                           <span className="text-[10px] line-through text-gray-600">
                             R$ {plan.price.toLocaleString("pt-BR")}
@@ -896,15 +900,23 @@ export function BillingClient({
                           </span>
                         </div>
                       )}
-                      {billingCycle === "annual" && savings > 0 && (
+                      {billingCycle === "annual" && savings > 0 && plan.id !== "ACADEMY" && (
                         <p className="text-[10px] text-emerald-400 mt-1 flex items-center gap-1">
                           <Gift className="w-3 h-3" />
                           Economize R$ {savings.toLocaleString("pt-BR")}/ano
                         </p>
                       )}
+                      {plan.id === "ACADEMY" && (
+                        <p className="text-[10px] text-indigo-400 mt-1 flex items-center gap-1">
+                          <GraduationCap className="w-3 h-3" />
+                          Curso presencial + certificação incluso
+                        </p>
+                      )}
                       <p className={cn("text-xs mt-1 font-medium", c.text)}>
                         <Zap className="w-3 h-3 inline mr-0.5" />
-                        {plan.credits.toLocaleString("pt-BR")} créditos/mês
+                        {plan.id === "ACADEMY"
+                          ? `${plan.credits.toLocaleString("pt-BR")} créditos (pacote completo)`
+                          : `${plan.credits.toLocaleString("pt-BR")} créditos/mês`}
                       </p>
                     </div>
 

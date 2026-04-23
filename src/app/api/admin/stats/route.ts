@@ -93,9 +93,10 @@ export async function GET() {
     `,
   ])
 
-  // Receita estimada
+  // Receita estimada (MRR — valores mensais)
+  // ACADEMY = pacote único R$ 4.970 por 6 meses (curso + acesso) → MRR = 4970/6 ≈ 828/mês
   const planRevenue: Record<string, number> = {
-    FREE: 0, DISCOVERY: 270, ADVANCED: 490, ENTERPRISE: 990, ACADEMY: 4970,
+    FREE: 0, DISCOVERY: 270, ADVANCED: 490, ENTERPRISE: 990, ACADEMY: Math.round(4970 / 6),
   }
 
   const revenueByPlan = usersByPlan.reduce((acc, r) => {
