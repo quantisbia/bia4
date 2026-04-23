@@ -84,10 +84,10 @@ export async function GET() {
     // Cadastros por dia (últimos 30 dias)
     prisma.$queryRaw<{ date: string; count: bigint }[]>`
       SELECT
-        DATE_TRUNC('day', "created_at")::date::text AS date,
+        DATE_TRUNC('day', "createdAt")::date::text AS date,
         COUNT(*) AS count
-      FROM users
-      WHERE "created_at" >= ${thirtyDaysAgo}
+      FROM "users"
+      WHERE "createdAt" >= ${thirtyDaysAgo}
       GROUP BY 1
       ORDER BY 1
     `,
