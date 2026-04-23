@@ -13,6 +13,7 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
     name: "BIO X",
     manufacturer: "CELLINK",
     flavor: "cellink",
+    technology: "extrusion",
     heads: 3,
     buildVolume: {
       min: { x: 0, y: 0, z: 0 },
@@ -52,6 +53,7 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
     name: "INKREDIBLE+",
     manufacturer: "CELLINK",
     flavor: "cellink",
+    technology: "extrusion",
     heads: 2,
     buildVolume: {
       min: { x: 0, y: 0, z: 0 },
@@ -87,6 +89,7 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
     name: "Allevi 2",
     manufacturer: "Allevi (3D Systems)",
     flavor: "allevi",
+    technology: "extrusion",
     heads: 2,
     buildVolume: {
       min: { x: 0, y: 0, z: 0 },
@@ -122,6 +125,7 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
     name: "Allevi 3",
     manufacturer: "Allevi (3D Systems)",
     flavor: "allevi",
+    technology: "extrusion",
     heads: 3,
     buildVolume: {
       min: { x: 0, y: 0, z: 0 },
@@ -157,6 +161,7 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
     name: "REGEMAT 3D V1",
     manufacturer: "REGEMAT 3D",
     flavor: "regemat",
+    technology: "extrusion",
     heads: 2,
     buildVolume: {
       min: { x: 0, y: 0, z: 0 },
@@ -185,11 +190,115 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
     ],
   },
 
+  envisiontec_perfactory_p4k: {
+    id: "envisiontec_perfactory_p4k",
+    name: "Perfactory P4K DSP",
+    manufacturer: "EnvisionTEC (Desktop Metal)",
+    flavor: "envisiontec",
+    technology: "dlp_sla",
+    heads: 1,  // DLP tem um único projetor
+    buildVolume: {
+      min: { x: 0, y: 0, z: 0 },
+      max: { x: 134, y: 84, z: 180 },
+    },
+    extrusionMode: "pressure_kpa",  // não se aplica a DLP, mas mantemos p/ compat
+    // Mecânica Z (subida incremental entre camadas)
+    maxFeedrate: { xy: 0, z: 300, e: 0 },  // DLP não move XY
+    minFeedrate: { xy: 0, z: 10, e: 0 },
+    maxAcceleration: 100,
+    minNozzleUm: 40,   // = pixelSize_um
+    maxNozzleUm: 40,
+    hasHeatedBed: false,
+    hasUV: true,       // projetor UV é a fonte de exposição
+    hasCamera: true,
+    hasAutoLeveling: false,
+    hasWellPlateSupport: false,
+    dlp: {
+      projector: "385nm_dlp",
+      resolution_px: { x: 3840, y: 2400 },
+      pixelSize_um: 35,
+      buildAreaMax_mm: { x: 134, y: 84 },
+      minLayerHeight_um: 25,
+      maxLayerHeight_um: 150,
+      minExposureTime_s: 0.8,
+      maxExposureTime_s: 30,
+      supportedResins: [
+        "GelMA-LAP",
+        "GelMA-I2959",
+        "PEGDA-575",
+        "PEGDA-700",
+        "HEMA",
+        "E-Shell 600 (biocompatible resin)",
+        "Clear Guide (transparent biocompatible)",
+      ],
+      tiltAngle_deg: 3,
+      hasO2Permeation: false,
+    },
+    mcodes: {
+      startPrint: "M110 N0",            // init DLP
+      endPrint: "M84",
+      projectImage: "PROJECT S{intensity}",  // acionar projetor
+      layerExposure: "G4 P{ms}",             // tempo de exposição (dwell)
+      vatTilt: "M3 S{angle}",                // tilt do vat para peeling
+      buildPlateLift: "G1 Z{dz} F300",       // erguer build plate
+    },
+    notes: [
+      "DLP/SLA 385nm — impressão por fotopolimerização camada-a-camada",
+      "RESOLUÇÃO XY: 35 µm/pixel (3840×2400 = 4K DLP)",
+      "NÃO USA BIOINK DE EXTRUSÃO — usa resinas fotopolimerizáveis",
+      "Ideal para GelMA + fotoiniciador (LAP ou I2959 a 0.05-0.1%)",
+      "Suporta microestruturas < 50 µm (mais fino que extrusão)",
+      "Sequência por camada: tilt vat → subir plate → descer (newlayer) → projetar imagem → dwell exposição",
+      "Tempo total de impressão depende apenas de N_layers × t_exposure (não depende da área)",
+      "Pouca shear stress → melhor viabilidade celular em suspensão",
+    ],
+  },
+
+  envisiontec_3dbioplotter: {
+    id: "envisiontec_3dbioplotter",
+    name: "3D-Bioplotter Manufacturer Series",
+    manufacturer: "EnvisionTEC (Desktop Metal)",
+    flavor: "envisiontec",
+    technology: "extrusion",  // este modelo é extrusão, não DLP
+    heads: 5,
+    buildVolume: {
+      min: { x: 0, y: 0, z: 0 },
+      max: { x: 150, y: 150, z: 140 },
+    },
+    extrusionMode: "pressure_kpa",
+    maxFeedrate: { xy: 2500, z: 500, e: 400 },
+    minFeedrate: { xy: 60, z: 30, e: 30 },
+    maxAcceleration: 400,
+    minNozzleUm: 100,
+    maxNozzleUm: 1200,
+    hasHeatedBed: true,
+    hasUV: true,
+    hasCamera: true,
+    hasAutoLeveling: true,
+    hasWellPlateSupport: true,
+    mcodes: {
+      startPrint: "G28",
+      pressureSet: "M751 P{head} S{kpa}",
+      uvOn: "M106 P2 S255",
+      uvOff: "M107 P2",
+      pauseForBioink: "M0",
+    },
+    sbsOriginOffset: { x: 10, y: 10, z: 0 },
+    notes: [
+      "3D-Bioplotter: 5 cabeçotes pneumáticos (temp -10°C a 250°C)",
+      "Suporta materiais termosensíveis (PCL, PLA, colágeno gelificado)",
+      "Sistema de UV modular acoplável ao cabeçote",
+      "Certificação GMP-ready (FDA 21 CFR Part 11)",
+      "Ideal para scaffolds multi-material com bioinks e polímeros sintéticos",
+    ],
+  },
+
   generic_marlin: {
     id: "generic_marlin",
     name: "Generic Marlin Bioprinter",
     manufacturer: "DIY / Open Source",
     flavor: "marlin",
+    technology: "extrusion",
     heads: 1,
     buildVolume: {
       min: { x: 0, y: 0, z: 0 },

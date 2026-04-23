@@ -55,19 +55,40 @@ export interface Layer {
 export type BioprinterFlavor = "marlin" | "klipper" | "reprap" | "cellink" | "allevi" | "regemat" | "envisiontec"
 export type ExtrusionMode = "volumetric_ul" | "filament_mm" | "pressure_kpa"
 
+export type PrintingTechnology =
+  | "extrusion"        // Deposição de material via pressão/volumétrico (CELLINK, Allevi, REGEMAT)
+  | "dlp_sla"          // Digital Light Processing / Stereolithography (EnvisionTEC)
+  | "inkjet"           // Inkjet droplet-based
+  | "laser_lift"       // Laser-Induced Forward Transfer
+
+export interface DLPParameters {
+  projector: "405nm_dlp" | "385nm_dlp" | "uv_laser_355nm"
+  resolution_px: { x: number; y: number }        // XY pixels (projector chip)
+  pixelSize_um: number                            // µm por pixel
+  buildAreaMax_mm: { x: number; y: number }
+  minLayerHeight_um: number                       // 10-50 µm típico DLP
+  maxLayerHeight_um: number                       // 100-150 µm típico
+  minExposureTime_s: number                       // ex 0.5s
+  maxExposureTime_s: number                       // ex 120s
+  supportedResins: string[]                       // GelMA-PI, PEGDA, etc
+  tiltAngle_deg?: number                          // mecanismo de peeling
+  hasO2Permeation?: boolean                       // continuous printing CLIP
+}
+
 export interface BioprinterProfile {
   id: string
   name: string
   manufacturer: string
   flavor: BioprinterFlavor
-  heads: number              // número de cabeçotes
+  technology: PrintingTechnology  // determina o tipo de emissor
+  heads: number              // número de cabeçotes (1 para DLP — único projetor)
   buildVolume: BBox3D        // mm
   extrusionMode: ExtrusionMode
-  // Limites físicos
+  // Limites físicos (mecânica Z — válido p/ todas tecnologias)
   maxFeedrate: { xy: number; z: number; e: number }  // mm/min
   minFeedrate: { xy: number; z: number; e: number }
   maxAcceleration: number    // mm/s²
-  minNozzleUm: number
+  minNozzleUm: number        // para DLP: pixelSize
   maxNozzleUm: number
   // Recursos
   hasHeatedBed: boolean
@@ -75,6 +96,8 @@ export interface BioprinterProfile {
   hasCamera: boolean
   hasAutoLeveling: boolean
   hasWellPlateSupport: boolean
+  // Parâmetros DLP (opcional — só para tecnologia DLP/SLA)
+  dlp?: DLPParameters
   // Códigos especiais (M-codes específicos da marca)
   mcodes: {
     startPrint?: string      // ex "M710" (Cellink start)
@@ -84,6 +107,11 @@ export interface BioprinterProfile {
     uvOff?: string           // ex "M107 P1"
     pauseForBioink?: string
     wipeTower?: string
+    // DLP-específicos
+    projectImage?: string    // ex "M106 S{intensity}" ou "PROJECT T{ms}"
+    layerExposure?: string   // ex "G4 P{ms}"
+    vatTilt?: string         // ex "M3 S{angle}"
+    buildPlateLift?: string  // ex "G1 Z+{dz}"
   }
   // Origem da placa SBS (mm no referencial da impressora)
   sbsOriginOffset?: Point3D

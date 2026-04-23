@@ -273,6 +273,27 @@ export async function POST(req: NextRequest) {
     },
   }).catch(() => {})
 
+  // Gerar segmentos leves para preview 3D (extraídos dos moves, limitado a 20k)
+  const previewSegments: Array<{ ax: number; ay: number; bx: number; by: number; z: number; kind: string }> = []
+  const MAX_PREVIEW_SEGS = 20000
+  let lastX: number | null = null, lastY: number | null = null, lastZ: number | null = null
+  for (const m of result.moves) {
+    const x = m.x ?? lastX
+    const y = m.y ?? lastY
+    const z = m.z ?? lastZ
+    if (m.type === "extrude" && lastX !== null && lastY !== null && x !== null && y !== null && z !== null) {
+      if (previewSegments.length < MAX_PREVIEW_SEGS) {
+        previewSegments.push({
+          ax: lastX, ay: lastY, bx: x, by: y, z,
+          kind: "base",
+        })
+      }
+    }
+    if (m.x !== undefined) lastX = m.x
+    if (m.y !== undefined) lastY = m.y
+    if (m.z !== undefined) lastZ = m.z
+  }
+
   return NextResponse.json({
     success: true,
     jobName: job.name,
@@ -280,6 +301,8 @@ export async function POST(req: NextRequest) {
     ...result,
     // Remove 'moves' (muito pesado) do retorno JSON — cliente usa 'gcode' para baixar
     moves: undefined,
+    previewSegments,
+    previewTruncated: result.moves.length > MAX_PREVIEW_SEGS,
     summary: {
       bioprinter: bp.name,
       bioink: `${bioink.material} ${bioink.concentration}%`,
@@ -321,28 +344,64 @@ export async function GET() {
     infillAlgorithms: [
       {
         id: "gyroid_tpms", name: "Gyroid TPMS", category: "paramétrico",
-        description: "Triply Periodic Minimal Surface — ideal para osso trabecular e scaffolds volumosos",
-        bestFor: ["osso", "cartilagem", "vascularização"],
+        description: "Triply Periodic Minimal Surface — superfície mínima tripla periódica. Estrutura matematicamente contínua, zero junções, alta razão superfície/volume.",
+        bestFor: ["osso", "cartilagem", "vascularização", "scaffolds volumosos"],
+        ref: "Han C et al. (2020) J. Mech. Behav. Biomed. Mater. 111, 103990",
       },
       {
-        id: "voronoi_3d", name: "Voronoi 3D", category: "não-paramétrico",
-        description: "Tesselação biomimética com poros irregulares (como osso real)",
-        bestFor: ["osso trabecular", "cartilagem", "tecidos heterogêneos"],
+        id: "voronoi_2d", name: "Voronoi 2D (slice)", category: "não-paramétrico",
+        description: "Tesselação Voronoi planar por camada com Lloyd relaxation. Rápido, ideal para scaffolds finos < 2mm. Células NÃO conectam verticalmente.",
+        bestFor: ["pele", "derme", "cartilagem fina", "membranas"],
+        ref: "Wang et al. (2018) Acta Biomater. 76, 123-134",
+      },
+      {
+        id: "voronoi_3d", name: "Voronoi 3D (Lloyd volumétrico)", category: "não-paramétrico",
+        description: "Tesselação Voronoi VOLUMÉTRICA com Lloyd 3D relaxation (4 iterações). Células INTERCONECTAM entre camadas — trabéculas ósseas reais.",
+        bestFor: ["osso trabecular", "osso esponjoso", "medula óssea", "tecidos heterogêneos espessos"],
+        ref: "Gómez et al. (2016) Biomaterials 110, 52-60",
+      },
+      {
+        id: "perlin_noise", name: "Perlin Noise (fbm)", category: "não-paramétrico",
+        description: "Perlin 3D + fractional Brownian Motion (4 oitavas). Morfologia orgânica contínua. Ideal para parênquima hepático e zonação biológica.",
+        bestFor: ["fígado", "parênquima", "baço", "cicatriz", "tendão direcional"],
+        ref: "Suresh V et al. (2020) Mater. Sci. Eng. C 116, 111187",
       },
       {
         id: "gradient", name: "Gradient", category: "paramétrico",
-        description: "Densidade variável ao longo do Z/X/Y ou radial",
+        description: "Densidade variável ao longo do Z/X/Y ou radial. Simula transições córtico-trabeculares.",
         bestFor: ["pele", "gradiente cortical-trabecular", "vascularização radial"],
       },
       {
         id: "rectilinear", name: "Rectilinear", category: "paramétrico",
-        description: "Linhas paralelas alternando ângulo por camada (padrão)",
+        description: "Linhas paralelas alternando ângulo por camada (padrão).",
         bestFor: ["scaffolds simples", "MVP rápido"],
       },
       {
         id: "linear", name: "Linear", category: "paramétrico",
-        description: "Linhas simples em uma só direção",
+        description: "Linhas simples em uma só direção.",
         bestFor: ["testes de viabilidade", "peles finas"],
+      },
+    ],
+    dualPorosityPresets: [
+      {
+        id: "bone", tissue: "Osso trabecular",
+        description: "Voronoi 3D (matriz) + cross-hatch Ø600µm (Havers) + stochastic Ø80µm (Volkmann NaCl)",
+        expectedViability: "92%", compressiveModulus: "25 kPa",
+      },
+      {
+        id: "liver", tissue: "Fígado",
+        description: "Perlin (parênquima) + hexagonal Ø500µm (tríade portal) + hexagonal_pores Ø100µm (Disse)",
+        expectedViability: "88%", compressiveModulus: "12 kPa",
+      },
+      {
+        id: "cartilage", tissue: "Cartilagem",
+        description: "Gyroid (matriz densa) + SEM canais macro (avascular) + directional_aligned Ø120µm",
+        expectedViability: "90%", compressiveModulus: "50 kPa",
+      },
+      {
+        id: "kidney", tissue: "Rim",
+        description: "Voronoi 3D + branching Murray Ø700µm + radial capillary Ø60µm",
+        expectedViability: "85%", compressiveModulus: "18 kPa",
       },
     ],
     defaults: {

@@ -25,6 +25,9 @@ import { planTrajectory } from "./wellplates/trajectory-planner"
 import { getGeometryBounds } from "./slicer/geometry-bounds"
 import { generateGyroidInfill } from "./infill/parametric/gyroid-tpms"
 import { generateVoronoiInfill } from "./infill/non-parametric/voronoi"
+import { generateVoronoi2D } from "./infill/non-parametric/voronoi-2d"
+import { generateVoronoi3D, type Voronoi3DResult } from "./infill/non-parametric/voronoi-3d"
+import { generatePerlinInfill } from "./infill/non-parametric/perlin-noise"
 import { generateGradientInfill, rectilinear } from "./infill/parametric/gradient"
 import { generateChannels } from "./infill/channels/channels"
 
@@ -38,6 +41,9 @@ function dispatchInfill(
   zMax: number,
   infillPercent: number,
   macroPorosity?: { density: number; poreSize_um: number; seed?: number },
+  voronoi3DCache?: Voronoi3DResult,
+  zRange?: [number, number],
+  layerHeight?: number,
 ): Segment2D[] {
   const density = 1 - infillPercent / 100  // porosity = 1 - infill
   const poreSize = macroPorosity?.poreSize_um ?? 500
@@ -46,20 +52,43 @@ function dispatchInfill(
   switch (algorithm) {
     case "gyroid_tpms":
       return generateGyroidInfill(bbox, z_mm, { density, poreSize_um: poreSize, seed })
-    case "voronoi_3d":
+
     case "voronoi_2d":
-      return generateVoronoiInfill(bbox, { density, poreSize_um: poreSize, seed }).segments
+      return generateVoronoi2D(bbox, {
+        density, poreSize_um: poreSize, seed,
+        lloydIterations: 3,
+      }).segments
+
+    case "voronoi_3d": {
+      // Usa cache pré-computado se disponível (ideal — uma tesselação p/ toda a peça)
+      if (voronoi3DCache) {
+        const key = Math.round(z_mm * 1000) / 1000
+        return voronoi3DCache.layerSegments.get(key) ?? []
+      }
+      // Fallback: geração por camada (não recomendado — não tem interconexão vertical)
+      return generateVoronoiInfill(bbox, {
+        density, poreSize_um: poreSize, seed,
+      }).segments
+    }
+
+    case "perlin_noise":
+      return generatePerlinInfill(bbox, z_mm, {
+        density, poreSize_um: poreSize, seed,
+        octaves: 4, scale: 2.5, persistence: 0.55,
+      }).segments
+
     case "gradient":
       return generateGradientInfill(bbox, {
         axis: "z",
         profile: "linear",
         startDensity: 0.8,
         endDensity: 0.3,
-        z_mm, zMin: 0, zMax,
+        z_mm, zMin: zRange?.[0] ?? 0, zMax,
         angle_deg: 45,
         minSpacing_mm: 0.8,
         maxSpacing_mm: 3.0,
       })
+
     case "rectilinear":
     case "linear":
     default: {
@@ -69,6 +98,39 @@ function dispatchInfill(
       return rectilinear(bbox, spacing, (z_mm * 90) % 180)  // alterna ângulo por camada
     }
   }
+  // parameters reserved for future infill variants
+  void layerHeight
+}
+
+/**
+ * Pré-computa o Voronoi 3D completo para uma geometria (chamado uma vez por job).
+ * Retorna undefined se o algoritmo não for voronoi_3d.
+ */
+export function precomputeVoronoi3D(
+  algorithm: InfillAlgorithm,
+  bbox: BBox2D,
+  zRange: [number, number],
+  layerHeight: number,
+  infillPercent: number,
+  poreSize_um: number,
+  seed = 42,
+): Voronoi3DResult | undefined {
+  if (algorithm !== "voronoi_3d") return undefined
+  const density = 1 - infillPercent / 100
+  return generateVoronoi3D(
+    {
+      min: { x: bbox.minX, y: bbox.minY, z: zRange[0] },
+      max: { x: bbox.maxX, y: bbox.maxY, z: zRange[1] },
+    },
+    {
+      density,
+      poreSize_um,
+      seed,
+      layerHeight_mm: layerHeight,
+      zRange,
+      lloydIterations: 4,
+    },
+  )
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -228,6 +290,19 @@ export function generateGCodeForJob(input: EngineInput): GCodeResult {
   const numLayers = Math.max(1, Math.ceil(bounds.height_mm / job.layerHeight))
   const wallSpacing = job.bioink.nozzleDiameter_um / 1000  // mm
 
+  // 3b) Pré-computar Voronoi 3D UMA VEZ por job (se aplicável)
+  //     Isto garante interconexão vertical real entre camadas.
+  const seedBBoxAtBase = bounds.getBoundsAtZ(bounds.zMin)
+  const voronoi3DCache = precomputeVoronoi3D(
+    job.infillAlgorithm,
+    seedBBoxAtBase,
+    [bounds.zMin, bounds.zMax],
+    job.layerHeight,
+    job.infillPercent,
+    job.macroPorosity?.poreSize_um ?? 500,
+    job.macroPorosity?.seed ?? 42,
+  )
+
   // 4) Volume de extrusão por mm depositado (volumétrico)
   const nozzle_mm = job.bioink.nozzleDiameter_um / 1000
   const extrusionPerMm = nozzle_mm * job.layerHeight * job.bioink.flowMultiplier
@@ -304,6 +379,9 @@ export function generateGCodeForJob(input: EngineInput): GCodeResult {
           bounds.zMax,
           job.infillPercent,
           job.macroPorosity,
+          voronoi3DCache,
+          [bounds.zMin, bounds.zMax],
+          job.layerHeight,
         )
         // Clip to innermost perimeter (se houver) — simplificação: bbox
         const infillSegs = localInfillSegs.map((s) => translateSeg(s, center.x, center.y))
