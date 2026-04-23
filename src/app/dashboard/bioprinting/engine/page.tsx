@@ -351,15 +351,22 @@ export default function GCodeEnginePage() {
             <span className="text-lg font-bold">BIA v4.2 — Motor GCODE</span>
             <Badge className="bg-emerald-600/20 text-emerald-300 border-emerald-700">Bioimpressão Especial</Badge>
           </div>
-          <Button
-            onClick={askAI}
-            disabled={aiLoading}
-            size="sm"
-            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
-          >
-            {aiLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Wand2 className="w-4 h-4 mr-1" />}
-            Pedir à BIA
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard/bioprinting/dual-porosity">
+              <Button size="sm" variant="outline" className="border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10">
+                <Layers className="w-4 h-4 mr-1" /> Dual-Porosity
+              </Button>
+            </Link>
+            <Button
+              onClick={askAI}
+              disabled={aiLoading}
+              size="sm"
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
+            >
+              {aiLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Wand2 className="w-4 h-4 mr-1" />}
+              Pedir à BIA
+            </Button>
+          </div>
         </div>
 
         {/* Progress steps */}

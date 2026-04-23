@@ -1,13 +1,14 @@
 "use client"
 
 import React, { useState, useCallback, useEffect } from "react"
+import Link from "next/link"
 import {
   Printer, Layers, Zap, Settings2, FlaskConical, ChevronDown, ChevronUp,
   Play, Download, RefreshCw, Info, AlertTriangle, CheckCircle2, Loader2,
   Sliders, Droplets, Thermometer, Wind, BarChart3, FileCode2, Microscope,
   Activity, Target, Shield, BookOpen, Database, Star, TrendingUp,
   ArrowRight, Beaker, MonitorDown, Cpu, Globe, ExternalLink,
-  Box, Lightbulb,
+  Box, Lightbulb, Sparkles,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
@@ -358,6 +359,39 @@ export default function BioprintingPage() {
               {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
               Analisar com IA (10 cr)
             </button>
+          </div>
+        </div>
+
+        {/* BIA v4.2 — Motores de Bioimpressão Avançada */}
+        <div className="bg-gradient-to-r from-emerald-500/10 via-cyan-500/10 to-purple-500/10 border border-emerald-500/30 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="w-5 h-5 text-emerald-400" />
+            <h3 className="text-sm font-bold text-white">BIA v4.2 — Motores Avançados</h3>
+            <span className="ml-auto text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">NOVO</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Link href="/dashboard/bioprinting/engine"
+              className="group p-3 rounded-xl bg-slate-900/60 border border-emerald-500/20 hover:border-emerald-500/50 transition-all">
+              <div className="flex items-center gap-2 mb-1">
+                <Printer className="w-4 h-4 text-emerald-400" />
+                <span className="text-sm font-bold text-white">Motor GCODE</span>
+                <span className="ml-auto text-[10px] text-emerald-400">→</span>
+              </div>
+              <p className="text-xs text-gray-400 leading-snug">
+                Gera G-code para multi-well plates (6/12/24/96) com 10+ algoritmos de infill: Gyroid, Voronoi 3D, Perlin, Gradient, L-System.
+              </p>
+            </Link>
+            <Link href="/dashboard/bioprinting/dual-porosity"
+              className="group p-3 rounded-xl bg-slate-900/60 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">
+              <div className="flex items-center gap-2 mb-1">
+                <Layers className="w-4 h-4 text-cyan-400" />
+                <span className="text-sm font-bold text-white">Dual-Porosity</span>
+                <span className="ml-auto text-[10px] text-cyan-400">→</span>
+              </div>
+              <p className="text-xs text-gray-400 leading-snug">
+                Arquitetura hierárquica macro+micro biomimética. Teste: <b>Osso trabecular</b>, <b>Fígado</b>, Cartilagem, Rim. Preview 3D.
+              </p>
+            </Link>
           </div>
         </div>
 
