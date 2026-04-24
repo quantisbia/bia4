@@ -7,10 +7,14 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
+// composition pode vir como string (legado) ou objeto JSON (novo catálogo de 31 biomateriais)
+type CompositionJson = Record<string, unknown>
 interface Biomaterial {
-  id: string; name: string; category: string; composition: string
-  concentration: string; applications: string[]; biocompatibility: string
+  id: string; name: string; category: string
+  composition: string | CompositionJson
+  concentration?: string; applications: string[]; biocompatibility: string
   gelTime?: string; crosslinking?: string
+  tissueTypes?: string[]; tags?: string[]
 }
 
 interface FormulationResult {
@@ -20,14 +24,59 @@ interface FormulationResult {
   preparation: string; considerations: string[]; references: string[]
 }
 
-const CATEGORIES = ["Hidrogel", "Polímero Sintético", "Matriz Natural", "Compósito", "Bioink"]
+// Enum do Prisma → label legível (em PT-BR)
+const CATEGORIES: Array<{ value: string; label: string }> = [
+  { value: "HYDROGEL",       label: "Hidrogel" },
+  { value: "SCAFFOLD",       label: "Scaffold / Polímero" },
+  { value: "BIOINK",         label: "Bioink Formulada" },
+  { value: "COMPOSITE",      label: "Compósito (cerâmica/nano)" },
+  { value: "DECELLULARIZED", label: "MEC Descelularizada" },
+  { value: "COATING",        label: "Coating / Peptídeo" },
+  { value: "MEMBRANE",       label: "Membrana" },
+  { value: "NANOPARTICLE",   label: "Nanopartícula" },
+]
+
+const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
+  CATEGORIES.map(c => [c.value, c.label])
+)
+
+// Transforma o composition (string OU objeto JSON) em string legível
+function formatComposition(c: string | CompositionJson | null | undefined): string {
+  if (!c) return "—"
+  if (typeof c === "string") return c
+  // Composition rica do novo catálogo: destacamos os campos mais importantes
+  const parts: string[] = []
+  if (c.shortName) parts.push(String(c.shortName))
+  if (c.family) parts.push(`família ${String(c.family)}`)
+  if (c.modulus_kPa) parts.push(`módulo ${String(c.modulus_kPa)}`)
+  if (c.poreSize_um) parts.push(`poros ${String(c.poreSize_um)}`)
+  if (parts.length === 0) {
+    // fallback: mostra primeiros 3 pares chave-valor
+    return Object.entries(c).slice(0, 3).map(([k, v]) =>
+      `${k}: ${Array.isArray(v) ? v.join("/") : String(v)}`
+    ).join(" • ")
+  }
+  return parts.join(" • ")
+}
+
+// Extrai a concentração legível — prioriza campo explícito, senão olha composition.concentration
+function getConcentration(bm: Biomaterial): string {
+  if (bm.concentration) return bm.concentration
+  if (typeof bm.composition === "object" && bm.composition && "concentration" in bm.composition) {
+    return String(bm.composition.concentration)
+  }
+  return "—"
+}
 
 const CATEGORY_COLORS: Record<string, string> = {
-  HYDROGEL:          "text-blue-400 bg-blue-500/10 border-blue-500/20",
-  SYNTHETIC_POLYMER: "text-purple-400 bg-purple-500/10 border-purple-500/20",
-  NATURAL_MATRIX:    "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-  COMPOSITE:         "text-amber-400 bg-amber-500/10 border-amber-500/20",
-  BIOINK:            "text-teal-400 bg-teal-500/10 border-teal-500/20",
+  HYDROGEL:       "text-blue-400 bg-blue-500/10 border-blue-500/20",
+  SCAFFOLD:       "text-purple-400 bg-purple-500/10 border-purple-500/20",
+  BIOINK:         "text-teal-400 bg-teal-500/10 border-teal-500/20",
+  COMPOSITE:      "text-amber-400 bg-amber-500/10 border-amber-500/20",
+  DECELLULARIZED: "text-rose-400 bg-rose-500/10 border-rose-500/20",
+  COATING:        "text-cyan-400 bg-cyan-500/10 border-cyan-500/20",
+  MEMBRANE:       "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+  NANOPARTICLE:   "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
 }
 
 export default function BiomaterialsPage() {
@@ -51,7 +100,7 @@ export default function BiomaterialsPage() {
       const params = new URLSearchParams()
       if (search) params.set("search", search)
       if (category) params.set("category", category)
-      params.set("limit", "30")
+      params.set("limit", "100")
       const res = await fetch(`/api/biomaterials?${params}`)
       if (res.ok) {
         const data = await res.json()
@@ -148,7 +197,7 @@ export default function BiomaterialsPage() {
               className="bg-white/5 border border-white/10 rounded-xl pl-9 pr-8 py-2.5 text-sm text-gray-300 appearance-none cursor-pointer focus:outline-none focus:border-blue-500/40"
             >
               <option value="">Todas categorias</option>
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
           </div>
         </div>
@@ -166,16 +215,16 @@ export default function BiomaterialsPage() {
               Todas
             </button>
             {CATEGORIES.map(c => (
-              <button key={c}
-                onClick={() => { setCategory(c); setShowFilter(false) }}
+              <button key={c.value}
+                onClick={() => { setCategory(c.value); setShowFilter(false) }}
                 className={cn(
                   "px-3 py-2 rounded-xl text-xs font-medium border transition-all",
-                  category === c
+                  category === c.value
                     ? "border-blue-500/30 bg-blue-500/10 text-blue-400"
                     : "border-white/8 text-gray-500 hover:text-gray-300"
                 )}
               >
-                {c}
+                {c.label}
               </button>
             ))}
           </div>
@@ -261,7 +310,7 @@ export default function BiomaterialsPage() {
                   <div>
                     <h4 className="text-base font-bold text-white mb-1">{formulationResult.name}</h4>
                     <span className={cn("text-xs px-2 py-1 rounded-lg border inline-block mb-3", CATEGORY_COLORS[formulationResult.category] ?? "text-gray-400")}>
-                      {formulationResult.category}
+                      {CATEGORY_LABELS[formulationResult.category] ?? formulationResult.category}
                     </span>
                     <p className="text-xs text-gray-300 mb-1"><strong className="text-gray-400">Composição:</strong> {formulationResult.composition}</p>
                     <p className="text-xs text-gray-300 mb-1"><strong className="text-gray-400">Concentração:</strong> {formulationResult.concentration}</p>
@@ -331,15 +380,15 @@ export default function BiomaterialsPage() {
                       }
                     </div>
                     <span className={cn("text-[10px] px-2 py-0.5 rounded-md border inline-block mt-1.5", CATEGORY_COLORS[bm.category] ?? "text-gray-400")}>
-                      {bm.category}
+                      {CATEGORY_LABELS[bm.category] ?? bm.category}
                     </span>
                   </div>
                 </button>
 
                 {expanded === bm.id && (
                   <div className="px-3.5 sm:px-4 pb-4 border-t border-white/5 pt-3 space-y-1.5">
-                    <InfoRow label="Composição" value={bm.composition} />
-                    <InfoRow label="Concentração" value={bm.concentration} />
+                    <InfoRow label="Composição" value={formatComposition(bm.composition)} />
+                    <InfoRow label="Concentração" value={getConcentration(bm)} />
                     {bm.crosslinking && <InfoRow label="Crosslinking" value={bm.crosslinking} />}
                     {bm.gelTime && <InfoRow label="Gel time" value={bm.gelTime} />}
                     {bm.biocompatibility && <InfoRow label="Biocompat." value={bm.biocompatibility} />}
