@@ -49,6 +49,12 @@ export interface GeometryParams {
   segments?: number
   // Estrutura interna
   wallThickness?: number
+  // Anatômicos (rim, fígado anatômico)
+  length?: number
+  // Mão
+  palmWidth?: number
+  palmLength?: number
+  fingerLength?: number
 }
 
 export interface STLGeometry {
@@ -198,6 +204,61 @@ export const GEOMETRIES: STLGeometry[] = [
     defaultParams: { radius: 5, segments: 32 },
     paramLabels: { radius: "Raio (mm)", segments: "Segmentos (resolução)" },
     creditCost: 6,
+  },
+  {
+    id: "ear",
+    label: "Orelha (Pavilhão Auricular)",
+    description: "Pavilhão auricular simplificado para reconstrução de orelha e educação em otorrinolaringologia",
+    tissue: "Cartilagem auricular",
+    application: "Microtia, reconstrução auricular, próteses externas",
+    icon: "👂",
+    defaultParams: { height: 60, width: 35, thickness: 4, segments: 32 },
+    paramLabels: { height: "Altura (mm)", width: "Largura (mm)", thickness: "Espessura (mm)", segments: "Resolução" },
+    creditCost: 6,
+  },
+  {
+    id: "heart",
+    label: "Coração (Forma Anatômica)",
+    description: "Coração simplificado (forma de pêra cardíaca) para modelos cardíacos educacionais e patches miocárdicos",
+    tissue: "Miocárdio",
+    application: "Patch cardíaco, modelo anatômico, educação em cardiologia",
+    icon: "❤️",
+    defaultParams: { radius: 20, height: 50, segments: 32 },
+    paramLabels: { radius: "Raio base (mm)", height: "Altura (mm)", segments: "Resolução" },
+    creditCost: 6,
+  },
+  {
+    id: "kidney",
+    label: "Rim (Feijão Anatômico)",
+    description: "Forma de feijão/rim para engenharia renal e modelos de néfron",
+    tissue: "Renal",
+    application: "Scaffold renal, organoide de néfron, modelo anatômico",
+    icon: "🫘",
+    defaultParams: { length: 45, width: 25, thickness: 15, segments: 32 },
+    paramLabels: { length: "Comprimento (mm)", width: "Largura (mm)", thickness: "Espessura (mm)", segments: "Resolução" },
+    creditCost: 6,
+  },
+  {
+    id: "liver_anatomical",
+    label: "Fígado (Anatômico)",
+    description: "Fígado com lobos direito/esquerdo para modelos hepáticos 3D e bioreatores",
+    tissue: "Hepático",
+    application: "Modelo hepático 3D, lóbulo artificial, órgão-em-chip",
+    icon: "🫀",
+    defaultParams: { length: 60, width: 40, thickness: 18, segments: 32 },
+    paramLabels: { length: "Comprimento (mm)", width: "Largura (mm)", thickness: "Espessura (mm)", segments: "Resolução" },
+    creditCost: 6,
+  },
+  {
+    id: "hand",
+    label: "Mão (Esqueleto Simplificado)",
+    description: "Forma simplificada de mão/palma com dedos para educação anatômica e biomecânica",
+    tissue: "Osso / Cartilagem (mão)",
+    application: "Modelo anatômico, próteses, biomecânica, educação",
+    icon: "✋",
+    defaultParams: { palmWidth: 80, palmLength: 100, fingerLength: 70, thickness: 15 },
+    paramLabels: { palmWidth: "Largura palma (mm)", palmLength: "Compr. palma (mm)", fingerLength: "Compr. dedos (mm)", thickness: "Espessura (mm)" },
+    creditCost: 8,
   },
 ]
 
@@ -477,6 +538,260 @@ function genBoneBlock(width: number, height: number, depth: number, wallT: numbe
   return tris
 }
 
+/** Orelha: pavilhão auricular como meia-elipse deformada, baseado em meniscus + textura C-scroll */
+function genEar(height: number, width: number, thickness: number, segs: number): Triangle[] {
+  const tris: Triangle[] = []
+  // Perfil externo de orelha (formato de C invertido + lobo)
+  // Usa contorno paramétrico de elipse distorcida, depois extrude
+  const outerPts: Vec3[] = []
+  const innerPts: Vec3[] = []
+  const n = Math.max(24, segs)
+  for (let i=0; i<n; i++) {
+    const t = i/n
+    const ang = t * Math.PI * 2
+    // Formato de orelha: elipse alongada + curva C + lobo inferior
+    let rx = width/2
+    let ry = height/2
+    // Achatamento lateral superior
+    if (Math.sin(ang) > 0.3) rx *= 0.7
+    // Lobo mais arredondado embaixo
+    if (Math.sin(ang) < -0.6) ry *= 0.75
+    const x = rx * Math.cos(ang)
+    const y = ry * Math.sin(ang) * 0.95
+    outerPts.push([x, y, 0])
+    // Contorno interno (concha): ~55% do tamanho, offset
+    const ix = rx * 0.55 * Math.cos(ang)
+    const iy = ry * 0.55 * Math.sin(ang) - height*0.08
+    innerPts.push([ix, iy, thickness*0.6])
+  }
+  // Face frontal (extrude outer contour com profundidade)
+  const cx: Vec3 = [0, 0, 0]
+  const cxBack: Vec3 = [0, 0, thickness]
+  for (let i=0; i<n; i++) {
+    const j = (i+1) % n
+    // Frente
+    tris.push(tri(cx, outerPts[j], outerPts[i]))
+    // Trás
+    const bi: Vec3 = [outerPts[i][0], outerPts[i][1], thickness]
+    const bj: Vec3 = [outerPts[j][0], outerPts[j][1], thickness]
+    tris.push(tri(cxBack, bi, bj))
+    // Laterais (parede)
+    tris.push(tri(outerPts[i], outerPts[j], bj))
+    tris.push(tri(outerPts[i], bj, bi))
+  }
+  // Concha interna (depressão simulada como relevo)
+  for (let i=0; i<n; i++) {
+    const j = (i+1) % n
+    tris.push(tri([0,-height*0.08, thickness*0.6], innerPts[j], innerPts[i]))
+  }
+  return tris
+}
+
+/** Coração: forma de "pêra cardíaca" — combinação de duas esferas + ápice */
+function genHeart(radius: number, height: number, segs: number): Triangle[] {
+  const tris: Triangle[] = []
+  const r = radius
+  const h = height
+  const n = Math.max(16, segs)
+  // Gera malha paramétrica: duas "bolhas" em cima + ponta em baixo
+  // theta: longitude [0, 2π], phi: latitude [0, π]
+  const vertices: Vec3[][] = []
+  for (let i=0; i<=n; i++) {
+    const row: Vec3[] = []
+    const phi = (i/n) * Math.PI // 0 → π
+    for (let j=0; j<=n; j++) {
+      const theta = (j/n) * Math.PI * 2
+      // Raio varia com phi para criar forma de coração:
+      // topo (phi<π/3): duas lóbulos (bolinhas)
+      // meio: corpo
+      // base (phi>2π/3): ponta
+      let rad = r
+      const zNorm = Math.cos(phi) // 1 no topo, -1 no fundo
+      // Lóbulos superiores (quando phi pequeno)
+      if (zNorm > 0.3) {
+        const lobeFactor = 1 + 0.5 * Math.abs(Math.cos(theta*2)) * zNorm
+        rad = r * lobeFactor * 0.8
+      } else if (zNorm < -0.5) {
+        // Ponta: raio diminui rápido
+        rad = r * (1 + zNorm) * 1.5
+        if (rad < 0) rad = 0.1
+      }
+      const x = rad * Math.sin(phi) * Math.cos(theta)
+      const y = rad * Math.sin(phi) * Math.sin(theta)
+      const z = (h/2) * Math.cos(phi) + h/2 // shift para z>=0
+      row.push([x, y, z])
+    }
+    vertices.push(row)
+  }
+  // Triangulize mesh
+  for (let i=0; i<n; i++) {
+    for (let j=0; j<n; j++) {
+      const v00 = vertices[i][j]
+      const v01 = vertices[i][j+1]
+      const v10 = vertices[i+1][j]
+      const v11 = vertices[i+1][j+1]
+      tris.push(tri(v00, v10, v11))
+      tris.push(tri(v00, v11, v01))
+    }
+  }
+  return tris
+}
+
+/** Rim: forma de feijão — elipsoide com indentação lateral */
+function genKidney(length: number, width: number, thickness: number, segs: number): Triangle[] {
+  const tris: Triangle[] = []
+  const n = Math.max(16, segs)
+  const vertices: Vec3[][] = []
+  for (let i=0; i<=n; i++) {
+    const row: Vec3[] = []
+    const phi = (i/n) * Math.PI
+    for (let j=0; j<=n; j++) {
+      const theta = (j/n) * Math.PI * 2
+      // Forma de feijão: elipsoide deformado com indent no lado côncavo
+      const a = length/2
+      const b = width/2
+      const c = thickness/2
+      // Indentação côncava em um lado (quando theta~π, x~0)
+      const indent = 0.3 * Math.sin(phi) * Math.max(0, Math.cos(theta))
+      const xFactor = 1 - indent
+      const x = a * Math.sin(phi) * Math.cos(theta) * xFactor
+      const y = b * Math.sin(phi) * Math.sin(theta)
+      const z = c * Math.cos(phi) + c
+      row.push([x, y, z])
+    }
+    vertices.push(row)
+  }
+  for (let i=0; i<n; i++) {
+    for (let j=0; j<n; j++) {
+      const v00 = vertices[i][j]
+      const v01 = vertices[i][j+1]
+      const v10 = vertices[i+1][j]
+      const v11 = vertices[i+1][j+1]
+      tris.push(tri(v00, v10, v11))
+      tris.push(tri(v00, v11, v01))
+    }
+  }
+  return tris
+}
+
+/** Fígado anatômico: forma irregular com dois lobos (direito maior, esquerdo menor) */
+function genLiverAnatomical(length: number, width: number, thickness: number, segs: number): Triangle[] {
+  const tris: Triangle[] = []
+  const n = Math.max(16, segs)
+  const vertices: Vec3[][] = []
+  for (let i=0; i<=n; i++) {
+    const row: Vec3[] = []
+    const phi = (i/n) * Math.PI
+    for (let j=0; j<=n; j++) {
+      const theta = (j/n) * Math.PI * 2
+      const a = length/2
+      const b = width/2
+      const c = thickness/2
+      // Assimetria: lobo direito (theta~0) maior, lobo esquerdo (theta~π) menor
+      const lobeFactor = theta < Math.PI ? 1.0 : 0.55
+      // Sulco entre lobos (theta próximo a π)
+      const sulcus = 1 - 0.35 * Math.exp(-Math.pow((theta - Math.PI) * 3, 2)) * Math.sin(phi)
+      // Curvatura superior (borda diafragmática)
+      const topCurve = 1 + 0.15 * Math.max(0, Math.cos(phi))
+      const x = a * Math.sin(phi) * Math.cos(theta) * lobeFactor * sulcus * topCurve
+      const y = b * Math.sin(phi) * Math.sin(theta) * sulcus
+      const z = c * Math.cos(phi) + c
+      row.push([x, y, z])
+    }
+    vertices.push(row)
+  }
+  for (let i=0; i<n; i++) {
+    for (let j=0; j<n; j++) {
+      const v00 = vertices[i][j]
+      const v01 = vertices[i][j+1]
+      const v10 = vertices[i+1][j]
+      const v11 = vertices[i+1][j+1]
+      tris.push(tri(v00, v10, v11))
+      tris.push(tri(v00, v11, v01))
+    }
+  }
+  return tris
+}
+
+/** Mão simplificada: palma retangular arredondada + 5 dedos (cilindros) */
+function genHand(palmWidth: number, palmLength: number, fingerLength: number, thickness: number): Triangle[] {
+  const tris: Triangle[] = []
+  // Palma: caixa arredondada
+  const hw = palmWidth/2
+  const pl = palmLength
+  const t = thickness
+  // Base palm as rounded rectangle (approximated with segments)
+  const palmSegs = 20
+  const palmPts: Vec3[] = []
+  for (let i=0; i<palmSegs; i++) {
+    const a = (i/palmSegs) * Math.PI * 2
+    const rx = hw, ry = pl/2
+    // Rounded rectangle: use p-norm
+    const cos = Math.cos(a), sin = Math.sin(a)
+    const r = 1 / Math.pow(Math.pow(Math.abs(cos), 8) + Math.pow(Math.abs(sin), 8), 1/8)
+    palmPts.push([rx*cos*r, ry*sin*r + pl/2, 0])
+  }
+  // Top/bottom palm faces
+  const palmCenter: Vec3 = [0, pl/2, 0]
+  const palmCenterTop: Vec3 = [0, pl/2, t]
+  for (let i=0; i<palmSegs; i++) {
+    const j = (i+1) % palmSegs
+    tris.push(tri(palmCenter, palmPts[j], palmPts[i]))
+    const topI: Vec3 = [palmPts[i][0], palmPts[i][1], t]
+    const topJ: Vec3 = [palmPts[j][0], palmPts[j][1], t]
+    tris.push(tri(palmCenterTop, topI, topJ))
+    // Sides
+    tris.push(tri(palmPts[i], palmPts[j], topJ))
+    tris.push(tri(palmPts[i], topJ, topI))
+  }
+  // Dedos: 4 dedos paralelos + polegar lateral
+  const fingerRadius = palmWidth/12
+  const fingerSpacing = palmWidth/4
+  for (let f=0; f<4; f++) {
+    const fx = -palmWidth/2 + fingerSpacing*(f + 0.5)
+    const fy = pl
+    // Variação comprimento: indicador>médio>anelar, mínimo o mindinho
+    const lenFactor = [0.85, 1.0, 0.95, 0.75][f]
+    const fLen = fingerLength * lenFactor
+    // Cilindro do dedo
+    const fSegs = 16
+    for (let i=0; i<fSegs; i++) {
+      const a0 = (2*Math.PI*i)/fSegs
+      const a1 = (2*Math.PI*(i+1))/fSegs
+      const x0 = fingerRadius*Math.cos(a0), y0 = fingerRadius*Math.sin(a0)
+      const x1 = fingerRadius*Math.cos(a1), y1 = fingerRadius*Math.sin(a1)
+      // Base (cilindro deitado ao longo do eixo Y: dedo sai do topo da palma)
+      tris.push(tri([fx+x0, fy, t/2+y0], [fx+x1, fy, t/2+y1], [fx+x1, fy+fLen, t/2+y1]))
+      tris.push(tri([fx+x0, fy, t/2+y0], [fx+x1, fy+fLen, t/2+y1], [fx+x0, fy+fLen, t/2+y0]))
+      // Ponta arredondada (tampa)
+      tris.push(tri([fx, fy+fLen, t/2], [fx+x1, fy+fLen, t/2+y1], [fx+x0, fy+fLen, t/2+y0]))
+    }
+  }
+  // Polegar (lateral, posição angulada)
+  const thumbBaseX = -palmWidth/2 - fingerRadius
+  const thumbBaseY = pl*0.3
+  const thumbLen = fingerLength*0.7
+  const thumbSegs = 16
+  for (let i=0; i<thumbSegs; i++) {
+    const a0 = (2*Math.PI*i)/thumbSegs
+    const a1 = (2*Math.PI*(i+1))/thumbSegs
+    const y0 = fingerRadius*Math.sin(a0), z0 = fingerRadius*Math.cos(a0)
+    const y1 = fingerRadius*Math.sin(a1), z1 = fingerRadius*Math.cos(a1)
+    // Polegar inclinado ~45° para fora
+    tris.push(tri(
+      [thumbBaseX, thumbBaseY+y0, t/2+z0],
+      [thumbBaseX, thumbBaseY+y1, t/2+z1],
+      [thumbBaseX-thumbLen*0.7, thumbBaseY+y1-thumbLen*0.5, t/2+z1]
+    ))
+    tris.push(tri(
+      [thumbBaseX, thumbBaseY+y0, t/2+z0],
+      [thumbBaseX-thumbLen*0.7, thumbBaseY+y1-thumbLen*0.5, t/2+z1],
+      [thumbBaseX-thumbLen*0.7, thumbBaseY+y0-thumbLen*0.5, t/2+z0]
+    ))
+  }
+  return tris
+}
+
 // ═══════════════════════════════════════════
 // DISPATCHER PRINCIPAL
 // ═══════════════════════════════════════════
@@ -507,6 +822,16 @@ export function generateGeometry(id: string, params: GeometryParams): Triangle[]
       return genOvalCylinder(p.radiusA ?? 5, p.radiusB ?? 3, p.thickness ?? 4, p.segments ?? 48)
     case "organoid_sphere":
       return genSphere(p.radius ?? 5, p.segments ?? 32)
+    case "ear":
+      return genEar(p.height ?? 60, p.width ?? 35, p.thickness ?? 4, p.segments ?? 32)
+    case "heart":
+      return genHeart(p.radius ?? 20, p.height ?? 50, p.segments ?? 32)
+    case "kidney":
+      return genKidney(p.length ?? 45, p.width ?? 25, p.thickness ?? 15, p.segments ?? 32)
+    case "liver_anatomical":
+      return genLiverAnatomical(p.length ?? 60, p.width ?? 40, p.thickness ?? 18, p.segments ?? 32)
+    case "hand":
+      return genHand(p.palmWidth ?? 80, p.palmLength ?? 100, p.fingerLength ?? 70, p.thickness ?? 15)
     default:
       return genCylinder(p.radius ?? 10, p.thickness ?? 5, p.segments ?? 32)
   }

@@ -8,7 +8,7 @@ import { useSession } from "next-auth/react"
 import {
   LayoutDashboard, GitBranch, FlaskConical, CircleDot,
   FileText, BookOpen, MessageSquare, CreditCard, Settings,
-  LogOut, Zap, ChevronRight, Menu, X, Printer, Microscope, Box, ClipboardCheck, BookMarked,
+  LogOut, Zap, ChevronRight, Menu, X, Printer, Box, ClipboardCheck, BookMarked,
   Crown, Wrench,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
@@ -37,19 +37,19 @@ export function BiaLogoIcon({ size = 22 }: { size?: number }) {
 }
 
 export const NAV_ITEMS = [
-  { href: "/dashboard",               label: "Visão Geral",         icon: LayoutDashboard, exact: true },
-  { href: "/dashboard/pipeline",      label: "Pipeline",            icon: GitBranch,        exact: false },
-  { href: "/dashboard/biomaterials",  label: "Formulador Bio",      icon: FlaskConical,     exact: false },
-  { href: "/dashboard/bioprinting",   label: "Bioimpressão 3D",     icon: Printer,          exact: false },
-  { href: "/dashboard/organoids",     label: "Organoid Builder",    icon: CircleDot,        exact: false },
-  { href: "/dashboard/protocols",     label: "Protocolos GLP/GMP",  icon: FileText,         exact: false },
-  { href: "/dashboard/analyses",      label: "Análises & Dossiês",  icon: Microscope,       exact: false },
-  { href: "/dashboard/knowledge",     label: "Base de Conhecimento",icon: BookOpen,         exact: false },
-  { href: "/dashboard/chat",          label: "Chat IA",             icon: MessageSquare,    exact: false },
-  { href: "/dashboard/stl",            label: "Gerador STL/OBJ",     icon: Box,              exact: false },
-  { href: "/dashboard/protocol-total", label: "Protocolo Total",      icon: ClipboardCheck,   exact: false },
-  { href: "/dashboard/notebook",       label: "Notebook Científico",   icon: BookMarked,       exact: false },
-  { href: "/dashboard/tools",          label: "Ferramentas",            icon: Wrench,           exact: false },
+  { href: "/dashboard",                         label: "Visão Geral",          icon: LayoutDashboard, exact: true },
+  { href: "/dashboard/pipeline",                label: "Pipeline",             icon: GitBranch,       exact: false },
+  { href: "/dashboard/biomaterials",            label: "Formulador Bio",       icon: FlaskConical,    exact: false },
+  { href: "/dashboard/bioprinting",             label: "Bioimpressão 3D",      icon: Printer,         exact: false },
+  { href: "/dashboard/stl",                     label: "Gerador STL",          icon: Box,             exact: false },
+  { href: "/dashboard/bioprinting/engine",      label: "Motor GCODE",          icon: Zap,             exact: false },
+  { href: "/dashboard/organoids",               label: "Organoid Builder",     icon: CircleDot,       exact: false },
+  { href: "/dashboard/protocols",               label: "Protocolos GLP/GMP",   icon: FileText,        exact: false },
+  { href: "/dashboard/protocol-total",          label: "Protocolo Total",      icon: ClipboardCheck,  exact: false },
+  { href: "/dashboard/knowledge",               label: "Base de Conhecimento", icon: BookOpen,        exact: false },
+  { href: "/dashboard/chat",                    label: "Chat IA",              icon: MessageSquare,   exact: false },
+  { href: "/dashboard/notebook",                label: "Notebook",             icon: BookMarked,      exact: false },
+  { href: "/dashboard/tools",                   label: "Ferramentas",          icon: Wrench,          exact: false },
 ]
 
 const BOTTOM_ITEMS = [

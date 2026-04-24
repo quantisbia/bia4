@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * BIA v4.2 — Motor GCODE + Multi-Well Orchestrator
+ * BIA — Motor GCODE + Multi-Well Orchestrator
  * Interface de criação e download de G-code para bioimpressão em placas de poços.
  */
 
@@ -11,6 +11,7 @@ import {
   Printer, Layers, Zap, Sparkles, Download, Play, ChevronLeft,
   FlaskConical, Microscope, Target, CheckCircle2, AlertTriangle,
   Activity, Loader2, Wand2, Box, Waves, Grid3x3, Route,
+  AlertCircle, Ruler, Move3d, Info, Power,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card"
 import { Button } from "@/components/ui/Button"
@@ -152,7 +153,10 @@ export default function GCodeEnginePage() {
   const [useMicroPoros, setUseMicroPoros] = useState(false)
   const [microPoreSize, setMicroPoreSize] = useState(50)
 
-  // Step 3: Well Plate
+  // Step 3: Well Plate / Superfície de impressão
+  // surfaceType: "well_plate" (SBS 6-384), "unit_dish" (placa unitária redonda 30/60/100mm), "bed" (direto na mesa)
+  const [surfaceType, setSurfaceType] = useState<"well_plate" | "unit_dish" | "bed">("well_plate")
+  const [unitDishDiameter, setUnitDishDiameter] = useState<30 | 60 | 100>(60)
   const [plateFormat, setPlateFormat] = useState<WellPlateFormat>(24)
   const [selectedWells, setSelectedWells] = useState<string[]>(["A1"])
   const [replicationMode, setReplicationMode] = useState<"same" | "different" | "gradient">("same")
@@ -160,6 +164,10 @@ export default function GCodeEnginePage() {
   const [pauseBetween, setPauseBetween] = useState(2)
   const [purgeVolume, setPurgeVolume] = useState(1)
   const [trajectory, setTrajectory] = useState<string[] | undefined>(undefined)
+
+  // Bed leveling / Z-offset confirmação
+  const [levelingConfirmed, setLevelingConfirmed] = useState(false)
+  const [zOffset, setZOffset] = useState(0.0) // offset adicional sobre mesa (mm)
 
   // Step 4: Bioink + Printer
   const [bioprinterId, setBioprinterId] = useState("cellink_biox")
@@ -324,15 +332,111 @@ export default function GCodeEnginePage() {
     }
   }
 
+  /**
+   * Monta o G-code final com cabeçalho de segurança BIA:
+   *  - Alerta e mensagens de nivelamento
+   *  - G92 X0 Y0 Z0 E0  → zera posições (após homing manual na impressora)
+   *  - G1 Z{0.4 + zOffset} F300 → subida inicial antes do primeiro movimento
+   * O G-code original gerado pelo servidor vem logo após este cabeçalho.
+   */
+  function buildFinalGCode(): string {
+    if (!result) return ""
+    const z0 = (0.4 + zOffset).toFixed(3)
+    const header = [
+      "; ═══════════════════════════════════════════════════════════",
+      "; BIA — Motor GCODE  |  Cabeçalho de Segurança",
+      "; ═══════════════════════════════════════════════════════════",
+      "; ⚠️  ANTES DE INICIAR:",
+      ";   1) NIVELE A MESA (parafusos + teste da folha de papel)",
+      ";   2) Calibre Z-offset (bico ~0.1-0.3 mm da mesa)",
+      ";   3) Faça homing: G28  (ou botão HOME na impressora)",
+      ";   4) Confirme que o bico não está entupido e bioink carregado",
+      ";",
+      `; Superfície: ${surfaceType === "well_plate" ? `Placa SBS ${plateFormat} poços`
+        : surfaceType === "unit_dish" ? `Placa unitária Ø ${unitDishDiameter} mm`
+        : "Direto na mesa da impressora"}`,
+      `; Z-offset extra: +${zOffset.toFixed(3)} mm`,
+      "; ═══════════════════════════════════════════════════════════",
+      "",
+      "M82                      ; extrusão absoluta",
+      "G21                      ; milímetros",
+      "G90                      ; coordenadas absolutas",
+      "G92 X0 Y0 Z0 E0          ; ZERA POSIÇÕES (após homing)",
+      `G1 Z${z0} F300            ; SOBE o bico ${z0} mm antes de começar`,
+      "G4 P500                  ; pausa 0.5s para estabilização",
+      "",
+      "; ═══════════════════════════════════════════════════════════",
+      "; INÍCIO DA IMPRESSÃO",
+      "; ═══════════════════════════════════════════════════════════",
+      "",
+    ].join("\n")
+    return header + result.gcode
+  }
+
   function downloadGCode() {
     if (!result) return
-    const blob = new Blob([result.gcode], { type: "text/plain" })
+    if (!levelingConfirmed) {
+      const ok = confirm(
+        "⚠️ ATENÇÃO: Você ainda não confirmou que a mesa foi nivelada e o Z-offset calibrado.\n\n" +
+        "Imprimir sem nivelamento pode:\n" +
+        "  • AMASSAR/ENTUPIR O BICO (dano no equipamento)\n" +
+        "  • Causar falha de adesão da bioink\n" +
+        "  • Gerar camadas desiguais\n\n" +
+        "Deseja baixar o G-code mesmo assim?"
+      )
+      if (!ok) return
+    }
+    const blob = new Blob([buildFinalGCode()], { type: "text/plain" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
     a.download = `${result.jobName}.gcode`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  /**
+   * "Iniciar impressão": prepara download + abre instruções de envio
+   * para a bioimpressora (via Octoprint, cartão SD, USB, etc.)
+   */
+  function startPrint() {
+    if (!result) return
+    if (!levelingConfirmed) {
+      alert(
+        "⛔ NIVELAMENTO NÃO CONFIRMADO\n\n" +
+        "Volte ao Passo 3 e marque a caixa:\n" +
+        "\"Confirmo que a mesa está nivelada e Z-offset calibrado\"\n\n" +
+        "Este é um passo crítico para não danificar o bico da sua bioimpressora."
+      )
+      return
+    }
+    const proceed = confirm(
+      "🚀 INICIAR IMPRESSÃO\n\n" +
+      "Checklist final:\n" +
+      "  ✅ Mesa nivelada (teste da folha de papel)\n" +
+      "  ✅ Z-offset calibrado (bico a ~0.1–0.3 mm)\n" +
+      "  ✅ Bioink carregada e sem bolhas\n" +
+      "  ✅ Homing executado na impressora (G28)\n" +
+      "  ✅ Placa/recipiente posicionado corretamente\n\n" +
+      "Ao clicar OK você receberá:\n" +
+      "  1. O download do G-code final (com G92 + Z0.4 de segurança)\n" +
+      "  2. Instruções para enviar à sua bioimpressora\n\n" +
+      "Prosseguir?"
+    )
+    if (!proceed) return
+    downloadGCode()
+    alert(
+      "✅ G-code baixado!\n\n" +
+      "COMO ENVIAR À BIOIMPRESSORA:\n\n" +
+      "• CELLINK BIO X / INKREDIBLE+: carregue o arquivo pelo software DNA Studio ou HeartOS\n" +
+      "• Allevi: envie pelo Allevi Bioprint Online\n" +
+      "• Regemat BIO V1: use o BioCAD\n" +
+      "• EnvisionTEC: Perfactory Software\n" +
+      "• Cartão SD / USB: copie o .gcode e insira na impressora\n" +
+      "• Octoprint: arraste o arquivo na interface web\n\n" +
+      "⚠️ O arquivo já contém G92 X0 Y0 Z0 E0 + G1 Z0.4 no cabeçalho.\n" +
+      "Certifique-se de fazer HOMING (G28) antes de iniciar."
+    )
   }
 
   // ──────────────────────────────────────────────────────────
@@ -348,7 +452,7 @@ export default function GCodeEnginePage() {
           </Link>
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-emerald-400" />
-            <span className="text-lg font-bold">BIA v4.2 — Motor GCODE</span>
+            <span className="text-lg font-bold">BIA — Motor GCODE</span>
             <Badge className="bg-emerald-600/20 text-emerald-300 border-emerald-700">Bioimpressão Especial</Badge>
           </div>
           <div className="flex items-center gap-2">
@@ -611,41 +715,213 @@ export default function GCodeEnginePage() {
           </Card>
         )}
 
-        {/* STEP 3 — WELL PLATE */}
+        {/* STEP 3 — WELL PLATE / UNIT DISH / BED */}
         {step === 3 && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Grid3x3 className="w-5 h-5" /> 3. Placa de Cultura — selecione os poços</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Grid3x3 className="w-5 h-5" /> 3. Superfície de Impressão</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Plate selector buttons */}
-              <div className="flex flex-wrap gap-2">
-                {([6, 12, 24, 48, 96, 384] as WellPlateFormat[]).map((f) => (
+            <CardContent className="space-y-5">
+              {/* Tipo de superfície */}
+              <div>
+                <label className="text-xs font-semibold text-gray-400 mb-2 block uppercase tracking-wider">Tipo de Superfície</label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <button
-                    key={f}
-                    onClick={() => setPlateFormat(f)}
+                    onClick={() => setSurfaceType("well_plate")}
                     className={cn(
-                      "px-4 py-2 rounded-lg border text-sm transition",
-                      plateFormat === f
-                        ? "bg-emerald-600 border-emerald-500 text-white"
+                      "p-4 rounded-xl border text-left transition-all",
+                      surfaceType === "well_plate"
+                        ? "bg-emerald-600/20 border-emerald-500 ring-2 ring-emerald-500/40"
                         : "bg-gray-800/50 border-gray-700 hover:border-emerald-500/50",
                     )}
                   >
-                    <div className="font-bold">{f}</div>
-                    <div className="text-[10px] text-gray-400">poços</div>
+                    <div className="flex items-center gap-2 mb-1"><Grid3x3 className="w-4 h-4 text-emerald-400" /><span className="font-bold">Placa de Poços (SBS)</span></div>
+                    <div className="text-xs text-gray-400">6, 12, 24, 48, 96 ou 384 poços padronizados</div>
                   </button>
-                ))}
+                  <button
+                    onClick={() => setSurfaceType("unit_dish")}
+                    className={cn(
+                      "p-4 rounded-xl border text-left transition-all",
+                      surfaceType === "unit_dish"
+                        ? "bg-cyan-600/20 border-cyan-500 ring-2 ring-cyan-500/40"
+                        : "bg-gray-800/50 border-gray-700 hover:border-cyan-500/50",
+                    )}
+                  >
+                    <div className="flex items-center gap-2 mb-1"><Target className="w-4 h-4 text-cyan-400" /><span className="font-bold">Placa Unitária</span></div>
+                    <div className="text-xs text-gray-400">Petri circular: Ø 30, 60 ou 100 mm</div>
+                  </button>
+                  <button
+                    onClick={() => setSurfaceType("bed")}
+                    className={cn(
+                      "p-4 rounded-xl border text-left transition-all",
+                      surfaceType === "bed"
+                        ? "bg-amber-600/20 border-amber-500 ring-2 ring-amber-500/40"
+                        : "bg-gray-800/50 border-gray-700 hover:border-amber-500/50",
+                    )}
+                  >
+                    <div className="flex items-center gap-2 mb-1"><Ruler className="w-4 h-4 text-amber-400" /><span className="font-bold">Mesa Direta</span></div>
+                    <div className="text-xs text-gray-400">Imprimir direto na mesa da impressora (sem recipiente)</div>
+                  </button>
+                </div>
               </div>
 
-              {/* Well selector SVG */}
-              <WellPlateSelector
-                format={plateFormat}
-                selected={selectedWells}
-                onChange={setSelectedWells}
-                trajectory={trajectory}
-              />
+              {/* ALERTA CRÍTICO: NIVELAMENTO + Z-OFFSET */}
+              <div className="rounded-xl border-2 border-amber-500/60 bg-gradient-to-br from-amber-500/10 to-red-500/10 p-4 sm:p-5">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center flex-shrink-0">
+                    <AlertCircle className="w-6 h-6 text-amber-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-bold text-amber-300 text-base mb-2 flex items-center gap-2">
+                      ⚠️ NIVELAMENTO DA MESA + Z-OFFSET — Crítico antes de imprimir
+                    </h4>
+                    <div className="space-y-2 text-sm text-gray-200">
+                      <p className="leading-relaxed">
+                        <b className="text-amber-300">Nivelar a mesa</b> significa ajustar os 3 ou 4 parafusos sob a mesa para que
+                        <b> a distância entre o bico do extrusor e a mesa seja uniforme em todos os pontos</b>.
+                        Se não nivelar corretamente:
+                      </p>
+                      <ul className="text-xs space-y-1 pl-4">
+                        <li>❌ <b>Bico muito baixo:</b> amassa/entope o bico, pode quebrar — <b>risco de dano ao equipamento</b></li>
+                        <li>❌ <b>Bico muito alto:</b> material não adere → impressão falha e descola</li>
+                        <li>❌ <b>Nível desigual:</b> camadas finas em um lado, grossas em outro</li>
+                      </ul>
+                      <div className="mt-3 p-3 rounded-lg bg-black/40 border border-white/10">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <Move3d className="w-4 h-4 text-cyan-400" />
+                          <span className="text-xs font-bold text-cyan-300 uppercase tracking-wider">Z-OFFSET (deslocamento Z da primeira camada)</span>
+                        </div>
+                        <p className="text-xs text-gray-300 leading-relaxed">
+                          É a <b>altura exata do bico em relação à mesa</b> no momento de iniciar a impressão.
+                          Tipicamente entre <b>0,1 e 0,3 mm</b> (espessura de uma folha de papel).
+                          Na BIA, usamos <b>G92 X0 Y0 Z0 E0</b> para zerar as posições e um <b>G1 Z0.4</b> para subir o bico antes de começar.
+                        </p>
+                      </div>
+                      <div className="mt-2 flex items-center gap-3">
+                        <label className="text-xs text-gray-400">Z-offset extra (mm):</label>
+                        <input
+                          type="number" step={0.05} min={0} max={2}
+                          value={zOffset}
+                          onChange={(e) => setZOffset(parseFloat(e.target.value) || 0)}
+                          className="w-24 px-2 py-1 rounded-md bg-black/40 border border-white/20 text-sm text-white focus:border-cyan-500 outline-none"
+                        />
+                        <span className="text-[10px] text-gray-500">default 0.0 — adicionado ao G1 Z0.4 inicial</span>
+                      </div>
+                      <label className="mt-3 flex items-center gap-2 cursor-pointer p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={levelingConfirmed}
+                          onChange={(e) => setLevelingConfirmed(e.target.checked)}
+                          className="w-4 h-4 accent-emerald-500"
+                        />
+                        <span className="text-sm font-semibold text-emerald-300 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4" />
+                          Confirmo que a mesa está nivelada e Z-offset calibrado
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-              {/* Replication mode */}
+              {/* PLACA DE POÇOS (SBS) */}
+              {surfaceType === "well_plate" && (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    {([6, 12, 24, 48, 96, 384] as WellPlateFormat[]).map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setPlateFormat(f)}
+                        className={cn(
+                          "px-4 py-2 rounded-lg border text-sm transition",
+                          plateFormat === f
+                            ? "bg-emerald-600 border-emerald-500 text-white"
+                            : "bg-gray-800/50 border-gray-700 hover:border-emerald-500/50",
+                        )}
+                      >
+                        <div className="font-bold">{f}</div>
+                        <div className="text-[10px] text-gray-400">poços</div>
+                      </button>
+                    ))}
+                  </div>
+
+                  <WellPlateSelector
+                    format={plateFormat}
+                    selected={selectedWells}
+                    onChange={setSelectedWells}
+                    trajectory={trajectory}
+                  />
+                </>
+              )}
+
+              {/* PLACA UNITÁRIA (PETRI 30/60/100 mm) */}
+              {surfaceType === "unit_dish" && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-semibold text-gray-400 mb-2 block uppercase tracking-wider">Diâmetro da placa (mm)</label>
+                    <div className="flex flex-wrap gap-2">
+                      {([30, 60, 100] as const).map((d) => (
+                        <button
+                          key={d}
+                          onClick={() => setUnitDishDiameter(d)}
+                          className={cn(
+                            "px-5 py-3 rounded-lg border text-sm transition",
+                            unitDishDiameter === d
+                              ? "bg-cyan-600 border-cyan-500 text-white"
+                              : "bg-gray-800/50 border-gray-700 hover:border-cyan-500/50",
+                          )}
+                        >
+                          <div className="font-bold text-base">Ø {d} mm</div>
+                          <div className="text-[10px] text-gray-400">
+                            {d === 30 && "área útil 7 cm² (micro)"}
+                            {d === 60 && "área útil 28 cm² (padrão)"}
+                            {d === 100 && "área útil 78 cm² (grande)"}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+                    <svg width="220" height="220" viewBox="-110 -110 220 220" className="overflow-visible">
+                      {/* mesa */}
+                      <rect x="-105" y="-105" width="210" height="210" fill="rgba(30,30,40,0.5)" stroke="#444" strokeWidth="1" strokeDasharray="4,2" rx="8" />
+                      {/* placa circular */}
+                      <circle cx="0" cy="0" r={unitDishDiameter} fill="rgba(6,182,212,0.1)" stroke="#06b6d4" strokeWidth="2" />
+                      <text x="0" y="5" textAnchor="middle" className="fill-cyan-400 font-bold text-sm">Ø {unitDishDiameter} mm</text>
+                      <text x="0" y={unitDishDiameter + 15} textAnchor="middle" className="fill-gray-500 text-[10px]">construto no centro da placa</text>
+                    </svg>
+                  </div>
+                </div>
+              )}
+
+              {/* MESA DIRETA */}
+              {surfaceType === "bed" && (
+                <div className="space-y-4">
+                  <div className="rounded-lg bg-amber-500/10 border border-amber-500/40 p-4 flex items-start gap-3">
+                    <Info className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-amber-100">
+                      <p className="font-semibold mb-1">Imprimindo direto na mesa</p>
+                      <p className="text-xs text-amber-200/80">
+                        Sem recipiente — o construto é impresso diretamente sobre a mesa da bioimpressora.
+                        Use <b>filme de transferência</b> (parafilm, papel-alumínio, PET tratado) para facilitar o destacamento.
+                        Indicado para: patches grandes, membranas, experimentos de aderência.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+                    <svg width="260" height="180" viewBox="0 0 260 180">
+                      <rect x="10" y="10" width="240" height="160" fill="rgba(251,191,36,0.08)" stroke="#f59e0b" strokeWidth="2" rx="4" />
+                      <text x="130" y="92" textAnchor="middle" className="fill-amber-400 font-bold text-base">Mesa da impressora</text>
+                      <text x="130" y="112" textAnchor="middle" className="fill-gray-500 text-xs">construto livre</text>
+                      {/* Construto centralizado */}
+                      <rect x="100" y="70" width="60" height="40" fill="rgba(16,185,129,0.3)" stroke="#10b981" strokeWidth="1.5" strokeDasharray="3,2" />
+                    </svg>
+                  </div>
+                </div>
+              )}
+
+              {/* Replication mode (só para well_plate) */}
+              {surfaceType === "well_plate" && (
               <div className="bg-gray-900/50 rounded-lg p-4 border border-gray-800 space-y-3">
                 <h4 className="text-sm font-semibold flex items-center gap-2"><Route className="w-4 h-4" /> Modo de Replicação</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -689,12 +965,13 @@ export default function GCodeEnginePage() {
                   </div>
                 </div>
               </div>
+              )}
 
               <div className="flex justify-between">
                 <Button variant="outline" onClick={() => setStep(2)}>← Voltar</Button>
                 <Button
                   onClick={() => setStep(4)}
-                  disabled={selectedWells.length === 0}
+                  disabled={surfaceType === "well_plate" && selectedWells.length === 0}
                   className="bg-emerald-600 hover:bg-emerald-500"
                 >
                   Próximo: Bioink & Printer →
@@ -856,9 +1133,33 @@ export default function GCodeEnginePage() {
                   </div>
                 )}
 
+                {/* Status de nivelamento */}
+                {!levelingConfirmed && (
+                  <div className="rounded-lg bg-red-950/40 border-2 border-red-500/60 p-3 flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 text-sm">
+                      <p className="font-bold text-red-300 mb-1">⛔ Nivelamento NÃO confirmado</p>
+                      <p className="text-xs text-red-200/80 mb-2">
+                        Volte ao Passo 3 e confirme que a mesa foi nivelada e o Z-offset calibrado.
+                        Imprimir sem nivelamento pode <b>danificar o bico</b> da sua bioimpressora.
+                      </p>
+                      <Button size="sm" variant="outline" onClick={() => setStep(3)} className="text-xs">
+                        ← Voltar ao Passo 3 para confirmar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap gap-2">
-                  <Button onClick={downloadGCode} className="bg-emerald-600 hover:bg-emerald-500">
-                    <Download className="w-4 h-4 mr-2" /> Download .gcode ({result.totalLines.toLocaleString()} linhas)
+                  <Button
+                    onClick={startPrint}
+                    disabled={!levelingConfirmed}
+                    className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 font-bold shadow-lg shadow-emerald-900/50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Power className="w-4 h-4 mr-2" /> 🚀 Iniciar Impressão
+                  </Button>
+                  <Button onClick={downloadGCode} variant="outline" className="border-emerald-600 text-emerald-300 hover:bg-emerald-600/20">
+                    <Download className="w-4 h-4 mr-2" /> Baixar .gcode ({result.totalLines.toLocaleString()} linhas)
                   </Button>
                   <Button variant="outline" onClick={() => setShowGcode(!showGcode)}>
                     {showGcode ? "Ocultar" : "Ver"} prévia do G-code
@@ -868,11 +1169,26 @@ export default function GCodeEnginePage() {
                   </Button>
                 </div>
 
+                {/* Cabeçalho de segurança informativo */}
+                <div className="rounded-lg bg-cyan-950/30 border border-cyan-500/30 p-3 text-xs text-cyan-100/90">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Info className="w-4 h-4 text-cyan-400" />
+                    <span className="font-bold text-cyan-300 uppercase tracking-wider">Cabeçalho de Segurança BIA (incluído no .gcode)</span>
+                  </div>
+                  <pre className="text-[10px] font-mono text-cyan-200/70 leading-relaxed overflow-x-auto">
+{`M82                      ; extrusão absoluta
+G21                      ; milímetros
+G90                      ; coordenadas absolutas
+G92 X0 Y0 Z0 E0          ; ZERA POSIÇÕES
+G1 Z${(0.4 + zOffset).toFixed(3)} F300            ; SOBE bico ${(0.4 + zOffset).toFixed(3)} mm (Z-offset)`}
+                  </pre>
+                </div>
+
                 {showGcode && (
                   <div className="bg-black/60 border border-gray-800 rounded-lg p-4 max-h-96 overflow-auto">
                     <pre className="text-[11px] text-green-400 font-mono whitespace-pre">
-                      {result.gcode.split("\n").slice(0, 300).join("\n")}
-                      {result.gcode.split("\n").length > 300 && "\n\n; ... [truncado para preview, baixe o arquivo completo] ..."}
+                      {buildFinalGCode().split("\n").slice(0, 300).join("\n")}
+                      {buildFinalGCode().split("\n").length > 300 && "\n\n; ... [truncado para preview, baixe o arquivo completo] ..."}
                     </pre>
                   </div>
                 )}

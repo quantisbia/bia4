@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard, GitBranch, MessageSquare, FlaskConical,
-  BookOpen, FileText, MoreHorizontal, Printer, CircleDot, Microscope, Box,
+  BookOpen, FileText, MoreHorizontal, Printer, CircleDot, Box, Zap,
   X, CreditCard, ClipboardCheck, BookMarked, Wrench
 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
@@ -18,16 +18,16 @@ const PRIMARY_TABS = [
 ]
 
 const MORE_TABS = [
-  { href: "/dashboard/bioprinting",    label: "Bioimpressão",       icon: Printer },
-  { href: "/dashboard/organoids",      label: "Organoides",         icon: CircleDot },
-  { href: "/dashboard/protocols",      label: "Protocolos",         icon: FileText },
-  { href: "/dashboard/analyses",       label: "Análises",           icon: Microscope },
-  { href: "/dashboard/knowledge",      label: "Base de Conhecimento", icon: BookOpen },
-  { href: "/dashboard/stl",            label: "Gerador STL/OBJ",    icon: Box },
-  { href: "/dashboard/protocol-total", label: "Protocolo Total",    icon: ClipboardCheck },
-  { href: "/dashboard/notebook",       label: "Notebook",           icon: BookMarked },
-  { href: "/dashboard/tools",          label: "Ferramentas",        icon: Wrench },
-  { href: "/dashboard/billing",        label: "Assinatura",         icon: CreditCard },
+  { href: "/dashboard/bioprinting",         label: "Bioimpressão 3D",      icon: Printer },
+  { href: "/dashboard/stl",                 label: "Gerador STL",          icon: Box },
+  { href: "/dashboard/bioprinting/engine",  label: "Motor GCODE",          icon: Zap },
+  { href: "/dashboard/organoids",           label: "Organoid Builder",     icon: CircleDot },
+  { href: "/dashboard/protocols",           label: "Protocolos GLP/GMP",   icon: FileText },
+  { href: "/dashboard/protocol-total",      label: "Protocolo Total",      icon: ClipboardCheck },
+  { href: "/dashboard/knowledge",           label: "Base de Conhecimento", icon: BookOpen },
+  { href: "/dashboard/notebook",            label: "Notebook",             icon: BookMarked },
+  { href: "/dashboard/tools",               label: "Ferramentas",          icon: Wrench },
+  { href: "/dashboard/billing",             label: "Assinatura",           icon: CreditCard },
 ]
 
 export function MobileBottomNav() {
