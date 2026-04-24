@@ -11,12 +11,17 @@ import {
   Printer, Layers, Zap, Sparkles, Download, Play, ChevronLeft,
   FlaskConical, Microscope, Target, CheckCircle2, AlertTriangle,
   Activity, Loader2, Wand2, Box, Waves, Grid3x3, Route,
-  AlertCircle, Ruler, Move3d, Info, Power,
+  AlertCircle, Ruler, Move3d, Info, Power, Usb, BookOpen, Eye,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card"
 import { Button } from "@/components/ui/Button"
 import { Badge } from "@/components/ui/Badge"
 import { WellPlateSelector, type WellPlateFormat } from "@/components/bioprinting/WellPlateSelector"
+import { BioinkFormulator, type BioinkComponent } from "@/components/bioprinting/BioinkFormulator"
+import { PrinterConnection } from "@/components/bioprinting/PrinterConnection"
+import { GCodeViewer2D } from "@/components/bioprinting/GCodeViewer2D"
+import { BIOPRINTERS as BIOPRINTERS_CATALOG, getBioprinterById, supportsWebSerial } from "@/lib/bioprinting/bioprinters"
+import { BIOMATERIALS } from "@/lib/bioprinting/biomaterials"
 import { cn } from "@/lib/utils/helpers"
 
 // ═══════════════════════════════════════════════════════════════
@@ -126,14 +131,21 @@ const INFILL_ALGOS: InfillAlgo[] = [
     bestFor: ["pele fina", "córnea", "tendão"] },
 ]
 
-const BIOPRINTERS = [
-  { id: "cellink_biox", name: "CELLINK BIO X", heads: 3, uv: true },
-  { id: "cellink_inkredible", name: "INKREDIBLE+", heads: 2, uv: true },
-  { id: "allevi_2", name: "Allevi 2", heads: 2, uv: true },
-  { id: "allevi_3", name: "Allevi 3", heads: 3, uv: true },
-  { id: "regemat_bio_v1", name: "REGEMAT 3D V1", heads: 2, uv: true },
-  { id: "generic_marlin", name: "Generic Marlin", heads: 1, uv: false },
-]
+// BIOPRINTERS agora vem do catálogo completo em /lib/bioprinting/bioprinters.ts
+// com tamanho de mesa, firmware, baud, drivers e compatibilidade Web Serial
+const BIOPRINTERS = BIOPRINTERS_CATALOG.map((bp) => ({
+  id: bp.id,
+  name: bp.model,
+  fullName: bp.fullName,
+  brand: bp.brand,
+  heads: bp.numHeads,
+  uv: bp.hasUVcuring,
+  buildVolume: bp.buildVolume,
+  baud: bp.baud,
+  firmware: bp.firmwareCompatibility,
+  supportsUSB: supportsWebSerial(bp),
+  icon: bp.icon,
+}))
 
 // ═══════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -171,8 +183,14 @@ export default function GCodeEnginePage() {
 
   // Step 4: Bioink + Printer
   const [bioprinterId, setBioprinterId] = useState("cellink_biox")
-  const [material, setMaterial] = useState("GelMA")
-  const [concentration, setConcentration] = useState(10)
+  // Conexão USB (Web Serial) com bioimpressora
+  const [showPrinterConnection, setShowPrinterConnection] = useState(false)
+  // Visualizador 2D do G-code (estilo Pronterface)
+  const [show2DViewer, setShow2DViewer] = useState(false)
+  // Formulação MULTI-MATERIAL (até 10 biomateriais) — integra o Formulador Bio
+  const [bioinkComponents, setBioinkComponents] = useState<BioinkComponent[]>([
+    { biomaterialId: "gelma", concentration: 10, unit: "% m/v", role: "Estrutura reticulável" },
+  ])
   const [hasCells, setHasCells] = useState(true)
   const [cellDensity, setCellDensity] = useState(2)
   const [nozzleUm, setNozzleUm] = useState(410)
@@ -181,6 +199,19 @@ export default function GCodeEnginePage() {
   const [printSpeed, setPrintSpeed] = useState(8)
   const [layerHeight, setLayerHeight] = useState(0.25)
   const [walls, setWalls] = useState(2)
+
+  // Derived — material principal (primeiro componente) para payload compatível com API legada
+  const mainMaterial = useMemo(() => {
+    if (bioinkComponents.length === 0) return { name: "GelMA", concentration: 10 }
+    const first = bioinkComponents[0]
+    const bm = BIOMATERIALS.find((m) => m.id === first.biomaterialId)
+    return {
+      name: bm?.shortName ?? bm?.name ?? "Custom",
+      concentration: first.concentration,
+    }
+  }, [bioinkComponents])
+  const material = mainMaterial.name
+  const concentration = mainMaterial.concentration
 
   // Tissue context
   const [tissue, setTissue] = useState("Cartilagem articular")
@@ -195,6 +226,15 @@ export default function GCodeEnginePage() {
   const [aiRec, setAiRec] = useState<Record<string, unknown> | null>(null)
 
   const currentGeom = useMemo(() => GEOMETRIES.find((g) => g.id === geomId) ?? GEOMETRIES[0], [geomId])
+  const currentPrinter = useMemo(() => {
+    const bp = getBioprinterById(bioprinterId)
+    if (!bp) return null
+    return {
+      ...bp,
+      firmware: bp.firmwareCompatibility,
+      supportsUSB: supportsWebSerial(bp),
+    }
+  }, [bioprinterId])
 
   // Reset params when geometry changes
   useEffect(() => {
@@ -298,6 +338,13 @@ export default function GCodeEnginePage() {
           printSpeed_mms: printSpeed,
           travelSpeed_mms: 50,
           shearStressMax_Pa: 50,
+          // Formulação multi-material (até 10 biomateriais)
+          formulation: bioinkComponents.map((c) => ({
+            biomaterialId: c.biomaterialId,
+            concentration: c.concentration,
+            unit: c.unit,
+            role: c.role,
+          })),
         },
         bioprinterId,
         layerHeight_mm: layerHeight,
@@ -988,10 +1035,16 @@ export default function GCodeEnginePage() {
               <CardTitle className="flex items-center gap-2"><FlaskConical className="w-5 h-5" /> 4. Bioink & Bioimpressora</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Bioprinter select */}
+              {/* Bioprinter select — com tamanho de mesa e conexão USB */}
               <div>
-                <label className="text-xs text-gray-400 mb-2 block">Bioimpressora</label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-gray-400 block">Bioimpressora (com tamanho de mesa)</label>
+                  <a href="/dashboard/bioprinting/connection-guide" target="_blank" rel="noopener"
+                     className="text-[11px] text-cyan-400 hover:underline flex items-center gap-1">
+                    <Info className="w-3 h-3" /> Como conectar USB?
+                  </a>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                   {BIOPRINTERS.map((bp) => (
                     <button
                       key={bp.id}
@@ -1003,34 +1056,73 @@ export default function GCodeEnginePage() {
                           : "bg-gray-800/50 border-gray-700 hover:border-emerald-500/50",
                       )}
                     >
-                      <div className="font-semibold">{bp.name}</div>
-                      <div className="text-[10px] text-gray-400 mt-0.5">
-                        {bp.heads} head{bp.heads > 1 ? "s" : ""} {bp.uv && "• UV"}
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{bp.icon}</span>
+                        <span className="font-semibold">{bp.name}</span>
+                        {bp.supportsUSB && (
+                          <span className="ml-auto text-[9px] px-1.5 py-0.5 bg-cyan-900/50 text-cyan-300 rounded border border-cyan-700">USB</span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-gray-400 mt-1">
+                        Mesa <strong className="text-gray-200">{bp.buildVolume.x}×{bp.buildVolume.y}×{bp.buildVolume.z} mm</strong>
+                      </div>
+                      <div className="text-[10px] text-gray-500 mt-0.5">
+                        {bp.heads} head{bp.heads > 1 ? "s" : ""} {bp.uv && "• UV"} • {bp.firmware[0]} • {bp.baud} baud
                       </div>
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Bioink */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div>
-                  <label className="text-xs text-gray-400">Material</label>
-                  <select
-                    value={material}
-                    onChange={(e) => setMaterial(e.target.value)}
-                    className="w-full mt-1 px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded"
+              {/* Card de conexão USB (Web Serial) */}
+              {currentPrinter && (
+                <div className="rounded-lg border border-cyan-800 bg-cyan-950/20 p-3 flex items-center justify-between gap-3 flex-wrap">
+                  <div className="text-sm">
+                    <div className="font-semibold text-cyan-200 flex items-center gap-2">
+                      <Usb className="w-4 h-4" /> {currentPrinter.fullName}
+                    </div>
+                    <div className="text-[11px] text-cyan-300/80 mt-0.5">
+                      Firmware: {currentPrinter.firmware.join(", ")} • Conexões: {currentPrinter.supportsUSB ? "USB (Web Serial) ✅" : "Proprietário — requer software do fabricante"}
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={showPrinterConnection ? "primary" : "outline"}
+                    onClick={() => setShowPrinterConnection((v) => !v)}
+                    disabled={!currentPrinter.supportsUSB}
+                    title={!currentPrinter.supportsUSB ? "Esta impressora usa protocolo proprietário (não-USB/Marlin)" : ""}
                   >
-                    {["GelMA", "Alginate", "Collagen", "PCL", "dECM", "Fibrinogen", "Hyaluronic Acid", "Gelatin", "PEGDA"].map((m) => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
+                    <Usb className="w-4 h-4 mr-1" />
+                    {showPrinterConnection ? "Ocultar painel de conexão" : "Conectar bioimpressora (USB)"}
+                  </Button>
                 </div>
-                <div>
-                  <label className="text-xs text-gray-400">Concentração (%)</label>
-                  <input type="number" value={concentration} onChange={(e) => setConcentration(parseFloat(e.target.value) || 0)} step={0.5}
-                    className="w-full mt-1 px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded" />
+              )}
+
+              {/* Painel de conexão USB com Web Serial */}
+              {showPrinterConnection && currentPrinter?.supportsUSB && (
+                <PrinterConnection
+                  gcode={result?.gcode ?? ""}
+                  defaultBaud={currentPrinter.baud}
+                  printerName={currentPrinter.fullName}
+                />
+              )}
+
+              {/* ============ FORMULADOR BIO MULTI-MATERIAL (1–10) ============ */}
+              <div className="rounded-lg border border-emerald-800 bg-emerald-950/10 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <FlaskConical className="w-4 h-4 text-emerald-400" />
+                  <h3 className="font-semibold text-emerald-300">Formulação da Bioink (multi-material)</h3>
+                  <span className="text-[11px] text-gray-400 ml-2">Selecione até 10 biomateriais — combine hidrogéis, polímeros sintéticos, matriz dECM, crosslinkers…</span>
                 </div>
+                <BioinkFormulator
+                  value={bioinkComponents}
+                  onChange={setBioinkComponents}
+                  maxComponents={10}
+                />
+              </div>
+
+              {/* Parâmetros de impressão */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
                   <label className="text-xs text-gray-400">Nozzle (µm)</label>
                   <input type="number" value={nozzleUm} onChange={(e) => setNozzleUm(parseInt(e.target.value) || 0)}
@@ -1164,10 +1256,45 @@ export default function GCodeEnginePage() {
                   <Button variant="outline" onClick={() => setShowGcode(!showGcode)}>
                     {showGcode ? "Ocultar" : "Ver"} prévia do G-code
                   </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShow2DViewer(!show2DViewer)}
+                    className="border-violet-700 text-violet-300 hover:bg-violet-700/20"
+                  >
+                    <Eye className="w-4 h-4 mr-1" />
+                    {show2DViewer ? "Ocultar" : "Abrir"} Visualizador 2D (Pronterface-style)
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowPrinterConnection(!showPrinterConnection)}
+                    disabled={!currentPrinter?.supportsUSB}
+                    className="border-cyan-700 text-cyan-300 hover:bg-cyan-700/20"
+                    title={!currentPrinter?.supportsUSB ? "Impressora selecionada não suporta USB/Marlin direto" : ""}
+                  >
+                    <Usb className="w-4 h-4 mr-1" />
+                    {showPrinterConnection ? "Ocultar" : "Enviar via"} USB
+                  </Button>
                   <Button variant="outline" onClick={() => { setStep(1); setResult(null) }}>
                     Novo G-code
                   </Button>
                 </div>
+
+                {/* Visualizador 2D estilo Pronterface */}
+                {show2DViewer && result && (
+                  <GCodeViewer2D
+                    gcode={buildFinalGCode()}
+                    buildPlate={currentPrinter ? { x: currentPrinter.buildVolume.x, y: currentPrinter.buildVolume.y } : undefined}
+                  />
+                )}
+
+                {/* Painel de conexão USB direto na revisão */}
+                {showPrinterConnection && currentPrinter?.supportsUSB && (
+                  <PrinterConnection
+                    gcode={buildFinalGCode()}
+                    defaultBaud={currentPrinter.baud}
+                    printerName={currentPrinter.fullName}
+                  />
+                )}
 
                 {/* Cabeçalho de segurança informativo */}
                 <div className="rounded-lg bg-cyan-950/30 border border-cyan-500/30 p-3 text-xs text-cyan-100/90">
