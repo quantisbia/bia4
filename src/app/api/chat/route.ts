@@ -7,7 +7,7 @@ import {
   getChatSession,
   addChatMessage,
 } from "@/lib/db/queries"
-import { generateChatStream, SYSTEM_PROMPTS, type GeminiMessage } from "@/lib/ai/gemini"
+import { generateChatStream, SYSTEM_PROMPTS, BiaAIError, aiErrorToHttp, type GeminiMessage } from "@/lib/ai/gemini"
 import { Prisma } from "@prisma/client"
 import { z } from "zod"
 
@@ -103,6 +103,7 @@ export async function POST(req: NextRequest) {
 
   const systemPrompt = systemPromptMap[mode] ?? SYSTEM_PROMPTS.BIOFAB_EXPERT
 
+  try {
   // Resposta com streaming
   if (streaming) {
     const stream = await generateChatStream(history, { systemPrompt })
@@ -168,4 +169,15 @@ export async function POST(req: NextRequest) {
     sessionId: chatSessionId,
     tokens,
   })
+  } catch (err) {
+    console.error("[POST /api/chat]", err)
+    if (err instanceof BiaAIError) {
+      const r = aiErrorToHttp(err)
+      return NextResponse.json({ error: r.error, code: r.code, sessionId: chatSessionId }, { status: r.status })
+    }
+    return NextResponse.json(
+      { error: "Falha ao processar mensagem. Tente novamente.", sessionId: chatSessionId },
+      { status: 500 }
+    )
+  }
 }

@@ -18,7 +18,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { requireCredits } from "@/lib/auth/credits"
-import { generateContent, SYSTEM_PROMPTS } from "@/lib/ai/gemini"
+import { generateContent, SYSTEM_PROMPTS, BiaAIError, aiErrorToHttp } from "@/lib/ai/gemini"
 import { prisma } from "@/lib/db/prisma"
 import type { Prisma } from "@prisma/client"
 import { z } from "zod"
@@ -137,8 +137,12 @@ Retorne EXATAMENTE este JSON (sem markdown, apenas o objeto):
     if (!match) throw new Error("Resposta sem JSON")
     recommendation = JSON.parse(match[0])
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
     console.error("[recommend]", err)
+    if (err instanceof BiaAIError) {
+      const r = aiErrorToHttp(err)
+      return NextResponse.json({ error: r.error, code: r.code }, { status: r.status })
+    }
+    const msg = err instanceof Error ? err.message : String(err)
     return NextResponse.json(
       { error: `Falha ao gerar recomendação: ${msg}` },
       { status: 500 },

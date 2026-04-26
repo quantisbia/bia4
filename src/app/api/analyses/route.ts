@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { requireCredits } from "@/lib/auth/credits"
 import { prisma } from "@/lib/db/prisma"
-import { generateContent, SYSTEM_PROMPTS } from "@/lib/ai/gemini"
+import { generateContent, SYSTEM_PROMPTS, BiaAIError, aiErrorToHttp } from "@/lib/ai/gemini"
 import { Prisma } from "@prisma/client"
 import { z } from "zod"
 
@@ -222,6 +222,10 @@ export async function POST(req: Request) {
 
   } catch (err) {
     console.error("[POST /api/analyses]", err)
+    if (err instanceof BiaAIError) {
+      const r = aiErrorToHttp(err)
+      return NextResponse.json({ error: r.error, code: r.code }, { status: r.status })
+    }
     const msg = err instanceof Error ? err.message : "Erro desconhecido"
     if (msg.includes("Créditos") || msg.includes("INSUFFICIENT")) {
       return NextResponse.json({ error: msg, code: "INSUFFICIENT_CREDITS" }, { status: 402 })

@@ -11,7 +11,7 @@ import {
   Printer, Layers, Zap, Sparkles, Download, Play, ChevronLeft,
   FlaskConical, Microscope, Target, CheckCircle2, AlertTriangle,
   Activity, Loader2, Wand2, Box, Waves, Grid3x3, Route,
-  AlertCircle, Ruler, Move3d, Info, Power, Usb, BookOpen, Eye,
+  AlertCircle, Ruler, Move3d, Info, Power, Usb, Eye,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card"
 import { Button } from "@/components/ui/Button"
@@ -183,7 +183,11 @@ export default function GCodeEnginePage() {
 
   // Step 4: Bioink + Printer
   const [bioprinterId, setBioprinterId] = useState("cellink_biox")
-  // Conexão USB (Web Serial) com bioimpressora
+  // Modo de entrega do G-code à impressora (conexão USB é OPCIONAL)
+  //  - "download": só baixa o .gcode (padrão, funciona com SD/USB/software do fabricante)
+  //  - "usb":      conecta via Web Serial para streaming direto (avançado, requer Marlin/Klipper)
+  const [deliveryMode, setDeliveryMode] = useState<"download" | "usb">("download")
+  // Exibir painel de conexão USB (só quando usuário escolhe modo "usb")
   const [showPrinterConnection, setShowPrinterConnection] = useState(false)
   // Visualizador 2D do G-code (estilo Pronterface)
   const [show2DViewer, setShow2DViewer] = useState(false)
@@ -1035,13 +1039,13 @@ export default function GCodeEnginePage() {
               <CardTitle className="flex items-center gap-2"><FlaskConical className="w-5 h-5" /> 4. Bioink & Bioimpressora</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Bioprinter select — com tamanho de mesa e conexão USB */}
+              {/* Bioprinter select — com tamanho de mesa */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs text-gray-400 block">Bioimpressora (com tamanho de mesa)</label>
                   <a href="/dashboard/bioprinting/connection-guide" target="_blank" rel="noopener"
-                     className="text-[11px] text-cyan-400 hover:underline flex items-center gap-1">
-                    <Info className="w-3 h-3" /> Como conectar USB?
+                     className="text-[11px] text-gray-500 hover:text-cyan-400 hover:underline flex items-center gap-1">
+                    <Info className="w-3 h-3" /> Guia de conexão USB (opcional)
                   </a>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -1074,37 +1078,91 @@ export default function GCodeEnginePage() {
                 </div>
               </div>
 
-              {/* Card de conexão USB (Web Serial) */}
+              {/* ═══ MODO DE ENTREGA DO G-CODE — escolha explícita e opcional ═══ */}
               {currentPrinter && (
-                <div className="rounded-lg border border-cyan-800 bg-cyan-950/20 p-3 flex items-center justify-between gap-3 flex-wrap">
-                  <div className="text-sm">
-                    <div className="font-semibold text-cyan-200 flex items-center gap-2">
-                      <Usb className="w-4 h-4" /> {currentPrinter.fullName}
-                    </div>
-                    <div className="text-[11px] text-cyan-300/80 mt-0.5">
-                      Firmware: {currentPrinter.firmware.join(", ")} • Conexões: {currentPrinter.supportsUSB ? "USB (Web Serial) ✅" : "Proprietário — requer software do fabricante"}
-                    </div>
+                <div className="space-y-2">
+                  <label className="text-xs text-gray-400 mb-1 block">
+                    Como você quer enviar o G-code para a impressora? <span className="text-gray-500">(a conexão USB é <b>opcional</b>)</span>
+                  </label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {/* OPÇÃO 1 — Download (padrão, sem conexão) */}
+                    <button
+                      onClick={() => { setDeliveryMode("download"); setShowPrinterConnection(false) }}
+                      className={cn(
+                        "p-3 rounded-lg border text-left transition",
+                        deliveryMode === "download"
+                          ? "bg-emerald-600/20 border-emerald-500"
+                          : "bg-gray-800/40 border-gray-700 hover:border-emerald-500/50",
+                      )}
+                    >
+                      <div className="flex items-center gap-2 font-semibold text-sm">
+                        <Download className="w-4 h-4 text-emerald-400" />
+                        Apenas baixar .gcode
+                        <span className="ml-auto text-[9px] px-1.5 py-0.5 bg-emerald-900/50 text-emerald-300 rounded border border-emerald-700">Recomendado</span>
+                      </div>
+                      <div className="text-[11px] text-gray-400 mt-1 leading-relaxed">
+                        Salva o arquivo no seu computador. Você envia pela impressora via SD/USB-drive,
+                        ou pelo software do fabricante (Cellink HeartWare, Allevi, Regemat…). <b>Não precisa conectar</b>.
+                      </div>
+                    </button>
+
+                    {/* OPÇÃO 2 — Conectar via USB (avançado, opt-in) */}
+                    <button
+                      onClick={() => {
+                        if (!currentPrinter.supportsUSB) return
+                        setDeliveryMode("usb")
+                      }}
+                      disabled={!currentPrinter.supportsUSB}
+                      className={cn(
+                        "p-3 rounded-lg border text-left transition",
+                        deliveryMode === "usb" && currentPrinter.supportsUSB
+                          ? "bg-cyan-600/20 border-cyan-500"
+                          : "bg-gray-800/40 border-gray-700 hover:border-cyan-500/50",
+                        !currentPrinter.supportsUSB && "opacity-40 cursor-not-allowed hover:border-gray-700",
+                      )}
+                      title={!currentPrinter.supportsUSB ? "Esta impressora usa protocolo proprietário — use o software do fabricante" : ""}
+                    >
+                      <div className="flex items-center gap-2 font-semibold text-sm">
+                        <Usb className="w-4 h-4 text-cyan-400" />
+                        Conectar via USB (avançado)
+                        {!currentPrinter.supportsUSB && (
+                          <span className="ml-auto text-[9px] px-1.5 py-0.5 bg-gray-700 text-gray-400 rounded">Indisponível</span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-gray-400 mt-1 leading-relaxed">
+                        {currentPrinter.supportsUSB
+                          ? <>Envia o G-code em <b>streaming direto</b> pela porta USB (Chrome/Edge). Requer firmware Marlin/Klipper — {currentPrinter.baud} baud.</>
+                          : <>Impressora com firmware proprietário. Use o software oficial do fabricante ({currentPrinter.firmware.join(", ")}).</>
+                        }
+                      </div>
+                    </button>
                   </div>
-                  <Button
-                    size="sm"
-                    variant={showPrinterConnection ? "primary" : "outline"}
-                    onClick={() => setShowPrinterConnection((v) => !v)}
-                    disabled={!currentPrinter.supportsUSB}
-                    title={!currentPrinter.supportsUSB ? "Esta impressora usa protocolo proprietário (não-USB/Marlin)" : ""}
-                  >
-                    <Usb className="w-4 h-4 mr-1" />
-                    {showPrinterConnection ? "Ocultar painel de conexão" : "Conectar bioimpressora (USB)"}
-                  </Button>
                 </div>
               )}
 
-              {/* Painel de conexão USB com Web Serial */}
-              {showPrinterConnection && currentPrinter?.supportsUSB && (
-                <PrinterConnection
-                  gcode={result?.gcode ?? ""}
-                  defaultBaud={currentPrinter.baud}
-                  printerName={currentPrinter.fullName}
-                />
+              {/* Painel de conexão USB — SÓ aparece se o usuário escolheu modo "usb" */}
+              {deliveryMode === "usb" && currentPrinter?.supportsUSB && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-cyan-300 flex items-center gap-1">
+                      <Usb className="w-3.5 h-3.5" /> Painel de streaming USB — {currentPrinter.fullName}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowPrinterConnection((v) => !v)}
+                    >
+                      {showPrinterConnection ? "Ocultar" : "Abrir"} painel
+                    </Button>
+                  </div>
+                  {showPrinterConnection && (
+                    <PrinterConnection
+                      gcode={result?.gcode ?? ""}
+                      defaultBaud={currentPrinter.baud}
+                      printerName={currentPrinter.fullName}
+                    />
+                  )}
+                </div>
               )}
 
               {/* ============ FORMULADOR BIO MULTI-MATERIAL (1–10) ============ */}
@@ -1264,20 +1322,35 @@ export default function GCodeEnginePage() {
                     <Eye className="w-4 h-4 mr-1" />
                     {show2DViewer ? "Ocultar" : "Abrir"} Visualizador 2D (Pronterface-style)
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowPrinterConnection(!showPrinterConnection)}
-                    disabled={!currentPrinter?.supportsUSB}
-                    className="border-cyan-700 text-cyan-300 hover:bg-cyan-700/20"
-                    title={!currentPrinter?.supportsUSB ? "Impressora selecionada não suporta USB/Marlin direto" : ""}
-                  >
-                    <Usb className="w-4 h-4 mr-1" />
-                    {showPrinterConnection ? "Ocultar" : "Enviar via"} USB
-                  </Button>
+                  {/* Botão USB só aparece se o usuário OPTOU pelo modo "usb" no Passo 4 */}
+                  {deliveryMode === "usb" && currentPrinter?.supportsUSB && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowPrinterConnection(!showPrinterConnection)}
+                      className="border-cyan-700 text-cyan-300 hover:bg-cyan-700/20"
+                    >
+                      <Usb className="w-4 h-4 mr-1" />
+                      {showPrinterConnection ? "Ocultar" : "Enviar via"} USB
+                    </Button>
+                  )}
                   <Button variant="outline" onClick={() => { setStep(1); setResult(null) }}>
                     Novo G-code
                   </Button>
                 </div>
+
+                {/* Dica quando usuário está no modo download (padrão) */}
+                {deliveryMode === "download" && (
+                  <div className="rounded-lg bg-emerald-950/20 border border-emerald-700/40 p-3 text-xs text-emerald-100/80 flex items-start gap-2">
+                    <Info className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <div>
+                      <b className="text-emerald-300">Modo download (sem conexão)</b> —
+                      Baixe o arquivo <code className="bg-black/30 px-1 rounded">.gcode</code> e transfira para a impressora por
+                      <b> SD card</b>, <b>pen-drive</b>, ou pelo <b>software do fabricante</b>
+                      {currentPrinter && ` (${currentPrinter.firmware[0]}${currentPrinter.supportsUSB ? " / Pronterface / OctoPrint" : ""})`}.
+                      Se quiser streaming direto via USB, volte ao Passo 4 e escolha &ldquo;Conectar via USB&rdquo;.
+                    </div>
+                  </div>
+                )}
 
                 {/* Visualizador 2D estilo Pronterface */}
                 {show2DViewer && result && (
@@ -1287,8 +1360,8 @@ export default function GCodeEnginePage() {
                   />
                 )}
 
-                {/* Painel de conexão USB direto na revisão */}
-                {showPrinterConnection && currentPrinter?.supportsUSB && (
+                {/* Painel de conexão USB direto na revisão — SÓ se optou pelo modo USB */}
+                {deliveryMode === "usb" && showPrinterConnection && currentPrinter?.supportsUSB && (
                   <PrinterConnection
                     gcode={buildFinalGCode()}
                     defaultBaud={currentPrinter.baud}

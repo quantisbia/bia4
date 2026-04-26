@@ -33,7 +33,6 @@ interface Segment {
 function parseGCode(gcode: string): { segments: Segment[]; maxLayer: number; stats: { totalExtrude: number; totalTravel: number } } {
   const segments: Segment[] = []
   let x = 0, y = 0, z = 0, e = 0
-  let lastE = 0
   let currentLayer = 0
   let lastZ = 0
   let totalExtrude = 0
@@ -57,7 +56,7 @@ function parseGCode(gcode: string): { segments: Segment[]; maxLayer: number; sta
         if (p.startsWith("X")) x = parseFloat(p.slice(1)) || 0
         else if (p.startsWith("Y")) y = parseFloat(p.slice(1)) || 0
         else if (p.startsWith("Z")) z = parseFloat(p.slice(1)) || 0
-        else if (p.startsWith("E")) { e = parseFloat(p.slice(1)) || 0; lastE = e }
+        else if (p.startsWith("E")) { e = parseFloat(p.slice(1)) || 0 }
       }
       continue
     }
@@ -95,7 +94,6 @@ function parseGCode(gcode: string): { segments: Segment[]; maxLayer: number; sta
         })
       }
       e = newE
-      lastE = e
       continue
     }
   }

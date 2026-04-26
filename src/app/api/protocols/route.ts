@@ -9,8 +9,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { requireCredits } from "@/lib/auth/credits"
 import { prisma } from "@/lib/db/prisma"
-import { generateContent } from "@/lib/ai/gemini"
-import { SYSTEM_PROMPTS } from "@/lib/ai/gemini"
+import { generateContent, SYSTEM_PROMPTS, BiaAIError, aiErrorToHttp } from "@/lib/ai/gemini"
 import { Prisma } from "@prisma/client"
 import { z } from "zod"
 
@@ -272,7 +271,10 @@ Seja específico com números, temperaturas, concentrações e tempos. Este prot
     )
   } catch (error) {
     console.error("[POST /api/protocols]", error)
-
+    if (error instanceof BiaAIError) {
+      const r = aiErrorToHttp(error)
+      return NextResponse.json({ error: r.error, code: r.code }, { status: r.status })
+    }
     // Retornar erro legível
     const message = error instanceof Error ? error.message : "Erro desconhecido"
     if (message.includes("Créditos insuficientes") || message.includes("INSUFFICIENT")) {

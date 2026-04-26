@@ -17,6 +17,72 @@ function getGenAI(): GoogleGenerativeAI {
   return genAI
 }
 
+/**
+ * Converte erros brutos do Gemini SDK em mensagens amigáveis ao usuário.
+ * Evita que stack traces técnicas (com API keys vazadas, 403, etc.) cheguem
+ * na UI — log fica completo no servidor, usuário vê mensagem limpa.
+ */
+export class BiaAIError extends Error {
+  public readonly userMessage: string
+  public readonly code: "API_KEY_INVALID" | "API_KEY_LEAKED" | "QUOTA_EXCEEDED" | "SAFETY_BLOCK" | "NETWORK" | "UNKNOWN"
+
+  constructor(originalError: unknown) {
+    const msg = originalError instanceof Error ? originalError.message : String(originalError)
+    const lower = msg.toLowerCase()
+    let code: BiaAIError["code"] = "UNKNOWN"
+    let userMessage = "A IA está temporariamente indisponível. Tente novamente em alguns instantes."
+
+    if (lower.includes("api key") && (lower.includes("leaked") || lower.includes("reported"))) {
+      code = "API_KEY_LEAKED"
+      userMessage = "Chave de IA indisponível no momento (em rotação de segurança). O administrador já foi notificado. Tente novamente mais tarde."
+    } else if (lower.includes("api key") && lower.includes("invalid")) {
+      code = "API_KEY_INVALID"
+      userMessage = "Chave de IA mal configurada. Entre em contato com o suporte."
+    } else if (lower.includes("quota") || lower.includes("429") || lower.includes("rate limit")) {
+      code = "QUOTA_EXCEEDED"
+      userMessage = "Limite diário de IA atingido. Tente novamente amanhã ou entre em contato com o suporte."
+    } else if (lower.includes("safety") || lower.includes("blocked")) {
+      code = "SAFETY_BLOCK"
+      userMessage = "Sua solicitação foi bloqueada pelos filtros de segurança da IA. Reformule o texto e tente novamente."
+    } else if (lower.includes("fetch") || lower.includes("network") || lower.includes("timeout")) {
+      code = "NETWORK"
+      userMessage = "Falha de rede ao chamar a IA. Verifique sua conexão e tente novamente."
+    }
+
+    super(userMessage)
+    this.name = "BiaAIError"
+    this.userMessage = userMessage
+    this.code = code
+    // preserva stack original no server log
+    if (originalError instanceof Error) this.stack = originalError.stack
+  }
+}
+
+/** Wrapper uniforme para todas as chamadas Gemini */
+async function safeGeminiCall<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch (e) {
+    // log detalhado no server
+    console.error("[Gemini]", e)
+    throw new BiaAIError(e)
+  }
+}
+
+/**
+ * Helper para rotas API: converte um erro qualquer em `{error, code, status}`
+ * apropriado. Se for BiaAIError, devolve 503 + userMessage. Caso contrário,
+ * passa adiante. Uso:
+ *   try { ... } catch (e) { return aiErrorResponse(e) }
+ */
+export function aiErrorToHttp(e: unknown): { error: string; code: string; status: number } {
+  const biaErr = e instanceof BiaAIError ? e : new BiaAIError(e)
+  // 503 Service Unavailable para problemas de IA (key/quota/network)
+  // 422 Unprocessable Entity para bloqueio de segurança
+  const status = biaErr.code === "SAFETY_BLOCK" ? 422 : 503
+  return { error: biaErr.userMessage, code: `AI_${biaErr.code}`, status }
+}
+
 const SAFETY_SETTINGS = [
   { category: HarmCategory.HARM_CATEGORY_HARASSMENT,        threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
   { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,       threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
@@ -964,81 +1030,94 @@ export async function generateContent(
   prompt: string,
   options: GeminiOptions = {}
 ): Promise<{ text: string; tokens: number }> {
-  const model = getGenAI().getGenerativeModel({
-    model: "gemini-2.5-flash",
-    systemInstruction: options.systemPrompt ?? SYSTEM_PROMPTS.BIOFAB_EXPERT,
-    safetySettings: SAFETY_SETTINGS,
-    generationConfig: {
-      temperature: options.temperature ?? 0.7,
-      maxOutputTokens: options.maxTokens ?? 4096,
-      topP: 0.95,
-      topK: 40,
-    },
+  return safeGeminiCall(async () => {
+    const model = getGenAI().getGenerativeModel({
+      model: "gemini-2.5-flash",
+      systemInstruction: options.systemPrompt ?? SYSTEM_PROMPTS.BIOFAB_EXPERT,
+      safetySettings: SAFETY_SETTINGS,
+      generationConfig: {
+        temperature: options.temperature ?? 0.7,
+        maxOutputTokens: options.maxTokens ?? 4096,
+        topP: 0.95,
+        topK: 40,
+      },
+    })
+    const result = await model.generateContent(prompt)
+    const text = result.response.text()
+    const tokens = result.response.usageMetadata?.totalTokenCount ?? 0
+    return { text, tokens }
   })
-  const result = await model.generateContent(prompt)
-  const text = result.response.text()
-  const tokens = result.response.usageMetadata?.totalTokenCount ?? 0
-  return { text, tokens }
 }
 
 export async function generateChat(
   messages: GeminiMessage[],
   options: GeminiOptions = {}
 ): Promise<{ text: string; tokens: number }> {
-  const model = getGenAI().getGenerativeModel({
-    model: "gemini-2.5-flash",
-    systemInstruction: options.systemPrompt ?? SYSTEM_PROMPTS.BIOFAB_EXPERT,
-    safetySettings: SAFETY_SETTINGS,
-    generationConfig: {
-      temperature: options.temperature ?? 0.7,
-      maxOutputTokens: options.maxTokens ?? 4096,
-      topP: 0.95,
-    },
+  return safeGeminiCall(async () => {
+    const model = getGenAI().getGenerativeModel({
+      model: "gemini-2.5-flash",
+      systemInstruction: options.systemPrompt ?? SYSTEM_PROMPTS.BIOFAB_EXPERT,
+      safetySettings: SAFETY_SETTINGS,
+      generationConfig: {
+        temperature: options.temperature ?? 0.7,
+        maxOutputTokens: options.maxTokens ?? 4096,
+        topP: 0.95,
+      },
+    })
+    const chat = model.startChat({
+      history: messages.slice(0, -1).map((m) => ({
+        role: m.role,
+        parts: [{ text: m.content }],
+      })),
+    })
+    const lastMessage = messages[messages.length - 1]
+    const result = await chat.sendMessage(lastMessage.content)
+    const text = result.response.text()
+    const tokens = result.response.usageMetadata?.totalTokenCount ?? 0
+    return { text, tokens }
   })
-  const chat = model.startChat({
-    history: messages.slice(0, -1).map((m) => ({
-      role: m.role,
-      parts: [{ text: m.content }],
-    })),
-  })
-  const lastMessage = messages[messages.length - 1]
-  const result = await chat.sendMessage(lastMessage.content)
-  const text = result.response.text()
-  const tokens = result.response.usageMetadata?.totalTokenCount ?? 0
-  return { text, tokens }
 }
 
 export async function generateChatStream(
   messages: GeminiMessage[],
   options: GeminiOptions = {}
 ): Promise<ReadableStream<Uint8Array>> {
-  const model = getGenAI().getGenerativeModel({
-    model: "gemini-2.5-flash",
-    systemInstruction: options.systemPrompt ?? SYSTEM_PROMPTS.BIOFAB_EXPERT,
-    safetySettings: SAFETY_SETTINGS,
-    generationConfig: {
-      temperature: options.temperature ?? 0.7,
-      maxOutputTokens: options.maxTokens ?? 4096,
-    },
-  })
-  const chat = model.startChat({
-    history: messages.slice(0, -1).map((m) => ({
-      role: m.role,
-      parts: [{ text: m.content }],
-    })),
-  })
-  const lastMessage = messages[messages.length - 1]
-  const result = await chat.sendMessageStream(lastMessage.content)
-  const encoder = new TextEncoder()
-  return new ReadableStream({
-    async start(controller) {
-      for await (const chunk of result.stream) {
-        const text = chunk.text()
-        if (text) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
-      }
-      controller.enqueue(encoder.encode("data: [DONE]\n\n"))
-      controller.close()
-    },
+  return safeGeminiCall(async () => {
+    const model = getGenAI().getGenerativeModel({
+      model: "gemini-2.5-flash",
+      systemInstruction: options.systemPrompt ?? SYSTEM_PROMPTS.BIOFAB_EXPERT,
+      safetySettings: SAFETY_SETTINGS,
+      generationConfig: {
+        temperature: options.temperature ?? 0.7,
+        maxOutputTokens: options.maxTokens ?? 4096,
+      },
+    })
+    const chat = model.startChat({
+      history: messages.slice(0, -1).map((m) => ({
+        role: m.role,
+        parts: [{ text: m.content }],
+      })),
+    })
+    const lastMessage = messages[messages.length - 1]
+    const result = await chat.sendMessageStream(lastMessage.content)
+    const encoder = new TextEncoder()
+    return new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of result.stream) {
+            const text = chunk.text()
+            if (text) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
+          }
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"))
+          controller.close()
+        } catch (err) {
+          const biaErr = new BiaAIError(err)
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: biaErr.userMessage })}\n\n`))
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"))
+          controller.close()
+        }
+      },
+    })
   })
 }
 

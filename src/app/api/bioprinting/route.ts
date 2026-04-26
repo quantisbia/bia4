@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { requireCredits } from "@/lib/auth/credits"
-import { generateContent } from "@/lib/ai/gemini"
-import { SYSTEM_PROMPTS } from "@/lib/ai/gemini"
+import { generateContent, SYSTEM_PROMPTS, BiaAIError, aiErrorToHttp } from "@/lib/ai/gemini"
 import { prisma } from "@/lib/db/prisma"
 import { Prisma } from "@prisma/client"
 import { z } from "zod"
@@ -127,6 +126,10 @@ Retorne JSON com esta estrutura exata:
     return NextResponse.json({ ...analysis, creditsUsed: 10 })
   } catch (error) {
     console.error("[bioprinting API]", error)
+    if (error instanceof BiaAIError) {
+      const r = aiErrorToHttp(error)
+      return NextResponse.json({ error: r.error, code: r.code }, { status: r.status })
+    }
     return NextResponse.json(
       { error: "Erro ao gerar análise. Tente novamente." },
       { status: 500 }

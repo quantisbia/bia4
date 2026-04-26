@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { requireCredits } from "@/lib/auth/credits"
-import { generateContent } from "@/lib/ai/gemini"
+import { generateContent, BiaAIError, aiErrorToHttp } from "@/lib/ai/gemini"
 import { prisma } from "@/lib/db/prisma"
 import { z } from "zod"
 
@@ -263,32 +263,44 @@ export async function POST(req: NextRequest) {
 
   const prompt = buildPrompt(safeGenType, entriesContent, { title, journal, style, language, keywords, extraNotes })
 
-  const { text: document } = await generateContent(prompt, { maxTokens: 8192, temperature: 0.4 })
+  try {
+    const { text: document } = await generateContent(prompt, { maxTokens: 8192, temperature: 0.4 })
 
-  // Salvar documento gerado na entrada principal
-  const mainEntryId = entryIds[0]
-  await prisma.notebookEntry.update({
-    where: { id: mainEntryId },
-    data: {
-      generatedDoc: {
-        type: safeGenType,
-        label: genConfig.label,
-        content: document,
-        generatedAt: new Date().toISOString(),
-        basedOnEntries: entryIds,
-        settings: { title, journal, style, language, keywords },
-      } as never,
-    },
-  })
+    // Salvar documento gerado na entrada principal
+    const mainEntryId = entryIds[0]
+    await prisma.notebookEntry.update({
+      where: { id: mainEntryId },
+      data: {
+        generatedDoc: {
+          type: safeGenType,
+          label: genConfig.label,
+          content: document,
+          generatedAt: new Date().toISOString(),
+          basedOnEntries: entryIds,
+          settings: { title, journal, style, language, keywords },
+        } as never,
+      },
+    })
 
-  return NextResponse.json({
-    document,
-    genType: safeGenType,
-    label: genConfig.label,
-    creditsUsed: genConfig.cost,
-    basedOn: entries.length,
-    generatedAt: new Date().toISOString(),
-  })
+    return NextResponse.json({
+      document,
+      genType: safeGenType,
+      label: genConfig.label,
+      creditsUsed: genConfig.cost,
+      basedOn: entries.length,
+      generatedAt: new Date().toISOString(),
+    })
+  } catch (err) {
+    console.error("[POST /api/notebook/generate]", err)
+    if (err instanceof BiaAIError) {
+      const r = aiErrorToHttp(err)
+      return NextResponse.json({ error: r.error, code: r.code }, { status: r.status })
+    }
+    return NextResponse.json(
+      { error: "Erro ao gerar documento. Tente novamente." },
+      { status: 500 }
+    )
+  }
 }
 
 export async function GET() {

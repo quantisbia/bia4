@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { requireCredits } from "@/lib/auth/credits"
-import { generateContent } from "@/lib/ai/gemini"
+import { generateContent, BiaAIError, aiErrorToHttp } from "@/lib/ai/gemini"
 import { prisma } from "@/lib/db/prisma"
 import { z } from "zod"
 
@@ -291,15 +291,27 @@ Gere um PROTOCOLO TÉCNICO COMPLETO seguindo EXATAMENTE esta estrutura em Markdo
 
 *© BIA v4 — Plataforma de Inteligência Artificial para Biofabricação | ${today}*`
 
-  const { text: protocol } = await generateContent(prompt, { maxTokens: 8192, temperature: 0.3 })
+  try {
+    const { text: protocol } = await generateContent(prompt, { maxTokens: 8192, temperature: 0.3 })
 
-  return NextResponse.json({
-    protocol,
-    projectName: project.name,
-    tissueType: project.tissueType,
-    application: project.targetApplication,
-    stagesCompleted: project.stages.filter(s => s.status === "COMPLETED").length,
-    generatedAt: new Date().toISOString(),
-    creditsUsed: 20,
-  })
+    return NextResponse.json({
+      protocol,
+      projectName: project.name,
+      tissueType: project.tissueType,
+      application: project.targetApplication,
+      stagesCompleted: project.stages.filter(s => s.status === "COMPLETED").length,
+      generatedAt: new Date().toISOString(),
+      creditsUsed: 20,
+    })
+  } catch (err) {
+    console.error("[POST /api/protocol-total]", err)
+    if (err instanceof BiaAIError) {
+      const r = aiErrorToHttp(err)
+      return NextResponse.json({ error: r.error, code: r.code }, { status: r.status })
+    }
+    return NextResponse.json(
+      { error: "Erro ao gerar protocolo. Tente novamente em alguns segundos." },
+      { status: 500 }
+    )
+  }
 }

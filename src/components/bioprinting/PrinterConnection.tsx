@@ -17,7 +17,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react"
 import {
-  Usb, Power, Send, Loader2, AlertCircle, CheckCircle2, XCircle,
+  Usb, Power, Send, Loader2, AlertCircle, XCircle,
   Terminal, RefreshCw, Wand2, Square,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
