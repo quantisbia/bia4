@@ -1,16 +1,33 @@
-import { NextResponse } from "next/server"
-import { readFileSync } from "fs"
-import { join } from "path"
+import { NextResponse, type NextRequest } from "next/server"
 
-export async function GET() {
+/**
+ * Serve o manual da BIA — busca o arquivo estático público via fetch
+ * para garantir que sempre temos a versão mais recente (sem cache do
+ * readFileSync no build standalone).
+ */
+export async function GET(request: NextRequest) {
   try {
-    const filePath = join(process.cwd(), "public", "manual-bia-v4.html")
-    const content = readFileSync(filePath, "utf-8")
+    const origin = request.nextUrl.origin
+    const res = await fetch(`${origin}/manual-bia-v4.html`, {
+      cache: "no-store",
+    })
+
+    if (!res.ok) {
+      return new NextResponse("Manual não encontrado", { status: 404 })
+    }
+
+    const content = await res.text()
     return new NextResponse(content, {
       status: 200,
-      headers: { "Content-Type": "text/html; charset=utf-8" },
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store, must-revalidate",
+      },
     })
-  } catch {
-    return new NextResponse("Manual não encontrado", { status: 404 })
+  } catch (err) {
+    console.error("[/api/manual]", err)
+    return new NextResponse("Erro ao carregar manual", { status: 500 })
   }
 }
+
+export const dynamic = "force-dynamic"
