@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import Link from "next/link"
 import {
   FlaskConical, Search, Loader2, ChevronDown, ChevronUp,
-  Filter, Sparkles, X, SlidersHorizontal
+  Filter, Sparkles, X, SlidersHorizontal, Atom, ArrowRight,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
@@ -149,19 +150,29 @@ export default function BiomaterialsPage() {
             </h1>
             <p className="text-xs text-gray-400 mt-0.5">{total.toLocaleString("pt-BR")} formulações validadas</p>
           </div>
-          <button
-            onClick={() => setShowFormulate(!showFormulate)}
-            className={cn(
-              "flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl border text-xs sm:text-sm font-medium transition-all active:scale-[0.98]",
-              showFormulate
-                ? "bg-blue-500/20 border-blue-500/30 text-blue-300"
-                : "bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20"
-            )}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Formular com </span>IA
-            <span className="hidden sm:inline text-[10px] bg-blue-500/20 px-1.5 py-0.5 rounded-md">10 créditos</span>
-          </button>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <Link
+              href="/dashboard/formulator-pro"
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30 text-purple-200 hover:from-purple-500/30 hover:to-blue-500/30 text-xs sm:text-sm font-medium transition-all active:scale-[0.98]"
+              title="Versão profissional: multi-componente, custom + catálogo, análise científica completa"
+            >
+              <Atom className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Formulador </span>Pro
+              <ArrowRight className="w-3 h-3 hidden sm:inline" />
+            </Link>
+            <button
+              onClick={() => setShowFormulate(!showFormulate)}
+              className={cn(
+                "flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl border text-xs sm:text-sm font-medium transition-all active:scale-[0.98]",
+                showFormulate
+                  ? "bg-blue-500/20 border-blue-500/30 text-blue-300"
+                  : "bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20"
+              )}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">IA </span>Rápida
+            </button>
+          </div>
         </div>
 
         {/* Search + filter row */}

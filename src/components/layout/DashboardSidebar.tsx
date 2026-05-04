@@ -9,7 +9,7 @@ import {
   LayoutDashboard, GitBranch, FlaskConical, CircleDot,
   FileText, BookOpen, MessageSquare, CreditCard, Settings,
   LogOut, Zap, ChevronRight, Menu, X, Printer, Box, ClipboardCheck, BookMarked,
-  Crown, Wrench, Info, Map,
+  Crown, Wrench, Info, Map, Atom,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { isSuperAdmin } from "@/lib/auth/admin-shared"
@@ -45,6 +45,8 @@ export const NAV_ITEMS = [
     info: "Pipeline de Engenharia de Tecidos em 12 etapas — da definição do problema clínico até pré-clínico/clínico. Use para guiar o seu projeto do zero ao protocolo validado. Custo: 5 créditos/etapa." },
   { href: "/dashboard/biomaterials",       label: "Formulador Bio",       icon: FlaskConical,    exact: false,
     info: "Banco de 31 biomateriais (GelMA, Alginato, PCL, dECM…) e formulador IA. Insira aplicação + tecido + requisitos e a BIA recomenda formulação, concentração, crosslinker e parâmetros de impressão. Custo: 10 créditos." },
+  { href: "/dashboard/formulator-pro",     label: "Formulador Pro",       icon: Atom,            exact: false,
+    info: "Versão profissional: monte formulações multi-componente livremente (até 8 biomateriais — catálogo OU customizados), defina objetivo clínico (cicatrização, osso, gengiva, implante mamário…), especificações viscoelásticas e a IA gera análise científica completa: score, incompatibilidades, protocolo, ISO/ANVISA. Custo: 10 créditos." },
   { href: "/dashboard/bioprinting",        label: "Bioimpressão 3D",      icon: Printer,         exact: false,
     info: "Especialista em bioimpressão (extrusão, inkjet, DLP, FRESH, laser, coaxial). Diga sua bioink + tecido alvo e a BIA gera parâmetros otimizados (pressão, velocidade, temperatura, layer height)." },
   { href: "/dashboard/stl",                label: "Gerador STL",          icon: Box,             exact: false,
