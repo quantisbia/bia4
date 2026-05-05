@@ -157,9 +157,58 @@ export default function FormulatorProPage() {
 
   // Step 4: resultado
   const [loading, setLoading] = useState(false)
+  const [loadingPhase, setLoadingPhase] = useState<string>("")
+  const [elapsedSec, setElapsedSec] = useState(0)
   const [result, setResult] = useState<ProFormulation | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [errorKind, setErrorKind] = useState<"auth" | "credits" | "validation" | "timeout" | "server" | "network" | null>(null)
   const [expandedProtocol, setExpandedProtocol] = useState(true)
+
+  // ─── Auto-save (localStorage) ──────────────────────────────────────────
+  // Preserva o trabalho do usuário entre sessões / refreshes — evita perda de dados
+  const STORAGE_KEY = "bia.formulator-pro.draft.v1"
+
+  // Hidratar do storage no mount
+  useEffect(() => {
+    try {
+      const raw = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null
+      if (!raw) return
+      const draft = JSON.parse(raw) as {
+        goal?: string; goalCategory?: ClinicalGoal; targetTissue?: string
+        components?: Component[]
+        specs?: typeof specs
+        constraints?: typeof constraints
+        mode?: "single" | "alternatives"
+        step?: 1 | 2 | 3 | 4
+      }
+      if (draft.goal) setGoal(draft.goal)
+      if (draft.goalCategory) setGoalCategory(draft.goalCategory)
+      if (draft.targetTissue) setTargetTissue(draft.targetTissue)
+      if (Array.isArray(draft.components)) setComponents(draft.components)
+      if (draft.specs) setSpecs(prev => ({ ...prev, ...draft.specs }))
+      if (draft.constraints) setConstraints(prev => ({ ...prev, ...draft.constraints }))
+      if (draft.mode) setMode(draft.mode)
+      if (draft.step && draft.step >= 1 && draft.step <= 3) setStep(draft.step)
+    } catch { /* no-op */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Persistir no storage quando mudar (debounced via micro task)
+  useEffect(() => {
+    if (result) return // não sobrescreve quando exibindo resultado
+    try {
+      const draft = { goal, goalCategory, targetTissue, components, specs, constraints, mode, step }
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft))
+    } catch { /* no-op */ }
+  }, [goal, goalCategory, targetTissue, components, specs, constraints, mode, step, result])
+
+  // Cronômetro durante chamada à IA
+  useEffect(() => {
+    if (!loading) { setElapsedSec(0); return }
+    setElapsedSec(0)
+    const t = setInterval(() => setElapsedSec(s => s + 1), 1000)
+    return () => clearInterval(t)
+  }, [loading])
 
   // Buscar catálogo (lazy, quando abre)
   const loadCatalog = useCallback(async () => {
@@ -208,34 +257,65 @@ export default function FormulatorProPage() {
     setShowCatalog(false)
   }
 
+  // ─── Validação client-side ──────────────────────────────────────────────
+  // Detecta erros antes de gastar créditos.
+  const validateBeforeSubmit = (): string | null => {
+    if (!goal.trim()) return "Descreva o objetivo da formulação no Passo 1."
+    if (goal.trim().length < 10) return "Descreva o objetivo com mais detalhes (mínimo 10 caracteres)."
+    if (components.length === 0) return "Adicione ao menos 1 biomaterial no Passo 2."
+    if (components.length > 8) return "Máximo 8 componentes por formulação."
+    const semNome = components.filter(c => !c.name.trim())
+    if (semNome.length > 0) return `Há ${semNome.length} componente(s) sem nome. Preencha ou remova.`
+    // Validar ranges (max >= min)
+    const validateRange = (a: string, b: string, label: string): string | null => {
+      if (a && b) {
+        const minN = parseFloat(a); const maxN = parseFloat(b)
+        if (!isNaN(minN) && !isNaN(maxN) && maxN < minN) return `${label}: máximo deve ser ≥ mínimo.`
+      }
+      return null
+    }
+    return validateRange(specs.targetModulusMin, specs.targetModulusMax, "Módulo de Young")
+      ?? validateRange(specs.porosityMin, specs.porosityMax, "Porosidade")
+      ?? validateRange(specs.poreSizeMin, specs.poreSizeMax, "Tamanho de poro")
+      ?? validateRange(specs.degradationMin, specs.degradationMax, "Degradação")
+      ?? validateRange(specs.swellingMin, specs.swellingMax, "Swelling")
+      ?? validateRange(specs.pHMin, specs.pHMax, "pH")
+  }
+
   // ─── Submit ─────────────────────────────────────────────────────────────
   const submit = async () => {
     setErrorMsg(null)
-    if (!goal.trim() || components.length === 0) {
-      setErrorMsg("Defina o objetivo e adicione ao menos 1 biomaterial.")
-      return
-    }
+    setErrorKind(null)
+
+    const valErr = validateBeforeSubmit()
+    if (valErr) { setErrorMsg(valErr); setErrorKind("validation"); return }
+
     setLoading(true)
+    setLoadingPhase("Validando entrada e estimando custo computacional…")
     setResult(null)
     setStep(4)
 
     const range = (a: string, b: string) => {
       const min = a ? parseFloat(a) : undefined
       const max = b ? parseFloat(b) : undefined
-      return min === undefined && max === undefined ? undefined : { min, max }
+      const cleanMin = (min !== undefined && !isNaN(min)) ? min : undefined
+      const cleanMax = (max !== undefined && !isNaN(max)) ? max : undefined
+      return cleanMin === undefined && cleanMax === undefined ? undefined : { min: cleanMin, max: cleanMax }
     }
 
     const payload = {
-      goal,
+      goal: goal.trim(),
       goalCategory,
-      targetTissue: targetTissue || undefined,
-      components: components.map(c => ({
-        name: c.name.trim(),
-        concentration: c.concentration?.trim() || undefined,
-        role: c.role,
-        catalogId: c.catalogId,
-        knownProps: c.knownProps,
-      })).filter(c => c.name.length > 0),
+      targetTissue: targetTissue.trim() || undefined,
+      components: components
+        .map(c => ({
+          name: c.name.trim(),
+          concentration: c.concentration?.trim() || undefined,
+          role: c.role,
+          catalogId: c.catalogId,
+          knownProps: c.knownProps && Object.values(c.knownProps).some(v => v !== undefined && v !== "") ? c.knownProps : undefined,
+        }))
+        .filter(c => c.name.length > 0),
       specs: {
         targetModulusKPa: range(specs.targetModulusMin, specs.targetModulusMax),
         porosityPercent: range(specs.porosityMin, specs.porosityMax),
@@ -256,39 +336,112 @@ export default function FormulatorProPage() {
         avoidPhotoinitiator: constraints.avoidPhotoinitiator || undefined,
         fdaApprovedOnly: constraints.fdaApprovedOnly || undefined,
         costSensitive: constraints.costSensitive || undefined,
-        notes: constraints.notes || undefined,
+        notes: constraints.notes.trim() || undefined,
       },
       mode,
     }
+
+    // Timeout cliente: 90s (a IA pode levar 20-40s; damos folga)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 90_000)
+
+    // Atualizar fase exibida ao usuário
+    const phaseTimers = [
+      setTimeout(() => setLoadingPhase("Analisando incompatibilidades químicas dos componentes…"), 1500),
+      setTimeout(() => setLoadingPhase("Consultando IA científica (Gemini 2.5)…"), 3500),
+      setTimeout(() => setLoadingPhase("Calculando propriedades preditas e protocolo…"), 12000),
+      setTimeout(() => setLoadingPhase("Compilando referências e classificação regulatória…"), 22000),
+    ]
 
     try {
       const res = await fetch("/api/biomaterials/formulate-pro", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const msg = data.error ?? "Falha ao gerar formulação."
-        const hint = data.hint ? ` ${data.hint}` : ""
-        setErrorMsg(`${msg}${hint}`)
+        // Mensagens contextualizadas
+        if (res.status === 401) {
+          setErrorKind("auth")
+          setErrorMsg("Sua sessão expirou. Faça login novamente para continuar (seus dados foram salvos automaticamente).")
+        } else if (res.status === 402 || /cr[eé]dito/i.test(data?.error ?? "")) {
+          setErrorKind("credits")
+          setErrorMsg(
+            (data?.error ?? "Créditos insuficientes.") +
+            " Esta operação custa 10 créditos. Veja seu plano em Configurações → Assinatura.",
+          )
+        } else if (res.status === 400) {
+          setErrorKind("validation")
+          const detail = data?.details?.fieldErrors
+            ? Object.entries(data.details.fieldErrors as Record<string, string[]>)
+                .slice(0, 3)
+                .map(([k, v]) => `${k}: ${v?.[0] ?? ""}`)
+                .join(" • ")
+            : ""
+          setErrorMsg(
+            (data?.error ?? "Dados inválidos.") + (detail ? ` (${detail})` : "") +
+            " Revise os campos marcados.",
+          )
+        } else {
+          setErrorKind("server")
+          const msg = data?.error ?? "Falha ao gerar formulação."
+          const hint = data?.hint ? ` ${data.hint}` : " Tente novamente em instantes."
+          setErrorMsg(`${msg}${hint}`)
+        }
       } else {
         setResult(data)
+        // Limpar draft após sucesso (mantém histórico no servidor)
+        try { window.localStorage.removeItem(STORAGE_KEY) } catch { /* no-op */ }
       }
     } catch (e) {
-      setErrorMsg(
-        (e instanceof Error ? e.message : "Erro inesperado.") +
-        " Verifique sua conexão e tente novamente."
-      )
+      if (e instanceof Error && e.name === "AbortError") {
+        setErrorKind("timeout")
+        setErrorMsg(
+          "A IA está demorando mais que o normal (>90s). Isso pode acontecer com formulações muito complexas. " +
+          "Tente novamente — seus dados foram preservados. Se persistir, simplifique (menos componentes ou descrição mais curta).",
+        )
+      } else {
+        setErrorKind("network")
+        setErrorMsg(
+          (e instanceof Error ? e.message : "Erro de rede inesperado.") +
+          " Verifique sua conexão e tente novamente — seus dados estão salvos.",
+        )
+      }
     } finally {
+      clearTimeout(timeoutId)
+      phaseTimers.forEach(clearTimeout)
       setLoading(false)
+      setLoadingPhase("")
     }
   }
 
+  // Tentar novamente preservando o estado completo
+  const retry = () => {
+    setErrorMsg(null)
+    setErrorKind(null)
+    void submit()
+  }
+
   const reset = () => {
-    setStep(1); setResult(null); setErrorMsg(null)
+    setStep(1); setResult(null); setErrorMsg(null); setErrorKind(null)
     setGoal(""); setTargetTissue(""); setGoalCategory("GENERIC")
     setComponents([])
+    setSpecs({
+      targetModulusMin: "", targetModulusMax: "", porosityMin: "", porosityMax: "",
+      poreSizeMin: "", poreSizeMax: "", degradationMin: "", degradationMax: "",
+      swellingMin: "", swellingMax: "", viscoelastic: "any",
+      biodegradable: false, printable: false, cellLaden: false,
+      sterilizable: false, transparent: false, injectable: false,
+      pHMin: "", pHMax: "",
+    })
+    setConstraints({
+      avoidAnimalDerived: false, avoidPhotoinitiator: false,
+      fdaApprovedOnly: false, costSensitive: false, notes: "",
+    })
+    setMode("single")
+    try { window.localStorage.removeItem(STORAGE_KEY) } catch { /* no-op */ }
   }
 
   // ─── Render ─────────────────────────────────────────────────────────────
@@ -797,26 +950,127 @@ export default function FormulatorProPage() {
           {step === 4 && (
             <div className="animate-in fade-in slide-in-from-bottom-2">
               {loading && (
-                <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-12 text-center">
-                  <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-500/15 border border-blue-500/30 mb-4">
-                    <Loader2 className="w-6 h-6 text-blue-300 animate-spin" />
+                <div className="rounded-2xl border border-white/8 bg-gradient-to-br from-blue-500/[0.04] to-purple-500/[0.04] p-8 sm:p-12 text-center">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-500/15 border border-blue-500/30 mb-4 relative">
+                    <Loader2 className="w-7 h-7 text-blue-300 animate-spin" />
+                    <div className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-md bg-blue-500 text-white text-[10px] font-mono font-bold">
+                      {elapsedSec}s
+                    </div>
                   </div>
-                  <p className="text-sm font-semibold text-white mb-1">Analisando combinação…</p>
-                  <p className="text-xs text-gray-500 max-w-md mx-auto">
-                    Verificando incompatibilidades químicas, calculando propriedades preditas e gerando protocolo profissional.
+                  <p className="text-base font-bold text-white mb-1">Gerando formulação profissional…</p>
+                  <p className="text-xs text-blue-300/90 mb-4 max-w-md mx-auto min-h-[1.25rem]">
+                    {loadingPhase || "Inicializando análise científica…"}
+                  </p>
+
+                  {/* Barra de progresso por fase */}
+                  <div className="max-w-md mx-auto space-y-1.5 text-left mt-6">
+                    {[
+                      { t: 0,  label: "Validar entrada e detectar incompatibilidades determinísticas" },
+                      { t: 3,  label: "Construir prompt científico e consultar Gemini 2.5" },
+                      { t: 12, label: "Calcular score multidimensional + propriedades preditas" },
+                      { t: 22, label: "Compilar protocolo, parâmetros de impressão e referências" },
+                    ].map((p, i) => {
+                      const done = elapsedSec >= (i + 1 < 4 ? [0,3,12,22][i+1] : 999) - 1
+                      const active = elapsedSec >= p.t && !done
+                      return (
+                        <div key={i} className="flex items-center gap-2 text-[11px]">
+                          {done ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          ) : active ? (
+                            <Loader2 className="w-3.5 h-3.5 text-blue-300 animate-spin shrink-0" />
+                          ) : (
+                            <div className="w-3.5 h-3.5 rounded-full border border-white/15 shrink-0" />
+                          )}
+                          <span className={cn(
+                            done ? "text-emerald-300/80" : active ? "text-blue-200" : "text-gray-600"
+                          )}>{p.label}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <p className="text-[10px] text-gray-600 mt-6">
+                    Isso normalmente leva 15-35 segundos. Não feche a aba.
                   </p>
                 </div>
               )}
 
               {errorMsg && !loading && (
-                <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-rose-300 shrink-0 mt-0.5" />
+                <div className={cn(
+                  "rounded-xl border p-4 flex items-start gap-3",
+                  errorKind === "auth"        ? "border-amber-500/30 bg-amber-500/10" :
+                  errorKind === "credits"     ? "border-purple-500/30 bg-purple-500/10" :
+                  errorKind === "timeout"     ? "border-blue-500/30 bg-blue-500/10" :
+                  errorKind === "validation"  ? "border-amber-500/30 bg-amber-500/10" :
+                                                "border-rose-500/30 bg-rose-500/10"
+                )}>
+                  <AlertTriangle className={cn(
+                    "w-5 h-5 shrink-0 mt-0.5",
+                    errorKind === "auth"        ? "text-amber-300" :
+                    errorKind === "credits"     ? "text-purple-300" :
+                    errorKind === "timeout"     ? "text-blue-300" :
+                    errorKind === "validation"  ? "text-amber-300" :
+                                                  "text-rose-300"
+                  )} />
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-rose-200">Erro na formulação</p>
-                    <p className="text-xs text-rose-300/80 mt-1">{errorMsg}</p>
-                    <button onClick={() => setStep(3)} className="mt-3 text-xs text-rose-200 underline hover:text-white">
-                      Voltar e ajustar
-                    </button>
+                    <p className={cn(
+                      "text-sm font-semibold",
+                      errorKind === "auth"        ? "text-amber-200" :
+                      errorKind === "credits"     ? "text-purple-200" :
+                      errorKind === "timeout"     ? "text-blue-200" :
+                      errorKind === "validation"  ? "text-amber-200" :
+                                                    "text-rose-200"
+                    )}>
+                      {errorKind === "auth"       ? "Sessão expirada"          :
+                       errorKind === "credits"    ? "Créditos insuficientes"   :
+                       errorKind === "timeout"    ? "Tempo limite excedido"    :
+                       errorKind === "validation" ? "Revise os dados"          :
+                       errorKind === "network"    ? "Erro de conexão"          :
+                                                    "Erro na formulação"}
+                    </p>
+                    <p className="text-xs text-white/80 mt-1 leading-relaxed">{errorMsg}</p>
+
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {errorKind === "auth" ? (
+                        <a
+                          href={`/auth/login?callbackUrl=${typeof window !== "undefined" ? encodeURIComponent(window.location.pathname) : ""}`}
+                          className="text-[11px] px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-100 hover:bg-amber-500/30 font-medium"
+                        >
+                          Fazer login →
+                        </a>
+                      ) : errorKind === "credits" ? (
+                        <a
+                          href="/dashboard/subscription"
+                          className="text-[11px] px-3 py-1.5 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-100 hover:bg-purple-500/30 font-medium"
+                        >
+                          Ver planos →
+                        </a>
+                      ) : errorKind === "validation" ? (
+                        <button
+                          onClick={() => setStep(2)}
+                          className="text-[11px] px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-100 hover:bg-amber-500/30 font-medium"
+                        >
+                          ← Revisar componentes
+                        </button>
+                      ) : (
+                        <button
+                          onClick={retry}
+                          className="text-[11px] px-3 py-1.5 rounded-lg bg-blue-500/20 border border-blue-500/40 text-blue-100 hover:bg-blue-500/30 font-medium flex items-center gap-1.5"
+                        >
+                          <RefreshCw className="w-3 h-3" /> Tentar novamente
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setStep(3)}
+                        className="text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10"
+                      >
+                        Voltar e ajustar
+                      </button>
+                    </div>
+
+                    <p className="text-[10px] text-gray-500 mt-3 italic flex items-center gap-1">
+                      <Save className="w-3 h-3" /> Seus dados foram salvos automaticamente.
+                    </p>
                   </div>
                 </div>
               )}
