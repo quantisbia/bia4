@@ -267,14 +267,19 @@ export default function FormulatorProPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setErrorMsg(data.error ?? "Falha ao gerar formulação.")
+        const msg = data.error ?? "Falha ao gerar formulação."
+        const hint = data.hint ? ` ${data.hint}` : ""
+        setErrorMsg(`${msg}${hint}`)
       } else {
         setResult(data)
       }
     } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : "Erro inesperado.")
+      setErrorMsg(
+        (e instanceof Error ? e.message : "Erro inesperado.") +
+        " Verifique sua conexão e tente novamente."
+      )
     } finally {
       setLoading(false)
     }

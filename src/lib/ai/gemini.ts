@@ -1126,46 +1126,188 @@ export async function generateStructured<T>(
   schema: string,
   options: GeminiOptions = {}
 ): Promise<T> {
-  const structured = `${prompt}\n\nIMPORTANTE: Responda APENAS com JSON válido seguindo o esquema abaixo. Sem texto antes ou depois, sem blocos markdown.\n\nEsquema esperado:\n${schema}`
-  const { text } = await generateContent(structured, { ...options, temperature: 0.2 })
-  return parseJsonFromAI<T>(text)
+  const structured = `${prompt}
+
+IMPORTANTE: Responda APENAS com JSON válido seguindo o esquema abaixo.
+- Sem texto antes ou depois.
+- Sem blocos markdown (sem \`\`\`json).
+- Strings devem ser CONCISAS (frases curtas), não parágrafos longos — para caber no limite de tokens.
+- Todos os campos do esquema são obrigatórios; se não souber, use string vazia "" ou array vazio [].
+
+Esquema esperado:
+${schema}`
+
+  return safeGeminiCall(async () => {
+    const model = getGenAI().getGenerativeModel({
+      model: "gemini-2.5-flash",
+      systemInstruction: options.systemPrompt ?? SYSTEM_PROMPTS.BIOFAB_EXPERT,
+      safetySettings: SAFETY_SETTINGS,
+      generationConfig: {
+        temperature: options.temperature ?? 0.2,
+        maxOutputTokens: options.maxTokens ?? 8192,
+        topP: 0.95,
+        topK: 40,
+        // Recurso oficial do Gemini: garante saída JSON válida
+        responseMimeType: "application/json",
+      },
+    })
+    const result = await model.generateContent(structured)
+    const text = result.response.text()
+    return parseJsonFromAI<T>(text)
+  })
 }
 
 /**
- * Extrai JSON de respostas da IA de forma robusta.
- * Lida com: blocos ```json```, texto antes/depois, objetos aninhados.
+ * Extrai JSON de respostas da IA de forma EXTRA robusta.
+ * Lida com:
+ *  - blocos ```json``` ou ```
+ *  - texto/comentários antes ou depois
+ *  - objetos/arrays aninhados
+ *  - JSON TRUNCADO (cortado pelo limite de tokens) — tenta reparar
+ *  - vírgulas finais (trailing commas)
+ *  - aspas simples ao invés de duplas
  */
 export function parseJsonFromAI<T>(text: string): T {
-  // 1. Remover blocos markdown
-  const clean = text
-    .replace(/^```(?:json)?\s*/im, "")
-    .replace(/\s*```\s*$/m, "")
-    .trim()
+  if (!text || typeof text !== "string") {
+    throw new Error("IA retornou resposta vazia.")
+  }
+
+  // 1. Remover blocos markdown (qualquer posição)
+  let clean = text.replace(/```(?:json|JSON)?\s*/g, "").replace(/```\s*/g, "").trim()
 
   // 2. Tentar parse direto
-  try {
-    return JSON.parse(clean) as T
-  } catch { /* continua */ }
+  try { return JSON.parse(clean) as T } catch { /* continua */ }
 
-  // 3. Extrair primeiro objeto JSON válido do texto
+  // 3. Localizar início do JSON (primeira chave/colchete)
   const firstBrace = clean.indexOf("{")
-  const lastBrace = clean.lastIndexOf("}")
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    try {
-      return JSON.parse(clean.slice(firstBrace, lastBrace + 1)) as T
-    } catch { /* continua */ }
-  }
-
-  // 4. Extrair primeiro array JSON
   const firstBracket = clean.indexOf("[")
-  const lastBracket = clean.lastIndexOf("]")
-  if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+  let start = -1
+  let openChar: "{" | "[" = "{"
+  if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+    start = firstBrace; openChar = "{"
+  } else if (firstBracket !== -1) {
+    start = firstBracket; openChar = "["
+  }
+  if (start === -1) {
+    throw new Error(`IA retornou resposta não-JSON: ${text.substring(0, 300)}`)
+  }
+
+  // 4. Tentar extrair objeto/array completo balanceando aspas e chaves
+  const closeChar = openChar === "{" ? "}" : "]"
+  const lastClose = clean.lastIndexOf(closeChar)
+  if (lastClose > start) {
     try {
-      return JSON.parse(clean.slice(firstBracket, lastBracket + 1)) as T
+      return JSON.parse(clean.slice(start, lastClose + 1)) as T
     } catch { /* continua */ }
   }
 
-  throw new Error(`IA retornou resposta não-JSON: ${text.substring(0, 300)}`)
+  // 5. Sanitizar trailing commas
+  const removeTrailingCommas = (s: string) =>
+    s.replace(/,(\s*[}\]])/g, "$1")
+
+  if (lastClose > start) {
+    try {
+      return JSON.parse(removeTrailingCommas(clean.slice(start, lastClose + 1))) as T
+    } catch { /* continua */ }
+  }
+
+  // 6. JSON TRUNCADO: reparar fechando chaves/colchetes/aspas pendentes
+  const truncatedAttempt = repairTruncatedJson(clean.slice(start))
+  if (truncatedAttempt) {
+    try { return JSON.parse(truncatedAttempt) as T } catch { /* continua */ }
+    try { return JSON.parse(removeTrailingCommas(truncatedAttempt)) as T } catch { /* continua */ }
+  }
+
+  throw new Error(
+    `IA retornou JSON inválido ou truncado. Tente novamente — se persistir, simplifique a entrada. ` +
+    `Trecho: ${clean.substring(0, 200)}…`,
+  )
+}
+
+/**
+ * Tenta reparar JSON truncado fechando estruturas pendentes.
+ * Útil quando o limite de tokens corta a resposta no meio.
+ */
+function repairTruncatedJson(s: string): string | null {
+  if (!s) return null
+
+  // Stack de aberturas pendentes
+  const stack: string[] = []
+  let inString = false
+  let escape = false
+  let lastValidIndex = -1
+
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i]
+    if (escape) { escape = false; continue }
+    if (ch === "\\") { escape = true; continue }
+    if (ch === '"') { inString = !inString; continue }
+    if (inString) continue
+
+    if (ch === "{" || ch === "[") {
+      stack.push(ch)
+    } else if (ch === "}" || ch === "]") {
+      const expected = stack.length ? (stack[stack.length - 1] === "{" ? "}" : "]") : null
+      if (expected === ch) {
+        stack.pop()
+        if (stack.length === 0) lastValidIndex = i
+      }
+    }
+  }
+
+  // Se o JSON está completo no meio, retornar até esse ponto
+  if (lastValidIndex !== -1 && stack.length === 0) {
+    return s.slice(0, lastValidIndex + 1)
+  }
+
+  // Tentar reparar truncamento: fechar string aberta e estruturas pendentes
+  let repaired = s
+
+  // Remover sufixo problemático: vírgula final, dois-pontos órfão,
+  // ou "chave": órfã (chave sem valor)
+  repaired = repaired
+    .replace(/,\s*$/, "")
+    .replace(/"[^"]*"\s*:\s*$/, "")  // remove "chave": no fim
+    .replace(/,\s*$/, "")             // novamente, caso tenha sobrado vírgula
+
+  // Se terminou no meio de uma string, fechar a string
+  if (inString) {
+    // Remover possível chave parcial: "key": "valor truncad
+    // Cortar até a última chave/vírgula/colchete fora de string
+    let lastSafe = -1
+    let inStr = false
+    let esc = false
+    for (let i = 0; i < repaired.length; i++) {
+      const c = repaired[i]
+      if (esc) { esc = false; continue }
+      if (c === "\\") { esc = true; continue }
+      if (c === '"') { inStr = !inStr; continue }
+      if (!inStr && (c === "," || c === "{" || c === "[")) lastSafe = i
+    }
+    if (lastSafe !== -1) {
+      repaired = repaired.slice(0, lastSafe).replace(/,\s*$/, "")
+    }
+  }
+
+  // Fechar estruturas pendentes (na ordem inversa)
+  // Reconta o stack após corte
+  const stack2: string[] = []
+  let inStr2 = false, esc2 = false
+  for (let i = 0; i < repaired.length; i++) {
+    const c = repaired[i]
+    if (esc2) { esc2 = false; continue }
+    if (c === "\\") { esc2 = true; continue }
+    if (c === '"') { inStr2 = !inStr2; continue }
+    if (inStr2) continue
+    if (c === "{" || c === "[") stack2.push(c)
+    else if (c === "}" || c === "]") stack2.pop()
+  }
+
+  while (stack2.length > 0) {
+    repaired += stack2.pop() === "{" ? "}" : "]"
+  }
+
+  return repaired || null
 }
 
 export function estimateTokens(text: string): number {

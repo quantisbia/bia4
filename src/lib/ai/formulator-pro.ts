@@ -503,66 +503,143 @@ ${constraintsBlock || "  (nenhuma)"}
 `.trim()
 }
 
+// Schema enxuto: descrições curtas, sem comentários longos.
+// Gemini reproduz melhor schemas pequenos sem perder qualidade do conteúdo.
 const RESULT_SCHEMA = `{
-  "name": "Nome profissional da formulação (ex: 'GelMA-HA-nHA Composite for Maxillary Bone Regeneration')",
+  "name": "string (nome profissional da formulação)",
   "goalCategory": "WOUND_HEALING|BONE_REGENERATION|GINGIVAL_REGENERATION|CARTILAGE_REPAIR|BREAST_IMPLANT|VASCULAR_GRAFT|NEURAL_REGENERATION|DRUG_DELIVERY|ORGANOID_SCAFFOLD|GENERIC",
-  "rationale": "Racional científico em 3-5 frases explicando POR QUE essa combinação atende ao objetivo. Cite mecanismo biológico + propriedade física relevante.",
-  "scientificScore": {
-    "overall": 85,
-    "mechanical": 90,
-    "biological": 80,
-    "manufacturability": 85,
-    "regulatory": 75
-  },
+  "rationale": "string (2-4 frases curtas)",
+  "scientificScore": { "overall": 0, "mechanical": 0, "biological": 0, "manufacturability": 0, "regulatory": 0 },
   "components": [
-    { "name": "GelMA (Gelatin Methacryloyl)", "role": "STRUCTURAL", "concentration": "5% w/v", "rationale": "Backbone proteico com sítios RGD nativos para adesão celular", "safetyClass": "ISO 10993-5 ok / pesquisa" }
+    { "name": "string", "role": "STRUCTURAL|BIOACTIVE|RHEOLOGY|CROSSLINKER|POROGEN|ADDITIVE|SOLVENT", "concentration": "string", "rationale": "string curta", "safetyClass": "string" }
   ],
   "crosslinking": {
-    "method": "Fotopolimerização UV 365 nm com 0.25% LAP, 30s",
-    "parameters": { "wavelength_nm": "365", "intensity_mWcm2": "10", "time_s": "30", "initiator_percent": "0.25" },
-    "rationale": "LAP é mais biocompatível que Irgacure e absorve em luz visível"
+    "method": "string",
+    "parameters": { "key": "value" },
+    "rationale": "string curta"
   },
   "predictedProperties": {
-    "youngsModulusKPa": "8-15 kPa",
-    "porosityPercent": "65-75%",
-    "poreSizeUm": "150-250 µm",
-    "swellingPercent": "300-400%",
-    "degradationDays": "21-35 dias",
-    "gelTimeMin": "1-2 min",
-    "cellViability": "≥85% após 7 dias",
-    "pH": "7.2-7.4",
-    "viscosityPaS": "0.5-2.0"
+    "youngsModulusKPa": "string",
+    "porosityPercent": "string",
+    "poreSizeUm": "string",
+    "swellingPercent": "string",
+    "degradationDays": "string",
+    "gelTimeMin": "string",
+    "cellViability": "string",
+    "pH": "string",
+    "viscosityPaS": "string"
   },
   "preparationProtocol": [
-    { "step": 1, "title": "Dissolver GelMA", "description": "Dissolver GelMA liofilizado em PBS estéril a 37°C, agitação 200 rpm, 1h", "timeMin": 60, "temperature": "37°C", "criticalPoint": false }
+    { "step": 1, "title": "string", "description": "string concisa (1-2 frases)", "timeMin": 0, "temperature": "string", "criticalPoint": false }
   ],
   "warnings": [
-    { "severity": "warning", "type": "STERILIZATION", "message": "...", "suggestion": "..." }
+    { "severity": "info|warning|critical", "type": "string", "message": "string", "suggestion": "string" }
   ],
   "printingParameters": {
-    "technology": "Extrusion (EBB)",
-    "nozzleDiameterUm": 250,
-    "pressureKPa": { "min": 30, "max": 80 },
-    "speedMmS": { "min": 5, "max": 15 },
-    "nozzleTempC": 25,
-    "plateTempC": 10,
-    "layerHeightUm": 200,
-    "infillPercent": 70,
-    "infillPattern": "Gyroid"
+    "technology": "string",
+    "nozzleDiameterUm": 0,
+    "pressureKPa": { "min": 0, "max": 0 },
+    "speedMmS": { "min": 0, "max": 0 },
+    "nozzleTempC": 0,
+    "plateTempC": 0,
+    "layerHeightUm": 0,
+    "infillPercent": 0,
+    "infillPattern": "string"
   },
-  "characterization": ["Reologia oscilatória 0.1-100 Hz", "MTT 24h/72h/7d", "Live/Dead day 7"],
+  "characterization": ["string"],
   "regulatory": {
-    "estimatedClass": "Pesquisa pré-clínica (não-implantável humano)",
-    "relevantStandards": ["ISO 10993-5", "ISO 10993-10", "ANVISA RDC 751/2022"],
-    "notes": "Classificação dependerá da via de administração final e tempo de contato."
+    "estimatedClass": "string",
+    "relevantStandards": ["string"],
+    "notes": "string curta"
   },
   "references": [
-    { "doi": "10.1016/j.biomaterials.2024.xxx", "title": "Título do artigo", "year": 2024 }
+    { "doi": "string", "title": "string", "year": 2024 }
   ],
   "alternatives": [
-    { "name": "Variante PLGA", "summary": "...", "swapFromOriginal": "troca PCL por PLGA 50:50", "tradeoff": "degradação mais rápida, menos rígido" }
+    { "name": "string", "summary": "string", "swapFromOriginal": "string", "tradeoff": "string" }
   ]
 }`
+
+// ────────────────────────────────────────────────────────────────────────────
+// NORMALIZAÇÃO DEFENSIVA — garante que o resultado nunca quebre a UI
+// ────────────────────────────────────────────────────────────────────────────
+
+function normalize(raw: Partial<ProFormulation> | null | undefined, input: FormulatorInput): ProFormulation {
+  const r = (raw ?? {}) as Partial<ProFormulation>
+  const goalLabel = GOAL_TEMPLATES[input.goalCategory ?? "GENERIC"].label
+
+  const score = r.scientificScore ?? { overall: 0, mechanical: 0, biological: 0, manufacturability: 0, regulatory: 0 }
+  // Normaliza para 0-100. Se IA devolveu em escala 0-5 ou 0-10, multiplica.
+  const clip = (n: unknown) => {
+    let v = typeof n === "number" ? n : Number(n)
+    if (!Number.isFinite(v)) return 0
+    if (v > 0 && v <= 5) v = v * 20        // escala 0-5 → 0-100
+    else if (v > 5 && v <= 10) v = v * 10  // escala 0-10 → 0-100
+    return Math.max(0, Math.min(100, Math.round(v)))
+  }
+
+  return {
+    name: (r.name && r.name.trim()) || `Formulação BIA — ${goalLabel}`,
+    goalCategory: (r.goalCategory ?? input.goalCategory ?? "GENERIC") as ClinicalGoal,
+    rationale: r.rationale ?? "Combinação proposta pelo usuário; análise detalhada limitada — verifique alertas e ajuste manualmente.",
+    scientificScore: {
+      overall: clip(score.overall),
+      mechanical: clip(score.mechanical),
+      biological: clip(score.biological),
+      manufacturability: clip(score.manufacturability),
+      regulatory: clip(score.regulatory),
+    },
+    components: Array.isArray(r.components) && r.components.length > 0
+      ? r.components.map(c => ({
+          name: c?.name ?? "Componente",
+          role: (c?.role ?? "STRUCTURAL") as BiomaterialRole,
+          concentration: c?.concentration ?? "—",
+          rationale: c?.rationale ?? "—",
+          safetyClass: c?.safetyClass,
+        }))
+      : input.components.map(c => ({
+          name: c.name,
+          role: (c.role ?? "STRUCTURAL") as BiomaterialRole,
+          concentration: c.concentration ?? "—",
+          rationale: "Componente fornecido pelo usuário.",
+        })),
+    crosslinking: {
+      method: r.crosslinking?.method ?? "A definir conforme química dos componentes",
+      parameters: (r.crosslinking?.parameters as Record<string, string>) ?? {},
+      rationale: r.crosslinking?.rationale ?? "—",
+    },
+    predictedProperties: r.predictedProperties ?? {},
+    preparationProtocol: Array.isArray(r.preparationProtocol) && r.preparationProtocol.length > 0
+      ? r.preparationProtocol.map((p, i) => ({
+          step: p?.step ?? i + 1,
+          title: p?.title ?? `Passo ${i + 1}`,
+          description: p?.description ?? "",
+          timeMin: p?.timeMin,
+          temperature: p?.temperature,
+          criticalPoint: !!p?.criticalPoint,
+        }))
+      : [{
+          step: 1, title: "Protocolo a definir",
+          description: "A IA não retornou protocolo detalhado. Use as referências e ajuste manualmente.",
+          criticalPoint: false,
+        }],
+    warnings: Array.isArray(r.warnings) ? r.warnings.map(w => ({
+      severity: (w?.severity ?? "info") as "info" | "warning" | "critical",
+      type: w?.type ?? "INFO",
+      message: w?.message ?? "",
+      suggestion: w?.suggestion,
+    })) : [],
+    printingParameters: r.printingParameters,
+    characterization: Array.isArray(r.characterization) ? r.characterization.filter(Boolean) : [],
+    regulatory: {
+      estimatedClass: r.regulatory?.estimatedClass ?? "Pesquisa (não-implantável)",
+      relevantStandards: Array.isArray(r.regulatory?.relevantStandards) ? r.regulatory.relevantStandards : [],
+      notes: r.regulatory?.notes ?? "",
+    },
+    references: Array.isArray(r.references) ? r.references : [],
+    alternatives: Array.isArray(r.alternatives) ? r.alternatives : [],
+  }
+}
 
 // ────────────────────────────────────────────────────────────────────────────
 // API PÚBLICA
@@ -572,51 +649,66 @@ export async function formulateProfessional(input: FormulatorInput): Promise<Pro
   // 1) Pre-checks determinísticos
   const preWarnings = runCompatibilityCheck(input)
 
-  // 2) Construir prompt rico
+  // 2) Construir prompt rico (mais enxuto)
   const context = buildContextBlock(input)
   const modeBlock =
     input.mode === "alternatives"
-      ? "\n\nGERE TAMBÉM 2 alternativas no campo 'alternatives' (cada uma com swap mínimo + tradeoff)."
-      : "\n\nForneça apenas a formulação principal (alternatives = [])."
+      ? "Inclua 2 alternativas curtas em 'alternatives'."
+      : "Use alternatives = []."
 
-  const prompt = `
-${context}
+  const prompt = `${context}
 
-${preWarnings.length > 0 ? `ALERTAS DE COMPATIBILIDADE PRÉ-DETECTADOS PELO MOTOR DETERMINÍSTICO:
-${preWarnings.map(w => `  [${w.severity.toUpperCase()}] ${w.type}: ${w.message}${w.suggestion ? ` → ${w.suggestion}` : ""}`).join("\n")}
+${preWarnings.length > 0 ? `ALERTAS PRÉ-DETECTADOS:
+${preWarnings.map(w => `[${w.severity.toUpperCase()}] ${w.type}: ${w.message}${w.suggestion ? ` → ${w.suggestion}` : ""}`).join("\n")}
 ` : ""}
 
-TAREFA: Atue como cientista sênior de biomateriais (PhD + indústria). Analise a combinação proposta pelo usuário, ajuste concentrações se necessário, escolha o método de crosslinking ótimo, prediga propriedades realistas (faixas, não valores únicos), gere protocolo passo a passo, identifique TODAS as incompatibilidades químicas/físicas/regulatórias, sugira parâmetros de bioimpressão se aplicável, e cite 3-5 DOIs reais (2020-2025).${modeBlock}
+TAREFA (cientista sênior de biomateriais): analise a combinação, ajuste concentrações, escolha crosslinking ótimo, prediga propriedades em FAIXAS, gere protocolo curto (5-8 passos), identifique incompatibilidades, sugira parâmetros de bioimpressão se aplicável, cite 3 DOIs reais (2020-2025). ${modeBlock}
 
-REGRAS CRÍTICAS:
-1. Se um componente do usuário for INCOMPATÍVEL ou PERIGOSO, mantenha-o na lista mas adicione warning CRITICAL e sugira substituto.
-2. Concentrações DEVEM ser realistas (faixas publicadas na literatura).
-3. NUNCA use percentuais sem unidade — sempre w/v, w/w ou v/v.
-4. Score 0-100 baseado em: mecânico (atinge alvo?), biológico (viabilidade celular esperada), manufaturabilidade (reprodutibilidade), regulatório (proximidade de FDA/ANVISA).
-5. Para implante mamário/biodegradável longo prazo, EXIGIR conformidade ISO 14607.
-6. Para componente CUSTOM (sem catálogo), assuma propriedades genéricas da família e SINALIZE incerteza no warnings.
-`.trim()
+REGRAS:
+- Concentrações com unidade (% w/v, mg/mL).
+- Score 0-100. Componentes CUSTOM: assuma propriedades da família.
+- Implante mamário: cite ISO 14607.
+- Strings CURTAS para caber no limite de tokens — descrições de 1-2 frases.`
 
-  // 3) Chamada estruturada
-  const aiResult = await generateStructured<ProFormulation>(
-    prompt,
-    RESULT_SCHEMA,
-    { systemPrompt: SYSTEM_PROMPTS.BIOMATERIAL_EXPERT, temperature: 0.45, maxTokens: 4500 },
-  )
+  // 3) Chamada estruturada — temperatura baixa, maxTokens alto, JSON forçado
+  let raw: Partial<ProFormulation> | null = null
+  let aiError: Error | null = null
+  try {
+    raw = await generateStructured<Partial<ProFormulation>>(
+      prompt,
+      RESULT_SCHEMA,
+      {
+        systemPrompt: SYSTEM_PROMPTS.BIOMATERIAL_EXPERT,
+        temperature: 0.3,
+        maxTokens: 8192,
+      },
+    )
+  } catch (e) {
+    aiError = e instanceof Error ? e : new Error(String(e))
+  }
 
-  // 4) Mesclar warnings determinísticos com warnings da IA (sem duplicatas)
-  const aiWarnings = aiResult.warnings ?? []
+  // 4) Normalização defensiva — sempre retorna objeto válido
+  const result = normalize(raw, input)
+
+  // 5) Mesclar warnings determinísticos
   const merged = [
     ...preWarnings,
-    ...aiWarnings.filter(w =>
-      !preWarnings.some(p => p.message.toLowerCase().includes(w.message.toLowerCase().slice(0, 30))),
+    ...result.warnings.filter(w =>
+      !preWarnings.some(p => p.message.toLowerCase().includes((w.message || "").toLowerCase().slice(0, 30))),
     ),
   ]
 
-  return {
-    ...aiResult,
-    warnings: merged,
+  // Se a IA falhou completamente, adicionar warning informativo (mas ainda devolver formulação base)
+  if (aiError) {
+    merged.unshift({
+      severity: "warning",
+      type: "AI_PARTIAL",
+      message: "A análise completa da IA não pôde ser concluída. Resultado preliminar baseado nos dados informados.",
+      suggestion: `Tente novamente, simplifique a entrada, ou consulte: ${aiError.message.substring(0, 120)}`,
+    })
   }
+
+  return { ...result, warnings: merged }
 }
 
 // ────────────────────────────────────────────────────────────────────────────

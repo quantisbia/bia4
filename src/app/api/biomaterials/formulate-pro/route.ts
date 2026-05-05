@@ -171,9 +171,17 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(formulation)
   } catch (e) {
+    // Log para diagnóstico no servidor
+    console.error("[formulate-pro] Erro:", e)
+
     const httpErr = aiErrorToHttp(e)
+    // Mesmo em erro, retornar mensagem útil em PT-BR
     return NextResponse.json(
-      { error: httpErr.error, code: httpErr.code },
+      {
+        error: httpErr.error || "Não foi possível gerar a formulação no momento.",
+        code: httpErr.code,
+        hint: "Tente novamente em alguns segundos. Se persistir, simplifique a entrada (menos componentes ou descrições mais curtas).",
+      },
       { status: httpErr.status },
     )
   }
