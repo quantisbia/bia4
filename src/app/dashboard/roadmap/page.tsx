@@ -87,19 +87,20 @@ const PHASES: Phase[] = [
   {
     number: 4,
     title: "Selecionar e Formular o Biomaterial",
-    goal: "Escolher a bioink que melhor atende suas specs — equilibrando imprimibilidade, biocompatibilidade, propriedades mecânicas e custo.",
+    goal: "Escolher a bioink que melhor atende suas specs — equilibrando imprimibilidade, biocompatibilidade, propriedades mecânicas e custo. Use o Formulador Bio para screening rápido (catálogo) ou o Formulador Pro para combinações multi-componente customizadas com análise científica completa.",
     duration: "5–10 dias (com testes)",
-    module: { name: "Formulador Bio", href: "/dashboard/biomaterials", icon: FlaskConical },
+    module: { name: "Formulador Pro", href: "/dashboard/formulator-pro", icon: FlaskConical },
     color: "from-emerald-500 to-teal-500",
     steps: [
-      "Abra o Formulador e insira: aplicação, tecido, rigidez desejada, biodegradabilidade, com células?",
-      "A BIA recomenda 1 biomaterial principal + 2 alternativos com referências científicas.",
-      "Use o Comparador de Biomateriais (Ferramentas) para confrontar 3-4 opções lado-a-lado.",
-      "Para sistemas multi-fase, use o Formulador Multi-Material (1-10 componentes simultâneos).",
-      "Solicite à BIA o protocolo de preparo + caracterização reológica.",
+      "📚 Antes de começar, leia o capítulo \"Formulador Pro\" no Manual do Usuário (5 min) para entender o racional.",
+      "🚀 Screening rápido: abra Formulador Bio → digite aplicação + tecido → receba 1 recomendação do catálogo BIA.",
+      "🧪 Análise profissional: abra Formulador Pro → defina objetivo clínico (10 categorias: cicatrização, osso, gengiva, mama, vaso…) → adicione até 8 biomateriais (catálogo OU customizados) → especifique módulo, porosidade, biodegradabilidade, injetabilidade.",
+      "⚗️ Em 15-35s a IA gera: score 0-100 multidimensional, protocolo passo-a-passo com CCPs, alertas de incompatibilidade química, parâmetros de bioimpressão, ISO 10993/14607, ANVISA RDC 751/2022 + 3 DOIs reais.",
+      "✅ Compare alternativas: marque \"Modo alternativas\" para receber 2 formulações alternativas com trade-offs explícitos.",
+      "💾 Exporte JSON (integração) ou Markdown (artigo/proposta) para o Notebook Científico.",
     ],
-    output: "Bioink validada: composição, % w/v, crosslinker, viscosidade alvo, módulo elástico.",
-    tip: "Hidrogéis fotopolimerizáveis (GelMA, PEGDA) são mais rápidos para iterar. Termorreversíveis (Pluronic) são ideais como sacrificial. Comece simples.",
+    output: "Dossiê de bioink: composição final, % w/v exato, crosslinker validado, score científico justificado, protocolo de bancada, classe regulatória estimada.",
+    tip: "Use o Formulador Bio (clássico) para 1 material conhecido. Use o Pro quando combinar 3+ componentes, biomateriais novos/customizados, ou quando precisa de documentação para artigo/regulatório. O Pro tem auto-save: nunca perde seu trabalho.",
   },
   {
     number: 5,
@@ -287,6 +288,34 @@ export default function RoadmapPage() {
             <span>Siga as 10 fases abaixo na ordem. Cada uma tem um módulo BIA dedicado. Use o <Link href="/dashboard/notebook" className="text-violet-300 hover:underline">Notebook</Link> pra registrar tudo.</span>
           </li>
         </ol>
+      </div>
+
+      {/* Manual CTA — destaque para Formulador Pro */}
+      <div className="rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-500/[0.06] to-purple-500/[0.06] p-5">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center shrink-0">
+            <BookOpen className="w-5 h-5 text-blue-300" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+              <h3 className="text-sm font-bold text-white">Manual do Usuário com tutoriais práticos</h3>
+              <span className="text-[10px] px-1.5 py-0.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 rounded font-mono uppercase">Novo</span>
+            </div>
+            <p className="text-xs text-blue-100/80 mb-3 leading-relaxed">
+              Cada módulo tem agora um <strong className="text-white">capítulo no Manual</strong> com racional fácil de entender, walkthrough passo-a-passo
+              e troubleshooting. Especialmente útil para o novo <strong className="text-blue-300">Formulador Pro</strong> (formulações
+              multi-componente com IA + análise científica completa).
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/dashboard/manual" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-400 text-white text-xs font-semibold transition-colors">
+                <BookOpen className="w-3.5 h-3.5" /> Abrir Manual
+              </Link>
+              <Link href="/dashboard/formulator-pro" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-gray-300 hover:bg-white/10 transition-colors">
+                <Sparkles className="w-3.5 h-3.5" /> Tentar Formulador Pro →
+              </Link>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Phases timeline */}

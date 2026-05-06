@@ -9,7 +9,7 @@ import {
   LayoutDashboard, GitBranch, FlaskConical, CircleDot,
   FileText, BookOpen, MessageSquare, CreditCard, Settings,
   LogOut, Zap, ChevronRight, Menu, X, Printer, Box, ClipboardCheck, BookMarked,
-  Crown, Wrench, Info, Map, Atom,
+  Crown, Wrench, Info, Map, Atom, Library,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { isSuperAdmin } from "@/lib/auth/admin-shared"
@@ -59,6 +59,8 @@ export const NAV_ITEMS = [
     info: "Geração de POPs em formato ABNT NBR ISO/IEC 17025 e ANVISA RDC: cultura celular, esterilização, criopreservação, controle de qualidade. Exporta PDF assinável. Custo: 8 créditos." },
   { href: "/dashboard/protocol-total",     label: "Protocolo Total",      icon: ClipboardCheck,  exact: false,
     info: "Síntese executiva: a BIA consolida TODAS as 12 etapas do seu pipeline em UM dossiê unificado pronto para publicação ou submissão regulatória." },
+  { href: "/dashboard/manual",             label: "Manual do Usuário",    icon: Library,         exact: false,
+    info: "Tutoriais passo-a-passo com racional científico fácil para cada módulo: Formulador Pro, Formulador Bio, Gerador STL, Bioimpressão. Comece aqui se for sua primeira vez!" },
   { href: "/dashboard/knowledge",          label: "Base de Conhecimento", icon: BookOpen,        exact: false,
     info: "Busca científica curada: 100+ artigos, 100+ patentes e 12 casos regulatórios FDA/ANVISA/EMA. Use para fundamentar suas decisões com referências reais." },
   { href: "/dashboard/chat",               label: "Chat IA",              icon: MessageSquare,   exact: false,

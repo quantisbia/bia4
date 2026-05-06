@@ -55,6 +55,11 @@ export interface GeometryParams {
   palmWidth?: number
   palmLength?: number
   fingerLength?: number
+  // TPMS (Triply Periodic Minimal Surfaces)
+  tpmsSize?: number       // mm (cubo)
+  tpmsPeriod?: number     // mm (período espacial)
+  tpmsPorosity?: number   // % (50-95)
+  tpmsResolution?: number // cubos/aresta (24-48)
 }
 
 export interface STLGeometry {
@@ -259,6 +264,55 @@ export const GEOMETRIES: STLGeometry[] = [
     defaultParams: { palmWidth: 80, palmLength: 100, fingerLength: 70, thickness: 15 },
     paramLabels: { palmWidth: "Largura palma (mm)", palmLength: "Compr. palma (mm)", fingerLength: "Compr. dedos (mm)", thickness: "Espessura (mm)" },
     creditCost: 8,
+  },
+  // ─── TPMS — Scaffolds com Topologia Otimizada ────────────────────────────
+  {
+    id: "tpms_gyroid",
+    label: "Scaffold Gyroid (TPMS)",
+    description: "Estrutura giroidal com canais interconectados — padrão-ouro para regeneração óssea (alta razão S/V, isotrópico, vascularizável)",
+    tissue: "Osso / Cartilagem / Pesquisa",
+    application: "Regeneração óssea trabecular, scaffolds para vascularização, cultura 3D",
+    icon: "🌀",
+    defaultParams: { tpmsSize: 20, tpmsPeriod: 5, tpmsPorosity: 70, tpmsResolution: 32 },
+    paramLabels: {
+      tpmsSize: "Tamanho do cubo (mm)",
+      tpmsPeriod: "Período espacial (mm)",
+      tpmsPorosity: "Porosidade (%)",
+      tpmsResolution: "Resolução (24-48)",
+    },
+    creditCost: 10,
+  },
+  {
+    id: "tpms_schwarz",
+    label: "Scaffold Schwarz P (TPMS)",
+    description: "TPMS clássico em ângulos retos — mais simples de imprimir e fatiar do que gyroid",
+    tissue: "Osso / Pesquisa",
+    application: "Scaffolds simples, cultura celular 3D, modelos didáticos",
+    icon: "🟦",
+    defaultParams: { tpmsSize: 20, tpmsPeriod: 5, tpmsPorosity: 70, tpmsResolution: 32 },
+    paramLabels: {
+      tpmsSize: "Tamanho do cubo (mm)",
+      tpmsPeriod: "Período espacial (mm)",
+      tpmsPorosity: "Porosidade (%)",
+      tpmsResolution: "Resolução (24-48)",
+    },
+    creditCost: 10,
+  },
+  {
+    id: "tpms_diamond",
+    label: "Scaffold Diamond (TPMS)",
+    description: "TPMS em rede tetraédrica — máxima razão superfície/volume para adesão celular",
+    tissue: "Pesquisa / Osso complexo",
+    application: "Scaffolds avançados, regeneração óssea de alta complexidade celular",
+    icon: "💎",
+    defaultParams: { tpmsSize: 20, tpmsPeriod: 5, tpmsPorosity: 70, tpmsResolution: 32 },
+    paramLabels: {
+      tpmsSize: "Tamanho do cubo (mm)",
+      tpmsPeriod: "Período espacial (mm)",
+      tpmsPorosity: "Porosidade (%)",
+      tpmsResolution: "Resolução (24-48)",
+    },
+    creditCost: 10,
   },
 ]
 
@@ -832,6 +886,22 @@ export function generateGeometry(id: string, params: GeometryParams): Triangle[]
       return genLiverAnatomical(p.length ?? 60, p.width ?? 40, p.thickness ?? 18, p.segments ?? 32)
     case "hand":
       return genHand(p.palmWidth ?? 80, p.palmLength ?? 100, p.fingerLength ?? 70, p.thickness ?? 15)
+    case "tpms_gyroid":
+    case "tpms_schwarz":
+    case "tpms_diamond": {
+      // Lazy import to avoid circular dep & keep main bundle leaner
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { generateTPMS, porosityToThreshold } = require("./tpms-generator") as typeof import("./tpms-generator")
+      const tpmsType =
+        id === "tpms_schwarz" ? "schwarzP" :
+        id === "tpms_diamond" ? "diamond" : "gyroid"
+      return generateTPMS(tpmsType, {
+        size: p.tpmsSize ?? 20,
+        period: p.tpmsPeriod ?? 5,
+        threshold: porosityToThreshold(p.tpmsPorosity ?? 70),
+        resolution: Math.max(16, Math.min(64, p.tpmsResolution ?? 32)),
+      })
+    }
     default:
       return genCylinder(p.radius ?? 10, p.thickness ?? 5, p.segments ?? 32)
   }
@@ -956,11 +1026,61 @@ export function downloadOBJ(triangles: Triangle[], filename: string): void {
 }
 
 /** Returns file size estimate in KB */
-export function estimateFileSize(triangles: Triangle[]): { stlBinary: number; stlAscii: number; obj: number } {
+export function estimateFileSize(triangles: Triangle[]): { stlBinary: number; stlAscii: number; obj: number; ply: number } {
   const n = triangles.length
   return {
     stlBinary: Math.round((84 + n * 50) / 1024),
     stlAscii: Math.round((n * 200) / 1024),
     obj: Math.round((n * 80) / 1024),
+    ply: Math.round((n * 60) / 1024),
   }
+}
+
+/**
+ * PLY (Polygon File Format) — usado por MeshLab, CloudCompare e pipelines
+ * de pesquisa biomédica. Suporta cor por vértice (extensão futura).
+ */
+export function trianglesToPLY(triangles: Triangle[], name = "bia_geometry"): string {
+  // Dedup vertices
+  const vertexMap = new Map<string, number>()
+  const verts: Vec3[] = []
+  const getVI = (v: Vec3): number => {
+    const key = `${v[0].toFixed(4)},${v[1].toFixed(4)},${v[2].toFixed(4)}`
+    if (vertexMap.has(key)) return vertexMap.get(key)!
+    const idx = verts.length
+    vertexMap.set(key, idx)
+    verts.push(v)
+    return idx
+  }
+  const faces: number[][] = []
+  for (const t of triangles) {
+    faces.push([getVI(t.v1), getVI(t.v2), getVI(t.v3)])
+  }
+  const lines: string[] = [
+    "ply",
+    "format ascii 1.0",
+    `comment BIA v4 - Quantis Biotechnology - ${name}`,
+    `element vertex ${verts.length}`,
+    "property float x",
+    "property float y",
+    "property float z",
+    `element face ${faces.length}`,
+    "property list uchar int vertex_indices",
+    "end_header",
+  ]
+  for (const v of verts) lines.push(`${v[0].toFixed(6)} ${v[1].toFixed(6)} ${v[2].toFixed(6)}`)
+  for (const f of faces) lines.push(`3 ${f[0]} ${f[1]} ${f[2]}`)
+  return lines.join("\n")
+}
+
+/** Trigger PLY download */
+export function downloadPLY(triangles: Triangle[], filename: string): void {
+  const text = trianglesToPLY(triangles, filename.replace(".ply", ""))
+  const blob = new Blob([text], { type: "text/plain" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
 }

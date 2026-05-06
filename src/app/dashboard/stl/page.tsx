@@ -3,13 +3,15 @@
 import { useState, useCallback } from "react"
 import {
   Download, Box, RefreshCw, Settings, ChevronDown, ChevronUp,
-  FileCode2, Layers, Ruler, CheckCircle2, Info, AlertTriangle
+  FileCode2, Layers, Ruler, CheckCircle2, Info, AlertTriangle,
+  ShieldCheck, Activity, BarChart3
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import {
-  GEOMETRIES, generateGeometry, downloadSTL, downloadOBJ,
-  estimateFileSize, type GeometryParams, type STLGeometry
+  GEOMETRIES, generateGeometry, downloadSTL, downloadOBJ, downloadPLY,
+  estimateFileSize, type GeometryParams, type STLGeometry, type Triangle
 } from "@/lib/stl/generator"
+import { validateMesh, formatVolume, formatArea, type ValidationReport } from "@/lib/stl/mesh-validator"
 
 // ─── Preview 3D simples via SVG isométrico ─────────────────────────────────
 function IsoPreview({ id }: { id: string }) {
@@ -111,6 +113,45 @@ function IsoPreview({ id }: { id: string }) {
         <circle cx="52" cy="43" r="5" fill="#fde68a" opacity="0.8"/>
       </svg>
     ),
+    tpms_gyroid: (
+      <svg viewBox="0 0 120 100" className="w-full h-full">
+        <defs>
+          <pattern id="gyr" patternUnits="userSpaceOnUse" width="20" height="20">
+            <path d="M 0 10 Q 5 0 10 10 T 20 10" fill="none" stroke="#a78bfa" strokeWidth="2" opacity="0.8"/>
+            <path d="M 10 0 Q 0 5 10 10 T 10 20" fill="none" stroke="#7c3aed" strokeWidth="2" opacity="0.6"/>
+          </pattern>
+        </defs>
+        <rect x="20" y="20" width="80" height="60" fill="url(#gyr)" rx="4"/>
+        <rect x="20" y="20" width="80" height="60" fill="none" stroke="#a78bfa" strokeWidth="2" opacity="0.4" rx="4"/>
+      </svg>
+    ),
+    tpms_schwarz: (
+      <svg viewBox="0 0 120 100" className="w-full h-full">
+        <g opacity="0.85">
+          <circle cx="35" cy="35" r="10" fill="none" stroke="#60a5fa" strokeWidth="2.5"/>
+          <circle cx="65" cy="35" r="10" fill="none" stroke="#60a5fa" strokeWidth="2.5"/>
+          <circle cx="95" cy="35" r="10" fill="none" stroke="#60a5fa" strokeWidth="2.5"/>
+          <circle cx="35" cy="65" r="10" fill="none" stroke="#60a5fa" strokeWidth="2.5"/>
+          <circle cx="65" cy="65" r="10" fill="none" stroke="#60a5fa" strokeWidth="2.5"/>
+          <circle cx="95" cy="65" r="10" fill="none" stroke="#60a5fa" strokeWidth="2.5"/>
+          <line x1="20" y1="20" x2="110" y2="20" stroke="#3b82f6" strokeWidth="1" opacity="0.4"/>
+          <line x1="20" y1="80" x2="110" y2="80" stroke="#3b82f6" strokeWidth="1" opacity="0.4"/>
+        </g>
+      </svg>
+    ),
+    tpms_diamond: (
+      <svg viewBox="0 0 120 100" className="w-full h-full">
+        <g opacity="0.9" fill="none" strokeWidth="2">
+          <polygon points="60,20 80,50 60,80 40,50" stroke="#06b6d4"/>
+          <polygon points="30,30 50,50 30,70 10,50" stroke="#0891b2"/>
+          <polygon points="90,30 110,50 90,70 70,50" stroke="#0891b2"/>
+          <line x1="60" y1="20" x2="30" y2="30" stroke="#22d3ee" opacity="0.5"/>
+          <line x1="60" y1="20" x2="90" y2="30" stroke="#22d3ee" opacity="0.5"/>
+          <line x1="60" y1="80" x2="30" y2="70" stroke="#22d3ee" opacity="0.5"/>
+          <line x1="60" y1="80" x2="90" y2="70" stroke="#22d3ee" opacity="0.5"/>
+        </g>
+      </svg>
+    ),
   }
   return (
     <div className="w-full h-28 flex items-center justify-center">
@@ -155,43 +196,64 @@ export default function STLGeneratorPage() {
   const [generated, setGenerated] = useState(false)
   const [showParams, setShowParams] = useState(true)
   const [triangleCount, setTriangleCount] = useState(0)
-  const [sizes, setSizes] = useState({ stlBinary: 0, stlAscii: 0, obj: 0 })
+  const [sizes, setSizes] = useState({ stlBinary: 0, stlAscii: 0, obj: 0, ply: 0 })
+  const [validation, setValidation] = useState<ValidationReport | null>(null)
+  const [cachedTris, setCachedTris] = useState<Triangle[]>([])
 
   const handleSelectGeo = (geo: STLGeometry) => {
     setSelected(geo)
     setParams({ ...geo.defaultParams })
     setGenerated(false)
     setTriangleCount(0)
+    setValidation(null)
+    setCachedTris([])
   }
 
   const handleParamChange = (key: string, val: number) => {
     setParams(prev => ({ ...prev, [key]: val }))
     setGenerated(false)
+    setValidation(null)
   }
 
   const handleGenerate = useCallback(() => {
     setGenerating(true)
     setTimeout(() => {
       const tris = generateGeometry(selected.id, params)
+      setCachedTris(tris)
       setTriangleCount(tris.length)
       setSizes(estimateFileSize(tris))
+      // Validar mesh — apenas para meshes pequenos a médios (TPMS pode ser lento)
+      try {
+        const report = tris.length > 200_000
+          ? null
+          : validateMesh(tris, { nozzleDiameterMm: 0.4, application: "bioprinting" })
+        setValidation(report)
+      } catch (e) {
+        console.error("Validation error", e)
+        setValidation(null)
+      }
       setGenerated(true)
       setGenerating(false)
     }, 80)
   }, [selected.id, params])
 
   const handleDownloadSTL = useCallback((binary: boolean) => {
-    const tris = generateGeometry(selected.id, params)
-    const ext = binary ? "stl" : "stl"
-    const fname = `BIA_${selected.id}_${Date.now()}.${ext}`
+    const tris = cachedTris.length > 0 ? cachedTris : generateGeometry(selected.id, params)
+    const fname = `BIA_${selected.id}_${Date.now()}.stl`
     downloadSTL(tris, fname, binary)
-  }, [selected.id, params])
+  }, [selected.id, params, cachedTris])
 
   const handleDownloadOBJ = useCallback(() => {
-    const tris = generateGeometry(selected.id, params)
+    const tris = cachedTris.length > 0 ? cachedTris : generateGeometry(selected.id, params)
     const fname = `BIA_${selected.id}_${Date.now()}.obj`
     downloadOBJ(tris, fname)
-  }, [selected.id, params])
+  }, [selected.id, params, cachedTris])
+
+  const handleDownloadPLY = useCallback(() => {
+    const tris = cachedTris.length > 0 ? cachedTris : generateGeometry(selected.id, params)
+    const fname = `BIA_${selected.id}_${Date.now()}.ply`
+    downloadPLY(tris, fname)
+  }, [selected.id, params, cachedTris])
 
   return (
     <div className="flex flex-col h-full overflow-auto bg-[#0a0a0f]">
@@ -279,7 +341,7 @@ export default function STLGeneratorPage() {
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                   <span className="text-sm font-semibold text-emerald-400">Geometria gerada!</span>
                 </div>
-                <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="grid grid-cols-3 gap-3 text-center mb-3">
                   <div>
                     <div className="text-lg font-bold text-white">{triangleCount.toLocaleString("pt-BR")}</div>
                     <div className="text-xs text-gray-400">triângulos</div>
@@ -293,6 +355,106 @@ export default function STLGeneratorPage() {
                     <div className="text-xs text-gray-400">OBJ</div>
                   </div>
                 </div>
+                {validation && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t border-white/5 text-center">
+                    <div>
+                      <div className="text-xs text-gray-500 mb-0.5 flex items-center justify-center gap-1">
+                        <BarChart3 className="w-3 h-3" /> Volume
+                      </div>
+                      <div className="text-sm font-semibold text-cyan-300">{formatVolume(validation.stats.volumeMm3)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 mb-0.5 flex items-center justify-center gap-1">
+                        <Activity className="w-3 h-3" /> Área
+                      </div>
+                      <div className="text-sm font-semibold text-cyan-300">{formatArea(validation.stats.surfaceAreaMm2)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 mb-0.5">BBox (mm)</div>
+                      <div className="text-xs font-mono text-gray-300">
+                        {validation.stats.bbox.size[0].toFixed(0)}×{validation.stats.bbox.size[1].toFixed(0)}×{validation.stats.bbox.size[2].toFixed(0)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 mb-0.5 flex items-center justify-center gap-1">
+                        <ShieldCheck className="w-3 h-3" /> Qualidade
+                      </div>
+                      <div className={cn(
+                        "text-sm font-bold",
+                        validation.qualityScore >= 90 ? "text-emerald-400" :
+                        validation.qualityScore >= 70 ? "text-amber-400" :
+                        "text-rose-400"
+                      )}>
+                        {validation.qualityScore}/100
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Validation Report */}
+            {generated && validation && (
+              <div className={cn(
+                "rounded-2xl p-4 border",
+                validation.printable
+                  ? "bg-emerald-500/[0.04] border-emerald-500/20"
+                  : "bg-rose-500/[0.04] border-rose-500/20"
+              )}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className={cn("w-4 h-4", validation.printable ? "text-emerald-400" : "text-rose-400")} />
+                    <span className="text-sm font-semibold text-white">Validação do Mesh</span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    {validation.stats.isManifold && (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-emerald-500/15 text-emerald-300 rounded font-mono">MANIFOLD</span>
+                    )}
+                    {validation.stats.isWatertight && (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-emerald-500/15 text-emerald-300 rounded font-mono">WATERTIGHT</span>
+                    )}
+                    {validation.stats.hasConsistentNormals && (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-emerald-500/15 text-emerald-300 rounded font-mono">NORMALS-OK</span>
+                    )}
+                  </div>
+                </div>
+                {validation.issues.length === 0 ? (
+                  <p className="text-xs text-emerald-300/80 leading-relaxed">
+                    Mesh perfeito para bioimpressão — geometria fechada, sem buracos, normais corretas e arestas ≥ 0.4 mm.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {validation.issues.slice(0, 5).map((issue, i) => (
+                      <div
+                        key={i}
+                        className={cn(
+                          "rounded-lg p-2.5 text-xs",
+                          issue.severity === "error" ? "bg-rose-500/10 border border-rose-500/20" :
+                          issue.severity === "warning" ? "bg-amber-500/10 border border-amber-500/20" :
+                          "bg-blue-500/10 border border-blue-500/20"
+                        )}
+                      >
+                        <div className="flex items-start gap-2">
+                          {issue.severity === "error" && <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />}
+                          {issue.severity === "warning" && <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />}
+                          {issue.severity === "info" && <Info className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />}
+                          <div className="flex-1 min-w-0">
+                            <div className={cn(
+                              "font-semibold",
+                              issue.severity === "error" ? "text-rose-300" :
+                              issue.severity === "warning" ? "text-amber-300" :
+                              "text-blue-300"
+                            )}>
+                              {issue.title}
+                            </div>
+                            <div className="text-gray-400 mt-0.5">{issue.detail}</div>
+                            <div className="text-gray-500 mt-1 italic">→ {issue.suggestion}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -412,6 +574,24 @@ export default function STLGeneratorPage() {
                     <div className="text-xs opacity-70">MeshLab · Blender · Meshmixer</div>
                   </div>
                   {generated && <span className="ml-auto text-xs text-gray-400">{sizes.obj} KB</span>}
+                </button>
+
+                <button
+                  onClick={handleDownloadPLY}
+                  disabled={!generated}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all",
+                    generated
+                      ? "bg-cyan-500/12 border border-cyan-500/25 text-cyan-300 hover:bg-cyan-500/20"
+                      : "bg-white/3 border border-white/6 text-gray-600 cursor-not-allowed"
+                  )}
+                >
+                  <FileCode2 className="w-4 h-4" />
+                  <div className="text-left">
+                    <div className="font-semibold">PLY (Polygon Format)</div>
+                    <div className="text-xs opacity-70">CloudCompare · MeshLab · Pesquisa</div>
+                  </div>
+                  {generated && <span className="ml-auto text-xs text-gray-400">{sizes.ply} KB</span>}
                 </button>
               </div>
             </div>
