@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { signIn } from "next-auth/react"
 import Link from "next/link"
 import { CheckCircle2, AlertCircle, Loader2, Eye, EyeOff, Zap, ArrowRight, FlaskConical } from "lucide-react"
@@ -43,6 +43,9 @@ const RESEARCH_AREAS = [
 
 export default function RegisterPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  // Permite landing post-cadastro customizado (ex: ?callbackUrl=/dashboard/roadmap para o tour)
+  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard"
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -84,9 +87,15 @@ export default function RegisterPage() {
         redirect: false,
       })
       if (signInResult?.error) {
-        router.push("/auth/login?registered=true")
+        // Mantém callbackUrl para o usuário voltar ao destino após login
+        const loginUrl = `/auth/login?registered=true${callbackUrl !== "/dashboard" ? `&callbackUrl=${encodeURIComponent(callbackUrl)}` : ""}`
+        router.push(loginUrl)
       } else {
-        router.push("/dashboard")
+        // Adiciona welcome=tour quando vier do "Ver demonstração guiada" (rota do roadmap)
+        const finalUrl = callbackUrl === "/dashboard/roadmap"
+          ? "/dashboard/roadmap?welcome=tour"
+          : callbackUrl
+        router.push(finalUrl)
         router.refresh()
       }
     } catch {
@@ -120,14 +129,36 @@ export default function RegisterPage() {
               </span>
             </div>
           </Link>
-          <h1 className="text-xl font-bold mt-5 mb-1">Criar sua conta</h1>
-          <p className="text-gray-400 text-sm">Acesso à plataforma de biofabricação com IA</p>
+          <h1 className="text-xl font-bold mt-5 mb-1">
+            {callbackUrl === "/dashboard/roadmap" ? "Comece o Tour Guiado" : "Criar sua conta"}
+          </h1>
+          <p className="text-gray-400 text-sm">
+            {callbackUrl === "/dashboard/roadmap"
+              ? "Crie sua conta gratuita e siga o Roteiro Profissional passo-a-passo"
+              : "Acesso à plataforma de biofabricação com IA"}
+          </p>
         </div>
+
+        {/* Tour-specific banner — quando vem do botão "Ver demonstração" */}
+        {callbackUrl === "/dashboard/roadmap" && (
+          <div className="bg-gradient-to-r from-violet-500/15 to-blue-500/15 border border-violet-500/30 rounded-xl px-4 py-3 mb-4 text-xs text-violet-100">
+            <div className="flex items-start gap-2">
+              <FlaskConical className="w-4 h-4 text-violet-300 shrink-0 mt-0.5" />
+              <div>
+                <strong className="text-white block mb-0.5">🎯 Após o cadastro, você cai direto no Roteiro Profissional</strong>
+                <span className="text-violet-200/80">
+                  10 fases, 12 módulos. Use seus <strong className="text-violet-200">30 créditos grátis</strong> para
+                  testar Formulador Pro, Gerador STL e mais — sem precisar de cartão.
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Discovery intro badge */}
         <div className="flex items-center justify-center gap-2 bg-violet-500/10 border border-violet-500/20 rounded-xl px-4 py-2.5 mb-5 text-sm text-violet-300">
           <Zap className="w-3.5 h-3.5 text-violet-400 shrink-0" />
-          <span>Plano <strong className="text-violet-200">Discovery</strong> — 10 créditos de boas-vindas</span>
+          <span>Plano <strong className="text-violet-200">Discovery</strong> — 30 créditos de boas-vindas</span>
         </div>
 
         {/* Perks */}

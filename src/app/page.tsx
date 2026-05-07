@@ -127,9 +127,10 @@ export default function HomePage() {
               <span>Começar agora</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
-            <Link href="/auth/login"
-              className="flex items-center justify-center gap-2 text-base w-full sm:w-auto px-8 py-3.5 rounded-xl border border-white/10 text-gray-300 hover:bg-white/5 hover:text-white transition-all">
-              <span>Ver demonstração</span>
+            <Link href="/auth/register?callbackUrl=%2Fdashboard%2Froadmap"
+              className="flex items-center justify-center gap-2 text-base w-full sm:w-auto px-8 py-3.5 rounded-xl border border-violet-500/30 bg-violet-500/5 text-violet-200 hover:bg-violet-500/10 hover:border-violet-500/50 hover:text-white transition-all"
+              title="Cadastre-se e siga o Roteiro Profissional passo-a-passo com seus 30 créditos grátis">
+              <span>Ver demonstração guiada</span>
               <ChevronRight className="w-4 h-4" />
             </Link>
           </div>

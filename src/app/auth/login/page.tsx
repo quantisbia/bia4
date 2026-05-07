@@ -53,7 +53,11 @@ export default function LoginPage() {
       if (result?.error) {
         setError("Email ou senha incorretos. Tente novamente.")
       } else {
-        router.push(callbackUrl)
+        // Quando usuário vem do "Ver demonstração guiada", anexa welcome=tour
+        const finalUrl = callbackUrl === "/dashboard/roadmap"
+          ? "/dashboard/roadmap?welcome=tour"
+          : callbackUrl
+        router.push(finalUrl)
         router.refresh()
       }
     } catch {
