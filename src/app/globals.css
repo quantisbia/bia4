@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Variáveis CSS para as fontes (carregadas via <link> no <head>) */
+:root {
+  --font-inter: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

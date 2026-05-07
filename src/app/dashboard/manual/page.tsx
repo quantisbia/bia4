@@ -90,6 +90,15 @@ const CHAPTERS: Chapter[] = [
     badge: "FUTURO",
     estReadMin: 5,
   },
+  {
+    id: "vision-formulator",
+    title: "Visão Estratégica — Formulador Pro",
+    subtitle: "12 melhorias priorizadas para tornar o módulo classe mundial",
+    icon: Sparkles,
+    color: "from-cyan-500 to-blue-600",
+    badge: "ESTRATÉGIA",
+    estReadMin: 10,
+  },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -214,6 +223,7 @@ export default function ManualPage() {
             {activeId === "stl-generator"   && <ChapterSTLGenerator />}
             {activeId === "bioprinting"     && <ChapterBioprinting />}
             {activeId === "roadmap-future"  && <ChapterRoadmapFuture />}
+            {activeId === "vision-formulator" && <ChapterVisionFormulator />}
 
           </div>
         </main>
@@ -906,6 +916,219 @@ function ChapterRoadmapFuture() {
         </ul>
       </Box2>
     </article>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+//  CAPÍTULO 6 — VISÃO ESTRATÉGICA DO FORMULADOR PRO
+// ═════════════════════════════════════════════════════════════════════════
+
+function ChapterVisionFormulator() {
+  return (
+    <article className="space-y-6">
+      <header className="flex items-start gap-3">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+          <Sparkles className="w-6 h-6 text-white" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-white">Visão Estratégica — Formulador Pro</h1>
+          <p className="text-sm text-gray-400 mt-1">
+            12 melhorias priorizadas para tornar o módulo um <strong className="text-cyan-300">co-piloto científico de classe mundial</strong>.
+          </p>
+        </div>
+      </header>
+
+      <div className="rounded-xl bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 p-5">
+        <div className="flex items-start gap-3">
+          <Lightbulb className="w-5 h-5 text-cyan-300 mt-0.5 shrink-0" />
+          <div className="space-y-2 text-sm text-gray-200">
+            <p>
+              <strong className="text-cyan-200">Para a Janaina e a equipe:</strong> esta análise foi feita
+              sob a ótica de um <em>cientista sênior de biomateriais + product strategist</em>, identificando
+              o que falta para o Formulador Pro ser <strong>auditável, reprodutível e aprendiz</strong>.
+            </p>
+            <p>
+              O documento técnico completo está em <code className="px-1.5 py-0.5 rounded bg-black/40 text-cyan-300">docs/FORMULATOR_PRO_ROADMAP.md</code>.
+              Aqui apresentamos um resumo amigável.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <Box2 icon={CheckCircle2} title="Onde já estamos fortes (diagnóstico atual)" tone="emerald">
+        <ul className="space-y-1.5 text-xs text-gray-300">
+          <li>✅ Aceita até 8 biomateriais (catálogo + custom) com 7 papéis funcionais</li>
+          <li>✅ Templates científicos para 10 objetivos clínicos (osso, gengiva, mama, vaso…)</li>
+          <li>✅ 6 regras determinísticas de incompatibilidade química pré-checadas</li>
+          <li>✅ JSON estruturado: score 0-100, protocolo, propriedades, regulatório, DOIs</li>
+          <li>✅ Normalização defensiva — nunca quebra a UI mesmo se a IA falhar</li>
+        </ul>
+        <p className="text-xs text-emerald-300 mt-3">
+          📊 Conclusão: <strong>base sólida</strong>. Próximo salto = rigor científico verificável e aprendizado contínuo.
+        </p>
+      </Box2>
+
+      <h2 className="text-lg font-semibold text-white flex items-center gap-2 mt-6">
+        <Rocket className="w-5 h-5 text-cyan-400" />
+        Plano em 3 sprints
+      </h2>
+
+      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[10px] font-semibold">SPRINT 1 · 2 SEMANAS</span>
+          <h3 className="text-base font-semibold text-white">Confiança & Transparência</h3>
+        </div>
+        <p className="text-xs text-gray-400 mb-3">Quick wins de máximo ROI. Tornam cada formulação <strong>auditável + reproduzível + visualizável</strong>.</p>
+        <div className="space-y-2.5">
+          <VisionItem number={4} title="Verificação automática de DOIs (CrossRef API)" value={5} effort={1} quick
+            desc="Toda referência citada pela IA é validada em real-time. Inválidas viram alerta vermelho. Nunca mais cite um DOI alucinado em um artigo. ROI máximo: 3-5 dias de implementação." />
+          <VisionItem number={8} title="Snapshot e versionamento (reprodutibilidade)" value={4} effort={2} quick
+            desc="Cada formulação salva: hash do input, versão do prompt, modelo, temperatura, seed. Botão 'Citar BIA' gera frase pronta para metodologia de papers (PLOS, Biomaterials, ACS aceitam)." />
+          <VisionItem number={11} title="Preview 3D do scaffold sugerido" value={4} effort={3} quick
+            desc="Conecta Formulador Pro ↔ Gerador STL. Resultado deixa de ser 'só texto' — usuário vê a peça 3D. 'Wow factor' que fecha venda." />
+          <VisionItem number={12} title="Feedback 👍/👎 + Aprendizado contínuo" value={4} effort={3} quick
+            desc="Cada formulação pode ser avaliada. A cada 100 feedbacks, padrões viram 'patches' do system prompt. Network effect real: BIA fica mais inteligente com o uso da comunidade." />
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 text-[10px] font-semibold">SPRINT 2 · 4 SEMANAS</span>
+          <h3 className="text-base font-semibold text-white">Inteligência Verificável</h3>
+        </div>
+        <p className="text-xs text-gray-400 mb-3">A IA passa de <strong>estimadora</strong> → <strong>calculadora científica auditável</strong>.</p>
+        <div className="space-y-2.5">
+          <VisionItem number={2} title="Banco de dados de propriedades curado (BIA Property DB)" value={5} effort={4}
+            desc="100+ biomateriais × 12 propriedades × faixas de concentração com DOIs. Lookup antes da IA: ela não inventa mais — interpola e contextualiza." />
+          <VisionItem number={1} title="Modelos físico-químicos quantitativos" value={5} effort={3}
+            desc="Flory-Rehner (swelling), Hagen-Poiseuille (extrusão), Mooney-Rivlin (elastômeros), Higuchi (release). A IA revisa números calculados — não chuta." />
+          <VisionItem number={5} title="Modo iteração (chat refinamento)" value={5} effort={3}
+            desc="Após 1ª fórmula, abre painel de chat com chips: 'aumentar módulo 2×', 'sem origem animal', 'reduzir custo 30%'. Cada iteração custa 3 créditos (vs 10 inicial). Timeline + comparação v1/v2/v3." />
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-pink-500/20 bg-pink-500/5 p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="px-2 py-0.5 rounded-full bg-pink-500/20 border border-pink-500/30 text-pink-300 text-[10px] font-semibold">SPRINT 3 · 6-8 SEMANAS</span>
+          <h3 className="text-base font-semibold text-white">Diferenciação Competitiva</h3>
+        </div>
+        <p className="text-xs text-gray-400 mb-3">Posicionamento como <strong>único agente científico de classe mundial em biofabricação</strong>.</p>
+        <div className="space-y-2.5">
+          <VisionItem number={3} title="Cross-check multi-LLM (Gemini + GPT-4o + Claude 3.5)" value={5} effort={4}
+            desc="Modo 'Consenso Científico' (30 créditos): 3 LLMs em paralelo, score de consenso 0-100, divergências destacadas. Nenhum concorrente faz isso para biomateriais." />
+          <VisionItem number={9} title="RAG sobre 120+ artigos científicos" value={5} effort={4}
+            desc="Embeddings + Vector Store. Cada afirmação da IA acompanhada do trecho citado e DOI. Posicionamento: 'Perplexity para biomateriais'." />
+          <VisionItem number={7} title="Compliance regulatório auditável (FDA/ANVISA/EMA)" value={5} effort={4}
+            desc="Árvore de regras MDR 2017/745, FDA 21 CFR 860.7, RDC 751/2022. Sugere predicate device 510(k) por similaridade. Exporta PDF para submissão real. Único no mundo." />
+          <VisionItem number={10} title="Workspace de comparação de fórmulas" value={4} effort={3}
+            desc="Página /workspace: grid de cards, filtros, comparação 2-4 fórmulas lado-a-lado, radar chart de scores, tags ('Tese MS', 'Projeto X'), export consolidado." />
+          <VisionItem number={6} title="Otimização Bayesiana de concentrações" value={4} effort={5}
+            desc="Modo exploração (50 créditos): GP + Expected Improvement em 8-12 iterações. Heatmap do design space + 3 candidatos Pareto-ótimos. Categoria nova de produto." />
+        </div>
+      </div>
+
+      <Box2 icon={Target} title="🎯 O próximo passo concreto desta semana" tone="cyan">
+        <p className="text-sm text-gray-200 leading-relaxed">
+          Implementar <strong className="text-cyan-300">#4 (DOI verifier) + #8 (snapshot)</strong> — total ~7 dias.
+        </p>
+        <p className="text-xs text-gray-400 mt-2">
+          Esses dois eliminam o <strong>maior risco de credibilidade científica</strong> com mínimo esforço,
+          e são pré-requisito para todos os demais avanços. Após implementados, a equipe pode anunciar oficialmente
+          que <strong className="text-cyan-300">"toda formulação BIA é cientificamente auditável e reproduzível"</strong> —
+          uma claim que nenhum concorrente pode fazer hoje.
+        </p>
+      </Box2>
+
+      <Box2 icon={Beaker} title="💰 Modelo de monetização sugerido" tone="amber">
+        <div className="overflow-x-auto -mx-2">
+          <table className="w-full text-xs">
+            <thead className="text-amber-300 border-b border-amber-500/30">
+              <tr>
+                <th className="text-left py-2 px-2">Funcionalidade</th>
+                <th className="text-left py-2 px-2">Plano</th>
+                <th className="text-right py-2 px-2">Créditos</th>
+              </tr>
+            </thead>
+            <tbody className="text-gray-300">
+              <tr className="border-b border-white/5"><td className="py-1.5 px-2">Formulação Pro básica</td><td className="px-2">Discovery (free 30)</td><td className="text-right px-2">10</td></tr>
+              <tr className="border-b border-white/5"><td className="py-1.5 px-2">Verificação DOI + Reproduzível</td><td className="px-2">Incluído</td><td className="text-right px-2">0</td></tr>
+              <tr className="border-b border-white/5"><td className="py-1.5 px-2">Preview 3D</td><td className="px-2">Discovery+</td><td className="text-right px-2">2</td></tr>
+              <tr className="border-b border-white/5"><td className="py-1.5 px-2">Modo iteração (chat)</td><td className="px-2">Discovery+</td><td className="text-right px-2">3</td></tr>
+              <tr className="border-b border-white/5"><td className="py-1.5 px-2">Consenso multi-LLM</td><td className="px-2">Pro</td><td className="text-right px-2">30</td></tr>
+              <tr className="border-b border-white/5"><td className="py-1.5 px-2">Otimização Bayesiana</td><td className="px-2">Pro / Lab</td><td className="text-right px-2">50</td></tr>
+              <tr className="border-b border-white/5"><td className="py-1.5 px-2">Compliance regulatório PDF</td><td className="px-2">Lab / Enterprise</td><td className="text-right px-2">20</td></tr>
+              <tr><td className="py-1.5 px-2">Workspace ilimitado</td><td className="px-2">Lab / Enterprise</td><td className="text-right px-2">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </Box2>
+
+      <Box2 icon={GitBranch} title="🎯 KPIs propostos" tone="purple">
+        <ul className="space-y-1.5 text-xs text-gray-300">
+          <li>• <strong>Retenção D7</strong> ≥ 40% — usuários voltam em 7 dias após 1ª fórmula</li>
+          <li>• <strong>Score de feedback</strong> ≥ 85% (👍 / total)</li>
+          <li>• <strong>DOIs válidos</strong> ≥ 95% (verificados no CrossRef)</li>
+          <li>• <strong>Time to first useful formula</strong> ≤ 8 minutos do signup</li>
+          <li>• <strong>NPS Formulador Pro</strong> ≥ 60 (survey trimestral)</li>
+          <li>• <strong>Reprodutibilidade</strong> = 100% das execuções com snapshot completo</li>
+          <li>• <strong>Conversão demo → pago</strong> ≥ 12% após uso do Formulador Pro</li>
+        </ul>
+      </Box2>
+
+      <Box2 icon={ShieldCheck} title="🛡️ Riscos & mitigações" tone="rose">
+        <ul className="space-y-1.5 text-xs text-gray-300">
+          <li>• <strong>Custo LLM explode</strong> com multi-LLM → cache 90 dias por inputHash; modo single como default.</li>
+          <li>• <strong>Rate-limit CrossRef</strong> → cache 30 dias + retry exponencial.</li>
+          <li>• <strong>Property DB desatualizado</strong> → job mensal de scraping PubMed; flag 'última atualização'.</li>
+          <li>• <strong>Feedback enviesado</strong> → gamification leve (selo "Contribuiu para 10 melhorias").</li>
+        </ul>
+      </Box2>
+
+      <div className="rounded-xl bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 p-4 mt-6">
+        <p className="text-xs text-gray-300 leading-relaxed">
+          📄 <strong className="text-cyan-300">Documento completo:</strong> {" "}
+          <code className="px-1.5 py-0.5 rounded bg-black/40 text-cyan-200">docs/FORMULATOR_PRO_ROADMAP.md</code> {" "}
+          (no GitHub) — contém a justificativa técnica detalhada de cada uma das 12 melhorias,
+          entregáveis de código por item, e referências de literatura.
+        </p>
+      </div>
+    </article>
+  )
+}
+
+function VisionItem({
+  number, title, desc, value, effort, quick,
+}: {
+  number: number
+  title: string
+  desc: string
+  value: number
+  effort: number
+  quick?: boolean
+}) {
+  return (
+    <div className="rounded-lg bg-black/30 border border-white/5 p-3 hover:border-white/10 transition">
+      <div className="flex items-start gap-3">
+        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 flex items-center justify-center text-xs font-bold text-cyan-300 shrink-0">
+          {number}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <h4 className="text-sm font-semibold text-white">{title}</h4>
+            {quick && (
+              <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[9px] font-semibold">
+                QUICK WIN
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-400 leading-relaxed">{desc}</p>
+          <div className="flex items-center gap-3 mt-2 text-[10px]">
+            <span className="text-cyan-300">💎 Valor {"⭐".repeat(value)}</span>
+            <span className="text-gray-500">⚙️ Esforço {"●".repeat(effort)}{"○".repeat(5 - effort)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 

@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next"
-import { Inter, JetBrains_Mono } from "next/font/google"
 import "./globals.css"
 import { SessionProvider } from "@/components/providers/SessionProvider"
 import { ToastProvider } from "@/components/ui/Toast"
 import { auth } from "@/lib/auth/config"
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
-const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" })
+// Fontes Inter + JetBrains Mono carregadas via <link> no <head> (CSS @import)
+// para evitar falhas de fetch em build-time em sandboxes com rede restrita.
+// Variáveis CSS --font-inter / --font-mono ficam definidas em globals.css.
 
 const siteUrl = process.env.NEXTAUTH_URL || "https://bia.quantis.bio"
 
@@ -89,6 +89,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="pt-BR" className="dark" suppressHydrationWarning>
       <head>
+        {/* Fontes Inter + JetBrains Mono via Google Fonts CSS (runtime, não build-time) */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        />
         {/* Structured Data - Organization */}
         <script
           type="application/ld+json"
@@ -125,7 +132,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
-      <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
+      <body className="font-sans antialiased">
         <SessionProvider session={session}>
           <ToastProvider>
             {children}
