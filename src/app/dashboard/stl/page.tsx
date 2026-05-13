@@ -11,7 +11,13 @@ import {
   GEOMETRIES, generateGeometry, downloadSTL, downloadOBJ, downloadPLY,
   estimateFileSize, type GeometryParams, type STLGeometry, type Triangle
 } from "@/lib/stl/generator"
+import { BIOMIMETIC_GEOMETRIES } from "@/lib/stl/biomimetic-tissues"
 import { validateMesh, formatVolume, formatArea, type ValidationReport } from "@/lib/stl/mesh-validator"
+
+// Lista combinada apresentada ao usuário em 3 grupos: Clássicos + Biomiméticos + Testes
+const ALL_GEOMETRIES: STLGeometry[] = [...GEOMETRIES, ...BIOMIMETIC_GEOMETRIES]
+const BIOMIMETIC_IDS = new Set(BIOMIMETIC_GEOMETRIES.filter(g => g.category === "biomimetic").map(g => g.id))
+const PRINTABILITY_IDS = new Set(BIOMIMETIC_GEOMETRIES.filter(g => g.category === "printability_test").map(g => g.id))
 
 // ─── Preview 3D simples via SVG isométrico ─────────────────────────────────
 function IsoPreview({ id }: { id: string }) {
@@ -266,7 +272,7 @@ export default function STLGeneratorPage() {
               Gerador de Geometrias 3D
             </h1>
             <p className="text-xs text-gray-400 mt-0.5">
-              STL / OBJ para bioimpressão · {GEOMETRIES.length} geometrias biológicas validadas
+              STL / OBJ / PLY para bioimpressão · {ALL_GEOMETRIES.length} geometrias ({GEOMETRIES.length} clássicas + {BIOMIMETIC_IDS.size} biomiméticas + {PRINTABILITY_IDS.size} testes)
             </p>
           </div>
           <div className="hidden sm:flex items-center gap-2">
@@ -279,31 +285,45 @@ export default function STLGeneratorPage() {
 
       <div className="flex flex-col lg:flex-row gap-0 flex-1 overflow-auto">
 
-        {/* ── Left: Geometry Selector ── */}
+        {/* ── Left: Geometry Selector (3 grupos) ── */}
         <div className="lg:w-64 xl:w-72 shrink-0 border-b lg:border-b-0 lg:border-r border-white/5 overflow-y-auto">
-          <div className="p-3">
-            <div className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2 px-1">
-              Geometrias ({GEOMETRIES.length})
+          <div className="p-3 space-y-4">
+            {/* Grupo 1: Clássicos */}
+            <div>
+              <div className="text-xs font-semibold text-violet-300 uppercase tracking-widest mb-2 px-1 flex items-center gap-1.5">
+                <Box className="w-3 h-3" /> Clássicas ({GEOMETRIES.length})
+              </div>
+              <div className="space-y-1">
+                {GEOMETRIES.map(geo => (
+                  <GeoButton key={geo.id} geo={geo} selected={selected.id === geo.id} onClick={() => handleSelectGeo(geo)} />
+                ))}
+              </div>
             </div>
-            <div className="space-y-1">
-              {GEOMETRIES.map(geo => (
-                <button
-                  key={geo.id}
-                  onClick={() => handleSelectGeo(geo)}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all",
-                    selected.id === geo.id
-                      ? "bg-violet-500/15 border border-violet-500/25 text-white"
-                      : "hover:bg-white/4 text-gray-400 hover:text-white border border-transparent"
-                  )}
-                >
-                  <span className="text-xl w-7 text-center shrink-0">{geo.icon}</span>
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium truncate">{geo.label}</div>
-                    <div className="text-xs text-gray-500 truncate">{geo.tissue}</div>
-                  </div>
-                </button>
-              ))}
+
+            {/* Grupo 2: Biomiméticas */}
+            <div>
+              <div className="text-xs font-semibold text-emerald-300 uppercase tracking-widest mb-2 px-1 flex items-center gap-1.5">
+                <Activity className="w-3 h-3" /> Biomiméticas ({BIOMIMETIC_IDS.size})
+              </div>
+              <div className="text-[10px] text-gray-500 px-1 mb-1">Multicamada · anatômico · biológico</div>
+              <div className="space-y-1">
+                {BIOMIMETIC_GEOMETRIES.filter(g => g.category === "biomimetic").map(geo => (
+                  <GeoButton key={geo.id} geo={geo} selected={selected.id === geo.id} onClick={() => handleSelectGeo(geo)} accent="emerald" />
+                ))}
+              </div>
+            </div>
+
+            {/* Grupo 3: Testes de printabilidade */}
+            <div>
+              <div className="text-xs font-semibold text-amber-300 uppercase tracking-widest mb-2 px-1 flex items-center gap-1.5">
+                <ShieldCheck className="w-3 h-3" /> Testes Printabilidade ({PRINTABILITY_IDS.size})
+              </div>
+              <div className="text-[10px] text-gray-500 px-1 mb-1">Calibração · validação de bioink</div>
+              <div className="space-y-1">
+                {BIOMIMETIC_GEOMETRIES.filter(g => g.category === "printability_test").map(geo => (
+                  <GeoButton key={geo.id} geo={geo} selected={selected.id === geo.id} onClick={() => handleSelectGeo(geo)} accent="amber" />
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -333,6 +353,40 @@ export default function STLGeneratorPage() {
               </div>
               <IsoPreview id={selected.id} />
             </div>
+
+            {/* Racional científico + protocolo de análise (apenas para biomiméticas/testes) */}
+            {(() => {
+              const bio = BIOMIMETIC_GEOMETRIES.find(g => g.id === selected.id)
+              if (!bio) return null
+              const isTest = bio.category === "printability_test"
+              const toneCls = isTest
+                ? "from-amber-500/8 to-orange-500/8 border-amber-500/20"
+                : "from-emerald-500/8 to-teal-500/8 border-emerald-500/20"
+              return (
+                <div className={cn("rounded-2xl border bg-gradient-to-br p-4 space-y-3", toneCls)}>
+                  <div className="flex items-start gap-2.5">
+                    <Info className={cn("w-4 h-4 mt-0.5 shrink-0", isTest ? "text-amber-300" : "text-emerald-300")} />
+                    <div className="flex-1 min-w-0">
+                      <div className={cn("text-xs font-semibold uppercase tracking-wider mb-1", isTest ? "text-amber-300" : "text-emerald-300")}>
+                        Racional científico
+                      </div>
+                      <p className="text-xs text-gray-300 leading-relaxed">{bio.rationale}</p>
+                    </div>
+                  </div>
+                  {bio.analysisProtocol && (
+                    <div className="flex items-start gap-2.5 pt-2 border-t border-white/5">
+                      <BarChart3 className={cn("w-4 h-4 mt-0.5 shrink-0", isTest ? "text-amber-300" : "text-emerald-300")} />
+                      <div className="flex-1 min-w-0">
+                        <div className={cn("text-xs font-semibold uppercase tracking-wider mb-1", isTest ? "text-amber-300" : "text-emerald-300")}>
+                          Como analisar o impresso
+                        </div>
+                        <p className="text-xs text-gray-300 leading-relaxed">{bio.analysisProtocol}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Stats when generated */}
             {generated && (
@@ -638,5 +692,36 @@ export default function STLGeneratorPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Botão de geometria reutilizável com cor de destaque (clássico/bio/teste)
+// ────────────────────────────────────────────────────────────────────────────
+function GeoButton({
+  geo, selected, onClick, accent,
+}: {
+  geo: STLGeometry
+  selected: boolean
+  onClick: () => void
+  accent?: "violet" | "emerald" | "amber"
+}) {
+  const tone = accent ?? "violet"
+  const cls = selected
+    ? tone === "emerald" ? "bg-emerald-500/15 border-emerald-500/25 text-white"
+    : tone === "amber"   ? "bg-amber-500/15 border-amber-500/25 text-white"
+                         : "bg-violet-500/15 border-violet-500/25 text-white"
+    : "hover:bg-white/4 text-gray-400 hover:text-white border-transparent"
+  return (
+    <button
+      onClick={onClick}
+      className={cn("w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all border", cls)}
+    >
+      <span className="text-xl w-7 text-center shrink-0">{geo.icon}</span>
+      <div className="min-w-0">
+        <div className="text-sm font-medium truncate">{geo.label}</div>
+        <div className="text-xs text-gray-500 truncate">{geo.tissue}</div>
+      </div>
+    </button>
   )
 }

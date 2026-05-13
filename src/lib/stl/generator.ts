@@ -902,8 +902,14 @@ export function generateGeometry(id: string, params: GeometryParams): Triangle[]
         resolution: Math.max(16, Math.min(64, p.tpmsResolution ?? 32)),
       })
     }
-    default:
+    default: {
+      // Tentar dispatcher biomimético/printability antes do fallback
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { generateBiomimeticGeometry } = require("./biomimetic-tissues") as typeof import("./biomimetic-tissues")
+      const biomimetic = generateBiomimeticGeometry(id, p)
+      if (biomimetic) return biomimetic
       return genCylinder(p.radius ?? 10, p.thickness ?? 5, p.segments ?? 32)
+    }
   }
 }
 

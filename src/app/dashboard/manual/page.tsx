@@ -17,7 +17,7 @@ import {
   BookOpen, Atom, FlaskConical, Box, Printer, Sparkles, MessageSquare,
   Target, Beaker, Settings, CheckCircle2, AlertTriangle, ChevronRight,
   ChevronDown, Lightbulb, Rocket, Save, ShieldCheck, ArrowRight,
-  Microscope, GitBranch, Map, Wrench, FileText, Coffee,
+  Microscope, GitBranch, Map, Wrench, FileText, Coffee, Download,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
@@ -98,6 +98,15 @@ const CHAPTERS: Chapter[] = [
     color: "from-cyan-500 to-blue-600",
     badge: "ESTRATÉGIA",
     estReadMin: 10,
+  },
+  {
+    id: "print-analysis",
+    title: "Análise dos Constructos Impressos",
+    subtitle: "Metodologia para validar bioink, printabilidade e arquitetura via fotografia + ImageJ",
+    icon: Microscope,
+    color: "from-amber-500 to-rose-600",
+    badge: "PROTOCOLO",
+    estReadMin: 8,
   },
 ]
 
@@ -224,6 +233,7 @@ export default function ManualPage() {
             {activeId === "bioprinting"     && <ChapterBioprinting />}
             {activeId === "roadmap-future"  && <ChapterRoadmapFuture />}
             {activeId === "vision-formulator" && <ChapterVisionFormulator />}
+            {activeId === "print-analysis"    && <ChapterPrintAnalysis />}
 
           </div>
         </main>
@@ -1133,6 +1143,258 @@ function VisionItem({
 }
 
 // ═════════════════════════════════════════════════════════════════════════
+//  CAPÍTULO 7 — ANÁLISE DOS CONSTRUCTOS IMPRESSOS
+// ═════════════════════════════════════════════════════════════════════════
+
+function ChapterPrintAnalysis() {
+  return (
+    <article className="space-y-6">
+      <header className="flex items-start gap-3">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-rose-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
+          <Microscope className="w-6 h-6 text-white" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-white">Análise dos Constructos Impressos</h1>
+          <p className="text-sm text-gray-400 mt-1">
+            Como avaliar objetivamente sua bioimpressão usando <strong className="text-amber-300">fotografia + ImageJ</strong>.
+            Protocolos reproduzíveis para qualquer laboratório.
+          </p>
+        </div>
+      </header>
+
+      <div className="rounded-xl bg-gradient-to-br from-amber-500/10 to-rose-500/10 border border-amber-500/20 p-5">
+        <div className="flex items-start gap-3">
+          <Lightbulb className="w-5 h-5 text-amber-300 mt-0.5 shrink-0" />
+          <div className="space-y-2 text-sm text-gray-200">
+            <p>
+              <strong className="text-amber-200">Princípio fundamental:</strong> não basta imprimir — você precisa
+              <strong> medir objetivamente</strong> se a impressão correspondeu ao desenho.
+              Sem números, não há ciência reprodutível.
+            </p>
+            <p className="text-xs text-gray-400">
+              Este capítulo usa apenas <strong className="text-amber-200">um celular + régua + ImageJ (grátis)</strong> —
+              acessível para qualquer laboratório. Para análises avançadas, usar µ-CT, AFM, reometria (capítulos futuros).
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* SETUP FOTOGRÁFICO */}
+      <Box2 icon={Settings} title="📸 Setup fotográfico padrão (5 min)" tone="info">
+        <ol className="space-y-2 text-xs text-gray-300 list-decimal pl-4">
+          <li><strong className="text-white">Fundo:</strong> papel preto fosco (alto contraste com hidrogéis claros).</li>
+          <li><strong className="text-white">Iluminação:</strong> 2 fontes laterais a 45°, evitando reflexos. LED branco difuso.</li>
+          <li><strong className="text-white">Escala obrigatória:</strong> régua milimetrada paralela ao constructo na mesma foto.</li>
+          <li><strong className="text-white">Distância fixa:</strong> celular a 20 cm, perpendicular (top-down) ou paralelo (lateral).</li>
+          <li><strong className="text-white">Foco macro:</strong> usar modo macro do celular ou clipe lupa de 10×.</li>
+          <li><strong className="text-white">Resolução:</strong> mínimo 1920×1080, sem zoom digital.</li>
+        </ol>
+        <p className="text-xs text-amber-300 mt-3">
+          💡 <strong>Dica de ouro:</strong> sempre tire 3 fotos da mesma amostra (top, 2 laterais). Salve com nome
+          padronizado: <code className="px-1 rounded bg-black/40">YYYYMMDD_amostra-ID_view.jpg</code>
+        </p>
+      </Box2>
+
+      {/* TIPOS DE ANÁLISE */}
+      <h2 className="text-lg font-semibold text-white flex items-center gap-2 mt-6">
+        <Target className="w-5 h-5 text-amber-400" />
+        Métricas principais por tipo de teste
+      </h2>
+
+      <AnalysisCard
+        title="1. Line Test — Largura real do filamento"
+        target="Calibrar bico + pressão de extrusão"
+        steps={[
+          "Foto top-down com escala (régua de 10 mm).",
+          "Abrir ImageJ → File → Open → escolher foto.",
+          "Definir escala: Analyze → Set Scale → desenhar linha sobre régua → ‟Known distance = 10 mm‟.",
+          "Para cada linha: usar Straight Line tool perpendicular → ‟Plot Profile‟ → medir FWHM (largura à meia altura).",
+          "Repetir em 5 pontos da mesma linha → calcular CV = desvio/média.",
+        ]}
+        criteria={[
+          "✅ CV < 10% = filamento estável (bom bioink)",
+          "⚠️ CV 10-20% = aceitável, ajustar pressão",
+          "❌ CV > 20% = bioink inadequado, refazer formulação",
+          "✅ Largura real ±20% da nominal = OK",
+        ]}
+      />
+
+      <AnalysisCard
+        title="2. Grid Test (Pf) — Printability Factor"
+        target="Quantificar viscosidade/gelificação do bioink (Ouyang 2016)"
+        steps={[
+          "Foto top-down, foco no centro da grade.",
+          "ImageJ: definir escala como acima.",
+          "Image → Adjust → Threshold → preto/branco automático.",
+          "Analyze → Analyze Particles → marcar ‟Show Outlines‟ → exclude on edges.",
+          "Para cada poro central, anotar perímetro (P) e área (A).",
+          "Calcular Pf = P² ÷ (16 × A) para cada poro. Reportar a média de pelo menos 16 poros.",
+        ]}
+        criteria={[
+          "🎯 Pf ≈ 1.00 → bioink ideal (poros quadrados)",
+          "⚠️ Pf < 0.90 → sub-gel (filamento espalha, poros arredondados)",
+          "⚠️ Pf > 1.10 → over-gel (filamentos irregulares, poros disformes)",
+          "Reportar: média ± DP, n ≥ 16 poros",
+        ]}
+      />
+
+      <AnalysisCard
+        title="3. Collapse Bridge — Self-supporting"
+        target="Vão máximo sem colapso (proxy do módulo G' do gel)"
+        steps={[
+          "Foto LATERAL paralela ao vão.",
+          "ImageJ: escala via régua.",
+          "Para cada ponte, traçar linha reta entre os topos das torres.",
+          "Medir a maior distância vertical da ponte abaixo dessa linha (= flecha/sag).",
+          "Calcular: sag_relativo = sag / vão (em %).",
+          "Identificar maior vão onde sag_relativo < 10%.",
+        ]}
+        criteria={[
+          "✅ Sag < 10% do vão → bioink self-supporting OK",
+          "⚠️ Sag 10-20% → suporte sacrificial recomendado (FRESH/Pluronic)",
+          "❌ Sag > 20% → bioink muito mole, aumentar % polímero ou crosslinker",
+          "Bioinks robustos (GelMA+LAP, alginato+CaCl₂): vão útil ≥ 10 mm",
+        ]}
+      />
+
+      <AnalysisCard
+        title="4. Star Overhang — Anisotropia direcional"
+        target="Detectar problemas direcionais (gravidade lateral, vibração do print head)"
+        steps={[
+          "Foto top-down centrada no pino.",
+          "ImageJ: escala definida.",
+          "Para cada braço (6 braços): medir comprimento real com Straight Line.",
+          "Comparar com comprimento nominal (default 8 mm).",
+          "Calcular: desvio padrão dos 6 comprimentos ÷ média.",
+        ]}
+        criteria={[
+          "✅ Desvio < 8% = comportamento isotrópico (bom)",
+          "⚠️ Desvio 8-15% = checar nivelamento da mesa",
+          "❌ Desvio > 15% = problema mecânico ou anisotropia do bioink",
+        ]}
+      />
+
+      <AnalysisCard
+        title="5. Stacking Tower — Acúmulo vertical"
+        target="Determinar altura máxima imprimível com este bioink"
+        steps={[
+          "Foto LATERAL com régua vertical.",
+          "ImageJ: escala definida.",
+          "Medir altura real do topo (h_real) e altura nominal (h_nominal = n × layer_height).",
+          "Medir diâmetro na base (D_base) e no topo (D_topo).",
+          "Calcular: razão de altura = h_real / h_nominal; afunilamento = (D_base − D_topo) / D_base.",
+        ]}
+        criteria={[
+          "✅ h_real / h_nominal > 0.90 → empilhamento OK",
+          "✅ Afunilamento < 10% → bioink mantém forma",
+          "⚠️ Afunilamento 10-25% → considerar crosslinking durante impressão (UV in-situ)",
+          "❌ Afunilamento > 25% ou colapso parcial → bioink inadequado para esta altura",
+        ]}
+      />
+
+      <AnalysisCard
+        title="6. Angle Fan — Ângulo crítico de overhang"
+        target="Maior ângulo sem suporte que o bioink aguenta"
+        steps={[
+          "Foto LATERAL paralela ao leque.",
+          "ImageJ: escala definida.",
+          "Para cada braço (0°, 15°, 30°…, 90°), inspecionar visualmente: deformou ou caiu?",
+          "O ângulo crítico = maior ângulo em que o braço se mantém reto (sag < 1 mm).",
+        ]}
+        criteria={[
+          "Reportar como: ‟overhang_critical = X°‟",
+          "Bioinks de extrusão típicos: 30-60° (sem suporte)",
+          "Com suporte FRESH/Pluronic: pode chegar a 90° (qualquer ângulo)",
+          "Use este valor para projetar peças sem precisar de suporte",
+        ]}
+      />
+
+      {/* RELATÓRIO E NOTEBOOK */}
+      <Box2 icon={FileText} title="📋 Estrutura de relatório por amostra" tone="default">
+        <p className="text-xs text-gray-300 mb-2">
+          Para cada experimento, registre no <Link href="/dashboard/notebook" className="text-amber-300 hover:underline">Notebook eletrônico</Link>:
+        </p>
+        <ul className="space-y-1.5 text-xs text-gray-300">
+          <li>📅 Data + ID da amostra (ex: <code className="px-1 rounded bg-black/40">2026-05-13_GelMA-8pc_001</code>)</li>
+          <li>🧪 Formulação completa (componentes + concentrações + crosslinker)</li>
+          <li>🖨️ Parâmetros de impressão (pressão, velocidade, bico Ø, temperatura, layer height)</li>
+          <li>📐 Geometria usada (qual teste/constructo)</li>
+          <li>🖼️ 3 fotos (top, lateral 1, lateral 2) com escala</li>
+          <li>📊 Métricas calculadas (Pf, CV, sag, etc) — colar valores no notebook</li>
+          <li>💬 Observações qualitativas (cor, transparência, aderência à plataforma, integridade)</li>
+          <li>✅ Veredicto: aprovado / repetir / refazer formulação</li>
+        </ul>
+      </Box2>
+
+      <Box2 icon={Beaker} title="🔬 Métricas avançadas (laboratórios equipados)" tone="info">
+        <ul className="space-y-1.5 text-xs text-gray-300">
+          <li>• <strong>µ-CT (8-20 µm/voxel):</strong> porosidade real, conectividade dos poros (Euler), distribuição 3D.</li>
+          <li>• <strong>AFM:</strong> módulo elástico local em escala micrométrica (compare zonas em cartilagem).</li>
+          <li>• <strong>Reometria oscilatória:</strong> G' / G'' do bioink antes e depois de crosslinking.</li>
+          <li>• <strong>Live/Dead (Calcein-AM + EthD-1):</strong> viabilidade celular pós-impressão (24h, 7d, 14d).</li>
+          <li>• <strong>HE / Picrosirius / Alizarin:</strong> histologia para deposição de matriz extracelular.</li>
+          <li>• <strong>SEM:</strong> arquitetura porosa e morfologia de superfície (necessita liofilização ou secagem crítica).</li>
+        </ul>
+      </Box2>
+
+      <Box2 icon={CheckCircle2} title="🎯 Fluxo recomendado de validação de bioink" tone="ok">
+        <ol className="space-y-1.5 text-xs text-gray-300 list-decimal pl-4">
+          <li><strong>Antes de imprimir constructo final</strong>, valide o bioink com 3 testes mínimos:</li>
+          <li><strong>Line Test</strong> → calibra largura real e CV.</li>
+          <li><strong>Grid Test (Pf)</strong> → quantifica printabilidade (alvo Pf ≈ 1).</li>
+          <li><strong>Collapse Bridge</strong> → vão máximo (proxy de G').</li>
+          <li>Se 3 testes ✅ → imprimir constructo biomimético com confiança.</li>
+          <li>Se algum ❌ → voltar ao <Link href="/dashboard/formulator-pro" className="text-emerald-300 hover:underline">Formulador Pro</Link> e ajustar formulação.</li>
+        </ol>
+        <p className="text-xs text-emerald-300 mt-3">
+          ⏱️ <strong>Tempo total:</strong> 3 testes × 20 min impressão + 10 min foto/análise = ~90 min para validar um bioink antes de usar em experimento real.
+        </p>
+      </Box2>
+
+      <div className="rounded-xl bg-gradient-to-br from-amber-500/10 to-rose-500/10 border border-amber-500/20 p-4 mt-6">
+        <p className="text-xs text-gray-300 leading-relaxed">
+          🔗 <strong className="text-amber-300">Próximo passo:</strong> abrir o {" "}
+          <Link href="/dashboard/stl" className="text-amber-200 hover:underline font-semibold">Gerador STL</Link> {" "}
+          e baixar os testes de printabilidade na seção "Testes Printabilidade" (badge amarelo). Imprima primeiro,
+          fotografe, analise no ImageJ seguindo este protocolo. Anote tudo no {" "}
+          <Link href="/dashboard/notebook" className="text-amber-200 hover:underline font-semibold">Notebook</Link>.
+        </p>
+      </div>
+    </article>
+  )
+}
+
+function AnalysisCard({
+  title, target, steps, criteria,
+}: {
+  title: string
+  target: string
+  steps: string[]
+  criteria: string[]
+}) {
+  return (
+    <div className="rounded-xl bg-white/3 border border-white/8 p-4">
+      <h3 className="text-sm font-bold text-white mb-1">{title}</h3>
+      <p className="text-xs text-amber-300 mb-3">🎯 {target}</p>
+      <div className="grid md:grid-cols-2 gap-4">
+        <div>
+          <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Passos</div>
+          <ol className="space-y-1 text-xs text-gray-300 list-decimal pl-4">
+            {steps.map((s, i) => <li key={i}>{s}</li>)}
+          </ol>
+        </div>
+        <div>
+          <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Critérios</div>
+          <ul className="space-y-1 text-xs text-gray-300">
+            {criteria.map((c, i) => <li key={i}>{c}</li>)}
+          </ul>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════════════════
 // COMPONENTES AUXILIARES
 // ═════════════════════════════════════════════════════════════════════════
 
@@ -1140,7 +1402,7 @@ function Box2({
   icon: Icon, title, tone, children,
 }: {
   icon: React.ElementType; title: string
-  tone: "info" | "default" | "warn" | "ok"
+  tone: "info" | "default" | "warn" | "ok" | "emerald" | "cyan" | "amber" | "purple" | "rose"
   children: React.ReactNode
 }) {
   const palette = {
@@ -1148,6 +1410,11 @@ function Box2({
     default: { bg: "from-white/[0.02] to-white/[0.01]",          border: "border-white/8",        iconBg: "bg-white/5 border-white/10",            iconColor: "text-gray-300",    titleColor: "text-white" },
     warn:    { bg: "from-amber-500/[0.04] to-amber-500/[0.02]",  border: "border-amber-500/15",   iconBg: "bg-amber-500/15 border-amber-500/30",   iconColor: "text-amber-300",   titleColor: "text-amber-100" },
     ok:      { bg: "from-emerald-500/[0.04] to-emerald-500/[0.02]", border: "border-emerald-500/15", iconBg: "bg-emerald-500/15 border-emerald-500/30", iconColor: "text-emerald-300", titleColor: "text-emerald-100" },
+    emerald: { bg: "from-emerald-500/[0.04] to-emerald-500/[0.02]", border: "border-emerald-500/15", iconBg: "bg-emerald-500/15 border-emerald-500/30", iconColor: "text-emerald-300", titleColor: "text-emerald-100" },
+    cyan:    { bg: "from-cyan-500/[0.04] to-cyan-500/[0.02]",    border: "border-cyan-500/15",    iconBg: "bg-cyan-500/15 border-cyan-500/30",    iconColor: "text-cyan-300",    titleColor: "text-cyan-100" },
+    amber:   { bg: "from-amber-500/[0.04] to-amber-500/[0.02]",  border: "border-amber-500/15",   iconBg: "bg-amber-500/15 border-amber-500/30",   iconColor: "text-amber-300",   titleColor: "text-amber-100" },
+    purple:  { bg: "from-purple-500/[0.04] to-purple-500/[0.02]", border: "border-purple-500/15", iconBg: "bg-purple-500/15 border-purple-500/30", iconColor: "text-purple-300", titleColor: "text-purple-100" },
+    rose:    { bg: "from-rose-500/[0.04] to-rose-500/[0.02]",    border: "border-rose-500/15",    iconBg: "bg-rose-500/15 border-rose-500/30",    iconColor: "text-rose-300",    titleColor: "text-rose-100" },
   }[tone]
 
   return (

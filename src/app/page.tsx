@@ -90,7 +90,7 @@ export default function HomePage() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 bg-violet-500/10 border border-violet-500/20 rounded-full px-3 sm:px-4 py-1.5 text-xs sm:text-sm text-violet-400 mb-6 sm:mb-8">
             <Zap className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-            <span>Powered by Gemini 2.0 Flash</span>
+            <span>Powered by Quantis</span>
           </div>
 
           {/* Logo */}

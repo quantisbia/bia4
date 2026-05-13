@@ -3,6 +3,9 @@ const nextConfig = {
   // Next 14: pacotes que devem rodar só no servidor (não no Edge runtime)
   experimental: {
     serverComponentsExternalPackages: ["@prisma/client", "bcryptjs"],
+    // Sandbox com RAM limitada (~1GB): desliga workers paralelos do webpack/build
+    workerThreads: false,
+    cpus: 1,
   },
 
   // Build em sandbox com RAM limitada (~1GB): pulamos lint/typecheck no build
