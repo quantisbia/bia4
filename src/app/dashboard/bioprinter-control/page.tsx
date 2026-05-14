@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { Joystick3D, type JoystickPosition } from "@/components/bioprinter/Joystick3D"
 import { ExtrusionPanel, type ExtrusionState } from "@/components/bioprinter/ExtrusionPanel"
+import { TissueViabilityPanel, type TissueState } from "@/components/bioprinter/TissueViabilityPanel"
 
 export default function BioprinterControlPage() {
   const [position, setPosition] = useState<JoystickPosition>({ x: 0, y: 0, z: 0, e: 0 })
@@ -39,6 +40,17 @@ export default function BioprinterControlPage() {
     chamberTempC: 20,
     humidityPercent: 85,
     bioink: "Gelatina/GelMA",
+  })
+  const [tissue, setTissue] = useState<TissueState>({
+    cellType: "Fibroblastos (NIH-3T3)",
+    cellDensityMillionMl: 5,
+    pressureKPa: 30,
+    nozzleDiameterUm: 410,
+    viscosityPaS: 3.0,
+    printSpeedMmS: 8,
+    bioink: "GelMA",
+    targetDimensionMm: 10,
+    infillPatternId: "parallel-lines",
   })
 
   // Helper para logar comandos G-code
@@ -121,8 +133,8 @@ export default function BioprinterControlPage() {
             </h1>
           </div>
           <div className="hidden md:flex items-center gap-2 text-[11px] text-gray-400">
-            <span className="px-2 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300">
-              FASE 3 · extrusão + sensores
+            <span className="px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
+              FASE 4 · viabilidade tecidual live
             </span>
           </div>
         </div>
@@ -154,7 +166,8 @@ export default function BioprinterControlPage() {
                 <Tag>✅ Extrusão (pneumático/pistão/screw)</Tag>
                 <Tag>✅ Triplo controle térmico</Tag>
                 <Tag>✅ Sensor vs setpoint live</Tag>
-                <Tag tone="pending">⏳ Viabilidade live (Fase 4)</Tag>
+                <Tag>✅ Viabilidade live (Blaeser 2016)</Tag>
+                <Tag>✅ Encolhimento + crosslink + infill BIO</Tag>
                 <Tag tone="pending">⏳ Pós-bio (Fase 5)</Tag>
               </div>
             </div>
@@ -265,25 +278,50 @@ export default function BioprinterControlPage() {
           />
         </section>
 
+        {/* ─── FASE 4: Painel de Tecido Vivo (Viabilidade Live) ─────────── */}
+        <section className="rounded-2xl bg-white/[0.02] border border-white/5 p-5 space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+                <Microscope className="w-4 h-4 text-emerald-300" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white">Tecido Vivo · Viabilidade Calculada ao Vivo</h3>
+                <p className="text-[10px] text-gray-500">
+                  Shear stress → viabilidade prevista · Encolhimento · Crosslinking · Padrão BIO
+                </p>
+              </div>
+            </div>
+            <span className="text-[10px] px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
+              Modelo: Hagen-Poiseuille + Blaeser 2016
+            </span>
+          </div>
+          <TissueViabilityPanel
+            state={tissue}
+            onChange={setTissue}
+            onGcode={log}
+          />
+        </section>
+
         {/* Próximos painéis (preview do que vem) */}
         <section>
           <h2 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">
-            Próximos painéis (em construção)
+            Próximo painel (em construção)
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <UpcomingCard
-              icon={Microscope}
-              title="Tecido Vivo"
-              phase="Fase 4"
-              description="Cálculo de viabilidade em tempo real (modelo Blaeser 2016) · Encolhimento pós-cura · Crosslinking inteligente · Padrões de infill BIO (vascular sacrificial, FRESH, esferoides embebidos)"
-              color="emerald"
-            />
             <UpcomingCard
               icon={Beaker}
               title="Pós-Bioimpressão"
               phase="Fase 5"
               description="Protocolo de cultura por tipo de tecido · Biorreator (estímulo elétrico/mecânico/fluxo) · Cronograma de assays · Validação morfológica e funcional"
               color="amber"
+            />
+            <UpcomingCard
+              icon={Settings2}
+              title="Conexão real"
+              phase="Fase 6"
+              description="Bridge serial/USB para Marlin via WebSerial API · Stream G-code em tempo real · Console bidirecional · Perfis de impressora salvos"
+              color="cyan"
             />
           </div>
         </section>
