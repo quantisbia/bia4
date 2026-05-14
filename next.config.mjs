@@ -21,6 +21,62 @@ const nextConfig = {
     ],
   },
 
+  // ─── Redirects 301 permanentes ─────────────────────────────────────────
+  // Reestruturação BIA v5: as funcionalidades de bioimpressão foram unificadas
+  // em /dashboard/bioprint/* (4 etapas lineares: model → bioink → slice → control).
+  // Rotas antigas redirecionam para as novas equivalentes para preservar links
+  // externos, indexação e bookmarks dos usuários.
+  //
+  // Mapeamento:
+  //   /dashboard/stl                        → /dashboard/bioprint/model
+  //   /dashboard/biomaterials               → /dashboard/bioprint/bioink
+  //   /dashboard/bioprinter-control         → /dashboard/bioprint/control
+  //   /dashboard/bioprinting                → /dashboard/bioprint
+  //   /dashboard/bioprinting/engine         → /dashboard/bioprint/slice
+  //   /dashboard/bioprinting/dual-porosity  → /dashboard/bioprint/model
+  //   /dashboard/bioprinting/connection-guide → /dashboard/bioprint/control
+  async redirects() {
+    return [
+      {
+        source: "/dashboard/stl",
+        destination: "/dashboard/bioprint/model",
+        permanent: true,
+      },
+      {
+        source: "/dashboard/biomaterials",
+        destination: "/dashboard/bioprint/bioink",
+        permanent: true,
+      },
+      {
+        source: "/dashboard/bioprinter-control",
+        destination: "/dashboard/bioprint/control",
+        permanent: true,
+      },
+      // ATENÇÃO: redirects mais específicos (sub-rotas) DEVEM vir antes do pai
+      // /dashboard/bioprinting → /dashboard/bioprint, senão o pai captura tudo.
+      {
+        source: "/dashboard/bioprinting/engine",
+        destination: "/dashboard/bioprint/slice",
+        permanent: true,
+      },
+      {
+        source: "/dashboard/bioprinting/dual-porosity",
+        destination: "/dashboard/bioprint/model",
+        permanent: true,
+      },
+      {
+        source: "/dashboard/bioprinting/connection-guide",
+        destination: "/dashboard/bioprint/control",
+        permanent: true,
+      },
+      {
+        source: "/dashboard/bioprinting",
+        destination: "/dashboard/bioprint",
+        permanent: true,
+      },
+    ]
+  },
+
   // CORS apenas para rotas de API públicas — NÃO incluir /api/auth/*
   // Access-Control-Allow-Origin: * é INCOMPATÍVEL com credentials:true do NextAuth
   async headers() {
