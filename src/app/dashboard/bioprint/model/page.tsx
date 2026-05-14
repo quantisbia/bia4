@@ -33,7 +33,7 @@ import {
   validateMesh, formatVolume, formatArea, type ValidationReport
 } from "@/lib/stl/mesh-validator"
 import {
-  useBioprintProcess, modelCategoryLabel,
+  useBioprintProcess,
   type ModelCategory,
 } from "@/lib/bioprint/process-context"
 
@@ -1049,5 +1049,5 @@ function computeNormal(
   return [nx / len, ny / len, nz / len]
 }
 
-// Helper para mostrar nome da categoria fora desta página (re-export pattern)
-export { modelCategoryLabel }
+// Nota: modelCategoryLabel é importado direto de @/lib/bioprint/process-context
+// (não pode ser re-exportado daqui — Next.js só aceita default/metadata em pages)
