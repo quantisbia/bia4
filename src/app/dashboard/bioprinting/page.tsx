@@ -369,7 +369,7 @@ export default function BioprintingPage() {
             <h3 className="text-sm font-bold text-white">BIA v4.2 — Motores Avançados</h3>
             <span className="ml-auto text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">NOVO</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <Link href="/dashboard/bioprinting/engine"
               className="group p-3 rounded-xl bg-slate-900/60 border border-emerald-500/20 hover:border-emerald-500/50 transition-all">
               <div className="flex items-center gap-2 mb-1">
@@ -390,6 +390,20 @@ export default function BioprintingPage() {
               </div>
               <p className="text-xs text-gray-400 leading-snug">
                 Arquitetura hierárquica macro+micro biomimética. Teste: <b>Osso trabecular</b>, <b>Fígado</b>, Cartilagem, Rim. Preview 3D.
+              </p>
+            </Link>
+            <Link href="/dashboard/bioprinter-control"
+              className="group p-3 rounded-xl bg-slate-900/60 border border-violet-500/30 hover:border-violet-400 transition-all relative overflow-hidden">
+              <div className="absolute top-1 right-1 text-[9px] px-1.5 py-0.5 rounded-full bg-violet-500/20 border border-violet-500/40 text-violet-200 font-bold">
+                NOVO
+              </div>
+              <div className="flex items-center gap-2 mb-1">
+                <Sparkles className="w-4 h-4 text-violet-400" />
+                <span className="text-sm font-bold text-white">Control Center</span>
+                <span className="ml-auto text-[10px] text-violet-400">→</span>
+              </div>
+              <p className="text-xs text-gray-400 leading-snug">
+                Joystick 3D · Extrusão fluida · Viabilidade celular live (Blaeser 2016) · Crosslinking · Pós-bioimpressão por tecido. <b className="text-violet-300">Melhor que Pronterface, pensado para BIO.</b>
               </p>
             </Link>
           </div>
