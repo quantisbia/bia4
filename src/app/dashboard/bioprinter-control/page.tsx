@@ -24,6 +24,7 @@ import {
 import { Joystick3D, type JoystickPosition } from "@/components/bioprinter/Joystick3D"
 import { ExtrusionPanel, type ExtrusionState } from "@/components/bioprinter/ExtrusionPanel"
 import { TissueViabilityPanel, type TissueState } from "@/components/bioprinter/TissueViabilityPanel"
+import { PostBioprintingPanel, type PostBioState } from "@/components/bioprinter/PostBioprintingPanel"
 
 export default function BioprinterControlPage() {
   const [position, setPosition] = useState<JoystickPosition>({ x: 0, y: 0, z: 0, e: 0 })
@@ -51,6 +52,9 @@ export default function BioprinterControlPage() {
     bioink: "GelMA",
     targetDimensionMm: 10,
     infillPatternId: "parallel-lines",
+  })
+  const [postBio, setPostBio] = useState<PostBioState>({
+    tissueType: "Cardíaco (patch)",
   })
 
   // Helper para logar comandos G-code
@@ -133,8 +137,8 @@ export default function BioprinterControlPage() {
             </h1>
           </div>
           <div className="hidden md:flex items-center gap-2 text-[11px] text-gray-400">
-            <span className="px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
-              FASE 4 · viabilidade tecidual live
+            <span className="px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300">
+              FASE 5 · pós-bioimpressão + biorreator
             </span>
           </div>
         </div>
@@ -168,7 +172,8 @@ export default function BioprinterControlPage() {
                 <Tag>✅ Sensor vs setpoint live</Tag>
                 <Tag>✅ Viabilidade live (Blaeser 2016)</Tag>
                 <Tag>✅ Encolhimento + crosslink + infill BIO</Tag>
-                <Tag tone="pending">⏳ Pós-bio (Fase 5)</Tag>
+                <Tag>✅ Pós-print: cultura + biorreator + assays</Tag>
+                <Tag tone="pending">⏳ Conexão serial real (Fase 6)</Tag>
               </div>
             </div>
           </div>
@@ -303,24 +308,41 @@ export default function BioprinterControlPage() {
           />
         </section>
 
-        {/* Próximos painéis (preview do que vem) */}
+        {/* ─── FASE 5: Painel de Pós-Bioimpressão (cultura/biorreator/assays) ── */}
+        <section className="rounded-2xl bg-white/[0.02] border border-white/5 p-5 space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
+                <Beaker className="w-4 h-4 text-amber-300" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white">Pós-Bioimpressão · Cultura → Biorreator → Validação</h3>
+                <p className="text-[10px] text-gray-500">
+                  Protocolos por tipo de tecido (7 protocolos): cardíaco · ósseo · cartilagem · vaso · pele · nervo · hepático
+                </p>
+              </div>
+            </div>
+            <span className="text-[10px] px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300">
+              Refs: Ronaldson-Bouchard 2018, Bose 2013, Kolesky 2014
+            </span>
+          </div>
+          <PostBioprintingPanel
+            state={postBio}
+            onChange={setPostBio}
+          />
+        </section>
+
+        {/* Próximo painel (Fase 6 é conexão serial real) */}
         <section>
           <h2 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">
-            Próximo painel (em construção)
+            Última etapa (em construção)
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <UpcomingCard
-              icon={Beaker}
-              title="Pós-Bioimpressão"
-              phase="Fase 5"
-              description="Protocolo de cultura por tipo de tecido · Biorreator (estímulo elétrico/mecânico/fluxo) · Cronograma de assays · Validação morfológica e funcional"
-              color="amber"
-            />
+          <div className="grid grid-cols-1">
             <UpcomingCard
               icon={Settings2}
-              title="Conexão real"
+              title="Conexão serial real"
               phase="Fase 6"
-              description="Bridge serial/USB para Marlin via WebSerial API · Stream G-code em tempo real · Console bidirecional · Perfis de impressora salvos"
+              description="Bridge USB para Marlin via WebSerial API · Stream G-code em tempo real para a bioimpressora física · Console bidirecional (ler temperaturas, endstops, status da impressora) · Perfis de impressora salvos em PRINTER_PROFILES"
               color="cyan"
             />
           </div>
