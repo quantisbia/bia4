@@ -250,9 +250,165 @@ export function getGeometryBounds(
       }
     }
 
+    // ─── Orelha (pavilhão auricular) ─────────────────────────────────────
+    case "ear": {
+      // Aproximação: elipse achatada em XY com altura "thickness".
+      // params: height=60 (Y), width=35 (X), thickness=4 (Z)
+      const W = params.width ?? 35
+      const H = params.height ?? 60
+      const t = params.thickness ?? 4
+      const a = W / 2, b = H / 2
+      return {
+        height_mm: t, zMin: 0, zMax: t,
+        getBoundsAtZ: () => ({ minX: cx - a, maxX: cx + a, minY: cy - b, maxY: cy + b }),
+        getPerimetersAtZ: (_z, walls, spacing) => {
+          const polys: Polygon2D[] = []
+          for (let w = 0; w < walls; w++) {
+            const aw = a - w * spacing
+            const bw = b - w * spacing
+            if (aw <= 0.1 || bw <= 0.1) break
+            const poly: Polygon2D = []
+            for (let i = 0; i < 64; i++) {
+              const ang = (2 * Math.PI * i) / 64
+              poly.push({ x: cx + aw * Math.cos(ang), y: cy + bw * Math.sin(ang) })
+            }
+            polys.push(poly)
+          }
+          return polys
+        },
+      }
+    }
+
+    // ─── Coração (pêra cardíaca) ─────────────────────────────────────────
+    case "heart": {
+      // Aproximação: elipse que afunila ao topo (ápice).
+      // params: radius=20 (raio base XY), height=50 (Z), segments=32
+      const r = params.radius ?? 20
+      const H = params.height ?? 50
+      return {
+        height_mm: H, zMin: 0, zMax: H,
+        getBoundsAtZ: (z) => {
+          const t = 1 - z / H              // 1 na base, 0 no ápice
+          const rz = r * (0.4 + 0.6 * t)   // afunila até 40% no topo
+          return { minX: cx - rz, maxX: cx + rz, minY: cy - rz, maxY: cy + rz }
+        },
+        getPerimetersAtZ: (z, walls, spacing) => {
+          const t = 1 - z / H
+          const rz = r * (0.4 + 0.6 * t)
+          if (rz < 0.1) return []
+          return circlePerimeters(cx, cy, rz, walls, spacing)
+        },
+      }
+    }
+
+    // ─── Rim (forma de feijão) ───────────────────────────────────────────
+    case "kidney": {
+      // Aproximação: cilindro com seção elíptica, eixo vertical.
+      // params: length=45 (Y), width=25 (X), thickness=15 (Z), segments=32
+      const W = params.width ?? 25
+      const L = params.length ?? 45
+      const T = params.thickness ?? 15
+      const a = W / 2, b = L / 2
+      return {
+        height_mm: T, zMin: 0, zMax: T,
+        getBoundsAtZ: () => ({ minX: cx - a, maxX: cx + a, minY: cy - b, maxY: cy + b }),
+        getPerimetersAtZ: (_z, walls, spacing) => {
+          const polys: Polygon2D[] = []
+          for (let w = 0; w < walls; w++) {
+            const aw = a - w * spacing
+            const bw = b - w * spacing
+            if (aw <= 0.1 || bw <= 0.1) break
+            const poly: Polygon2D = []
+            for (let i = 0; i < 64; i++) {
+              const ang = (2 * Math.PI * i) / 64
+              // Pequena reentrância no meio para simular hilo renal
+              const indent = 1 - 0.15 * Math.exp(-Math.pow(Math.sin(ang) * 2, 2))
+              poly.push({ x: cx + aw * Math.cos(ang) * indent, y: cy + bw * Math.sin(ang) })
+            }
+            polys.push(poly)
+          }
+          return polys
+        },
+      }
+    }
+
+    // ─── Fígado (anatômico com lobos) ────────────────────────────────────
+    case "liver_anatomical": {
+      // Aproximação: bloco elíptico achatado (lobos direito/esquerdo).
+      // params: length=60 (X), width=40 (Y), thickness=18 (Z), segments=32
+      const L = params.length ?? 60
+      const W = params.width ?? 40
+      const T = params.thickness ?? 18
+      const a = L / 2, b = W / 2
+      return {
+        height_mm: T, zMin: 0, zMax: T,
+        getBoundsAtZ: () => ({ minX: cx - a, maxX: cx + a, minY: cy - b, maxY: cy + b }),
+        getPerimetersAtZ: (_z, walls, spacing) => {
+          const polys: Polygon2D[] = []
+          for (let w = 0; w < walls; w++) {
+            const aw = a - w * spacing
+            const bw = b - w * spacing
+            if (aw <= 0.1 || bw <= 0.1) break
+            const poly: Polygon2D = []
+            for (let i = 0; i < 80; i++) {
+              const ang = (2 * Math.PI * i) / 80
+              poly.push({ x: cx + aw * Math.cos(ang), y: cy + bw * Math.sin(ang) })
+            }
+            polys.push(poly)
+          }
+          return polys
+        },
+      }
+    }
+
+    // ─── Mão (palma simplificada) ────────────────────────────────────────
+    case "hand": {
+      // Aproximação simples: retângulo arredondado da palma (sem dedos detalhados).
+      // params: palmWidth=80, palmLength=100, fingerLength=70, thickness=15
+      const W = params.palmWidth ?? 80
+      const L = (params.palmLength ?? 100) + (params.fingerLength ?? 70)
+      const T = params.thickness ?? 15
+      return {
+        height_mm: T, zMin: 0, zMax: T,
+        getBoundsAtZ: () => ({ minX: cx - W/2, maxX: cx + W/2, minY: cy - L/2, maxY: cy + L/2 }),
+        getPerimetersAtZ: (_z, walls, spacing) => rectPerimeters(cx, cy, W, L, walls, spacing),
+      }
+    }
+
+    // ─── TPMS Gyroid / Schwarz P / Diamond ──────────────────────────────
+    // Os 3 scaffolds TPMS têm bbox cúbica idêntica. A topologia interna
+    // (giroide/schwarz/diamond) é gerada pelo algoritmo de infill (não pela
+    // shell). Walls = perímetro do cubo.
+    case "tpms_gyroid":
+    case "tpms_schwarz":
+    case "tpms_diamond": {
+      const s = params.tpmsSize ?? 20
+      return {
+        height_mm: s, zMin: 0, zMax: s,
+        getBoundsAtZ: () => ({ minX: cx - s/2, maxX: cx + s/2, minY: cy - s/2, maxY: cy + s/2 }),
+        getPerimetersAtZ: (_z, walls, spacing) => rectPerimeters(cx, cy, s, s, walls, spacing),
+      }
+    }
+
     default: {
-      // fallback: disk 10x3
-      return getGeometryBounds("disk", { radius: 10, thickness: 3 }, origin)
+      // ⚠️ Geometria desconhecida: usa um disco generoso (Ø20mm, 5mm alto)
+      // ao invés do antigo 10x3 — mais útil como fallback para teste de
+      // impressão. O caller deve sempre verificar warnings do engine.
+      console.warn(`[geometry-bounds] geometria "${geomId}" sem mapping específico — usando fallback disk 20mm/5mm.`)
+      return getGeometryBounds("disk", { radius: 10, thickness: 5 }, origin)
     }
   }
+}
+
+// ─── Helper público: lista todas as geometrias com bounds dedicado ─────────
+// Útil para o frontend validar antes de chamar /api/gcode/generate.
+export const SUPPORTED_GEOMETRY_IDS = [
+  "membrane", "disk", "bone_block", "cube_tissue", "vessel", "hexagonal_liver",
+  "femur", "nose", "meniscus", "cornea", "lens", "organoid_sphere",
+  "ear", "heart", "kidney", "liver_anatomical", "hand",
+  "tpms_gyroid", "tpms_schwarz", "tpms_diamond",
+] as const
+
+export function isSupportedGeometry(id: string): boolean {
+  return SUPPORTED_GEOMETRY_IDS.includes(id as typeof SUPPORTED_GEOMETRY_IDS[number])
 }

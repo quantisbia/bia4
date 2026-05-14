@@ -62,6 +62,19 @@ interface PrinterConnectionProps {
   defaultBaud?: number                      // Baud padrão (115200)
   printerName?: string
   className?: string
+  /**
+   * Slot para componentes adicionais (controles real-time customizados)
+   * recebem o `sendCommand` e o estado `connected` para poderem operar.
+   */
+  renderExtraControls?: (api: {
+    connected: boolean
+    sendCommand: (cmd: string) => Promise<void>
+  }) => React.ReactNode
+  /**
+   * Callback chamado quando o estado de conexão muda.
+   * Útil para sincronizar a UI externa (ex: tag "ONLINE" no header).
+   */
+  onConnectionChange?: (connected: boolean) => void
 }
 
 export function PrinterConnection({
@@ -69,6 +82,8 @@ export function PrinterConnection({
   defaultBaud = 115200,
   printerName = "Bioimpressora",
   className,
+  renderExtraControls,
+  onConnectionChange,
 }: PrinterConnectionProps) {
   const [supported, setSupported] = useState<boolean>(false)
   const [port, setPort] = useState<SerialPort | null>(null)
@@ -94,6 +109,11 @@ export function PrinterConnection({
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
   }, [log])
+
+  // Notifica externamente quando conecta/desconecta
+  useEffect(() => {
+    onConnectionChange?.(connected)
+  }, [connected, onConnectionChange])
 
   const addLog = useCallback((text: string, kind: LogLine["kind"] = "info") => {
     setLog((prev) => [...prev.slice(-499), { ts: new Date(), text, kind }])
@@ -379,6 +399,13 @@ export function PrinterConnection({
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* SLOT — Controles real-time customizados (Temperatura, Extrusão, Retração, Z-offset...) */}
+      {renderExtraControls && (
+        <div className="border-b border-white/10">
+          {renderExtraControls({ connected, sendCommand })}
         </div>
       )}
 

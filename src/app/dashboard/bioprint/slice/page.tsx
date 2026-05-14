@@ -28,11 +28,16 @@ import {
   ArrowRight, AlertTriangle, CheckCircle2, Info, Download, Copy,
   Wind, Thermometer, Target, BarChart3, Clock, Droplets, Activity,
   Beaker, Zap, AlertCircle, ChevronDown, ChevronRight, Microscope,
+  Lightbulb, ShieldAlert,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { useBioprintProcess } from "@/lib/bioprint/process-context"
 import { INFILL_PATTERNS, TEMPERATURE_PROFILES } from "@/lib/bioprinter/biomedical-params"
 import { BIOPRINTERS, getBioprinterById, supportsWebSerial } from "@/lib/bioprinting/bioprinters"
+import { SUPPORTED_GEOMETRY_IDS } from "@/lib/gcode/slicer/geometry-bounds"
+
+// Timeout máximo de geração — evita rodar para sempre se o engine travar
+const GCODE_TIMEOUT_MS = 45_000
 
 // ─── Mapeamento material BIA → algoritmo padrão do engine ────────────────
 // O motor /api/gcode/generate aceita algoritmos enum específicos.
@@ -161,7 +166,7 @@ export default function BioprintSlicePage() {
 
   // ── Estado de geração ──
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<{ message: string; details?: string; suggestions?: string[] } | null>(null)
   const [result, setResult] = useState<GCodeResponse | null>(
     state.slice.gcode
       ? {
@@ -214,20 +219,122 @@ export default function BioprintSlicePage() {
     skirtLoops, retractionMm, result,
   ])
 
+  // ── Helper: gera lista de sugestões contextuais quando há falha ──
+  const buildSuggestions = useCallback((reason: "geometry-unsupported" | "validation" | "engine" | "timeout" | "auth"): string[] => {
+    const out: string[] = []
+    const gid = state.model.geometryId ?? ""
+
+    if (reason === "geometry-unsupported") {
+      out.push(
+        `A geometria "${gid}" ainda não tem caminho 3D otimizado no engine BIA. Use uma das geometrias com suporte completo:`,
+        "• disk (Ø10mm × 3mm) — teste rápido de printabilidade",
+        "• membrane (30×30×2 mm) — pele/derme",
+        "• cube_tissue (20×20×10 mm) — bloco de tecido",
+        "• tpms_gyroid (20×20×20 mm) — scaffold ósseo",
+        "• organoid_sphere (Ø10mm) — organoide",
+      )
+      return out
+    }
+
+    if (reason === "validation") {
+      out.push(
+        "Algum parâmetro está fora da faixa aceita. Verifique:",
+        `• Layer height entre 0.05 e 1.0 mm (atual: ${layerHeightMm})`,
+        `• Pressão entre 5 e 700 kPa (atual: ${pressureKPa})`,
+        `• Speed entre 1 e 50 mm/s (atual: ${printSpeedMmS})`,
+        `• Nozzle entre 100 e 1500 µm (atual: ${nozzleDiameterUm})`,
+        `• Infill entre 0 e 100% (atual: ${infillPercent})`,
+      )
+      return out
+    }
+
+    if (reason === "timeout") {
+      out.push(
+        "A geração demorou mais que 45 segundos — provavelmente a geometria está muito grande ou complexa.",
+        "Tente reduzir os parâmetros:",
+        "• Diminua o tamanho do modelo na Etapa 1 (ex: TPMS 20×20×20 → 10×10×10 mm)",
+        "• Aumente layer height (ex: 0.25 → 0.40 mm) — reduz nº de camadas",
+        "• Reduza infill (ex: 30% → 15%)",
+        "• Para Voronoi 3D em construtos > 30mm, prefira gyroid_tpms (mais rápido)",
+      )
+      return out
+    }
+
+    if (reason === "auth") {
+      out.push(
+        "Sessão expirou ou créditos insuficientes (6 créditos por geração).",
+        "• Faça login novamente",
+        "• Verifique seus créditos em /dashboard/billing",
+      )
+      return out
+    }
+
+    // engine error genérico — sugestões baseadas em contexto
+    out.push("Algumas dicas para a próxima tentativa:")
+    if (state.bioink.cellType && pressureKPa > 100) {
+      out.push(`⚠️ Pressão ${pressureKPa} kPa é alta para células vivas. Reduza para 30–80 kPa.`)
+    }
+    if (nozzleDiameterUm < 250 && state.bioink.cellType) {
+      out.push(`⚠️ Bico ${nozzleDiameterUm}µm muito fino para células. Use 410µm (22G) ou 580µm (20G).`)
+    }
+    if (printSpeedMmS > 20 && state.bioink.cellType) {
+      out.push(`⚠️ Speed ${printSpeedMmS}mm/s alto para células. Use 5–10 mm/s.`)
+    }
+    if (layerHeightMm > nozzleDiameterUm / 1000 * 0.8) {
+      out.push(`⚠️ Layer height ${layerHeightMm}mm > 80% do bico. Use ${(nozzleDiameterUm / 1000 * 0.5).toFixed(2)} mm.`)
+    }
+    if (useMultiWell && selectedWells.length === 0) {
+      out.push("⚠️ Multi-poço ativado mas nenhum poço selecionado. Vá na tab Multi-poço.")
+    }
+    if (algorithm === "voronoi_3d" && infillPercent > 50) {
+      out.push("⚠️ Voronoi 3D com infill > 50% gera trabéculas muito densas. Tente 25–40%.")
+    }
+    if (out.length === 1) {
+      // nenhum aviso específico — sugestão padrão segura
+      out.push(
+        "• Tente o algoritmo padrão: gyroid_tpms com infill 30%, layer 0.25mm, speed 8mm/s",
+        "• Use um modelo simples (disk Ø10mm × 3mm) para validar antes",
+        "• Verifique que sua geometria está entre as 20 suportadas pelo engine",
+      )
+    }
+    return out
+  }, [
+    state.model.geometryId, state.bioink.cellType, layerHeightMm, pressureKPa,
+    printSpeedMmS, nozzleDiameterUm, infillPercent, useMultiWell,
+    selectedWells.length, algorithm,
+  ])
+
   // ── Geração de G-code ──
   const generateGCode = useCallback(async () => {
     if (!isUnlocked) {
-      setError("Complete as etapas 1 (Modelo) e 2 (Biotinta) antes de gerar G-code.")
+      setError({ message: "Complete as etapas 1 (Modelo) e 2 (Biotinta) antes de gerar G-code." })
       return
     }
     if (!state.model.geometryId) {
-      setError("Modelo 3D não tem geometryId — verifique a Etapa 1.")
+      setError({
+        message: "Modelo 3D não tem geometryId — verifique a Etapa 1.",
+        suggestions: ["Volte para /dashboard/bioprint/model e selecione/gere um modelo válido."],
+      })
       return
+    }
+
+    // Pré-check: geometria está mapeada no engine de bounds?
+    if (!(SUPPORTED_GEOMETRY_IDS as readonly string[]).includes(state.model.geometryId)) {
+      setError({
+        message: `A geometria "${state.model.geometryId}" não tem caminho 3D otimizado.`,
+        details: "Engine vai usar um fallback genérico (disk Ø20mm × 5mm), o que pode não representar fielmente o modelo.",
+        suggestions: buildSuggestions("geometry-unsupported"),
+      })
+      // Não bloqueia — apenas avisa. Continua se usuário insistir.
     }
 
     setLoading(true)
     setError(null)
     setResult(null)
+
+    // AbortController para timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), GCODE_TIMEOUT_MS)
 
     try {
       // ─ Geometry: id + params do state.model ─
@@ -296,9 +403,61 @@ export default function BioprintSlicePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: controller.signal,
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Erro ao gerar G-code")
+      clearTimeout(timeoutId)
+
+      let data: { error?: string; details?: unknown; gcode?: string; layerCount?: number; estimatedTime_min?: number; bioinkVolume_uL?: number; success?: boolean } & Partial<GCodeResponse>
+      try {
+        data = await res.json()
+      } catch {
+        throw new Error("Resposta do servidor inválida (não-JSON). Engine pode ter caído — tente novamente em 30 segundos.")
+      }
+
+      if (!res.ok) {
+        // Auth/credits
+        if (res.status === 401) {
+          setError({
+            message: "Não autenticado — sessão expirou.",
+            suggestions: buildSuggestions("auth"),
+          })
+          return
+        }
+        if (res.status === 402 || (data.error || "").toLowerCase().includes("crédito")) {
+          setError({
+            message: data.error || "Créditos insuficientes (6 por geração).",
+            suggestions: buildSuggestions("auth"),
+          })
+          return
+        }
+        // Validação Zod
+        if (res.status === 400 && data.details) {
+          setError({
+            message: data.error || "Dados inválidos enviados ao engine.",
+            details: typeof data.details === "object"
+              ? JSON.stringify(data.details, null, 2).slice(0, 500)
+              : String(data.details).slice(0, 500),
+            suggestions: buildSuggestions("validation"),
+          })
+          return
+        }
+        // Erro do engine (5xx ou outro 4xx)
+        setError({
+          message: data.error || `Erro ${res.status} do engine`,
+          suggestions: buildSuggestions("engine"),
+        })
+        return
+      }
+
+      // Sanity check do resultado
+      if (!data.gcode || (data.layerCount ?? 0) === 0) {
+        setError({
+          message: "Engine retornou G-code vazio ou sem camadas.",
+          details: `O motor calculou ${data.layerCount ?? 0} camadas para a geometria "${state.model.geometryId}". Isso normalmente indica que a geometria não tem bounds válidos no slicer.`,
+          suggestions: buildSuggestions("geometry-unsupported"),
+        })
+        return
+      }
 
       setResult(data as GCodeResponse)
       // Persistir gcode + estimate
@@ -306,16 +465,31 @@ export default function BioprintSlicePage() {
         status: "ready",
         gcode: data.gcode ?? null,
         estimate: {
-          totalLayers: data.layerCount,
-          estimatedTimeMin: data.estimatedTime_min,
+          totalLayers: data.layerCount ?? 0,
+          estimatedTimeMin: data.estimatedTime_min ?? 0,
           estimatedVolumeMl: data.bioinkVolume_uL ? data.bioinkVolume_uL / 1000 : undefined,
         },
       })
       // Pular para tab G-code
       setTab("gcode")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro inesperado")
+      clearTimeout(timeoutId)
+      // Timeout/abort
+      if (err instanceof Error && err.name === "AbortError") {
+        setError({
+          message: `Geração cancelada — passou de ${GCODE_TIMEOUT_MS / 1000}s.`,
+          details: "O engine pode estar processando uma geometria muito complexa. Veja as sugestões abaixo para simplificar.",
+          suggestions: buildSuggestions("timeout"),
+        })
+        return
+      }
+      const msg = err instanceof Error ? err.message : "Erro inesperado"
+      setError({
+        message: msg,
+        suggestions: buildSuggestions("engine"),
+      })
     } finally {
+      clearTimeout(timeoutId)
       setLoading(false)
     }
   }, [
@@ -323,7 +497,7 @@ export default function BioprintSlicePage() {
     bioprinterId, layerHeightMm, walls, skirtLoops, retractionMm,
     pressureKPa, printSpeedMmS, nozzleDiameterUm, cartridgeTempC,
     useMultiWell, plateFormat, selectedWells, zHopBetweenWellsMm,
-    pauseBetweenWellsS, purgeVolumeUL, updateSlice,
+    pauseBetweenWellsS, purgeVolumeUL, updateSlice, buildSuggestions,
   ])
 
   // ── Download do G-code ──
@@ -1115,10 +1289,13 @@ function WellsPanel({
 function GCodePanel({
   loading, error, result, onGenerate, onDownload, isUnlocked,
 }: {
-  loading: boolean; error: string | null; result: GCodeResponse | null
+  loading: boolean
+  error: { message: string; details?: string; suggestions?: string[] } | null
+  result: GCodeResponse | null
   onGenerate: () => void; onDownload: () => void; isUnlocked: boolean
 }) {
   const [copied, setCopied] = useState(false)
+  const [elapsed, setElapsed] = useState(0)
   const handleCopy = useCallback(() => {
     if (!result?.gcode) return
     navigator.clipboard.writeText(result.gcode).then(() => {
@@ -1127,10 +1304,18 @@ function GCodePanel({
     })
   }, [result])
 
+  // Contador de tempo enquanto loading — feedback ao usuário
+  useEffect(() => {
+    if (!loading) { setElapsed(0); return }
+    const start = Date.now()
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 250)
+    return () => clearInterval(id)
+  }, [loading])
+
   return (
     <div className="max-w-5xl mx-auto space-y-5">
       {/* Botão de gerar (se ainda não gerou) */}
-      {!result && !loading && (
+      {!result && !loading && !error && (
         <section className="rounded-2xl border border-violet-500/30 bg-violet-500/5 p-8 text-center">
           <FileCode2 className="w-12 h-12 text-violet-400 mx-auto mb-3" />
           <h3 className="text-base font-semibold text-white mb-2">Pronto para gerar o G-code</h3>
@@ -1150,34 +1335,86 @@ function GCodePanel({
           >
             <Zap className="w-4 h-4" /> Gerar G-code agora
           </button>
-          <p className="text-[10px] text-gray-600 mt-3">Custo: 6 créditos por geração</p>
+          <p className="text-[10px] text-gray-600 mt-3">Custo: 6 créditos por geração · timeout em 45s</p>
         </section>
       )}
 
-      {/* Loading */}
+      {/* Loading com contador e mensagens progressivas */}
       {loading && (
         <section className="rounded-2xl border border-violet-500/30 bg-violet-500/5 p-8 text-center">
           <Loader2 className="w-12 h-12 text-violet-400 mx-auto mb-3 animate-spin" />
-          <h3 className="text-base font-semibold text-white mb-1">Gerando G-code…</h3>
-          <p className="text-xs text-gray-400">Calculando trajetórias, viabilidade celular e cabeçalho de segurança</p>
+          <h3 className="text-base font-semibold text-white mb-1">
+            Gerando G-code… <span className="text-violet-300 tabular-nums">{elapsed}s</span>
+          </h3>
+          <p className="text-xs text-gray-400">
+            {elapsed < 5 && "Validando parâmetros e calculando bounds da geometria"}
+            {elapsed >= 5 && elapsed < 15 && "Pré-computando Voronoi/TPMS e trajetória entre poços"}
+            {elapsed >= 15 && elapsed < 30 && "Emitindo movimentos camada a camada (Hagen-Poiseuille)"}
+            {elapsed >= 30 && "Quase lá — formatando G-code final e calculando viabilidade…"}
+          </p>
+          {elapsed >= 30 && (
+            <p className="text-[10px] text-amber-400 mt-2">
+              ⏱️ Demorando mais que o normal — vai cancelar automaticamente em {45 - elapsed}s se não responder.
+            </p>
+          )}
         </section>
       )}
 
-      {/* Erro */}
-      {error && (
-        <div className="rounded-2xl border border-rose-500/30 bg-rose-500/5 p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-rose-200">Erro ao gerar G-code</p>
-            <p className="text-xs text-rose-100/70 mt-1">{error}</p>
+      {/* Erro estruturado com sugestões inteligentes */}
+      {error && !loading && (
+        <section className="rounded-2xl border border-rose-500/30 bg-rose-500/[0.04] p-5">
+          <div className="flex items-start gap-3 mb-3">
+            <div className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0">
+              <AlertCircle className="w-5 h-5 text-rose-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-semibold text-rose-100">Não foi possível gerar o G-code</h3>
+              <p className="text-xs text-rose-100/80 mt-1 leading-relaxed">{error.message}</p>
+              {error.details && (
+                <pre className="mt-2 p-2 rounded-lg bg-black/30 border border-rose-500/20 text-[10px] text-rose-200/70 font-mono overflow-x-auto whitespace-pre-wrap">
+                  {error.details}
+                </pre>
+              )}
+            </div>
+            <button
+              onClick={onGenerate}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-100 whitespace-nowrap shrink-0"
+            >
+              Tentar novamente
+            </button>
           </div>
-          <button
-            onClick={onGenerate}
-            className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-100 whitespace-nowrap"
-          >
-            Tentar novamente
-          </button>
-        </div>
+
+          {/* Sugestões inteligentes */}
+          {error.suggestions && error.suggestions.length > 0 && (
+            <div className="mt-3 rounded-xl bg-amber-500/[0.06] border border-amber-500/25 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Lightbulb className="w-4 h-4 text-amber-300" />
+                <span className="text-xs font-semibold text-amber-200 uppercase tracking-wider">
+                  Sugestões da BIA para você continuar
+                </span>
+              </div>
+              <ul className="space-y-1 text-xs text-amber-100/85 leading-relaxed">
+                {error.suggestions.map((s, i) => (
+                  <li key={i} className={s.startsWith("•") || s.startsWith("⚠️") ? "ml-3" : "font-medium"}>{s}</li>
+                ))}
+              </ul>
+              <div className="mt-3 pt-3 border-t border-amber-500/15 flex flex-wrap gap-2">
+                <Link
+                  href="/dashboard/bioprint/model"
+                  className="text-[11px] font-medium px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-200"
+                >
+                  ← Trocar modelo (Etapa 1)
+                </Link>
+                <Link
+                  href="/dashboard/bioprint/bioink"
+                  className="text-[11px] font-medium px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/25 text-cyan-200"
+                >
+                  ← Reformular biotinta (Etapa 2)
+                </Link>
+              </div>
+            </div>
+          )}
+        </section>
       )}
 
       {/* Resultado */}
@@ -1248,6 +1485,9 @@ function GCodePanel({
             </section>
           )}
 
+          {/* ⚠️ BANNER CRÍTICO: Checklist de calibração ANTES da impressão real */}
+          <PrePrintChecklist />
+
           {/* Actions */}
           <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
             <h3 className="text-sm font-semibold text-white mb-3">Ações</h3>
@@ -1286,6 +1526,109 @@ function GCodePanel({
         </>
       )}
     </div>
+  )
+}
+
+// ─── Pre-print Checklist (banner crítico Z-offset + calibração) ────────────
+function PrePrintChecklist() {
+  const ITEMS = [
+    {
+      icon: "🎯",
+      title: "Calibre o Z-offset com bioink real, não com plástico",
+      body: "Bioinks são viscoelásticas. O offset que funciona com PLA NÃO funciona com hidrogel. Coloque uma gota da SUA bioink no cartucho, faça G28 e use G92 Z0 quando o menisco encostar no leito. Diferença típica: bioink precisa de Z 0.05–0.10 mm MAIS alto do que filamento.",
+      tone: "violet",
+    },
+    {
+      icon: "🌡️",
+      title: "Pré-aqueça/refrigere TUDO 10 minutos antes do print",
+      body: "Cartucho, leito E câmara precisam estar em equilíbrio térmico estável. GelMA a 22°C cristaliza no canto frio do leito 4°C — o filamento entope. Use M190 (bed wait) + M109 (cartridge wait) ANTES do G28.",
+      tone: "rose",
+    },
+    {
+      icon: "💨",
+      title: "Purgue o ar do cartucho (anti-bolha)",
+      body: "Bolha de ar = filamento descontínuo = camada falha. Antes de iniciar, faça G1 E1.0 F60 (extrude 1mm devagar) até sair bioink limpa. Repita se a bioink ficou parada > 15 min.",
+      tone: "amber",
+    },
+    {
+      icon: "🦠",
+      title: "Esterilização do bico — UV 5 min ou EtOH 70% (sem encostar)",
+      body: "O bico passou pela mesa e pelo cartucho. Antes de iniciar, ligue UV (M355 S1) por 5 min OU borrife EtOH 70% e espere evaporar. NUNCA toque o bico com luva contaminada.",
+      tone: "cyan",
+    },
+    {
+      icon: "📐",
+      title: "Verifique a primeira camada visualmente",
+      body: "Os primeiros 5mm² da bioimpressão revelam tudo. Se viu filamento descolando do leito, despressurize (Z+5) e RE-CALIBRE. Não tente salvar — repita do zero. Um print ruim contamina o resto.",
+      tone: "emerald",
+    },
+    {
+      icon: "🧊",
+      title: "Crosslinker pronto e na mesa ANTES do start",
+      body: "Para GelMA: lâmpada UV 365nm com filtro Schott UG-11 configurada e CaCl₂ 100mM pré-aquecida 37°C ao lado. NUNCA crosslinkar a frio — choque térmico mata 30–50% das células.",
+      tone: "blue",
+    },
+  ]
+
+  const TONE_MAP: Record<string, { bg: string; border: string; title: string }> = {
+    violet:  { bg: "bg-violet-500/[0.04]",  border: "border-violet-500/25",  title: "text-violet-100" },
+    rose:    { bg: "bg-rose-500/[0.04]",    border: "border-rose-500/25",    title: "text-rose-100" },
+    amber:   { bg: "bg-amber-500/[0.04]",   border: "border-amber-500/25",   title: "text-amber-100" },
+    cyan:    { bg: "bg-cyan-500/[0.04]",    border: "border-cyan-500/25",    title: "text-cyan-100" },
+    emerald: { bg: "bg-emerald-500/[0.04]", border: "border-emerald-500/25", title: "text-emerald-100" },
+    blue:    { bg: "bg-blue-500/[0.04]",    border: "border-blue-500/25",    title: "text-blue-100" },
+  }
+
+  return (
+    <section className="rounded-2xl border-2 border-amber-500/40 bg-gradient-to-br from-amber-500/[0.05] to-rose-500/[0.05] p-5">
+      <div className="flex items-start gap-3 mb-4">
+        <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
+          <ShieldAlert className="w-5 h-5 text-amber-300" />
+        </div>
+        <div>
+          <h3 className="text-base font-bold text-amber-100">
+            ⚠️ Checklist crítico ANTES de mandar pra impressora
+          </h3>
+          <p className="text-xs text-amber-100/75 mt-0.5 leading-relaxed">
+            Bioink não é filamento. Pulei essa lista = print falha + bioink desperdiçada + células mortas.
+            Leia os 6 itens abaixo antes de pressionar &quot;Iniciar&quot; na Etapa 4.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+        {ITEMS.map((it, i) => {
+          const t = TONE_MAP[it.tone]
+          return (
+            <div
+              key={i}
+              className={cn("rounded-xl border p-3", t.bg, t.border)}
+            >
+              <div className="flex items-start gap-2.5">
+                <span className="text-xl shrink-0 leading-none mt-0.5">{it.icon}</span>
+                <div className="min-w-0">
+                  <p className={cn("text-xs font-semibold leading-tight", t.title)}>{it.title}</p>
+                  <p className="text-[11px] text-gray-300/80 mt-1 leading-relaxed">{it.body}</p>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="mt-4 pt-3 border-t border-amber-500/15 flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-[11px] text-amber-100/60 italic">
+          Dica BIA: imprima primeiro a versão SEM CÉLULAS (acelular) para validar geometria + Z-offset.
+          Só depois rode com bioink celular cara.
+        </p>
+        <Link
+          href="/dashboard/bioprint/control"
+          className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-200 inline-flex items-center gap-1.5 whitespace-nowrap"
+        >
+          Ir para Execução · Etapa 4 <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
+      </div>
+    </section>
   )
 }
 

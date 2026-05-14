@@ -23,12 +23,12 @@
  * ═══════════════════════════════════════════════════════════════════════
  */
 
-import { useState, useCallback, useEffect, useMemo } from "react"
+import { useState, useCallback, useEffect, useMemo, useRef } from "react"
 import Link from "next/link"
 import {
-  Gamepad2, Terminal, Microscope, Beaker, FlaskConical, Settings2,
+  Gamepad2, Terminal, Microscope, Beaker, FlaskConical,
   ShieldCheck, Info, AlertTriangle, CheckCircle2, Layers, Droplets,
-  PlayCircle, Download, Cable,
+  PlayCircle, Download, Usb, Radio,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { useBioprintProcess } from "@/lib/bioprint/process-context"
@@ -36,6 +36,8 @@ import { Joystick3D, type JoystickPosition } from "@/components/bioprinter/Joyst
 import { ExtrusionPanel, type ExtrusionState } from "@/components/bioprinter/ExtrusionPanel"
 import { TissueViabilityPanel, type TissueState } from "@/components/bioprinter/TissueViabilityPanel"
 import { PostBioprintingPanel, type PostBioState } from "@/components/bioprinter/PostBioprintingPanel"
+import { PrinterConnection } from "@/components/bioprinting/PrinterConnection"
+import { RealtimeControls } from "@/components/bioprinting/RealtimeControls"
 
 // ─── Mapas auxiliares ──────────────────────────────────────────────────────
 
@@ -112,6 +114,22 @@ export default function BioprintControlPage() {
 
   // ── Joystick / Console ──
   const [position, setPosition] = useState<JoystickPosition>({ x: 0, y: 0, z: 0, e: 0 })
+
+  // ── Conexão real com a bioimpressora (Web Serial) ──
+  const [isConnected, setIsConnected] = useState(false)
+  // Ref para o sendCommand exposto pelo PrinterConnection (via renderExtraControls)
+  const sendCommandRef = useRef<((cmd: string) => Promise<void>) | null>(null)
+
+  // Envia comando para a impressora real (se conectada) — joystick reaproveita isso
+  const sendToPrinter = useCallback(async (cmd: string) => {
+    if (isConnected && sendCommandRef.current) {
+      try {
+        await sendCommandRef.current(cmd)
+      } catch (err) {
+        console.error("[bioprint/control] Falha ao enviar comando:", err)
+      }
+    }
+  }, [isConnected])
 
   // Pré-carrega o console com info do contexto + (se houver) primeiras linhas do G-code
   const initialLog = useMemo(() => {
@@ -197,6 +215,7 @@ export default function BioprintControlPage() {
   }, [isUnlocked, tissueType])
 
   // ── Handlers do Joystick ────────────────────────────────────────────
+  // Cada handler: registra no console + (se conectado) envia para a máquina real via sendToPrinter.
   const handleMove = useCallback((axis: "X" | "Y" | "Z" | "E", delta: number) => {
     setPosition((prev) => {
       const next = { ...prev }
@@ -208,24 +227,34 @@ export default function BioprintControlPage() {
       log(`G90 ; modo absoluto`)
       return next
     })
-  }, [log])
+    const feedrate = axis === "Z" ? 300 : axis === "E" ? 200 : 1500
+    void sendToPrinter("G91")
+    void sendToPrinter(`G1 ${axis}${delta > 0 ? "+" : ""}${delta} F${feedrate}`)
+    void sendToPrinter("G90")
+  }, [log, sendToPrinter])
 
   const handleHome = useCallback((axis: "all" | "X" | "Y" | "Z") => {
     setPosition({ x: 0, y: 0, z: 0, e: 0 })
-    log(`G28${axis === "all" ? "" : " " + axis} ; home ${axis === "all" ? "todos os eixos" : "eixo " + axis}`)
-  }, [log])
+    const cmd = `G28${axis === "all" ? "" : " " + axis}`
+    log(`${cmd} ; home ${axis === "all" ? "todos os eixos" : "eixo " + axis}`)
+    void sendToPrinter(cmd)
+  }, [log, sendToPrinter])
 
   const handleZero = useCallback(() => {
     log(`G92 X0 Y0 Z0 E0 ; zera posições virtuais no local atual`)
     setPosition({ x: 0, y: 0, z: 0, e: 0 })
-  }, [log])
+    void sendToPrinter("G92 X0 Y0 Z0 E0")
+  }, [log, sendToPrinter])
 
   const handleProbeZ = useCallback(() => {
     log(`; ── Z-Probe suave (0.5N) — modo bio ──`)
     log(`M851 Z-2.5 ; offset do probe`)
     log(`G29 ; auto-bed-leveling com sensor suave`)
     log(`G1 Z2 F300 ; sobe 2mm para segurança`)
-  }, [log])
+    void sendToPrinter("M851 Z-2.5")
+    void sendToPrinter("G29")
+    void sendToPrinter("G1 Z2 F300")
+  }, [log, sendToPrinter])
 
   const handlePurge = useCallback(() => {
     log(`; ── Purga de ar (pré-print) ──`)
@@ -233,20 +262,26 @@ export default function BioprintControlPage() {
     log(`G1 E1.0 F60 ; extrude 1mm devagar para tirar bolha de ar`)
     log(`G90`)
     setPosition((p) => ({ ...p, e: +(p.e + 1).toFixed(3) }))
-  }, [log])
+    void sendToPrinter("G91")
+    void sendToPrinter("G1 E1.0 F60")
+    void sendToPrinter("G90")
+  }, [log, sendToPrinter])
 
   const handleSterilePause = useCallback(() => {
     log(`; ── Pausa estéril (mantém pressão pneumática) ──`)
     log(`M0 ; pausa firmware`)
     log(`; ATENÇÃO: NÃO despressurizar — toggle pneumático fica ON`)
-  }, [log])
+    void sendToPrinter("M0")
+  }, [log, sendToPrinter])
 
   const handleGoToRest = useCallback(() => {
     log(`; ── Posição de repouso para troca de cartucho ──`)
     log(`G1 Z20 F300 ; sobe 20mm`)
     log(`G1 X0 Y200 F3000 ; canto traseiro`)
     setPosition({ x: 0, y: 200, z: 20, e: position.e })
-  }, [log, position.e])
+    void sendToPrinter("G1 Z20 F300")
+    void sendToPrinter("G1 X0 Y200 F3000")
+  }, [log, position.e, sendToPrinter])
 
   const clearLog = () => setGcodeLog([...initialLog, "; (log limpo)"])
 
@@ -407,7 +442,7 @@ export default function BioprintControlPage() {
                 <Tag>Viabilidade live (Blaeser 2016)</Tag>
                 <Tag>Encolhimento + crosslink</Tag>
                 <Tag>Pós-print: cultura + biorreator + assays</Tag>
-                <Tag tone="pending">⏳ Conexão serial real (em desenvolvimento)</Tag>
+                <Tag>✅ Conexão serial real (Web Serial / Marlin)</Tag>
               </div>
             </div>
           </div>
@@ -463,18 +498,79 @@ export default function BioprintControlPage() {
           </div>
         </section>
 
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/*  HOST PROFISSIONAL — Conexão USB (Web Serial) + Real-Time Control */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        <section className="rounded-2xl bg-gradient-to-br from-cyan-500/[0.06] to-violet-500/[0.04] border border-cyan-500/25 p-5 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center shrink-0">
+              <Usb className="w-4 h-4 text-cyan-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base font-semibold text-white">Host Profissional · Conexão USB</h3>
+                <span className={cn(
+                  "text-[10px] px-2 py-0.5 rounded-full border font-semibold inline-flex items-center gap-1",
+                  isConnected
+                    ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300"
+                    : "bg-gray-500/15 border-gray-500/30 text-gray-400"
+                )}>
+                  <Radio className={cn("w-2.5 h-2.5", isConnected && "animate-pulse")} />
+                  {isConnected ? "ONLINE" : "OFFLINE"}
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-400 leading-relaxed mt-0.5">
+                Conexão direta com sua bioimpressora via Web Serial API (Chrome/Edge 89+) · Firmware Marlin · Stream G-code em tempo real ·
+                Controle ao vivo de temperatura, extrusão, retração e Z-offset.
+              </p>
+            </div>
+          </div>
+
+          {/* PrinterConnection com slot para RealtimeControls */}
+          <PrinterConnection
+            gcode={state.slice.gcode ?? ""}
+            printerName={state.model.name ?? "Bioimpressora BIA"}
+            onConnectionChange={setIsConnected}
+            renderExtraControls={({ connected, sendCommand }) => {
+              // Captura o sendCommand para o joystick poder usar
+              sendCommandRef.current = sendCommand
+              return (
+                <RealtimeControls
+                  connected={connected}
+                  sendCommand={sendCommand}
+                  suggestedCartridgeC={state.slice.cartridgeTempC ?? 22}
+                  suggestedBedC={state.slice.bedTempC ?? 6}
+                  suggestedChamberC={state.slice.chamberTempC ?? 20}
+                  suggestedRetractionMm={state.slice.retractionMm ?? 0.5}
+                />
+              )
+            }}
+          />
+        </section>
+
         {/* Grade: Joystick + Console */}
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,380px)_1fr] gap-6">
           {/* Joystick */}
           <section className="rounded-2xl bg-white/[0.02] border border-white/5 p-5 space-y-4">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-violet-500/15 border border-violet-500/30 flex items-center justify-center">
-                <Gamepad2 className="w-4 h-4 text-violet-300" />
+            <div className="flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-violet-500/15 border border-violet-500/30 flex items-center justify-center">
+                  <Gamepad2 className="w-4 h-4 text-violet-300" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Joystick 3D</h3>
+                  <p className="text-[10px] text-gray-500">
+                    {isConnected
+                      ? "Comandos enviados para a máquina REAL"
+                      : "Modo simulação (sem conexão USB)"}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-semibold text-white">Joystick 3D</h3>
-                <p className="text-[10px] text-gray-500">Controle manual X/Y/Z + extrusora</p>
-              </div>
+              {isConnected && (
+                <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 font-semibold uppercase tracking-wider inline-flex items-center gap-1">
+                  <Radio className="w-2 h-2 animate-pulse" /> LIVE
+                </span>
+              )}
             </div>
 
             <Joystick3D
@@ -486,7 +582,7 @@ export default function BioprintControlPage() {
               onPurge={handlePurge}
               onSterilePause={handleSterilePause}
               onGoToRest={handleGoToRest}
-              connected={false}
+              connected={isConnected}
             />
           </section>
 
@@ -621,22 +717,6 @@ export default function BioprintControlPage() {
           />
         </section>
 
-        {/* Próxima fase: serial real */}
-        <section className="rounded-2xl bg-gradient-to-br from-cyan-500/[0.04] to-cyan-500/[0.02] border border-cyan-500/15 p-5 opacity-80 hover:opacity-100 transition-opacity">
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center shrink-0">
-              <Cable className="w-4 h-4 text-cyan-300" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h4 className="text-sm font-semibold text-white">Conexão serial real <span className="text-[10px] text-cyan-300 ml-2">(em construção)</span></h4>
-              <p className="text-[11px] text-gray-400 leading-relaxed mt-1">
-                Bridge USB para Marlin via WebSerial API · Stream G-code em tempo real para a bioimpressora física ·
-                Console bidirecional (ler temperaturas, endstops, status da impressora) ·
-                Perfis de impressora salvos em PRINTER_PROFILES
-              </p>
-            </div>
-          </div>
-        </section>
       </main>
 
       {/* Rodapé sticky com status do processo completo */}
