@@ -22,6 +22,7 @@ import {
   FlaskConical, Settings2, ShieldCheck, Info,
 } from "lucide-react"
 import { Joystick3D, type JoystickPosition } from "@/components/bioprinter/Joystick3D"
+import { ExtrusionPanel, type ExtrusionState } from "@/components/bioprinter/ExtrusionPanel"
 
 export default function BioprinterControlPage() {
   const [position, setPosition] = useState<JoystickPosition>({ x: 0, y: 0, z: 0, e: 0 })
@@ -29,6 +30,16 @@ export default function BioprinterControlPage() {
     "; BIA Bioprinter Control Center — pronto",
     "; Modo simulação (impressora não conectada)",
   ])
+  const [extrusion, setExtrusion] = useState<ExtrusionState>({
+    mechanism: "pneumatic",
+    setpoint: 30,
+    actual: 28.5,
+    cartridgeTempC: 25,
+    bedTempC: 6,
+    chamberTempC: 20,
+    humidityPercent: 85,
+    bioink: "Gelatina/GelMA",
+  })
 
   // Helper para logar comandos G-code
   const log = useCallback((line: string) => {
@@ -110,8 +121,8 @@ export default function BioprinterControlPage() {
             </h1>
           </div>
           <div className="hidden md:flex items-center gap-2 text-[11px] text-gray-400">
-            <span className="px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300">
-              FASE 2 · joystick + console
+            <span className="px-2 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300">
+              FASE 3 · extrusão + sensores
             </span>
           </div>
         </div>
@@ -140,7 +151,9 @@ export default function BioprinterControlPage() {
                 <Tag>✅ Z-probe suave (0.5N)</Tag>
                 <Tag>✅ Purga anti-bolha</Tag>
                 <Tag>✅ Pausa estéril</Tag>
-                <Tag tone="pending">⏳ Sensores fluídos (Fase 3)</Tag>
+                <Tag>✅ Extrusão (pneumático/pistão/screw)</Tag>
+                <Tag>✅ Triplo controle térmico</Tag>
+                <Tag>✅ Sensor vs setpoint live</Tag>
                 <Tag tone="pending">⏳ Viabilidade live (Fase 4)</Tag>
                 <Tag tone="pending">⏳ Pós-bio (Fase 5)</Tag>
               </div>
@@ -227,31 +240,49 @@ export default function BioprinterControlPage() {
           </section>
         </div>
 
+        {/* ─── FASE 3: Painel de Extrusão Fluida + Sensores ───────────────── */}
+        <section className="rounded-2xl bg-white/[0.02] border border-white/5 p-5 space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center">
+                <FlaskConical className="w-4 h-4 text-cyan-300" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white">Extrusão Fluida + Sensores</h3>
+                <p className="text-[10px] text-gray-500">
+                  Mecanismo · pressão/vazão/rotação · cartucho · cama · câmara · umidade
+                </p>
+              </div>
+            </div>
+            <span className="text-[10px] px-2 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300">
+              Knowledge: EXTRUSION_CONFIGS · TEMPERATURE_PROFILES
+            </span>
+          </div>
+          <ExtrusionPanel
+            state={extrusion}
+            onChange={setExtrusion}
+            onGcode={log}
+          />
+        </section>
+
         {/* Próximos painéis (preview do que vem) */}
         <section>
           <h2 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">
             Próximos painéis (em construção)
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <UpcomingCard
-              icon={FlaskConical}
-              title="Extrusão Fluida"
-              phase="Fase 3"
-              description="Pressão pneumática / pistão / parafuso · Temperatura cartucho-cama-câmara · Umidade · Sensores live"
-              color="cyan"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <UpcomingCard
               icon={Microscope}
               title="Tecido Vivo"
               phase="Fase 4"
-              description="Cálculo de viabilidade em tempo real · Encolhimento pós-cura · Crosslinking inteligente · Padrões de infill BIO"
+              description="Cálculo de viabilidade em tempo real (modelo Blaeser 2016) · Encolhimento pós-cura · Crosslinking inteligente · Padrões de infill BIO (vascular sacrificial, FRESH, esferoides embebidos)"
               color="emerald"
             />
             <UpcomingCard
               icon={Beaker}
               title="Pós-Bioimpressão"
               phase="Fase 5"
-              description="Protocolo de cultura · Biorreator (estímulo elétrico/mecânico/fluxo) · Cronograma de assays · Validação morfológica"
+              description="Protocolo de cultura por tipo de tecido · Biorreator (estímulo elétrico/mecânico/fluxo) · Cronograma de assays · Validação morfológica e funcional"
               color="amber"
             />
           </div>
