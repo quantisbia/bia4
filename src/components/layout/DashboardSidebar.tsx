@@ -6,9 +6,9 @@ import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
 import { useSession } from "next-auth/react"
 import {
-  LayoutDashboard, GitBranch, FlaskConical, CircleDot,
+  LayoutDashboard, GitBranch, CircleDot,
   FileText, BookOpen, MessageSquare, CreditCard, Settings,
-  LogOut, Zap, ChevronRight, Menu, X, Printer, Box, ClipboardCheck, BookMarked,
+  LogOut, Zap, ChevronRight, Menu, X, Printer, ClipboardCheck, BookMarked,
   Crown, Wrench, Info, Map, Atom, Library,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
@@ -43,16 +43,10 @@ export const NAV_ITEMS = [
     info: "Guia passo-a-passo: do problema clínico ao tecido funcional impresso. Use este roteiro se for sua primeira vez ou se quiser seguir o caminho recomendado pela equipe Quantis." },
   { href: "/dashboard/pipeline",           label: "Pipeline",             icon: GitBranch,       exact: false,
     info: "Pipeline de Engenharia de Tecidos em 12 etapas — da definição do problema clínico até pré-clínico/clínico. Use para guiar o seu projeto do zero ao protocolo validado. Custo: 5 créditos/etapa." },
-  { href: "/dashboard/biomaterials",       label: "Formulador Bio",       icon: FlaskConical,    exact: false,
-    info: "Banco de 31 biomateriais (GelMA, Alginato, PCL, dECM…) e formulador IA. Insira aplicação + tecido + requisitos e a BIA recomenda formulação, concentração, crosslinker e parâmetros de impressão. Custo: 10 créditos." },
   { href: "/dashboard/formulator-pro",     label: "Formulador Pro",       icon: Atom,            exact: false,
     info: "Versão profissional: monte formulações multi-componente livremente (até 8 biomateriais — catálogo OU customizados), defina objetivo clínico (cicatrização, osso, gengiva, implante mamário…), especificações viscoelásticas e a IA gera análise científica completa: score, incompatibilidades, protocolo, ISO/ANVISA. Custo: 10 créditos." },
-  { href: "/dashboard/bioprinting",        label: "Bioimpressão 3D",      icon: Printer,         exact: false,
-    info: "Especialista em bioimpressão (extrusão, inkjet, DLP, FRESH, laser, coaxial). Diga sua bioink + tecido alvo e a BIA gera parâmetros otimizados (pressão, velocidade, temperatura, layer height)." },
-  { href: "/dashboard/stl",                label: "Gerador STL",          icon: Box,             exact: false,
-    info: "Crie modelos 3D (STL/OBJ) prontos para fatiar: scaffolds porosos, organoides, vasos, tecidos anatômicos (orelha, coração, rim, fígado, mão). Pronto para o Motor GCODE." },
-  { href: "/dashboard/bioprinting/engine", label: "Motor GCODE",          icon: Zap,             exact: false,
-    info: "Motor BIA v4.2: gera G-code completo a partir de STL com infills paramétricos (Voronoi 3D, Gyroid, dual-porosity macro+micro), multi-material, multi-well, conexão USB Web Serial (Marlin/Klipper) e visualizador 2D. Coração da plataforma." },
+  { href: "/dashboard/bioprint",           label: "Bioimpressão",         icon: Printer,         exact: false,
+    info: "Processo completo de bioimpressão em 4 etapas lineares: (1) Modelo 3D — upload ou gerar entre 5 categorias com IA, (2) Biotinta — formular com 807 biomateriais + reologia em tempo real, (3) Fatiamento — motor G-code com 11 algoritmos e parâmetros biomédicos, (4) Execução — controle ao vivo com viabilidade, crosslink e pós-processamento. Cada etapa desbloqueia a próxima. Custo: 6 créditos por G-code." },
   { href: "/dashboard/organoids",          label: "Organoid Builder",     icon: CircleDot,       exact: false,
     info: "Desenhe esferoides e organoides (intestinal, hepático, neural, cardíaco, renal, pancreático, pulmonar) com protocolo QMicroNiche™ integrado e moldes não-adesivos QMatrix™." },
   { href: "/dashboard/protocols",          label: "Protocolos GLP/GMP",   icon: FileText,        exact: false,

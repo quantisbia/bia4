@@ -607,8 +607,8 @@ function ChapterFormulatorBio() {
           Recomendação <strong>rápida</strong> baseada no catálogo BIA de 31 biomateriais validados (GelMA, Alginato, PCL,
           dECM…). Ideal para screening inicial e quando você quer apenas <em>uma</em> sugestão pronta.
         </p>
-        <Link href="/dashboard/biomaterials" className="inline-flex items-center gap-1.5 mt-4 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-semibold">
-          <Rocket className="w-3.5 h-3.5" /> Abrir Formulador Bio
+        <Link href="/dashboard/bioprint/bioink" className="inline-flex items-center gap-1.5 mt-4 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-semibold">
+          <Rocket className="w-3.5 h-3.5" /> Abrir Bioimpressão · Etapa 2 (Biotinta)
         </Link>
       </div>
       <Box2 icon={ArrowRight} title="Fluxo em 3 passos" tone="default">
@@ -641,8 +641,8 @@ function ChapterSTLGenerator() {
           fêmur, nariz, menisco, córnea, esfera, orelha, coração, rim, fígado, mão. <strong className="text-white">Saída em STL
           binário/ASCII e OBJ Wavefront</strong>, unidades em mm.
         </p>
-        <Link href="/dashboard/stl" className="inline-flex items-center gap-1.5 mt-4 px-3 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-400 text-white text-xs font-semibold">
-          <Rocket className="w-3.5 h-3.5" /> Abrir Gerador STL
+        <Link href="/dashboard/bioprint/model" className="inline-flex items-center gap-1.5 mt-4 px-3 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-400 text-white text-xs font-semibold">
+          <Rocket className="w-3.5 h-3.5" /> Abrir Bioimpressão · Etapa 1 (Modelo 3D)
         </Link>
       </div>
 
@@ -745,8 +745,8 @@ function ChapterBioprinting() {
           Para qualquer bioink + tecido alvo, a BIA gera <strong>pressão de extrusão, velocidade, temperatura, layer
           height, infill</strong> otimizados. Suporta extrusão (EBB), inkjet, DLP/SLA, FRESH, laser e coaxial.
         </p>
-        <Link href="/dashboard/bioprinting" className="inline-flex items-center gap-1.5 mt-4 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-white text-xs font-semibold">
-          <Rocket className="w-3.5 h-3.5" /> Abrir Bioimpressão 3D
+        <Link href="/dashboard/bioprint" className="inline-flex items-center gap-1.5 mt-4 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-white text-xs font-semibold">
+          <Rocket className="w-3.5 h-3.5" /> Abrir Bioimpressão (4 etapas)
         </Link>
       </div>
       <Box2 icon={Lightbulb} title="Racional rápido" tone="info">
@@ -1354,7 +1354,7 @@ function ChapterPrintAnalysis() {
       <div className="rounded-xl bg-gradient-to-br from-amber-500/10 to-rose-500/10 border border-amber-500/20 p-4 mt-6">
         <p className="text-xs text-gray-300 leading-relaxed">
           🔗 <strong className="text-amber-300">Próximo passo:</strong> abrir o {" "}
-          <Link href="/dashboard/stl" className="text-amber-200 hover:underline font-semibold">Gerador STL</Link> {" "}
+          <Link href="/dashboard/bioprint/model" className="text-amber-200 hover:underline font-semibold">Bioimpressão · Etapa 1 (Modelo 3D)</Link> {" "}
           e baixar os testes de printabilidade na seção "Testes Printabilidade" (badge amarelo). Imprima primeiro,
           fotografe, analise no ImageJ seguindo este protocolo. Anote tudo no {" "}
           <Link href="/dashboard/notebook" className="text-amber-200 hover:underline font-semibold">Notebook</Link>.

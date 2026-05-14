@@ -109,7 +109,7 @@ const PHASES: Phase[] = [
     title: "Modelar a Geometria 3D (STL)",
     goal: "Criar o modelo digital do construto: anatomia paciente-específica ou geometria padrão (scaffold poroso, organoide, vaso).",
     duration: "2–5 dias",
-    module: { name: "Gerador STL", href: "/dashboard/stl", icon: Box },
+    module: { name: "Bioimpressão · Etapa 1 (Modelo 3D)", href: "/dashboard/bioprint/model", icon: Box },
     color: "from-blue-500 to-cyan-500",
     steps: [
       "Para anatomia: importe DICOM (CT/MRI) ou use STLs pré-prontos (orelha, coração, rim, fígado, mão).",
@@ -126,7 +126,7 @@ const PHASES: Phase[] = [
     title: "Gerar G-code & Otimizar Parâmetros",
     goal: "Converter o STL em instruções de máquina: caminho da agulha, velocidade, pressão, temperatura, infill — tudo otimizado para sua bioink.",
     duration: "1–3 dias",
-    module: { name: "Motor GCODE", href: "/dashboard/bioprinting/engine", icon: Zap },
+    module: { name: "Bioimpressão · Etapa 3 (Fatiamento + G-code)", href: "/dashboard/bioprint/slice", icon: Zap },
     color: "from-amber-500 to-yellow-500",
     steps: [
       "Importe o STL no Motor GCODE BIA v4.2.",
@@ -144,7 +144,7 @@ const PHASES: Phase[] = [
     title: "Imprimir o Construto (Bioimpressão 3D)",
     goal: "Executar a impressão real com células e biomaterial — em ambiente estéril, monitorando parâmetros críticos.",
     duration: "1–4 horas",
-    module: { name: "Bioimpressão 3D", href: "/dashboard/bioprinting", icon: Printer },
+    module: { name: "Bioimpressão · Etapa 4 (Execução)", href: "/dashboard/bioprint/control", icon: Printer },
     color: "from-purple-500 to-fuchsia-500",
     steps: [
       "Conecte a impressora via USB Web Serial (Marlin/Klipper) — ou opere offline.",

@@ -31,18 +31,33 @@ Combina até **8 biomateriais** com análise multi-dimensional via IA:
 **Rota:** `/dashboard/formulator-pro`
 **API:** `POST /api/biomaterials/formulate-pro` (10 créditos / 15 com alternativas)
 
-### 📦 Gerador STL (ATUALIZADO em v4.3)
-- **20 geometrias** paramétricas: membrana, disco, vaso, fêmur, nariz, menisco, córnea,
-  lente, esfera organoide, orelha, coração, rim, fígado, mão + **3 TPMS novas**
-- **TPMS scaffolds** (NOVO): Gyroid, Schwarz P, Diamond — superfícies mínimas triperiódicas
-  para regeneração óssea avançada
-- **Validador de Mesh** (NOVO): manifoldness, watertightness, normais, paredes finas,
-  volume e área em mm³/mm² + Quality Score 0-100
-- **4 formatos de export**: STL Binário, STL ASCII, OBJ Wavefront, **PLY (NOVO)**
-- Marching Cubes para TPMS (32-48 cubos/aresta)
+### 🖨️ Bioimpressão Unificada (NOVO em v4.4 — R1→R8)
+Processo linear em **4 etapas** que substitui os antigos `/stl`, `/biomaterials`,
+`/bioprinting`, `/bioprinting/engine`, `/bioprinting/dual-porosity`, `/bioprinting/connection-guide`
+e `/bioprinter-control`. Estado compartilhado via `BioprintProcessContext` (React Context
++ sessionStorage). Cada etapa desbloqueia a próxima.
 
-**Rota:** `/dashboard/stl`
-**Lib:** `src/lib/stl/{generator.ts, mesh-validator.ts, tpms-generator.ts}`
+| Etapa | Rota | Função |
+|------:|------|--------|
+| Hub | `/dashboard/bioprint` | Stepper visual + status das 4 etapas |
+| 1 — Modelo 3D | `/dashboard/bioprint/model` | Upload ou geração paramétrica entre 5 categorias (membrana/scaffold/vascular/organoide/anatômico) com 20+ geometrias incluindo **TPMS** (Gyroid, Schwarz P, Diamond) e validador de mesh |
+| 2 — Biotinta | `/dashboard/bioprint/bioink` | Formular com 807 biomateriais + reologia em tempo real (Hagen-Poiseuille) |
+| 3 — Fatiamento | `/dashboard/bioprint/slice` | Motor G-code real com 11 algoritmos + parâmetros biomédicos · **6 créditos** por geração |
+| 4 — Execução | `/dashboard/bioprint/control` | Joystick 3D, viabilidade celular (Blaeser 2016), crosslink e pós-processamento |
+
+**Redirects permanentes (HTTP 308)** mantêm compatibilidade com links antigos:
+- `/dashboard/stl` → `/dashboard/bioprint/model`
+- `/dashboard/biomaterials` → `/dashboard/bioprint/bioink`
+- `/dashboard/bioprinting/engine` → `/dashboard/bioprint/slice`
+- `/dashboard/bioprinter-control` → `/dashboard/bioprint/control`
+- `/dashboard/bioprinting/dual-porosity` → `/dashboard/bioprint/model`
+- `/dashboard/bioprinting/connection-guide` → `/dashboard/bioprint/control`
+- `/dashboard/bioprinting` → `/dashboard/bioprint`
+
+**Libs envolvidas:** `src/lib/bioprint/process-context.tsx`, `src/lib/stl/*`,
+`src/lib/bioprinter/biomedical-params.ts`, `src/lib/bioprinting/bioprinters.ts`,
+`src/components/bioprinter/{Joystick3D,ExtrusionPanel,TissueViabilityPanel,PostBioprintingPanel}.tsx`
+**API principal:** `POST /api/gcode/generate` (6 créditos)
 
 ### 📚 Manual do Usuário (NOVO em v4.3)
 5 capítulos didáticos com racional fácil de entender:
@@ -60,7 +75,6 @@ Combina até **8 biomateriais** com análise multi-dimensional via IA:
 
 ### Outros módulos
 - **Knowledge Base** — 120 artigos + 100 patentes indexados
-- **Bioprinting Engine** — Cálculo de G-code com Hagen-Poiseuille + dual porosity
 - **Notebook** — Caderno eletrônico de laboratório
 - **Pipeline** — Gestão de projetos científicos
 - **Protocols** — Biblioteca de protocolos validados
@@ -124,14 +138,17 @@ GOOGLE_AI_API_KEY=...
 
 ## 📊 Tamanhos do Bundle (build atual)
 
-| Rota | First Load JS |
-|---|---|
-| `/dashboard/formulator-pro` | 14.4 kB |
-| `/dashboard/stl` | 19.3 kB (com TPMS + validador) |
-| `/dashboard/manual` | 12.8 kB (5 capítulos) |
-| `/dashboard/roadmap` | 9.75 kB |
-| `/dashboard/bioprinting/engine` | 37.3 kB |
-| **Shared** | 87.3 kB |
+| Rota | Page Size | First Load JS |
+|---|---|---|
+| `/dashboard/formulator-pro` | 14.4 kB | 111 kB |
+| `/dashboard/bioprint` | 5.75 kB | 111 kB |
+| `/dashboard/bioprint/model` | 29.3 kB | 134 kB |
+| `/dashboard/bioprint/bioink` | 11.9 kB | 117 kB |
+| `/dashboard/bioprint/slice` | 14.5 kB | 128 kB |
+| `/dashboard/bioprint/control` | 20 kB | 133 kB |
+| `/dashboard/manual` | 23.7 kB | 129 kB |
+| `/dashboard/roadmap` | 11 kB | 116 kB |
+| **Shared** | — | 87.3 kB |
 
 ---
 
@@ -143,7 +160,7 @@ GOOGLE_AI_API_KEY=...
 - Exportação PDF científico ABNT/Vancouver
 
 ### v4.5 (Q3 2026)
-- Importação DICOM-CT/MRI direto no Gerador STL
+- Importação DICOM-CT/MRI direto na Etapa 1 da Bioimpressão
 - Multi-LLM: Gemini + GPT-4o + Claude 3.5 com comparação A/B
 - Reparo automático de mesh (NON_MANIFOLD → fix)
 

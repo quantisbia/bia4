@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import {
   TrendingUp, Zap, GitBranch, FlaskConical,
   MessageSquare, BookOpen, ArrowRight, Activity,
-  Clock, CheckCircle2, AlertCircle, CircleDot, FileText, Printer, Microscope, Box, Wrench
+  Clock, CheckCircle2, AlertCircle, CircleDot, FileText, Printer, Microscope, Wrench
 } from "lucide-react"
 import Link from "next/link"
 
@@ -39,13 +39,11 @@ export default async function DashboardPage() {
 
   const quickActions = [
     { title: "Novo Pipeline",        desc: "Design de tecido",       href: "/dashboard/pipeline",      icon: GitBranch,    color: "violet" },
-    { title: "Formular Biomaterial", desc: "Buscar formulação",      href: "/dashboard/biomaterials",  icon: FlaskConical, color: "blue"   },
-    { title: "Bioimpressão 3D",      desc: "STL · GCode · Reologia", href: "/dashboard/bioprinting",   icon: Printer,      color: "indigo" },
+    { title: "Bioimpressão",         desc: "Modelo · Tinta · G-code · Print", href: "/dashboard/bioprint",      icon: Printer,      color: "indigo" },
     { title: "Organoid Builder",     desc: "Design de organoide",    href: "/dashboard/organoids",     icon: CircleDot,    color: "purple" },
     { title: "Protocolos GLP/GMP",   desc: "Protocolo laboratorial", href: "/dashboard/protocols",     icon: FileText,     color: "violet" },
     { title: "Análises & Dossiês",   desc: "Molecular, celular, FDA",href: "/dashboard/analyses",      icon: Microscope,   color: "rose"   },
     { title: "Chat com IA",          desc: "Dúvidas científicas",    href: "/dashboard/chat",          icon: MessageSquare,color: "indigo" },
-    { title: "Gerador STL/OBJ",      desc: "12 geometrias 3D",        href: "/dashboard/stl",           icon: Box,          color: "violet" },
     { title: "Base de Conhecimento", desc: "Pesquisar artigos",      href: "/dashboard/knowledge",     icon: BookOpen,     color: "blue"   },
     { title: "Ferramentas BIA",     desc: "Comparador · Custos · PDF", href: "/dashboard/tools",         icon: Wrench,       color: "amber"  },
   ]
@@ -124,8 +122,8 @@ export default async function DashboardPage() {
             {
               title: "GelMA: o bioink mais versátil",
               tip: "Use GelMA 5-10% + LAP 0.05% para crosslinking UV. Ideal para extrusão com shear-thinning. Combine com alginato para duplo crosslinking.",
-              module: "Formulador Bio",
-              href: "/dashboard/biomaterials",
+              module: "Bioimpressão · Etapa 2",
+              href: "/dashboard/bioprint/bioink",
               color: "blue",
             },
             {

@@ -21,7 +21,7 @@ import Link from "next/link"
 import {
   Upload, Sparkles, FlaskConical, Heart, Bone, Activity, Hexagon,
   ShieldCheck, Brain, CheckCircle2, AlertTriangle, ArrowRight, Box,
-  Download, Loader2, FileCode2, Info, XCircle, ChevronRight
+  Download, Loader2, FileCode2, Info, XCircle
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import {
@@ -594,21 +594,18 @@ function GeneratePanel({
           )
         })}
 
-        {/* Estratégia avançada link (só na categoria organoid-vascular) */}
+        {/* Estratégia avançada — dual-porosity (consolidada nesta página, categoria organoid-vascular) */}
         {category === "organoid-vascular" && (
-          <Link
-            href="/dashboard/bioprinting/dual-porosity"
-            className="block mt-2 rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-3 hover:bg-cyan-500/10 transition-colors"
-          >
+          <div className="block mt-2 rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-3">
             <div className="flex items-center gap-2 text-xs font-semibold text-cyan-300">
               <Activity className="w-4 h-4" />
               Dual-porosity (avançado)
-              <ChevronRight className="w-3 h-3 ml-auto" />
             </div>
             <div className="text-[11px] text-cyan-100/70 mt-1 leading-snug">
-              Estratégia de vascularização com poros macro+micro para organoides perfundíveis
+              Estratégia de vascularização com poros macro+micro para organoides perfundíveis.
+              Disponível nas geometrias <strong>Vascular Tree</strong> e <strong>Organoid Cluster</strong> abaixo.
             </div>
-          </Link>
+          </div>
         )}
       </aside>
 

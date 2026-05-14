@@ -3,8 +3,8 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  LayoutDashboard, GitBranch, MessageSquare, FlaskConical,
-  BookOpen, FileText, MoreHorizontal, Printer, CircleDot, Box, Zap,
+  LayoutDashboard, GitBranch, MessageSquare,
+  BookOpen, FileText, MoreHorizontal, Printer, CircleDot,
   X, CreditCard, ClipboardCheck, BookMarked, Wrench
 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
@@ -14,13 +14,10 @@ const PRIMARY_TABS = [
   { href: "/dashboard",              label: "Home",      icon: LayoutDashboard, exact: true },
   { href: "/dashboard/pipeline",     label: "Pipeline",  icon: GitBranch },
   { href: "/dashboard/chat",         label: "Chat IA",   icon: MessageSquare },
-  { href: "/dashboard/biomaterials", label: "Bio",       icon: FlaskConical },
+  { href: "/dashboard/bioprint",     label: "Bioprint",  icon: Printer },
 ]
 
 const MORE_TABS = [
-  { href: "/dashboard/bioprinting",         label: "Bioimpressão 3D",      icon: Printer },
-  { href: "/dashboard/stl",                 label: "Gerador STL",          icon: Box },
-  { href: "/dashboard/bioprinting/engine",  label: "Motor GCODE",          icon: Zap },
   { href: "/dashboard/organoids",           label: "Organoid Builder",     icon: CircleDot },
   { href: "/dashboard/protocols",           label: "Protocolos GLP/GMP",   icon: FileText },
   { href: "/dashboard/protocol-total",      label: "Protocolo Total",      icon: ClipboardCheck },
