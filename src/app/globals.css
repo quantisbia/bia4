@@ -33,25 +33,26 @@
   }
 
   .dark {
-    --background: 265 50% 4%;
+    /* Quantis palette — dark mode (R10) */
+    --background: 257 50% 6%;        /* quantis-ink-950 */
     --foreground: 0 0% 98%;
-    --card: 265 40% 6%;
+    --card: 256 40% 10%;             /* quantis-ink-900 */
     --card-foreground: 0 0% 98%;
-    --popover: 265 40% 6%;
+    --popover: 256 40% 10%;
     --popover-foreground: 0 0% 98%;
-    --primary: 270 71% 65%;
+    --primary: 268 84% 60%;          /* quantis-purple-500 (#7531df) */
     --primary-foreground: 0 0% 100%;
-    --secondary: 265 30% 12%;
+    --secondary: 255 30% 16%;        /* quantis-ink-800 */
     --secondary-foreground: 0 0% 98%;
-    --muted: 265 30% 12%;
-    --muted-foreground: 265 10% 65%;
-    --accent: 265 30% 12%;
+    --muted: 255 30% 16%;
+    --muted-foreground: 255 15% 65%;
+    --accent: 226 86% 59%;           /* quantis-blue-500 */
     --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 343 56% 50%;      /* quantis-wine-600 */
     --destructive-foreground: 0 0% 98%;
-    --border: 265 30% 14%;
-    --input: 265 30% 14%;
-    --ring: 270 71% 65%;
+    --border: 256 30% 18%;
+    --input: 256 30% 18%;
+    --ring: 268 84% 60%;
   }
 }
 
@@ -72,11 +73,111 @@
   }
 
   .bia-gradient-text {
-    @apply bg-gradient-to-r from-violet-400 via-purple-400 to-blue-400 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-quantis-lilac-300 via-quantis-purple-400 to-quantis-blue-400 bg-clip-text text-transparent;
   }
 
   .bia-button-primary {
-    @apply bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-semibold px-6 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-violet-500/25;
+    @apply bg-gradient-to-r from-quantis-purple-600 to-quantis-lilac-500 hover:from-quantis-purple-500 hover:to-quantis-lilac-400 text-white font-semibold px-6 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-quantis-purple-500/30;
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     QUANTIS BRAND UTILITIES (R10) — tipografia maior + cores
+     ═══════════════════════════════════════════════════════════ */
+
+  /* Tipografia ampliada para leitura confortável */
+  .q-h1 {
+    @apply text-2xl sm:text-3xl font-bold text-white tracking-tight;
+  }
+  .q-h2 {
+    @apply text-xl sm:text-2xl font-bold text-white;
+  }
+  .q-h3 {
+    @apply text-base sm:text-lg font-bold text-white;
+  }
+  .q-text {
+    @apply text-sm sm:text-base text-quantis-ink-100 leading-relaxed;
+  }
+  .q-text-muted {
+    @apply text-sm text-quantis-ink-200/80 leading-relaxed;
+  }
+  .q-label {
+    @apply text-xs sm:text-sm font-semibold text-quantis-lilac-200 uppercase tracking-wider;
+  }
+  .q-mono {
+    @apply font-mono text-quantis-gold-200 tabular-nums;
+  }
+
+  /* Cards Quantis */
+  .q-card {
+    @apply rounded-2xl bg-gradient-to-br from-quantis-ink-900/60 to-quantis-ink-800/40 border border-quantis-lilac-500/15 shadow-quantis-card;
+  }
+  .q-card-purple {
+    @apply rounded-2xl bg-gradient-to-br from-quantis-purple-500/10 to-quantis-purple-700/5 border border-quantis-purple-500/30;
+  }
+  .q-card-lilac {
+    @apply rounded-2xl bg-gradient-to-br from-quantis-lilac-500/10 to-quantis-lilac-700/5 border border-quantis-lilac-500/30;
+  }
+  .q-card-blue {
+    @apply rounded-2xl bg-gradient-to-br from-quantis-blue-500/10 to-quantis-blue-700/5 border border-quantis-blue-500/30;
+  }
+  .q-card-wine {
+    @apply rounded-2xl bg-gradient-to-br from-quantis-wine-500/10 to-quantis-wine-700/5 border border-quantis-wine-500/30;
+  }
+  .q-card-gold {
+    @apply rounded-2xl bg-gradient-to-br from-quantis-gold-500/10 to-quantis-gold-700/5 border border-quantis-gold-500/30;
+  }
+
+  /* Botões Quantis */
+  .q-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm
+           bg-gradient-to-r from-quantis-purple-600 to-quantis-lilac-500
+           hover:from-quantis-purple-500 hover:to-quantis-lilac-400
+           text-white shadow-lg shadow-quantis-purple-500/20
+           transition-all duration-150 active:scale-[0.98];
+  }
+  .q-btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm
+           bg-quantis-ink-800/60 hover:bg-quantis-ink-700/60
+           border border-quantis-lilac-500/30 hover:border-quantis-lilac-400/50
+           text-quantis-lilac-100
+           transition-all duration-150;
+  }
+  .q-btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
+           text-quantis-ink-200 hover:text-quantis-lilac-100 hover:bg-quantis-lilac-500/8
+           transition-colors duration-150;
+  }
+  .q-btn-wine {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm
+           bg-gradient-to-r from-quantis-wine-600 to-quantis-wine-500
+           hover:from-quantis-wine-500 hover:to-quantis-wine-400
+           text-white shadow-lg shadow-quantis-wine-500/20
+           transition-all duration-150 active:scale-[0.98];
+  }
+
+  /* Pills / Badges Quantis */
+  .q-pill {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold
+           bg-quantis-purple-500/15 border border-quantis-purple-400/30 text-quantis-purple-200;
+  }
+  .q-pill-gold {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold
+           bg-quantis-gold-500/15 border border-quantis-gold-400/30 text-quantis-gold-200;
+  }
+  .q-pill-wine {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold
+           bg-quantis-wine-500/15 border border-quantis-wine-400/30 text-quantis-wine-200;
+  }
+
+  /* Glow effects Quantis */
+  .q-glow {
+    box-shadow: 0 0 30px rgba(145, 82, 245, 0.2), 0 0 60px rgba(58, 102, 240, 0.08);
+  }
+  .q-glow-wine {
+    box-shadow: 0 0 25px rgba(205, 68, 103, 0.25);
+  }
+  .q-glow-gold {
+    box-shadow: 0 0 25px rgba(251, 191, 36, 0.2);
   }
 
   .bia-sidebar-item {

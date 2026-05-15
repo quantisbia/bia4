@@ -35,6 +35,8 @@ import { useBioprintProcess } from "@/lib/bioprint/process-context"
 import { INFILL_PATTERNS, TEMPERATURE_PROFILES } from "@/lib/bioprinter/biomedical-params"
 import { BIOPRINTERS, getBioprinterById, supportsWebSerial } from "@/lib/bioprinting/bioprinters"
 import { SUPPORTED_GEOMETRY_IDS } from "@/lib/gcode/slicer/geometry-bounds"
+import { TissueDesigner, type TissueDesignerValue } from "@/components/bioprinting/TissueDesigner"
+import { PrinterConnection } from "@/components/bioprinting/PrinterConnection"
 
 // Timeout máximo de geração — evita rodar para sempre se o engine travar
 const GCODE_TIMEOUT_MS = 45_000
@@ -123,7 +125,13 @@ export default function BioprintSlicePage() {
   const isUnlocked = modelReady && bioinkReady
 
   // ── Tab atual ──
-  const [tab, setTab] = useState<"params" | "wells" | "gcode">("params")
+  const [tab, setTab] = useState<"tissue" | "params" | "wells" | "gcode">("tissue")
+
+  // ── TissueDesigner (R10) ─ perfil biomimético inteligente ──
+  const [tissueDesign, setTissueDesign] = useState<TissueDesignerValue>({
+    profileId: null,
+    pattern: null,
+  })
 
   // ── Parâmetros do slicer ──
   // Inicializa do state.slice (se houver) ou de defaults conservadores
@@ -563,6 +571,7 @@ export default function BioprintSlicePage() {
 
         {/* Tabs */}
         <div className="mt-5 flex gap-1.5 bg-white/3 border border-white/8 rounded-xl p-1 w-fit max-w-full overflow-x-auto">
+          <TabButton label="Tecido" icon={Microscope} active={tab === "tissue"} onClick={() => setTab("tissue")} dot={tissueDesign.profileId ? "violet" : null} />
           <TabButton label="Parâmetros" icon={Settings2} active={tab === "params"} onClick={() => setTab("params")} />
           <TabButton label="Multi-poço" icon={Beaker} active={tab === "wells"} onClick={() => setTab("wells")} dot={useMultiWell ? "violet" : null} />
           <TabButton label="G-code" icon={FileCode2} active={tab === "gcode"} onClick={() => setTab("gcode")} dot={result ? "emerald" : null} />
@@ -638,6 +647,36 @@ export default function BioprintSlicePage() {
 
       {/* Conteúdo da tab */}
       <main className="flex-1 px-4 sm:px-6 py-6 pb-24">
+        {tab === "tissue" && (
+          <div className="max-w-5xl mx-auto">
+            <TissueDesigner
+              value={tissueDesign}
+              hasCells={!!state.bioink.cellType}
+              onChange={(v) => {
+                setTissueDesign(v)
+                // Auto-aplica os parâmetros do perfil aos sliders clássicos
+                if (v.infillDensity !== undefined) setInfillPercent(v.infillDensity)
+                if (v.nozzleDiameter !== undefined) setNozzleDiameterUm(v.nozzleDiameter)
+                if (v.printSpeed !== undefined) setPrintSpeedMmS(v.printSpeed)
+                if (v.pressure !== undefined) setPressureKPa(v.pressure)
+                if (v.layerHeight !== undefined) setLayerHeightMm(v.layerHeight)
+              }}
+            />
+            {tissueDesign.profileId && (
+              <div className="mt-6 flex items-center justify-between rounded-2xl bg-quantis-purple-500/10 border border-quantis-purple-400/30 p-4">
+                <div className="text-sm text-quantis-lilac-100">
+                  Perfil aplicado. Avance para <strong>Parâmetros</strong> para ajustes finais e depois gere o G-code.
+                </div>
+                <button
+                  onClick={() => setTab("params")}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-quantis-lilac-500 hover:bg-quantis-lilac-400 text-quantis-ink-950 text-sm font-bold rounded-lg transition-colors"
+                >
+                  Continuar <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         {tab === "params" && (
           <ParamsPanel
             bioprinterId={bioprinterId} onBioprinterChange={setBioprinterId}
@@ -671,14 +710,21 @@ export default function BioprintSlicePage() {
           />
         )}
         {tab === "gcode" && (
-          <GCodePanel
-            loading={loading}
-            error={error}
-            result={result}
-            onGenerate={generateGCode}
-            onDownload={downloadGCode}
-            isUnlocked={isUnlocked}
-          />
+          <div className="space-y-6">
+            {/* PREPARAÇÃO DA BIOIMPRESSORA — conexão USB + joystick (R10) */}
+            <PrinterPrepSection
+              gcode={result?.gcode ?? state.slice.gcode ?? ""}
+              printerName={currentPrinter?.fullName ?? "Bioimpressora BIA"}
+            />
+            <GCodePanel
+              loading={loading}
+              error={error}
+              result={result}
+              onGenerate={generateGCode}
+              onDownload={downloadGCode}
+              isUnlocked={isUnlocked}
+            />
+          </div>
         )}
       </main>
 
@@ -1653,5 +1699,55 @@ function StatBox({
       </div>
       <div className="text-lg font-bold">{value}</div>
     </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// PrinterPrepSection (R10) — Conexão + joystick no topo da aba G-code.
+// Permite que o usuário PREPARE a máquina (homing, Z-offset, purga)
+// ANTES de gerar/enviar o G-code.
+// ═══════════════════════════════════════════════════════════════════════
+function PrinterPrepSection({ gcode, printerName }: { gcode: string; printerName: string }) {
+  const [expanded, setExpanded] = useState(true)
+  const [isConnected, setIsConnected] = useState(false)
+
+  return (
+    <section className="rounded-2xl bg-gradient-to-br from-quantis-blue-500/[0.06] to-quantis-purple-500/[0.04] border border-quantis-blue-400/30 overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full px-5 py-4 flex items-center gap-3 hover:bg-white/[0.02] transition-colors text-left"
+      >
+        <div className="w-11 h-11 rounded-xl bg-quantis-blue-500/20 border border-quantis-blue-400/40 flex items-center justify-center shrink-0">
+          <Printer className="w-5 h-5 text-quantis-blue-200" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-base font-bold text-white">Preparar a Bioimpressora</h3>
+            <span className={cn(
+              "text-xs px-2 py-0.5 rounded-full border font-semibold inline-flex items-center gap-1",
+              isConnected
+                ? "bg-emerald-500/15 border-emerald-400/40 text-emerald-200"
+                : "bg-quantis-ink-700/40 border-quantis-ink-500/40 text-quantis-ink-200"
+            )}>
+              {isConnected ? "● ONLINE" : "○ OFFLINE"}
+            </span>
+          </div>
+          <p className="text-sm text-quantis-blue-100/80 mt-0.5">
+            Conecte por USB, faça homing, ajuste Z-offset e purgue antes de gerar/enviar o G-code.
+          </p>
+        </div>
+        {expanded ? <ChevronDown className="w-5 h-5 text-quantis-blue-200" /> : <ChevronRight className="w-5 h-5 text-quantis-blue-200" />}
+      </button>
+
+      {expanded && (
+        <div className="px-4 sm:px-5 pb-5 border-t border-white/5 pt-4">
+          <PrinterConnection
+            gcode={gcode}
+            printerName={printerName}
+            onConnectionChange={setIsConnected}
+          />
+        </div>
+      )}
+    </section>
   )
 }
