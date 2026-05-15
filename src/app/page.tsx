@@ -6,6 +6,7 @@ import {
   TrendingUp, AlertCircle, Crown, CircleDot,
   ChevronRight
 } from "lucide-react"
+import { FloatingThemeLocale } from "@/components/ui/FloatingThemeLocale"
 
 /* ─── Logo BIA SVG ──────────────────────────────────────────────────── */
 function BiaLogoSvg({ size = 32 }: { size?: number }) {
@@ -44,6 +45,9 @@ function BiaLogoBox({ sizeClass = "w-10 h-10", size = 32, rounded = "rounded-xl"
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-[#0a0514] text-white overflow-x-hidden">
+
+      {/* ── Controles flutuantes (tema + idioma) ─────────────────────────── */}
+      <FloatingThemeLocale position="top-right" className="mt-16" />
 
       {/* ── Nav ─────────────────────────────────────────────────────────── */}
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#0a0514]/90 backdrop-blur-xl">

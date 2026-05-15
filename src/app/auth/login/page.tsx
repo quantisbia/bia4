@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { AlertCircle, Loader2, Eye, EyeOff, Zap, ArrowRight } from "lucide-react"
+import { FloatingThemeLocale } from "@/components/ui/FloatingThemeLocale"
 
 function BiaLogoIcon({ size = 38 }: { size?: number }) {
   return (
@@ -74,6 +75,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0514] flex flex-col items-center justify-center px-4 py-8 grid-bg">
+      <FloatingThemeLocale position="top-right" />
       {/* Glow */}
       <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-violet-500/6 rounded-full blur-3xl pointer-events-none" />
 

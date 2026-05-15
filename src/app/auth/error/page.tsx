@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Dna, AlertTriangle, ArrowLeft } from "lucide-react"
+import { FloatingThemeLocale } from "@/components/ui/FloatingThemeLocale"
 
 const ERROR_MESSAGES: Record<string, string> = {
   Configuration: "Erro de configuração do servidor. Contate o suporte.",
@@ -27,6 +28,7 @@ export default function AuthErrorPage() {
 
   return (
     <div className="min-h-screen bg-[#030a04] flex items-center justify-center p-6 grid-bg">
+      <FloatingThemeLocale position="top-right" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-red-500/5 rounded-full blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-md relative z-10 text-center">

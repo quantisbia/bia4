@@ -13,6 +13,8 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { isSuperAdmin } from "@/lib/auth/admin-shared"
+import { ThemeToggle } from "@/components/ui/ThemeToggle"
+import { LocaleSwitcher } from "@/components/ui/LocaleSwitcher"
 
 export function BiaLogoIcon({ size = 22 }: { size?: number }) {
   return (
@@ -298,9 +300,15 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           </div>
         </div>
 
+        {/* Preferências — tema + idioma */}
+        <div className="mt-2 flex items-center justify-between gap-2 px-1">
+          <LocaleSwitcher />
+          <ThemeToggle />
+        </div>
+
         {/* User row */}
-        <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-white/[0.04] transition-all mt-1">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center text-xs font-bold text-white shrink-0">
+        <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-white/[0.04] transition-all mt-2">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-quantis-purple-600 to-quantis-lilac-500 flex items-center justify-center text-xs font-bold text-white shrink-0">
             {initials}
           </div>
           <div className="flex-1 min-w-0">

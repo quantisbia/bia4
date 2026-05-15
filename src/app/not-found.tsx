@@ -1,9 +1,11 @@
 import Link from "next/link"
 import { Home, Search, ArrowLeft } from "lucide-react"
+import { FloatingThemeLocale } from "@/components/ui/FloatingThemeLocale"
 
 export default function NotFound() {
   return (
     <div className="min-h-screen bg-[#0a0514] flex items-center justify-center px-4">
+      <FloatingThemeLocale position="top-right" />
       <div className="text-center space-y-6 max-w-md mx-auto animate-fadeIn">
         {/* 404 number with glow */}
         <div className="relative">
