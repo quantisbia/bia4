@@ -10,25 +10,29 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 270 84% 5%;
-    --card: 0 0% 100%;
-    --card-foreground: 270 84% 5%;
+    /* Quantis palette — light mode (R11)
+     * Fundo creme/lilás suave para reduzir fadiga ocular em laboratórios.
+     * Mantém roxo Quantis como primária e vinho como destrutiva.
+     */
+    --background: 270 50% 98%;        /* quase branco com toque lilás */
+    --foreground: 257 50% 12%;        /* texto escuro lilás */
+    --card: 0 0% 100%;                /* branco puro p/ cards */
+    --card-foreground: 257 50% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 270 84% 5%;
-    --primary: 270 71% 55%;
+    --popover-foreground: 257 50% 12%;
+    --primary: 268 75% 52%;           /* quantis-purple-600 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 270 10% 96%;
-    --secondary-foreground: 270 84% 5%;
-    --muted: 270 10% 96%;
-    --muted-foreground: 270 10% 40%;
-    --accent: 270 10% 96%;
-    --accent-foreground: 270 84% 5%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 270 20% 90%;
-    --input: 270 20% 90%;
-    --ring: 270 71% 55%;
+    --secondary: 270 40% 96%;         /* lilás clarinho */
+    --secondary-foreground: 257 50% 18%;
+    --muted: 270 30% 94%;
+    --muted-foreground: 257 20% 40%;
+    --accent: 226 86% 59%;            /* quantis-blue-500 */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 343 56% 50%;       /* quantis-wine-600 */
+    --destructive-foreground: 0 0% 100%;
+    --border: 270 30% 90%;
+    --input: 270 30% 90%;
+    --ring: 268 75% 52%;
     --radius: 0.75rem;
   }
 

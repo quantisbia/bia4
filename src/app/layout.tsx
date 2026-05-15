@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next"
 import "./globals.css"
 import { SessionProvider } from "@/components/providers/SessionProvider"
+import { ThemeProvider, themeInitScript } from "@/components/providers/ThemeProvider"
+import { LocaleProvider } from "@/components/providers/LocaleProvider"
 import { ToastProvider } from "@/components/ui/Toast"
 import { auth } from "@/lib/auth/config"
 
@@ -74,7 +76,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: dark)", color: "#0a0514" },
-    { media: "(prefers-color-scheme: light)", color: "#0a0514" },
+    { media: "(prefers-color-scheme: light)", color: "#faf9ff" },
   ],
   width: "device-width",
   initialScale: 1,
@@ -87,8 +89,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const session = await auth()
 
   return (
-    <html lang="pt-BR" className="dark" suppressHydrationWarning>
+    <html lang="pt-BR" suppressHydrationWarning>
       <head>
+        {/* Anti-FOUC: aplica tema antes do React hidratar */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         {/* Fontes Inter + JetBrains Mono via Google Fonts CSS (runtime, não build-time) */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -133,11 +137,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className="font-sans antialiased">
-        <SessionProvider session={session}>
-          <ToastProvider>
-            {children}
-          </ToastProvider>
-        </SessionProvider>
+        <ThemeProvider defaultTheme="dark">
+          <LocaleProvider defaultLocale="pt">
+            <SessionProvider session={session}>
+              <ToastProvider>
+                {children}
+              </ToastProvider>
+            </SessionProvider>
+          </LocaleProvider>
+        </ThemeProvider>
       </body>
     </html>
   )
