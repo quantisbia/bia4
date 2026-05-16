@@ -325,7 +325,7 @@ export default function BioprintBioinkPage() {
   }, [materialId, concentration, crosslinker, crosslinkerConc, hasCells, cellType, cellDensity, additivesText, rheology.viscosityPaS, rheology.yieldStressPa])
 
   return (
-    <div className="flex flex-col min-h-full bg-[#0a0a0f]">
+    <div className="bia-bioink-page flex flex-col min-h-full bg-[#0a0a0f]">
       {/* Cabeçalho */}
       <header className="px-4 sm:px-6 py-5 border-b border-white/5">
         <div className="flex items-start justify-between gap-3">

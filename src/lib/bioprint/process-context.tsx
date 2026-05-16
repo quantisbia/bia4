@@ -114,10 +114,24 @@ export interface SliceStepState {
 
 export interface ControlStepState {
   status: StepStatus
-  /** Tipo de tecido alvo (chave em POST_PROCESSING) */
+  /** Tipo de tecido alvo (chave em POST_PROCESSING) — usado também por postBio */
   tissueType: string | null
   /** Se a impressora já está conectada (futuro WebSerial) */
   connected: boolean
+}
+
+/**
+ * Etapa 5: Pós-Bioimpressão (R12.3)
+ * Cultura → Crosslink → Biorreator → Validação (assays)
+ */
+export interface PostBioStepState {
+  status: StepStatus
+  /** Tipo de tecido alvo (espelhado de control.tissueType para flexibilidade) */
+  tissueType: string | null
+  /** Protocolos confirmados pelo usuário */
+  cultureConfirmed: boolean
+  bioreactorConfirmed: boolean
+  assaysConfirmed: boolean
 }
 
 // ─── Estado global ──────────────────────────────────────────────────────
@@ -127,6 +141,7 @@ export interface BioprintProcessState {
   bioink: BioinkStepState
   slice: SliceStepState
   control: ControlStepState
+  postBio: PostBioStepState
 }
 
 const DEFAULT_STATE: BioprintProcessState = {
@@ -172,6 +187,13 @@ const DEFAULT_STATE: BioprintProcessState = {
     tissueType: null,
     connected: false,
   },
+  postBio: {
+    status: "empty",
+    tissueType: null,
+    cultureConfirmed: false,
+    bioreactorConfirmed: false,
+    assaysConfirmed: false,
+  },
 }
 
 // ─── Context API ────────────────────────────────────────────────────────
@@ -182,6 +204,7 @@ export interface BioprintProcessContextValue {
   updateBioink: (patch: Partial<BioinkStepState>) => void
   updateSlice: (patch: Partial<SliceStepState>) => void
   updateControl: (patch: Partial<ControlStepState>) => void
+  updatePostBio: (patch: Partial<PostBioStepState>) => void
   resetStep: (step: keyof BioprintProcessState) => void
   resetAll: () => void
   /** Próxima etapa "pronta para entrar" baseada nos status */
@@ -208,6 +231,7 @@ export function BioprintProcessProvider({ children }: { children: ReactNode }) {
           bioink:  { ...DEFAULT_STATE.bioink,  ...(parsed.bioink  ?? {}) },
           slice:   { ...DEFAULT_STATE.slice,   ...(parsed.slice   ?? {}) },
           control: { ...DEFAULT_STATE.control, ...(parsed.control ?? {}) },
+          postBio: { ...DEFAULT_STATE.postBio, ...(parsed.postBio ?? {}) },
         })
       }
     } catch {
@@ -242,6 +266,10 @@ export function BioprintProcessProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, control: { ...prev.control, ...patch } }))
   }, [])
 
+  const updatePostBio = useCallback((patch: Partial<PostBioStepState>) => {
+    setState((prev) => ({ ...prev, postBio: { ...prev.postBio, ...patch } }))
+  }, [])
+
   const resetStep = useCallback((step: keyof BioprintProcessState) => {
     setState((prev) => ({ ...prev, [step]: DEFAULT_STATE[step] }))
   }, [])
@@ -255,7 +283,8 @@ export function BioprintProcessProvider({ children }: { children: ReactNode }) {
     state.model.status   !== "ready" ? "model" :
     state.bioink.status  !== "ready" ? "bioink" :
     state.slice.status   !== "ready" ? "slice" :
-    "control"
+    state.control.status !== "ready" ? "control" :
+    "postBio"
 
   const value: BioprintProcessContextValue = {
     state,
@@ -263,6 +292,7 @@ export function BioprintProcessProvider({ children }: { children: ReactNode }) {
     updateBioink,
     updateSlice,
     updateControl,
+    updatePostBio,
     resetStep,
     resetAll,
     nextStep,
@@ -306,6 +336,7 @@ export const STEP_LABELS = {
   bioink:  "Biotinta",
   slice:   "Fatiamento",
   control: "Execução",
+  postBio: "Pós-Bioimpressão",
 } as const
 
 /** Retorna se a etapa anterior está pronta (gate para avançar) */
@@ -318,5 +349,6 @@ export function isStepUnlocked(
     case "bioink":  return state.model.status === "ready"
     case "slice":   return state.bioink.status === "ready"
     case "control": return state.slice.status === "ready"
+    case "postBio": return state.control.status === "ready"
   }
 }

@@ -88,8 +88,184 @@ html.light [class*="bg-[#0c0820]"],
 html.light [class*="bg-[#030a04]"],
 html.light [class*="bg-[#0c0818]"],
 html.light [class*="bg-[#150f26]"],
-html.light [class*="bg-[#221c3a]"] {
+html.light [class*="bg-[#221c3a]"],
+html.light [class*="bg-[#0a0a0f]"],
+html.light [class*="bg-[#0f0f17]"],
+html.light [class*="bg-[#111118]"] {
   background-color: hsl(var(--background)) !important;
+}
+
+/* === BIOPRINT PAGES — overrides especificos para light mode (R12.3) ===
+   As paginas /dashboard/bioprint/* usam fundos muito escuros (bg-black/30,
+   bg-black/40, bg-black/95) que ficam ilegiveis em light. Forcamos paineis
+   claros mantendo as cores semanticas (emerald/cyan/rose/amber) das bordas. */
+html.light .bia-control-page,
+html.light .bia-post-page,
+html.light .bia-slice-page,
+html.light .bia-model-page,
+html.light .bia-bioink-page,
+html.light .bia-hub-page {
+  background-color: hsl(var(--background)) !important;
+  color: hsl(257 50% 14%) !important;
+}
+
+/* Overlays escuros (bg-black/30, bg-black/40, bg-black/50, bg-black/60) → painel claro */
+html.light .bia-control-page [class*="bg-black/"],
+html.light .bia-post-page [class*="bg-black/"],
+html.light .bia-slice-page [class*="bg-black/"],
+html.light .bia-model-page [class*="bg-black/"],
+html.light .bia-bioink-page [class*="bg-black/"],
+html.light .bia-hub-page [class*="bg-black/"] {
+  background-color: hsl(270 30% 98%) !important;
+}
+
+/* Footer sticky com bg-[#0a0a0f]/95 → branco com leve transparencia */
+html.light .bia-control-page footer[class*="bg-[#0a0a0f]"],
+html.light .bia-post-page footer[class*="bg-[#0a0a0f]"],
+html.light .bia-slice-page footer[class*="bg-[#0a0a0f]"],
+html.light .bia-model-page footer[class*="bg-[#0a0a0f]"],
+html.light .bia-bioink-page footer[class*="bg-[#0a0a0f]"],
+html.light .bia-hub-page footer[class*="bg-[#0a0a0f]"] {
+  background-color: hsl(270 30% 98% / 0.95) !important;
+}
+
+/* Bordas semanticas mais visiveis em light (emerald-500/20, cyan-500/20, etc.) */
+html.light .bia-control-page [class*="border-emerald-500/2"],
+html.light .bia-post-page    [class*="border-rose-500/2"],
+html.light .bia-slice-page   [class*="border-cyan-500/2"],
+html.light .bia-model-page   [class*="border-violet-500/2"],
+html.light .bia-bioink-page  [class*="border-cyan-500/2"] {
+  border-color: hsl(270 30% 82%) !important;
+}
+
+/* Tons de cinza/text dentro de cards escuros que ficam invisiveis */
+html.light .bia-control-page .text-gray-200,
+html.light .bia-control-page .text-gray-300,
+html.light .bia-post-page .text-gray-200,
+html.light .bia-post-page .text-gray-300,
+html.light .bia-slice-page .text-gray-200,
+html.light .bia-slice-page .text-gray-300 {
+  color: hsl(257 40% 22%) !important;
+}
+
+html.light .bia-control-page .text-gray-400,
+html.light .bia-post-page .text-gray-400,
+html.light .bia-slice-page .text-gray-400 {
+  color: hsl(257 25% 38%) !important;
+}
+
+html.light .bia-control-page .text-gray-500,
+html.light .bia-post-page .text-gray-500,
+html.light .bia-slice-page .text-gray-500 {
+  color: hsl(257 18% 50%) !important;
+}
+
+/* Tons coloridos (emerald-100, rose-100, etc.) ja sao claros — em light precisam escurecer */
+html.light .bia-control-page .text-emerald-100,
+html.light .bia-control-page .text-emerald-200,
+html.light .bia-control-page .text-emerald-300,
+html.light .bia-post-page .text-emerald-100,
+html.light .bia-post-page .text-emerald-200,
+html.light .bia-post-page .text-emerald-300 {
+  color: hsl(160 70% 28%) !important;
+}
+
+html.light .bia-control-page .text-rose-100,
+html.light .bia-control-page .text-rose-200,
+html.light .bia-control-page .text-rose-300,
+html.light .bia-post-page .text-rose-100,
+html.light .bia-post-page .text-rose-200,
+html.light .bia-post-page .text-rose-300 {
+  color: hsl(345 75% 38%) !important;
+}
+
+html.light .bia-control-page .text-cyan-100,
+html.light .bia-control-page .text-cyan-200,
+html.light .bia-control-page .text-cyan-300,
+html.light .bia-post-page .text-cyan-100,
+html.light .bia-post-page .text-cyan-200,
+html.light .bia-post-page .text-cyan-300,
+html.light .bia-slice-page .text-cyan-100,
+html.light .bia-slice-page .text-cyan-200,
+html.light .bia-slice-page .text-cyan-300 {
+  color: hsl(195 80% 30%) !important;
+}
+
+html.light .bia-control-page .text-amber-100,
+html.light .bia-control-page .text-amber-200,
+html.light .bia-control-page .text-amber-300,
+html.light .bia-post-page .text-amber-100,
+html.light .bia-post-page .text-amber-200,
+html.light .bia-post-page .text-amber-300,
+html.light .bia-slice-page .text-amber-100,
+html.light .bia-slice-page .text-amber-200,
+html.light .bia-slice-page .text-amber-300 {
+  color: hsl(32 85% 32%) !important;
+}
+
+/* Subtitulos com /80 dentro das bia-pages */
+html.light .bia-control-page [class*="text-amber-200/"],
+html.light .bia-control-page [class*="text-emerald-200/"],
+html.light .bia-control-page [class*="text-cyan-200/"],
+html.light .bia-control-page [class*="text-rose-200/"],
+html.light .bia-post-page [class*="text-amber-200/"],
+html.light .bia-post-page [class*="text-emerald-200/"],
+html.light .bia-post-page [class*="text-cyan-200/"],
+html.light .bia-post-page [class*="text-rose-200/"],
+html.light .bia-slice-page [class*="text-amber-200/"],
+html.light .bia-slice-page [class*="text-cyan-200/"] {
+  opacity: 1;
+}
+
+/* Botoes "ghost" (bg-white/5 hover:bg-white/10) — em light viram cinza-claro */
+html.light .bia-control-page button[class*="bg-white/5"],
+html.light .bia-control-page a[class*="bg-white/5"],
+html.light .bia-post-page button[class*="bg-white/5"],
+html.light .bia-post-page a[class*="bg-white/5"],
+html.light .bia-slice-page button[class*="bg-white/5"],
+html.light .bia-slice-page a[class*="bg-white/5"] {
+  background-color: hsl(270 25% 92%) !important;
+}
+
+html.light .bia-control-page button[class*="bg-white/5"]:hover,
+html.light .bia-control-page a[class*="bg-white/5"]:hover,
+html.light .bia-post-page button[class*="bg-white/5"]:hover,
+html.light .bia-post-page a[class*="bg-white/5"]:hover,
+html.light .bia-slice-page button[class*="bg-white/5"]:hover,
+html.light .bia-slice-page a[class*="bg-white/5"]:hover {
+  background-color: hsl(270 30% 86%) !important;
+}
+
+/* Cards de status (bg-emerald-500/5, bg-rose-500/5, etc.) — manter
+   mas com saturacao adequada para contraste em light */
+html.light .bia-control-page [class*="bg-emerald-500/5"],
+html.light .bia-control-page [class*="bg-emerald-500/10"],
+html.light .bia-post-page [class*="bg-rose-500/5"],
+html.light .bia-post-page [class*="bg-rose-500/10"],
+html.light .bia-slice-page [class*="bg-cyan-500/5"],
+html.light .bia-slice-page [class*="bg-cyan-500/10"],
+html.light .bia-slice-page [class*="bg-amber-500/5"],
+html.light .bia-slice-page [class*="bg-amber-500/10"] {
+  background-color: hsl(150 50% 95%) !important;
+}
+
+html.light .bia-post-page [class*="bg-rose-500/5"],
+html.light .bia-post-page [class*="bg-rose-500/10"] {
+  background-color: hsl(350 70% 96%) !important;
+}
+
+html.light .bia-slice-page [class*="bg-amber-500/5"],
+html.light .bia-slice-page [class*="bg-amber-500/10"],
+html.light .bia-control-page [class*="bg-amber-500/5"],
+html.light .bia-control-page [class*="bg-amber-500/10"],
+html.light .bia-post-page [class*="bg-amber-500/5"],
+html.light .bia-post-page [class*="bg-amber-500/10"] {
+  background-color: hsl(40 90% 95%) !important;
+}
+
+html.light .bia-slice-page [class*="bg-cyan-500/5"],
+html.light .bia-slice-page [class*="bg-cyan-500/10"] {
+  background-color: hsl(195 70% 95%) !important;
 }
 
 /* === TEXTOS BRANCOS/CINZAS → TEXTOS ESCUROS === */

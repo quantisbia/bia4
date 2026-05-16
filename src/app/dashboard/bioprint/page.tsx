@@ -16,7 +16,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
-  Box, Droplets, Layers, Gamepad2,
+  Box, Droplets, Layers, Gamepad2, Beaker,
   ArrowRight, RotateCcw, Sparkles, Info, CheckCircle2, Circle,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
@@ -35,7 +35,7 @@ interface StepCardDef {
   description: string
   icon: React.ElementType
   route: string
-  color: "emerald" | "cyan" | "violet" | "amber"
+  color: "emerald" | "cyan" | "violet" | "amber" | "rose"
 }
 
 const STEP_CARDS: StepCardDef[] = [
@@ -78,10 +78,21 @@ const STEP_CARDS: StepCardDef[] = [
     title: "Execução",
     short: STEP_LABELS.control,
     description:
-      "Painel de controle da bioimpressora: joystick 3D, extrusão fluida com sensores, viabilidade celular live (Blaeser 2016) e protocolos de pós-bioimpressão (cultura + biorreator + assays).",
+      "Painel de controle da bioimpressora: joystick 3D em primeiro plano, conexão USB (Web Serial / Marlin), extrusão fluida (avançado), viabilidade celular live (Blaeser 2016).",
     icon: Gamepad2,
     route: "/dashboard/bioprint/control",
     color: "amber",
+  },
+  {
+    key: "postBio",
+    number: 5,
+    title: "Pós-Bioimpressão",
+    short: STEP_LABELS.postBio,
+    description:
+      "Tipo de tecido alvo + protocolos pós-impressão: cultura, crosslink, biorreator (perfusão/agitação) e validação (Live/Dead, AlamarBlue, immunostaining). Protocolos por tecido: cardíaco · ósseo · cartilagem · vaso · pele · nervo · hepático.",
+    icon: Beaker,
+    route: "/dashboard/bioprint/post",
+    color: "rose",
   },
 ]
 
@@ -100,13 +111,13 @@ export default function BioprintHubPage() {
   const allReady = readyCount === totalSteps
 
   const handleReset = () => {
-    if (confirm("Deseja realmente reiniciar o processo? Todas as configurações das 4 etapas serão apagadas (sem afetar arquivos salvos).")) {
+    if (confirm("Deseja realmente reiniciar o processo? Todas as configurações das 5 etapas serão apagadas (sem afetar arquivos salvos).")) {
       resetAll()
     }
   }
 
   return (
-    <div className="space-y-6">
+    <div className="bia-hub-page space-y-6">
       {/* ─── Banner explicativo ────────────────────────────────────── */}
       <section className="rounded-2xl bg-gradient-to-br from-emerald-500/8 via-cyan-500/8 to-violet-500/8 border border-emerald-500/20 p-5">
         <div className="flex items-start gap-3">
@@ -115,14 +126,15 @@ export default function BioprintHubPage() {
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-base font-bold text-white mb-1">
-              Bioimpressão de ponta a ponta — em 4 etapas
+              Bioimpressão de ponta a ponta — em 5 etapas
             </h2>
             <p className="text-xs text-gray-300 leading-relaxed">
               Este é o processo unificado de bioimpressão da BIA. Cada etapa alimenta a próxima:
               o <strong className="text-emerald-200">modelo 3D</strong> define a geometria,
               a <strong className="text-cyan-200">biotinta</strong> define propriedades reológicas e celulares,
               o <strong className="text-violet-200">fatiamento</strong> gera o G-code respeitando ambos,
-              e a <strong className="text-amber-200">execução</strong> controla a impressora com viabilidade live.
+              a <strong className="text-amber-200">execução</strong> controla a impressora com viabilidade live,
+              e a <strong className="text-rose-200">pós-bioimpressão</strong> cuida do tecido até maturar (cultura, biorreator, assays).
             </p>
           </div>
         </div>
@@ -238,6 +250,7 @@ function StepCard({
     cyan:    { bg: "from-cyan-500/8 to-cyan-500/2",       border: "border-cyan-500/20",     iconBg: "bg-cyan-500/15 border-cyan-500/30",        iconText: "text-cyan-300",     title: "group-hover:text-cyan-100",    num: "text-cyan-200/70" },
     violet:  { bg: "from-violet-500/8 to-violet-500/2",   border: "border-violet-500/20",   iconBg: "bg-violet-500/15 border-violet-500/30",    iconText: "text-violet-300",   title: "group-hover:text-violet-100",  num: "text-violet-200/70" },
     amber:   { bg: "from-amber-500/8 to-amber-500/2",     border: "border-amber-500/20",    iconBg: "bg-amber-500/15 border-amber-500/30",      iconText: "text-amber-300",    title: "group-hover:text-amber-100",   num: "text-amber-200/70" },
+    rose:    { bg: "from-rose-500/8 to-rose-500/2",       border: "border-rose-500/20",     iconBg: "bg-rose-500/15 border-rose-500/30",        iconText: "text-rose-300",     title: "group-hover:text-rose-100",    num: "text-rose-200/70" },
   }[card.color]
 
   const wrapper = unlocked ? (

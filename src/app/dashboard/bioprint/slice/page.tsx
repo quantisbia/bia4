@@ -540,7 +540,7 @@ export default function BioprintSlicePage() {
   }, [result, state.model, state.bioink, currentPrinter, bioprinterId, algorithm, infillPercent, layerHeightMm, printSpeedMmS, pressureKPa, cartridgeTempC, bedTempC, chamberTempC])
 
   return (
-    <div className="flex flex-col min-h-full bg-[#0a0a0f]">
+    <div className="bia-slice-page flex flex-col min-h-full bg-[#0a0a0f]">
       {/* Cabeçalho */}
       <header className="px-4 sm:px-6 py-5 border-b border-white/5">
         <div className="flex items-start justify-between gap-3">
@@ -1167,38 +1167,152 @@ function WellsPanel({
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
-      {/* Toggle multi-well */}
+      {/* Seletor de modo: Direto na mesa OU Placa multi-poços */}
       <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-semibold text-white flex items-center gap-2 mb-1">
-              <Beaker className="w-4 h-4 text-violet-400" />
-              Impressão em placa multi-poços
-            </h3>
-            <p className="text-xs text-gray-400 max-w-2xl">
-              Use placas SBS padrão (6–384 poços) para replicar a mesma geometria em vários poços simultaneamente.
-              Útil para screening de drogas, ensaios de viabilidade ou validação estatística.
-            </p>
-          </div>
-          <label className="flex items-center gap-2 cursor-pointer shrink-0">
-            <div
-              onClick={() => onUseMultiWellChange(!useMultiWell)}
-              className={cn(
-                "w-10 h-5 rounded-full relative transition-colors cursor-pointer",
-                useMultiWell ? "bg-violet-500" : "bg-white/10"
-              )}
-            >
+        <h3 className="text-sm font-semibold text-white mb-1 flex items-center gap-2">
+          <Beaker className="w-4 h-4 text-violet-400" />
+          Modo de impressão
+        </h3>
+        <p className="text-xs text-gray-400 mb-4">
+          Escolha onde a bioimpressora vai depositar o material.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Card: Direto na mesa */}
+          <button
+            type="button"
+            onClick={() => onUseMultiWellChange(false)}
+            className={cn(
+              "rounded-xl border p-4 text-left transition-all",
+              !useMultiWell
+                ? "border-violet-500/60 bg-violet-500/10 ring-1 ring-violet-500/30"
+                : "border-white/10 bg-white/[0.02] hover:border-white/20"
+            )}
+          >
+            <div className="flex items-start gap-3">
               <div className={cn(
-                "absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all",
-              )} style={{ left: useMultiWell ? "22px" : "2px" }} />
+                "w-9 h-9 rounded-lg flex items-center justify-center shrink-0",
+                !useMultiWell ? "bg-violet-500/25 text-violet-200" : "bg-white/5 text-gray-400"
+              )}>
+                <Layers className="w-5 h-5" />
+              </div>
+              <div>
+                <div className={cn(
+                  "text-sm font-semibold mb-0.5",
+                  !useMultiWell ? "text-violet-100" : "text-white"
+                )}>
+                  Direto na mesa
+                </div>
+                <p className="text-[11px] text-gray-400 leading-relaxed">
+                  Bioimpressão em superfície aberta (Petri, lâmina, scaffold). 1 peça única no centro da mesa.
+                </p>
+              </div>
             </div>
-            <span className="text-xs text-gray-300">{useMultiWell ? "Ativado" : "Direto na mesa"}</span>
-          </label>
+          </button>
+
+          {/* Card: Placa multi-poços */}
+          <button
+            type="button"
+            onClick={() => onUseMultiWellChange(true)}
+            className={cn(
+              "rounded-xl border p-4 text-left transition-all",
+              useMultiWell
+                ? "border-violet-500/60 bg-violet-500/10 ring-1 ring-violet-500/30"
+                : "border-white/10 bg-white/[0.02] hover:border-white/20"
+            )}
+          >
+            <div className="flex items-start gap-3">
+              <div className={cn(
+                "w-9 h-9 rounded-lg flex items-center justify-center shrink-0",
+                useMultiWell ? "bg-violet-500/25 text-violet-200" : "bg-white/5 text-gray-400"
+              )}>
+                <Beaker className="w-5 h-5" />
+              </div>
+              <div>
+                <div className={cn(
+                  "text-sm font-semibold mb-0.5",
+                  useMultiWell ? "text-violet-100" : "text-white"
+                )}>
+                  Placa multi-poços
+                </div>
+                <p className="text-[11px] text-gray-400 leading-relaxed">
+                  Placas SBS padrão (6–384 poços) para replicar a mesma geometria. Ideal para screening, viabilidade e validação estatística.
+                </p>
+              </div>
+            </div>
+          </button>
         </div>
       </section>
 
+      {/* === MODO: DIRETO NA MESA — visualização da mesa de impressão === */}
+      {!useMultiWell && (
+        <section className="rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-500/[0.06] to-blue-500/[0.03] p-5">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-violet-500/15 flex items-center justify-center shrink-0">
+              <Layers className="w-5 h-5 text-violet-300" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-white mb-0.5">Mesa de impressão (build plate)</h3>
+              <p className="text-[11px] text-gray-400">
+                A peça será impressa no centro da mesa. Verifique se a superfície (Petri, lâmina ou scaffold) está bem fixada antes de iniciar.
+              </p>
+            </div>
+          </div>
+          {/* Visualização simplificada da mesa */}
+          <div className="relative mx-auto" style={{ maxWidth: "320px", aspectRatio: "4/3" }}>
+            <div className="absolute inset-0 rounded-xl border-2 border-violet-400/40 bg-gradient-to-br from-violet-900/20 via-quantis-ink-900/40 to-quantis-ink-900/60 shadow-inner shadow-violet-900/30" />
+            {/* Grid sutil */}
+            <div className="absolute inset-2 rounded-lg opacity-40"
+              style={{
+                backgroundImage: "linear-gradient(rgba(167,139,250,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(167,139,250,0.15) 1px, transparent 1px)",
+                backgroundSize: "20px 20px",
+              }}
+            />
+            {/* Crosshair centro */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16">
+              <div className="absolute top-1/2 left-0 right-0 border-t border-dashed border-violet-300/40" />
+              <div className="absolute left-1/2 top-0 bottom-0 border-l border-dashed border-violet-300/40" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-violet-300" />
+            </div>
+            {/* Origem X0/Y0 */}
+            <div className="absolute bottom-1 left-1 text-[9px] text-violet-300/70 font-mono">X0,Y0</div>
+            {/* Indicador */}
+            <div className="absolute top-1 right-2 text-[10px] text-violet-200 font-medium bg-violet-500/20 px-1.5 py-0.5 rounded">
+              Centro · origem da peça
+            </div>
+          </div>
+          {/* Alerta posicionamento inicial */}
+          <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/8 p-3 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div className="text-[11px] text-amber-100 leading-relaxed">
+              <strong className="block mb-0.5">Antes de iniciar a impressão:</strong>
+              Posicione o cabeçote no centro da mesa (X0,Y0 lógico = centro físico) com a biotinta carregada e o Z-offset calibrado para tocar levemente a superfície (~0,1 mm acima). O G-code parte deste ponto.
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* === MODO: MULTI-POÇOS === */}
       {useMultiWell && (
         <>
+          {/* Alerta de posicionamento inicial — primeira impressão */}
+          <section className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.08] p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
+                <AlertCircle className="w-5 h-5 text-amber-300" />
+              </div>
+              <div className="text-[12px] text-amber-100 leading-relaxed space-y-1">
+                <strong className="text-amber-50">Posicionamento inicial obrigatório:</strong>
+                <p>
+                  O G-code assume que a <strong>primeira impressão começa no centro do primeiro poço selecionado</strong> (canto superior esquerdo, ex.: <code className="font-mono text-amber-200 bg-amber-900/30 px-1 rounded">A1</code>).
+                  Posicione manualmente o cabeçote no centro de A1 com a biotinta carregada e ajuste o <strong>Z-offset</strong> para o bico tocar levemente o fundo do poço (~0,1 mm acima).
+                </p>
+                <p>
+                  Entre poços, o cabeçote sobe <strong>{zHopBetweenWellsMm.toFixed(1)} mm</strong> (Z-hop) para não bater nas paredes — ajuste abaixo se o seu cabeçote tiver folga lateral grande ou se os poços forem profundos (recomendado: ≥ altura do poço + 2 mm).
+                </p>
+              </div>
+            </div>
+          </section>
+
           {/* Formato da placa */}
           <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
             <h3 className="text-sm font-semibold text-white mb-3">Formato SBS</h3>
@@ -1298,14 +1412,18 @@ function WellsPanel({
 
           {/* Parâmetros multi-well */}
           <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
-            <h3 className="text-sm font-semibold text-white mb-3">Parâmetros entre poços</h3>
+            <h3 className="text-sm font-semibold text-white mb-1">Parâmetros entre poços</h3>
+            <p className="text-[11px] text-gray-400 mb-4">
+              <strong className="text-violet-200">Z-hop</strong> é a altura que o bico sobe ao migrar de um poço para o próximo —
+              evita choque com as paredes. Aumente se os poços forem profundos.
+            </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <SliderField
-                label="Z-hop entre poços" icon={Layers}
+                label="Z-hop entre poços (altura de segurança)" icon={Layers}
                 min={1} max={20} step={0.5}
                 value={zHopBetweenWellsMm} onChange={onZHopChange}
                 display={`${zHopBetweenWellsMm.toFixed(1)} mm`}
-                hint="Subida do bico ao mover"
+                hint="Subida do bico ao mover entre poços"
               />
               <SliderField
                 label="Pausa entre poços" icon={Clock}

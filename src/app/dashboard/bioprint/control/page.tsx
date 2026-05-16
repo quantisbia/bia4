@@ -2,20 +2,19 @@
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
- *  BIA — Etapa 4 / 4 · Execução (controle da bioimpressora)
+ *  BIA — Etapa 4 / 5 · Execução (controle da bioimpressora)
  *  ───────────────────────────────────────────────────────────────────────
- *  Hub central de controle da bioimpressora em 4 painéis:
- *    A. JOYSTICK + CONSOLE — controle manual + log de G-code real
- *    B. EXTRUSÃO + SENSORES — pneumático/pistão/screw + temperaturas + UR
- *    C. TECIDO VIVO         — viabilidade live (Hagen-Poiseuille + Blaeser)
- *    D. PÓS-BIOIMPRESSÃO    — cultura → biorreator → assays (7 protocolos)
+ *  Foco da etapa 4 (R12.3): controle ao vivo da bioimpressora.
+ *    1. Conexão USB (Web Serial / Marlin) + Joystick 3D em destaque
+ *    2. Real-Time Controls (temperatura, retração, Z-offset) abaixo do joystick
+ *    3. Console G-code (lado direito do joystick)
+ *    4. Modo avançado (colapsável): Extrusão + Sensores · Viabilidade + Encolhimento
  *
- *  LÊ:  state.model (categoria → tipo tecido) +
- *       state.bioink (material → perfil, células → sensibilidade) +
- *       state.slice  (gcode → pré-carregado no console, pressão/temps)
- *  ESCREVE: state.control (tissueType + connected)
+ *  A escolha do "Tipo de tecido alvo" e o painel "Pós-Bioimpressão"
+ *  foram movidos para a Etapa 5 (/dashboard/bioprint/post).
  *
- *  Substitui /dashboard/bioprinter-control (será alvo do R7 redirect).
+ *  LÊ:  state.model · state.bioink · state.slice
+ *  ESCREVE: state.control (connected + status)
  *
  *  Pré-requisito: state.slice.status === "ready" (precisa de G-code)
  *
@@ -28,16 +27,17 @@ import Link from "next/link"
 import {
   Gamepad2, Terminal, Microscope, Beaker, FlaskConical,
   ShieldCheck, Info, AlertTriangle, CheckCircle2, Layers, Droplets,
-  PlayCircle, Download, Usb, Radio,
+  PlayCircle, Download, Usb, Radio, ArrowRight, Sliders,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { useBioprintProcess } from "@/lib/bioprint/process-context"
 import { Joystick3D, type JoystickPosition } from "@/components/bioprinter/Joystick3D"
 import { ExtrusionPanel, type ExtrusionState } from "@/components/bioprinter/ExtrusionPanel"
 import { TissueViabilityPanel, type TissueState } from "@/components/bioprinter/TissueViabilityPanel"
-import { PostBioprintingPanel, type PostBioState } from "@/components/bioprinter/PostBioprintingPanel"
 import { PrinterConnection } from "@/components/bioprinting/PrinterConnection"
 import { RealtimeControls } from "@/components/bioprinting/RealtimeControls"
+import { InfoButton } from "@/components/ui/InfoButton"
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection"
 
 // ─── Mapas auxiliares ──────────────────────────────────────────────────────
 
@@ -77,25 +77,16 @@ function mapCellTypeLabel(cellTypeId: string | null): string {
 function mapCategoryToTissue(category: string | null): string {
   if (!category) return "Cardíaco (patch)"
   switch (category) {
-    case "rigid-tissue":      return "Ósseo (scaffold)"
-    case "biomimetic-tpms":   return "Ósseo (scaffold)"
-    case "organoid-vascular": return "Vascular (vaso)"
+    case "rigid-tissue":      return "Ósseo"
+    case "biomimetic-tpms":   return "Ósseo"
+    case "organoid-vascular": return "Vaso sanguíneo"
     case "printability-test": return "Cardíaco (patch)"
     case "soft-tissue":
     default:                  return "Cardíaco (patch)"
   }
 }
 
-// Tipos de tecido disponíveis em POST_PROCESSING (visível na tab)
-const TISSUE_TYPES = [
-  "Cardíaco (patch)",
-  "Ósseo (scaffold)",
-  "Cartilagem",
-  "Vascular (vaso)",
-  "Pele",
-  "Nervo (conduit)",
-  "Hepático",
-] as const
+// (Tipos de tecido movidos para a Etapa 5 — /dashboard/bioprint/post)
 
 // ═══════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
@@ -107,10 +98,9 @@ export default function BioprintControlPage() {
   const sliceReady = state.slice.status === "ready"
   const isUnlocked = sliceReady
 
-  // ── Tipo de tecido (escrito no context) ──
-  const [tissueType, setTissueType] = useState<string>(
-    state.control.tissueType ?? mapCategoryToTissue(state.model.category)
-  )
+  // Tipo de tecido inferido (usado apenas pelo painel de viabilidade aqui;
+  // a seleção real foi movida para a Etapa 5)
+  const inferredTissue = state.control.tissueType ?? mapCategoryToTissue(state.model.category)
 
   // ── Joystick / Console ──
   const [position, setPosition] = useState<JoystickPosition>({ x: 0, y: 0, z: 0, e: 0 })
@@ -184,35 +174,24 @@ export default function BioprintControlPage() {
     infillPatternId: state.slice.infillPatternId ?? "parallel-lines",
   }))
 
-  // ── Pós-bioimpressão ──
-  const [postBio, setPostBio] = useState<PostBioState>(() => ({
-    tissueType: state.control.tissueType ?? mapCategoryToTissue(state.model.category),
-  }))
-
   // ── Logger ──
   const log = useCallback((line: string) => {
     setGcodeLog((prev) => [...prev.slice(-199), line])
   }, [])
 
-  // ── Quando tissueType muda: atualizar context + postBio ──
-  const handleTissueChange = useCallback((newType: string) => {
-    setTissueType(newType)
-    setPostBio({ tissueType: newType })
-    updateControl({
-      status: "ready",
-      tissueType: newType,
-    })
-  }, [updateControl])
-
-  // ── Persistir control no context (status "ready" quando tem tissueType definido) ──
+  // ── Persistir control no context: Etapa 4 fica "ready" quando a impressão
+  //    foi configurada ao menos uma vez (basta interagir com joystick OU conectar).
+  //    A escolha de tecido foi movida para a Etapa 5. ──
   useEffect(() => {
     if (!isUnlocked) return
     updateControl({
-      status: tissueType ? "ready" : "draft",
-      tissueType,
+      status: "ready",
+      connected: isConnected,
+      // Mantém qualquer tissueType prévio para retrocompat com Etapa 5
+      tissueType: state.control.tissueType ?? inferredTissue,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isUnlocked, tissueType])
+  }, [isUnlocked, isConnected])
 
   // ── Handlers do Joystick ────────────────────────────────────────────
   // Cada handler: registra no console + (se conectado) envia para a máquina real via sendToPrinter.
@@ -297,7 +276,7 @@ export default function BioprintControlPage() {
       state.bioink.cellType
         ? `; Células: ${state.bioink.cellType} ${state.bioink.cellDensityMillionMl}×10^6/mL`
         : "; Sem células (scaffold acelular)",
-      `; Tecido alvo: ${tissueType}`,
+      `; Tecido alvo (Etapa 5): ${state.control.tissueType ?? inferredTissue}`,
       "; ═══════════════════════════════════════════════════════════",
       "",
     ].join("\n")
@@ -308,7 +287,7 @@ export default function BioprintControlPage() {
     a.download = `bia_${state.model.geometryId ?? "job"}.gcode`
     a.click()
     URL.revokeObjectURL(url)
-  }, [state, tissueType])
+  }, [state, inferredTissue])
 
   // ── "Iniciar Print" — só simulação por enquanto ──
   const handleStartPrint = useCallback(() => {
@@ -332,21 +311,23 @@ export default function BioprintControlPage() {
   }, [log, state.slice.gcode])
 
   return (
-    <div className="flex flex-col min-h-full bg-[#0a0a0f]">
+    <div className="flex flex-col min-h-full bg-[#0a0a0f] bia-control-page">
       {/* Cabeçalho */}
       <header className="px-4 sm:px-6 py-5 border-b border-white/5">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-[10px] uppercase tracking-[0.25em] text-emerald-300/80 font-semibold mb-1">
-              Etapa 4 / 4 · Bioimpressão
+              Etapa 4 / 5 · Bioimpressão
             </div>
             <h1 className="text-lg sm:text-2xl font-bold text-white flex items-center gap-2">
               <PlayCircle className="w-5 h-5 text-emerald-400" />
-              Execução
+              Execução · Controle ao vivo
             </h1>
             <p className="text-xs sm:text-sm text-gray-400 mt-1 max-w-2xl">
-              Controle ao vivo da bioimpressora — joystick, extrusão, viabilidade celular e
-              protocolos pós-impressão (cultura + biorreator + assays).
+              Conecte a bioimpressora, mova o cabeçote com o joystick e acompanhe o G-code em tempo real.
+              <span className="block mt-0.5 text-[11px] text-gray-500">
+                A pós-bioimpressão (tecido alvo, cultura, biorreator, assays) está na <Link href="/dashboard/bioprint/post" className="text-rose-300 hover:text-rose-200 underline">Etapa 5</Link>.
+              </span>
             </p>
           </div>
 
@@ -415,150 +396,122 @@ export default function BioprintControlPage() {
       )}
 
       <main className="flex-1 px-4 sm:px-6 py-6 pb-24 space-y-6 max-w-7xl mx-auto w-full">
-        {/* Aviso de fase */}
-        <section className="rounded-2xl bg-gradient-to-br from-violet-500/8 to-emerald-500/8 border border-emerald-500/20 p-5">
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
-              <Info className="w-4 h-4 text-emerald-300" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-base font-semibold text-white mb-1.5">
-                Controle de bioimpressora — não é Pronterface, é bioengenheiro
-              </h2>
-              <p className="text-xs text-gray-300 leading-relaxed">
-                O Pronterface foi feito para imprimir plástico. Bioimpressão é outro mundo:
-                células vivas, hidrogéis viscoelásticos, riscos de contaminação, viabilidade que despenca
-                se você apertar demais. Este painel é o <strong className="text-emerald-200">controle remoto da
-                sua bioimpressora pensado por bioengenheiro</strong> — cada botão tem racional biológico.
-              </p>
-              <div className="mt-3 flex flex-wrap gap-1.5 text-[10px]">
-                <Tag>Joystick com micropasso 0.05mm</Tag>
-                <Tag>G92 com 1 clique</Tag>
-                <Tag>Z-probe suave (0.5N)</Tag>
-                <Tag>Purga anti-bolha</Tag>
-                <Tag>Pausa estéril</Tag>
-                <Tag>Extrusão (pneum/pistão/screw)</Tag>
-                <Tag>Triplo controle térmico</Tag>
-                <Tag>Viabilidade live (Blaeser 2016)</Tag>
-                <Tag>Encolhimento + crosslink</Tag>
-                <Tag>Pós-print: cultura + biorreator + assays</Tag>
-                <Tag>✅ Conexão serial real (Web Serial / Marlin)</Tag>
+
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/*  1. CONEXÃO + JOYSTICK + CONSOLE — em destaque, sem scroll-jump */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
+
+        {/* Header compacto: Bioengenheiro + (i) Mais informações */}
+        <section className="rounded-2xl bg-gradient-to-br from-emerald-500/[0.06] to-violet-500/[0.04] border border-emerald-500/20 p-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-4 h-4 text-emerald-300" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-white flex items-center gap-2">
+                  Bioengenheiro
+                  <InfoButton title="Por que não é Pronterface?" align="left">
+                    <p>
+                      O Pronterface foi feito para imprimir plástico. Bioimpressão é outro mundo: células vivas,
+                      hidrogéis viscoelásticos, riscos de contaminação, viabilidade que despenca se você apertar demais.
+                    </p>
+                    <p>
+                      Este painel é o <strong className="text-emerald-200">controle remoto da sua bioimpressora pensado
+                      por bioengenheiro</strong> — cada botão tem racional biológico.
+                    </p>
+                    <ul className="mt-1.5 space-y-1 text-[10.5px] list-disc list-inside">
+                      <li>Joystick com micropasso 0.05 mm</li>
+                      <li>G92 com 1 clique</li>
+                      <li>Z-probe suave (0.5 N)</li>
+                      <li>Purga anti-bolha</li>
+                      <li>Pausa estéril (mantém pressão pneumática)</li>
+                      <li>Triplo controle térmico (cartucho/cama/câmara)</li>
+                      <li>Viabilidade live (Hagen-Poiseuille + Blaeser 2016)</li>
+                      <li>Conexão serial real (Web Serial / Marlin)</li>
+                    </ul>
+                  </InfoButton>
+                </h2>
+                <p className="text-[11px] text-gray-400">
+                  Controle remoto da bioimpressora pensado para tecidos vivos · cada botão tem racional biológico.
+                </p>
               </div>
             </div>
+            <span className={cn(
+              "text-[10px] px-2 py-0.5 rounded-full border font-semibold inline-flex items-center gap-1",
+              isConnected
+                ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300"
+                : "bg-gray-500/15 border-gray-500/30 text-gray-400"
+            )}>
+              <Radio className={cn("w-2.5 h-2.5", isConnected && "animate-pulse")} />
+              {isConnected ? "ONLINE" : "OFFLINE"}
+            </span>
           </div>
         </section>
 
-        {/* Tipo de tecido alvo (chave para POST_PROCESSING) */}
-        <section className="rounded-2xl bg-white/[0.02] border border-white/5 p-5">
-          <div className="flex items-start gap-3 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
-              <Beaker className="w-4 h-4 text-emerald-300" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-white">Tipo de tecido alvo</h3>
-              <p className="text-[10px] text-gray-500">
-                Define o protocolo pós-impressão (cultura, crosslink, biorreator, assays)
-                {state.model.category && (
-                  <span className="ml-2 text-emerald-400">
-                    · sugerido para sua categoria de modelo: {mapCategoryToTissue(state.model.category)}
-                  </span>
-                )}
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-            {TISSUE_TYPES.map(t => {
-              const isRecommended = mapCategoryToTissue(state.model.category) === t
-              return (
-                <button
-                  key={t}
-                  onClick={() => handleTissueChange(t)}
-                  className={cn(
-                    "p-2.5 rounded-xl border text-left transition-all",
-                    tissueType === t
-                      ? "border-emerald-500/50 bg-emerald-500/10 ring-1 ring-emerald-500/30"
-                      : "border-white/8 bg-white/3 hover:border-white/15 hover:bg-white/5",
-                    isRecommended && tissueType !== t && "border-emerald-500/25"
-                  )}
-                >
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className={cn(
-                      "text-xs font-semibold leading-tight",
-                      tissueType === t ? "text-emerald-200" : "text-white"
-                    )}>
-                      {t}
-                    </span>
-                    {isRecommended && tissueType !== t && (
-                      <span className="text-[8px] text-emerald-400 font-bold">REC</span>
-                    )}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </section>
-
-        {/* ═══════════════════════════════════════════════════════════════ */}
-        {/*  HOST PROFISSIONAL — Conexão USB (Web Serial) + Real-Time Control */}
-        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* CONEXÃO USB — compacta no topo */}
         <section className="rounded-2xl bg-gradient-to-br from-cyan-500/[0.06] to-violet-500/[0.04] border border-cyan-500/25 p-5 space-y-4">
           <div className="flex items-start gap-3">
             <div className="w-9 h-9 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center shrink-0">
               <Usb className="w-4 h-4 text-cyan-300" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-base font-semibold text-white">Host Profissional · Conexão USB</h3>
-                <span className={cn(
-                  "text-[10px] px-2 py-0.5 rounded-full border font-semibold inline-flex items-center gap-1",
-                  isConnected
-                    ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300"
-                    : "bg-gray-500/15 border-gray-500/30 text-gray-400"
-                )}>
-                  <Radio className={cn("w-2.5 h-2.5", isConnected && "animate-pulse")} />
-                  {isConnected ? "ONLINE" : "OFFLINE"}
-                </span>
-              </div>
-              <p className="text-[11px] text-gray-400 leading-relaxed mt-0.5">
-                Conexão direta com sua bioimpressora via Web Serial API (Chrome/Edge 89+) · Firmware Marlin · Stream G-code em tempo real ·
-                Controle ao vivo de temperatura, extrusão, retração e Z-offset.
+              <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                Passo 1 · Conexão USB
+                <InfoButton title="Como funciona a Web Serial API?" align="left">
+                  <p>
+                    Conexão direta com sua bioimpressora via Web Serial API (Chrome/Edge 89+) ·
+                    Firmware Marlin · Stream G-code em tempo real.
+                  </p>
+                  <p className="mt-1">
+                    Sem driver, sem instalação. O navegador conversa direto com a placa USB
+                    da bioimpressora — basta selecionar a porta serial e velocidade (115200 padrão).
+                  </p>
+                </InfoButton>
+              </h3>
+              <p className="text-[11px] text-gray-400">
+                Conecte e selecione a porta serial. <strong>Sem conexão</strong>, tudo aqui funciona em modo simulação.
               </p>
             </div>
           </div>
 
-          {/* PrinterConnection com slot para RealtimeControls */}
           <PrinterConnection
             gcode={state.slice.gcode ?? ""}
             printerName={state.model.name ?? "Bioimpressora BIA"}
             onConnectionChange={setIsConnected}
             renderExtraControls={({ connected, sendCommand }) => {
-              // Captura o sendCommand para o joystick poder usar
               sendCommandRef.current = sendCommand
-              return (
-                <RealtimeControls
-                  connected={connected}
-                  sendCommand={sendCommand}
-                  suggestedCartridgeC={state.slice.cartridgeTempC ?? 22}
-                  suggestedBedC={state.slice.bedTempC ?? 6}
-                  suggestedChamberC={state.slice.chamberTempC ?? 20}
-                  suggestedRetractionMm={state.slice.retractionMm ?? 0.5}
-                />
-              )
+              // RealtimeControls renderizado fora — capturamos só o sendCommand
+              return null
             }}
           />
         </section>
 
-        {/* Grade: Joystick + Console */}
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,380px)_1fr] gap-6">
+        {/* JOYSTICK + CONSOLE — destaque máximo, isolado no DOM para não causar scroll jumps */}
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,380px)_1fr] gap-6 scroll-mt-24" id="joystick-zone">
           {/* Joystick */}
-          <section className="rounded-2xl bg-white/[0.02] border border-white/5 p-5 space-y-4">
+          <section className="rounded-2xl bg-gradient-to-br from-violet-500/[0.05] to-violet-500/[0.01] border border-violet-500/25 p-5 space-y-4 self-start lg:sticky lg:top-4">
             <div className="flex items-center justify-between gap-2.5">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-violet-500/15 border border-violet-500/30 flex items-center justify-center">
-                  <Gamepad2 className="w-4 h-4 text-violet-300" />
+                <div className="w-9 h-9 rounded-xl bg-violet-500/20 border border-violet-500/35 flex items-center justify-center">
+                  <Gamepad2 className="w-5 h-5 text-violet-200" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-white">Joystick 3D</h3>
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                    Passo 2 · Joystick 3D
+                    <InfoButton title="Joystick BIO" align="left">
+                      <p>Controle manual dos eixos X/Y/Z + extrusor (E) com micropasso 0.05 mm.</p>
+                      <p className="mt-1"><strong className="text-violet-200">Botões especiais:</strong></p>
+                      <ul className="list-disc list-inside text-[10.5px] space-y-0.5">
+                        <li><code>HOME</code> — leva a impressora ao ponto zero da máquina</li>
+                        <li><code>G92</code> — zera as coords virtuais aqui (sem mover)</li>
+                        <li><code>Z-probe suave</code> — bed leveling com 0.5 N (não amassa o gel)</li>
+                        <li><code>Purga</code> — extrude 1 mm devagar para tirar bolha</li>
+                        <li><code>Pausa estéril</code> — para o motor mas mantém pneumática</li>
+                        <li><code>Posição de repouso</code> — sobe Z e vai ao canto para trocar cartucho</li>
+                      </ul>
+                    </InfoButton>
+                  </h3>
                   <p className="text-[10px] text-gray-500">
                     {isConnected
                       ? "Comandos enviados para a máquina REAL"
@@ -594,9 +547,15 @@ export default function BioprintControlPage() {
                   <Terminal className="w-4 h-4 text-emerald-300" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-white">Console G-code</h3>
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                    Console G-code
+                    <InfoButton title="O que aparece no console?" align="left">
+                      <p>Cada interação com o joystick gera linhas de G-code reais (Marlin compatível) — útil para auditoria e debug.</p>
+                      <p className="mt-1">Comandos <code>G28</code>, <code>G92</code>, <code>M851</code>, <code>G29</code>, <code>M0</code> são coloridos para inspeção rápida.</p>
+                    </InfoButton>
+                  </h3>
                   <p className="text-[10px] text-gray-500">
-                    Comandos do joystick + G-code da Etapa 3 aparecem aqui
+                    Comandos do joystick + G-code da Etapa 3
                   </p>
                 </div>
               </div>
@@ -648,74 +607,116 @@ export default function BioprintControlPage() {
           </section>
         </div>
 
-        {/* Extrusão + Sensores */}
-        <section className="rounded-2xl bg-white/[0.02] border border-white/5 p-5 space-y-4">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center">
-                <FlaskConical className="w-4 h-4 text-cyan-300" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-white">Extrusão Fluida + Sensores</h3>
-                <p className="text-[10px] text-gray-500">
-                  Mecanismo · pressão/vazão/rotação · cartucho · cama · câmara · umidade
-                </p>
-              </div>
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/*  2. REAL-TIME CONTROLS — logo abaixo do joystick                 */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        <section className="rounded-2xl bg-gradient-to-br from-cyan-500/[0.04] to-emerald-500/[0.03] border border-cyan-500/20 p-5 space-y-4">
+          <div className="flex items-start gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center shrink-0">
+              <Sliders className="w-4 h-4 text-cyan-300" />
             </div>
-            <span className="text-[10px] px-2 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300">
-              Pré-populado: Etapa 2 + Etapa 3
-            </span>
-          </div>
-          <ExtrusionPanel state={extrusion} onChange={setExtrusion} onGcode={log} />
-        </section>
-
-        {/* Tecido vivo / Viabilidade */}
-        <section className="rounded-2xl bg-white/[0.02] border border-white/5 p-5 space-y-4">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
-                <Microscope className="w-4 h-4 text-emerald-300" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-white">Tecido Vivo · Viabilidade ao Vivo</h3>
-                <p className="text-[10px] text-gray-500">
-                  Shear stress → viabilidade prevista · Encolhimento · Crosslinking · Padrão BIO
-                </p>
-              </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                Controles em tempo real
+                <InfoButton title="Real-Time Controls" align="left">
+                  <p>Ajustes ao vivo enviados para a impressora <strong>durante</strong> a impressão:</p>
+                  <ul className="list-disc list-inside text-[10.5px] mt-1 space-y-0.5">
+                    <li>Temperatura do cartucho (M104 S…)</li>
+                    <li>Temperatura da cama (M140 S…)</li>
+                    <li>Temperatura da câmara (M141 S…)</li>
+                    <li>Retração do extrusor (G10/G11)</li>
+                    <li>Z-offset live (M851 Z…)</li>
+                  </ul>
+                  <p className="mt-1">Sugestões pré-populadas a partir das Etapas 2 e 3.</p>
+                </InfoButton>
+              </h3>
+              <p className="text-[11px] text-gray-400">
+                Temperatura · retração · Z-offset · enviado direto para a máquina enquanto imprime.
+              </p>
             </div>
-            <span className="text-[10px] px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
-              Hagen-Poiseuille + Blaeser 2016
-            </span>
           </div>
-          <TissueViabilityPanel state={tissue} onChange={setTissue} onGcode={log} />
-        </section>
-
-        {/* Pós-bioimpressão */}
-        <section className="rounded-2xl bg-white/[0.02] border border-white/5 p-5 space-y-4">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
-                <Beaker className="w-4 h-4 text-amber-300" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-white">Pós-Bioimpressão · Cultura → Biorreator → Validação</h3>
-                <p className="text-[10px] text-gray-500">
-                  Protocolos por tipo de tecido: cardíaco · ósseo · cartilagem · vaso · pele · nervo · hepático
-                </p>
-              </div>
-            </div>
-            <span className="text-[10px] px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300">
-              Tecido alvo: {tissueType}
-            </span>
-          </div>
-          <PostBioprintingPanel
-            state={postBio}
-            onChange={(s) => {
-              setPostBio(s)
-              if (s.tissueType !== tissueType) handleTissueChange(s.tissueType)
+          <RealtimeControls
+            connected={isConnected}
+            sendCommand={async (cmd: string) => {
+              if (sendCommandRef.current) {
+                await sendCommandRef.current(cmd)
+              }
             }}
+            suggestedCartridgeC={state.slice.cartridgeTempC ?? 22}
+            suggestedBedC={state.slice.bedTempC ?? 6}
+            suggestedChamberC={state.slice.chamberTempC ?? 20}
+            suggestedRetractionMm={state.slice.retractionMm ?? 0.5}
           />
         </section>
+
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/*  3. MODO AVANÇADO — Extrusão · Viabilidade · Encolhimento        */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        <div className="flex items-center gap-2 pt-2">
+          <div className="h-px flex-1 bg-white/10" />
+          <span className="text-[10px] uppercase tracking-[0.25em] text-gray-500 font-semibold px-2">
+            Modo avançado · Opcional
+          </span>
+          <div className="h-px flex-1 bg-white/10" />
+        </div>
+
+        <CollapsibleSection
+          title="Extrusão Fluida + Sensores"
+          subtitle="Mecanismo · pressão/vazão/rotação · cartucho · cama · câmara · umidade"
+          icon={FlaskConical}
+          badge="Avançado"
+          badgeColor="cyan"
+          defaultOpen={false}
+          rightSlot={
+            <span className="text-[10px] px-2 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 hidden sm:inline">
+              Pré-populado Etapa 2 + 3
+            </span>
+          }
+        >
+          <ExtrusionPanel state={extrusion} onChange={setExtrusion} onGcode={log} />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="Tecido Vivo · Viabilidade ao Vivo + Encolhimento"
+          subtitle="Shear stress → viabilidade prevista · Encolhimento pós-cura · Crosslinking"
+          icon={Microscope}
+          badge="Avançado"
+          badgeColor="emerald"
+          defaultOpen={false}
+          rightSlot={
+            <span className="text-[10px] px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 hidden sm:inline">
+              Hagen-Poiseuille + Blaeser
+            </span>
+          }
+        >
+          <TissueViabilityPanel state={tissue} onChange={setTissue} onGcode={log} />
+        </CollapsibleSection>
+
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/*  4. NAVEGAÇÃO PARA ETAPA 5 — Pós-Bioimpressão                   */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        <Link
+          href="/dashboard/bioprint/post"
+          className="block rounded-2xl border border-rose-500/30 bg-gradient-to-br from-rose-500/[0.08] to-amber-500/[0.04] p-5 hover:border-rose-500/60 transition-all group"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center shrink-0">
+              <Beaker className="w-6 h-6 text-rose-200" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] uppercase tracking-wider text-rose-300/80 font-semibold mb-0.5">
+                Próxima · Etapa 5 / 5
+              </div>
+              <h3 className="text-base font-bold text-white group-hover:text-rose-100 transition-colors">
+                Pós-Bioimpressão · Cultura → Biorreator → Validação
+              </h3>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                Defina o tipo de tecido alvo e os protocolos pós-impressão (cultura, crosslink, biorreator, assays).
+              </p>
+            </div>
+            <ArrowRight className="w-5 h-5 text-rose-300 shrink-0 group-hover:translate-x-1 transition-transform" />
+          </div>
+        </Link>
 
       </main>
 
@@ -725,16 +726,16 @@ export default function BioprintControlPage() {
           {state.control.status === "ready" ? (
             <>
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span className="text-emerald-300 font-medium shrink-0">Processo 4/4:</span>
+              <span className="text-emerald-300 font-medium shrink-0">Etapa 4/5 concluída:</span>
               <span className="text-gray-300 truncate">
-                Tecido alvo: {tissueType} · protocolos pós-impressão prontos
+                Bioimpressão executada · siga para Etapa 5 (Pós-Bioimpressão)
               </span>
             </>
           ) : (
             <>
               <Info className="w-4 h-4 text-gray-500 shrink-0" />
               <span className="text-gray-400 text-xs">
-                {isUnlocked ? "Defina o tipo de tecido alvo para finalizar o processo" : "Complete a Etapa 3 (Fatiamento) primeiro"}
+                {isUnlocked ? "Conecte a bioimpressora e execute a impressão para liberar a Etapa 5" : "Complete a Etapa 3 (Fatiamento) primeiro"}
               </span>
             </>
           )}
@@ -750,10 +751,16 @@ export default function BioprintControlPage() {
             </button>
           )}
           <Link
-            href="/dashboard/bioprint"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-200 text-sm font-medium rounded-lg transition-colors"
+            href="/dashboard/bioprint/post"
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-200 text-xs font-medium rounded-lg transition-colors"
           >
-            Voltar ao hub
+            Etapa 5 →
+          </Link>
+          <Link
+            href="/dashboard/bioprint"
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 text-xs font-medium rounded-lg transition-colors"
+          >
+            Hub
           </Link>
         </div>
       </footer>
