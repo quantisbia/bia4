@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation"
 import {
   Box, Droplets, Layers, Gamepad2, Beaker,
   ArrowRight, RotateCcw, Sparkles, Info, CheckCircle2, Circle,
+  Brain, BookOpen,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import {
@@ -187,7 +188,7 @@ export default function BioprintHubPage() {
               Tudo pronto
             </div>
             <div className="text-sm font-semibold text-white">
-              Todas as 4 etapas estão configuradas. Você pode imprimir agora.
+              Todas as 5 etapas estão configuradas. Você pode imprimir agora.
             </div>
           </div>
           <button
@@ -216,11 +217,70 @@ export default function BioprintHubPage() {
         })}
       </section>
 
+      {/* ─── Ferramentas auxiliares · BTIE ────────────────────────────── */}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-violet-500/30 to-transparent" />
+          <span className="text-[10px] uppercase tracking-[0.25em] text-violet-300/70 font-semibold flex items-center gap-1.5">
+            <Sparkles className="w-3 h-3" />
+            Ferramentas Auxiliares · BTIE
+          </span>
+          <div className="h-px flex-1 bg-gradient-to-r from-violet-500/30 via-transparent to-transparent" />
+        </div>
+
+        <Link
+          href="/dashboard/bioprint/toolpath"
+          className="group block rounded-2xl bg-gradient-to-br from-violet-500/[0.08] via-cyan-500/[0.04] to-violet-500/[0.02] border border-violet-500/25 hover:border-violet-400/50 p-5 transition-all hover:scale-[1.005]"
+        >
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-xl bg-violet-500/15 border border-violet-500/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <Brain className="w-6 h-6 text-violet-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] uppercase tracking-wider text-violet-300/80 font-semibold">
+                  Engine proprietário · R12.8
+                </span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-200 font-semibold uppercase tracking-wider flex items-center gap-1">
+                  <BookOpen className="w-2.5 h-2.5" /> 5 papers
+                </span>
+              </div>
+              <h3 className="text-base font-bold text-white mt-0.5 group-hover:text-violet-100 transition-colors">
+                Biofabrication Toolpath Intelligence Engine
+              </h3>
+              <p className="text-[11.5px] text-gray-300 mt-1.5 leading-relaxed">
+                Visualizador 3D científico · análise de shear (Hagen-Poiseuille) · predição de falhas · geração
+                de scaffolds biomiméticos (Gyroid TPMS, Voronoi, Concentric perfusable, Vector-field NAATIV3).
+                Engine fundamentado em 5 papers canônicos de bioimpressão.
+              </p>
+              <div className="flex flex-wrap gap-1.5 mt-3">
+                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-violet-200">
+                  📊 Viewer 3D Canvas2D
+                </span>
+                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-200">
+                  🧬 Shear · Viabilidade
+                </span>
+                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-200">
+                  🎯 Predição de falhas
+                </span>
+                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-200">
+                  🔬 Infill biomimético
+                </span>
+                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-200">
+                  📚 Base científica
+                </span>
+              </div>
+            </div>
+            <ArrowRight className="w-5 h-5 text-violet-300/60 group-hover:text-violet-200 group-hover:translate-x-0.5 transition-all shrink-0 mt-1" />
+          </div>
+        </Link>
+      </section>
+
       {/* ─── Ações secundárias ─────────────────────────────────────── */}
       <section className="rounded-2xl bg-white/[0.02] border border-white/5 p-4 flex flex-wrap items-center gap-3">
         <Info className="w-4 h-4 text-gray-400 shrink-0" />
         <p className="text-xs text-gray-400 flex-1 min-w-0">
-          O estado das 4 etapas é mantido na sua sessão (sessionStorage). Fechar a aba reinicia tudo.
+          O estado das 5 etapas é mantido na sua sessão (sessionStorage). Fechar a aba reinicia tudo.
         </p>
         {readyCount > 0 && (
           <button
