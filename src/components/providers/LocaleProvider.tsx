@@ -17,6 +17,7 @@ import {
   LOCALE_HTML_LANG,
   detectBrowserLocale,
 } from "@/lib/i18n/locales"
+import { applyAutoTranslate } from "@/lib/i18n/auto-translate"
 
 interface LocaleContextValue {
   locale: Locale
@@ -53,10 +54,13 @@ export function LocaleProvider({ children, defaultLocale = "pt" }: LocaleProvide
     }
   }, [])
 
-  // Atualiza atributo lang do <html>
+  // Atualiza atributo lang do <html> e aplica auto-tradução do DOM
   useEffect(() => {
     if (typeof document === "undefined") return
     document.documentElement.lang = LOCALE_HTML_LANG[locale]
+    // Aplica tradução automática de todos os textos hardcoded em PT
+    // (cobre páginas que ainda não usam useT diretamente)
+    applyAutoTranslate(locale)
   }, [locale])
 
   const setLocale = useCallback((next: Locale) => {
