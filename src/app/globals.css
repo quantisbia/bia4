@@ -506,6 +506,511 @@ html.light header[class*="border-b"] {
    FIM LAYOUT GLOBAL LIGHT MODE
    ═════════════════════════════════════════════════════════════════════════ */
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   R12.5 — UX/A11y PROFESSIONAL LIGHT-MODE COLOR SYSTEM (Quantis design tokens)
+   ═══════════════════════════════════════════════════════════════════════════
+   Princípios:
+   1. Fundo branco/quase-branco com TODOS os textos em tons ESCUROS
+   2. Mínimo WCAG AAA (7:1 contraste) sempre que possível
+   3. Identidade Quantis preservada (roxo brand, azul accent, vinho destrutiva)
+   4. Hierarquia tipográfica clara (3 níveis: forte / médio / sutil)
+   5. Override universal — não depende de classes hook por página
+
+   Tokens semânticos derivados:
+     --light-ink:        hsl(257 65%  8%)  → text primário (~17:1)
+     --light-ink-strong: hsl(257 70%  5%)  → títulos / strong
+     --light-text:       hsl(257 35% 22%)  → text secundário (~10:1)
+     --light-muted:      hsl(257 20% 38%)  → text terciário/captions (~6:1)
+     --light-disabled:   hsl(257 15% 52%)  → estados desabilitados
+     --light-brand:      hsl(268 80% 32%)  → roxo Quantis acessível
+     --light-success:    hsl(160 78% 22%)  → verde profundo (~9:1)
+     --light-warning:    hsl(32 92% 28%)   → âmbar profundo (~7:1)
+     --light-error:      hsl(348 76% 36%)  → vinho Quantis (~7:1)
+     --light-info:       hsl(217 82% 32%)  → azul Quantis (~8:1)
+     --light-accent:     hsl(195 88% 26%)  → cyan profundo (~8:1)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+html.light {
+  /* Custom properties locais (não conflitam com :root globais) */
+  --light-ink:        hsl(257 65%  8%);
+  --light-ink-strong: hsl(257 70%  5%);
+  --light-text:       hsl(257 35% 22%);
+  --light-muted:      hsl(257 20% 38%);
+  --light-disabled:   hsl(257 15% 52%);
+  --light-brand:      hsl(268 80% 32%);
+  --light-brand-deep: hsl(268 85% 22%);
+  --light-success:    hsl(160 78% 22%);
+  --light-warning:    hsl(32 92% 28%);
+  --light-error:      hsl(348 76% 36%);
+  --light-info:       hsl(217 82% 32%);
+  --light-accent:     hsl(195 88% 26%);
+  --light-teal:       hsl(174 80% 22%);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   1) NEUTROS — todos os tons de cinza e branco viram tons escuros legíveis
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* text-white & opacidades — texto principal */
+html.light .text-white,
+html.light [class*="text-white/"] {
+  color: var(--light-ink) !important;
+}
+
+/* Cinza-clarinho/médio (gray-200/300) — texto primário escuro */
+html.light .text-gray-50,
+html.light .text-gray-100,
+html.light .text-gray-200,
+html.light .text-gray-300,
+html.light .text-slate-200,
+html.light .text-slate-300,
+html.light .text-zinc-200,
+html.light .text-zinc-300,
+html.light .text-neutral-200,
+html.light .text-neutral-300,
+html.light .text-stone-200,
+html.light .text-stone-300 {
+  color: var(--light-ink) !important;
+}
+
+/* Cinza-médio (gray-400/500) — texto secundário */
+html.light .text-gray-400,
+html.light .text-gray-500,
+html.light .text-slate-400,
+html.light .text-slate-500,
+html.light .text-zinc-400,
+html.light .text-zinc-500,
+html.light .text-neutral-400,
+html.light .text-neutral-500,
+html.light .text-stone-400,
+html.light .text-stone-500 {
+  color: var(--light-text) !important;
+}
+
+/* Cinza-escuro (gray-600/700) — texto terciário/captions
+   ATENÇÃO: em dark esses tons são quase invisíveis (escuros sobre escuro),
+   mas em light precisam ser legíveis sobre branco → escurece para muted */
+html.light .text-gray-600,
+html.light .text-gray-700,
+html.light .text-slate-600,
+html.light .text-slate-700,
+html.light .text-zinc-600,
+html.light .text-zinc-700,
+html.light .text-neutral-600,
+html.light .text-neutral-700,
+html.light .text-stone-600,
+html.light .text-stone-700 {
+  color: var(--light-muted) !important;
+}
+
+/* Gray-800/900 já são escuros — mantém */
+html.light .text-gray-800,
+html.light .text-gray-900,
+html.light .text-slate-800,
+html.light .text-slate-900,
+html.light .text-zinc-800,
+html.light .text-zinc-900 {
+  color: var(--light-ink-strong) !important;
+}
+
+/* Opacidades de gray (gray-X/Y) */
+html.light [class*="text-gray-300/"],
+html.light [class*="text-gray-400/"] {
+  color: var(--light-text) !important;
+  opacity: 1 !important;
+}
+
+html.light [class*="text-gray-500/"],
+html.light [class*="text-gray-600/"] {
+  color: var(--light-muted) !important;
+  opacity: 1 !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   2) BRAND — Violet/Purple/Quantis-Lilac/Quantis-Purple
+   Toda escala vira roxo Quantis escuro acessível (~9:1 sobre branco)
+   ────────────────────────────────────────────────────────────────────────── */
+
+html.light .text-violet-100,
+html.light .text-violet-200,
+html.light .text-violet-300,
+html.light .text-violet-400,
+html.light .text-violet-500,
+html.light .text-purple-100,
+html.light .text-purple-200,
+html.light .text-purple-300,
+html.light .text-purple-400,
+html.light .text-purple-500,
+html.light .text-quantis-lilac-100,
+html.light .text-quantis-lilac-200,
+html.light .text-quantis-lilac-300,
+html.light .text-quantis-lilac-400,
+html.light .text-quantis-lilac-500,
+html.light .text-quantis-purple-100,
+html.light .text-quantis-purple-200,
+html.light .text-quantis-purple-300,
+html.light .text-quantis-purple-400,
+html.light .text-quantis-purple-500,
+html.light [class*="text-violet-200/"],
+html.light [class*="text-violet-300/"],
+html.light [class*="text-violet-400/"],
+html.light [class*="text-purple-200/"],
+html.light [class*="text-purple-300/"],
+html.light [class*="text-purple-400/"],
+html.light [class*="text-quantis-lilac-300/"],
+html.light [class*="text-quantis-purple-300/"] {
+  color: var(--light-brand) !important;
+  opacity: 1 !important;
+}
+
+/* Violet/Purple 600+ → versão ainda mais profunda */
+html.light .text-violet-600,
+html.light .text-violet-700,
+html.light .text-violet-800,
+html.light .text-purple-600,
+html.light .text-purple-700,
+html.light .text-purple-800,
+html.light .text-quantis-purple-600,
+html.light .text-quantis-purple-700,
+html.light .text-quantis-purple-800 {
+  color: var(--light-brand-deep) !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   3) FUCHSIA / INDIGO / PINK — variações do brand
+   ────────────────────────────────────────────────────────────────────────── */
+
+html.light .text-fuchsia-200,
+html.light .text-fuchsia-300,
+html.light .text-fuchsia-400,
+html.light .text-fuchsia-500,
+html.light .text-indigo-200,
+html.light .text-indigo-300,
+html.light .text-indigo-400,
+html.light .text-indigo-500,
+html.light .text-pink-200,
+html.light .text-pink-300,
+html.light .text-pink-400,
+html.light .text-pink-500,
+html.light [class*="text-fuchsia-300/"],
+html.light [class*="text-indigo-300/"],
+html.light [class*="text-pink-300/"] {
+  color: var(--light-brand) !important;
+  opacity: 1 !important;
+}
+
+html.light .text-fuchsia-600,
+html.light .text-fuchsia-700,
+html.light .text-indigo-600,
+html.light .text-indigo-700,
+html.light .text-pink-600,
+html.light .text-pink-700 {
+  color: var(--light-brand-deep) !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   4) SUCCESS — Emerald / Green / Lime
+   ────────────────────────────────────────────────────────────────────────── */
+
+html.light .text-emerald-100,
+html.light .text-emerald-200,
+html.light .text-emerald-300,
+html.light .text-emerald-400,
+html.light .text-emerald-500,
+html.light .text-green-100,
+html.light .text-green-200,
+html.light .text-green-300,
+html.light .text-green-400,
+html.light .text-green-500,
+html.light .text-lime-200,
+html.light .text-lime-300,
+html.light .text-lime-400,
+html.light .text-lime-500,
+html.light [class*="text-emerald-200/"],
+html.light [class*="text-emerald-300/"],
+html.light [class*="text-emerald-400/"],
+html.light [class*="text-green-200/"],
+html.light [class*="text-green-300/"],
+html.light [class*="text-lime-300/"] {
+  color: var(--light-success) !important;
+  opacity: 1 !important;
+}
+
+html.light .text-emerald-600,
+html.light .text-emerald-700,
+html.light .text-emerald-800,
+html.light .text-green-600,
+html.light .text-green-700,
+html.light .text-green-800 {
+  color: hsl(160 85% 16%) !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   5) WARNING — Amber / Yellow / Orange / Quantis-Gold
+   ────────────────────────────────────────────────────────────────────────── */
+
+html.light .text-amber-100,
+html.light .text-amber-200,
+html.light .text-amber-300,
+html.light .text-amber-400,
+html.light .text-amber-500,
+html.light .text-yellow-100,
+html.light .text-yellow-200,
+html.light .text-yellow-300,
+html.light .text-yellow-400,
+html.light .text-yellow-500,
+html.light .text-orange-100,
+html.light .text-orange-200,
+html.light .text-orange-300,
+html.light .text-orange-400,
+html.light .text-orange-500,
+html.light .text-quantis-gold-100,
+html.light .text-quantis-gold-200,
+html.light .text-quantis-gold-300,
+html.light .text-quantis-gold-400,
+html.light .text-quantis-gold-500,
+html.light [class*="text-amber-200/"],
+html.light [class*="text-amber-300/"],
+html.light [class*="text-amber-400/"],
+html.light [class*="text-yellow-300/"],
+html.light [class*="text-orange-300/"] {
+  color: var(--light-warning) !important;
+  opacity: 1 !important;
+}
+
+html.light .text-amber-600,
+html.light .text-amber-700,
+html.light .text-amber-800,
+html.light .text-orange-600,
+html.light .text-orange-700,
+html.light .text-yellow-600,
+html.light .text-yellow-700,
+html.light .text-quantis-gold-600,
+html.light .text-quantis-gold-700 {
+  color: hsl(32 95% 22%) !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   6) ERROR — Rose / Red / Pink-error / Quantis-Wine
+   ────────────────────────────────────────────────────────────────────────── */
+
+html.light .text-rose-100,
+html.light .text-rose-200,
+html.light .text-rose-300,
+html.light .text-rose-400,
+html.light .text-rose-500,
+html.light .text-red-100,
+html.light .text-red-200,
+html.light .text-red-300,
+html.light .text-red-400,
+html.light .text-red-500,
+html.light .text-quantis-wine-100,
+html.light .text-quantis-wine-200,
+html.light .text-quantis-wine-300,
+html.light .text-quantis-wine-400,
+html.light .text-quantis-wine-500,
+html.light [class*="text-rose-200/"],
+html.light [class*="text-rose-300/"],
+html.light [class*="text-rose-400/"],
+html.light [class*="text-red-200/"],
+html.light [class*="text-red-300/"] {
+  color: var(--light-error) !important;
+  opacity: 1 !important;
+}
+
+html.light .text-rose-600,
+html.light .text-rose-700,
+html.light .text-red-600,
+html.light .text-red-700,
+html.light .text-quantis-wine-600,
+html.light .text-quantis-wine-700 {
+  color: hsl(348 80% 28%) !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   7) INFO/ACCENT — Blue / Cyan / Sky / Quantis-Blue / Teal
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Blue → Info principal */
+html.light .text-blue-100,
+html.light .text-blue-200,
+html.light .text-blue-300,
+html.light .text-blue-400,
+html.light .text-blue-500,
+html.light .text-sky-100,
+html.light .text-sky-200,
+html.light .text-sky-300,
+html.light .text-sky-400,
+html.light .text-sky-500,
+html.light .text-quantis-blue-100,
+html.light .text-quantis-blue-200,
+html.light .text-quantis-blue-300,
+html.light .text-quantis-blue-400,
+html.light .text-quantis-blue-500,
+html.light [class*="text-blue-200/"],
+html.light [class*="text-blue-300/"],
+html.light [class*="text-blue-400/"],
+html.light [class*="text-sky-300/"] {
+  color: var(--light-info) !important;
+  opacity: 1 !important;
+}
+
+html.light .text-blue-600,
+html.light .text-blue-700,
+html.light .text-blue-800,
+html.light .text-sky-600,
+html.light .text-sky-700,
+html.light .text-quantis-blue-600,
+html.light .text-quantis-blue-700 {
+  color: hsl(217 85% 24%) !important;
+}
+
+/* Cyan → Accent */
+html.light .text-cyan-100,
+html.light .text-cyan-200,
+html.light .text-cyan-300,
+html.light .text-cyan-400,
+html.light .text-cyan-500,
+html.light [class*="text-cyan-200/"],
+html.light [class*="text-cyan-300/"],
+html.light [class*="text-cyan-400/"] {
+  color: var(--light-accent) !important;
+  opacity: 1 !important;
+}
+
+html.light .text-cyan-600,
+html.light .text-cyan-700,
+html.light .text-cyan-800 {
+  color: hsl(195 90% 20%) !important;
+}
+
+/* Teal — variação accent verde-azulada */
+html.light .text-teal-100,
+html.light .text-teal-200,
+html.light .text-teal-300,
+html.light .text-teal-400,
+html.light .text-teal-500,
+html.light [class*="text-teal-200/"],
+html.light [class*="text-teal-300/"],
+html.light [class*="text-teal-400/"] {
+  color: var(--light-teal) !important;
+  opacity: 1 !important;
+}
+
+html.light .text-teal-600,
+html.light .text-teal-700,
+html.light .text-teal-800 {
+  color: hsl(174 85% 18%) !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   8) ELEMENTOS DE TEXTO HTML (h1-h6, p, strong, em, label, span)
+   Garante que conteúdo sem classe explícita ainda fique escuro
+   ────────────────────────────────────────────────────────────────────────── */
+
+html.light h1,
+html.light h2,
+html.light h3,
+html.light h4,
+html.light h5,
+html.light h6 {
+  color: var(--light-ink-strong);
+}
+
+html.light strong,
+html.light b {
+  color: var(--light-ink-strong);
+}
+
+/* Strong dentro de containers coloridos — adapta semanticamente */
+html.light [class*="bg-emerald-"] strong,
+html.light [class*="bg-green-"] strong {
+  color: hsl(160 85% 14%) !important;
+}
+
+html.light [class*="bg-amber-"] strong,
+html.light [class*="bg-yellow-"] strong,
+html.light [class*="bg-orange-"] strong {
+  color: hsl(32 95% 20%) !important;
+}
+
+html.light [class*="bg-rose-"] strong,
+html.light [class*="bg-red-"] strong,
+html.light [class*="bg-quantis-wine-"] strong {
+  color: hsl(348 80% 26%) !important;
+}
+
+html.light [class*="bg-blue-"] strong,
+html.light [class*="bg-sky-"] strong,
+html.light [class*="bg-quantis-blue-"] strong {
+  color: hsl(217 85% 22%) !important;
+}
+
+html.light [class*="bg-cyan-"] strong {
+  color: hsl(195 90% 18%) !important;
+}
+
+html.light [class*="bg-teal-"] strong {
+  color: hsl(174 85% 16%) !important;
+}
+
+html.light [class*="bg-violet-"] strong,
+html.light [class*="bg-purple-"] strong,
+html.light [class*="bg-fuchsia-"] strong,
+html.light [class*="bg-indigo-"] strong {
+  color: var(--light-brand-deep) !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   9) PLACEHOLDERS de inputs/textarea — texto sutil mas legível
+   ────────────────────────────────────────────────────────────────────────── */
+
+html.light input::placeholder,
+html.light textarea::placeholder,
+html.light select::placeholder {
+  color: var(--light-disabled) !important;
+  opacity: 1 !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   10) ESTADOS DISABLED — ficam visíveis mas claramente inativos
+   ────────────────────────────────────────────────────────────────────────── */
+
+html.light [disabled],
+html.light .disabled,
+html.light [aria-disabled="true"] {
+  color: var(--light-disabled) !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   11) LINKS — devem se destacar (cor brand) e ter underline em hover
+   ────────────────────────────────────────────────────────────────────────── */
+
+html.light a:not([class]) {
+  color: var(--light-brand);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+html.light a:not([class]):hover {
+  color: var(--light-brand-deep);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   12) FALLBACK — qualquer elemento sem cor explícita herda --light-ink
+   (já coberto via body { @apply text-foreground } + :root.light)
+   ────────────────────────────────────────────────────────────────────────── */
+
+html.light {
+  color: var(--light-ink);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FIM R12.5 UX/A11y COLOR SYSTEM
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+
 /* === TEXTOS BRANCOS/CINZAS → TEXTOS ESCUROS === */
 html.light .text-white {
   color: hsl(257 50% 12%) !important; /* azul escuro Quantis */
