@@ -28,6 +28,7 @@ import {
   Gamepad2, Terminal, Microscope, Beaker, FlaskConical,
   ShieldCheck, Info, AlertTriangle, CheckCircle2, Layers, Droplets,
   PlayCircle, Download, Usb, Radio, ArrowRight, Sliders,
+  Snowflake, Zap as ZapIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { useBioprintProcess } from "@/lib/bioprint/process-context"
@@ -38,6 +39,7 @@ import { PrinterConnection } from "@/components/bioprinting/PrinterConnection"
 import { RealtimeControls } from "@/components/bioprinting/RealtimeControls"
 import { InfoButton } from "@/components/ui/InfoButton"
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection"
+import { BioengineerLiveDock, type DockTab } from "@/components/bioprinter/BioengineerLiveDock"
 
 // ─── Mapas auxiliares ──────────────────────────────────────────────────────
 
@@ -262,6 +264,28 @@ export default function BioprintControlPage() {
     void sendToPrinter("G1 X0 Y200 F3000")
   }, [log, position.e, sendToPrinter])
 
+  // ── Resfriar TUDO — protege a placa de erro ao trocar cartucho ou desligar ──
+  // M104 S0: cartucho off · M140 S0: cama off · M141 S0: câmara off
+  const handleCoolAll = useCallback(() => {
+    log(`; ── ❄️ Resfriar TUDO (proteção da placa) ──`)
+    log(`M104 S0 ; desliga aquecedor do cartucho`)
+    log(`M140 S0 ; desliga aquecedor da cama`)
+    log(`M141 S0 ; desliga aquecedor da câmara`)
+    void sendToPrinter("M104 S0")
+    void sendToPrinter("M140 S0")
+    void sendToPrinter("M141 S0")
+  }, [log, sendToPrinter])
+
+  // ── Bioengineer Live Dock (painel flutuante) ──
+  // Resolve o problema de scroll jump: usa position:fixed, NUNCA é afetado pela rolagem
+  const [dockOpen, setDockOpen] = useState(false)
+  const [dockTab, setDockTab] = useState<DockTab>("joystick")
+
+  const openDockTab = useCallback((t: DockTab) => {
+    setDockTab(t)
+    setDockOpen(true)
+  }, [])
+
   const clearLog = () => setGcodeLog([...initialLog, "; (log limpo)"])
 
   // ── Download do G-code (re-disponibilizado aqui pra conveniência) ──
@@ -485,6 +509,38 @@ export default function BioprintControlPage() {
               return null
             }}
           />
+
+          {/* ─── Linha de ações críticas (Resfriar Tudo + abrir dock) ─── */}
+          <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-cyan-500/15">
+            <button
+              onClick={handleCoolAll}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/40 text-cyan-200 text-xs font-semibold transition-colors"
+              title="M104 S0 + M140 S0 + M141 S0 — desliga todos os aquecedores. Importante antes de trocar cartucho ou desligar a impressora."
+            >
+              <Snowflake className="w-3.5 h-3.5" />
+              Resfriar Tudo
+              <InfoButton title="Por que resfriar tudo?" align="left" size="sm">
+                <p>
+                  Manda <code>M104 S0</code> (cartucho off), <code>M140 S0</code> (cama off) e{" "}
+                  <code>M141 S0</code> (câmara off) de uma vez.
+                </p>
+                <p className="mt-1">
+                  <strong>Importante:</strong> algumas placas Marlin entram em <em>thermal runaway</em>
+                  ou crasham se você desligar a impressora com aquecedores ainda ativos. Sempre
+                  resfrie antes de trocar cartucho ou desconectar.
+                </p>
+              </InfoButton>
+            </button>
+
+            <button
+              onClick={() => openDockTab("joystick")}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/40 text-violet-100 text-xs font-bold transition-colors ml-auto"
+              title="Abrir painel flutuante (joystick + temperaturas + console) — imune a scroll"
+            >
+              <ZapIcon className="w-3.5 h-3.5" />
+              Painel Bioengenheiro
+            </button>
+          </div>
         </section>
 
         {/* JOYSTICK + CONSOLE — destaque máximo, isolado no DOM para não causar scroll jumps */}
@@ -764,6 +820,68 @@ export default function BioprintControlPage() {
           </Link>
         </div>
       </footer>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+       *  FAB FLUTUANTE — sempre visível em qualquer scroll
+       *  Abre o Bioengineer Live Dock (controle remoto da bioimpressora)
+       * ═══════════════════════════════════════════════════════════════════ */}
+      {!dockOpen && (
+        <button
+          onClick={() => openDockTab("joystick")}
+          className={cn(
+            "fixed bottom-20 right-4 z-40 group",
+            "inline-flex items-center gap-2 pl-4 pr-5 py-3 rounded-2xl",
+            "bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500",
+            "border border-violet-400/50 shadow-2xl shadow-violet-900/50",
+            "text-white font-bold text-sm",
+            "transition-all duration-200 hover:scale-105 active:scale-95",
+            "animate-in slide-in-from-right"
+          )}
+          title="Abrir painel Bioengenheiro (controle ao vivo, imune a scroll)"
+          aria-label="Abrir painel Bioengenheiro"
+        >
+          <div className="relative">
+            <Gamepad2 className="w-5 h-5" />
+            {isConnected && (
+              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-violet-600 animate-pulse" />
+            )}
+          </div>
+          <span className="hidden sm:inline">Painel Bioengenheiro</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-white/15 font-mono hidden md:inline">
+            G
+          </span>
+        </button>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+       *  BIOENGINEER LIVE DOCK — painel flutuante de controle máximo
+       * ═══════════════════════════════════════════════════════════════════ */}
+      <BioengineerLiveDock
+        open={dockOpen}
+        onClose={() => setDockOpen(false)}
+        connected={isConnected}
+        sendCommand={async (cmd: string) => {
+          if (sendCommandRef.current) {
+            await sendCommandRef.current(cmd)
+          }
+          log(cmd)
+        }}
+        position={position}
+        onMove={handleMove}
+        onHome={handleHome}
+        onZero={handleZero}
+        onProbeZ={handleProbeZ}
+        onPurge={handlePurge}
+        onSterilePause={handleSterilePause}
+        onGoToRest={handleGoToRest}
+        onCoolAll={handleCoolAll}
+        consoleLog={gcodeLog}
+        onClearLog={clearLog}
+        cartridgeC={extrusion.cartridgeTempC}
+        bedC={extrusion.bedTempC}
+        chamberC={extrusion.chamberTempC}
+        defaultTab={dockTab}
+      />
     </div>
   )
 }
