@@ -8,6 +8,7 @@ import {
   addChatMessage,
 } from "@/lib/db/queries"
 import { generateChatStream, SYSTEM_PROMPTS, BiaAIError, aiErrorToHttp, type GeminiMessage } from "@/lib/ai/gemini"
+import { retrieveUploads, buildRagContext } from "@/lib/knowledge/rag"
 import { Prisma } from "@prisma/client"
 import { z } from "zod"
 
@@ -101,7 +102,12 @@ export async function POST(req: NextRequest) {
     protocol: SYSTEM_PROMPTS.PROTOCOL_GENERATOR,
   }
 
-  const systemPrompt = systemPromptMap[mode] ?? SYSTEM_PROMPTS.BIOFAB_EXPERT
+  const basePrompt = systemPromptMap[mode] ?? SYSTEM_PROMPTS.BIOFAB_EXPERT
+
+  // RAG: anexar uploads relevantes do Motor de Conhecimento
+  const ragSnippets = await retrieveUploads(message, session.user.id, 3)
+  const ragContext = buildRagContext(ragSnippets)
+  const systemPrompt = ragContext ? `${basePrompt}\n${ragContext}` : basePrompt
 
   try {
   // Resposta com streaming

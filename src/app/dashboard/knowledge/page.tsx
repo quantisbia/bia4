@@ -6,9 +6,10 @@ import {
   BookOpen, FileText, Briefcase, Scale, TrendingUp, Target,
   Lightbulb, ChevronDown, ChevronUp, Search, Filter,
   MessageSquare, ExternalLink, Beaker, Microscope, Dna,
-  GraduationCap, Award, BarChart3
+  GraduationCap, Award, BarChart3, Sparkles, BarChart
 } from 'lucide-react'
 import { cn } from '@/lib/utils/helpers'
+import { KnowledgeEngine } from '@/components/knowledge/KnowledgeEngine'
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Dados da Base de Conhecimento
@@ -281,6 +282,7 @@ function Section({ title, icon: Icon, color, expanded, onToggle, children, badge
    Page Component
 ═══════════════════════════════════════════════════════════════════════════ */
 export default function KnowledgeBasePage() {
+  const [viewMode, setViewMode] = useState<"motor" | "analise">("motor")
   const [expandedSection, setExpandedSection] = useState<string | null>("novos")
   const [searchTerm, setSearchTerm] = useState("")
   const [filterCategory, setFilterCategory] = useState("all")
@@ -322,18 +324,54 @@ export default function KnowledgeBasePage() {
 
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-        <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center shrink-0 shadow-lg shadow-violet-900/40">
+        <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-quantis-purple-600 via-quantis-lilac-500 to-quantis-wine-600 flex items-center justify-center shrink-0 shadow-lg shadow-quantis-purple-900/40">
           <BookOpen className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
         </div>
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-white">
-            Base de Conhecimento BIA
+            Motor de Conhecimento BIA
           </h1>
           <p className="text-xs sm:text-sm text-gray-400">
-            {data.resumo.total_artigos} artigos · {data.resumo.total_patentes} patentes · {data.resumo.total_regulatorio} casos regulatórios
+            Artigos · Patentes · Metodologias · Seus uploads para alimentar a BIA
           </p>
         </div>
       </div>
+
+      {/* ── View Mode Tabs ── */}
+      <div className="flex gap-2 p-1 bg-white/[0.04] border border-white/[0.08] rounded-xl w-fit">
+        <button
+          onClick={() => setViewMode("motor")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+            viewMode === "motor"
+              ? "bg-gradient-to-r from-quantis-purple-600 to-quantis-lilac-500 text-white shadow-lg shadow-quantis-purple-900/40"
+              : "text-gray-400 hover:text-white hover:bg-white/[0.04]"
+          )}
+        >
+          <Sparkles className="w-4 h-4" />
+          Motor de Conhecimento
+        </button>
+        <button
+          onClick={() => setViewMode("analise")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+            viewMode === "analise"
+              ? "bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-lg shadow-violet-900/40"
+              : "text-gray-400 hover:text-white hover:bg-white/[0.04]"
+          )}
+        >
+          <BarChart className="w-4 h-4" />
+          Análise Estratégica
+        </button>
+      </div>
+
+      {/* ── Motor de Conhecimento (novo) ── */}
+      {viewMode === "motor" && <KnowledgeEngine />}
+
+      {/* ── Análise Estratégica (antigo, preservado) ── */}
+      {viewMode === "analise" && (
+      <>
+      {/* legacy-analise-start */}
 
       {/* ── Search + Filter ── */}
       <div className="space-y-2">
@@ -666,6 +704,9 @@ export default function KnowledgeBasePage() {
           </Link>
         </div>
       </div>
+      {/* legacy-analise-end */}
+      </>
+      )}
     </div>
   )
 }

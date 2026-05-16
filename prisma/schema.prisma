@@ -264,11 +264,22 @@ model KnowledgeArticle {
   chunkCount  Int      @default(0)
   isPublic    Boolean  @default(true)
   accessCount Int      @default(0)
+  // R12 — Motor de Conhecimento: tipos e uploads de usuário
+  kind        String   @default("article") // "article" | "patent" | "methodology" | "user_upload"
+  source      String?  // ex: "internal", "pubmed", "scholar", "wipo", "user"
+  fileUrl     String?  // URL do arquivo enviado pelo usuário (storage)
+  fileName    String?  // nome original do arquivo
+  fileType    String?  // pdf/docx/txt/md
+  fileSize    Int?     // bytes
+  uploadedBy  String?  // userId — quem fez o upload
+  textContent String?  // extracted text para busca/RAG
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([category])
   @@index([year])
+  @@index([kind])
+  @@index([uploadedBy])
   @@map("knowledge_articles")
 }
 

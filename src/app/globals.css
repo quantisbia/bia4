@@ -70,6 +70,150 @@
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   LIGHT MODE OVERRIDES (R11.2)
+   Força paginas que usam cores hardcoded (bg-[#0a0514], text-white, etc)
+   a se adaptarem ao tema claro automaticamente.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+html.light {
+  color-scheme: light;
+}
+
+/* === FUNDOS ESCUROS HARDCODED → FUNDO CLARO ===
+   Usa class*= com substring SEM escape de colchete (atributo string match).
+   Funciona para "bg-[#0a0514]", "bg-[#0a0514]/90", etc. */
+html.light [class*="bg-[#0a0514]"],
+html.light [class*="bg-[#0c0820]"],
+html.light [class*="bg-[#030a04]"],
+html.light [class*="bg-[#0c0818]"],
+html.light [class*="bg-[#150f26]"],
+html.light [class*="bg-[#221c3a]"] {
+  background-color: hsl(var(--background)) !important;
+}
+
+/* === TEXTOS BRANCOS/CINZAS → TEXTOS ESCUROS === */
+html.light .text-white {
+  color: hsl(257 50% 12%) !important; /* azul escuro Quantis */
+}
+
+html.light .text-white\/80,
+html.light .text-white\/90 {
+  color: hsl(257 50% 15%) !important;
+}
+
+html.light .text-white\/70,
+html.light .text-white\/60 {
+  color: hsl(257 30% 25%) !important;
+}
+
+html.light .text-white\/50,
+html.light .text-white\/40 {
+  color: hsl(257 20% 40%) !important;
+}
+
+/* Cinzas (Tailwind) — viram tons escuros legíveis */
+html.light .text-gray-200,
+html.light .text-gray-300 {
+  color: hsl(257 50% 18%) !important;
+}
+
+html.light .text-gray-400 {
+  color: hsl(257 30% 32%) !important;
+}
+
+html.light .text-gray-500 {
+  color: hsl(257 20% 42%) !important;
+}
+
+html.light .text-gray-600,
+html.light .text-gray-700 {
+  color: hsl(257 15% 55%) !important;
+}
+
+/* Hovers comuns */
+html.light .hover\:text-white:hover {
+  color: hsl(268 75% 52%) !important; /* roxo Quantis */
+}
+
+/* === BORDAS BRANCAS SEMI-TRANSPARENTES → BORDAS ROXAS SUTIS === */
+html.light .border-white\/5,
+html.light .border-white\/8,
+html.light .border-white\/10,
+html.light .border-white\/20 {
+  border-color: hsl(270 30% 88%) !important;
+}
+
+/* === FUNDOS BRANCOS SEMI-TRANSPARENTES (overlays escuros) === */
+html.light .bg-white\/5,
+html.light .bg-white\/\[0\.04\],
+html.light .bg-white\/\[0\.06\],
+html.light .bg-white\/\[0\.08\],
+html.light .bg-white\/10 {
+  background-color: hsl(270 40% 94%) !important;
+}
+
+/* === Mantem gradientes Quantis legiveis no light === */
+html.light .bia-gradient-text {
+  background-image: linear-gradient(
+    to right,
+    hsl(268 75% 42%),
+    hsl(280 70% 52%),
+    hsl(226 86% 49%)
+  );
+}
+
+/* === Grid background sutil para light === */
+html.light .grid-bg {
+  background-color: hsl(var(--background));
+  background-image:
+    linear-gradient(hsl(270 30% 90%) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(270 30% 90%) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* === Inputs / forms === */
+html.light input,
+html.light textarea,
+html.light select {
+  color: hsl(257 50% 12%);
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: hsl(257 15% 55%) !important;
+}
+
+/* === Botoes "violet" pre-existentes ficam visiveis === */
+html.light .bg-violet-500\/5,
+html.light .bg-violet-500\/10,
+html.light .bg-violet-500\/\[0\.06\] {
+  background-color: hsl(268 75% 96%) !important;
+}
+
+html.light .border-violet-500\/10,
+html.light .border-violet-500\/20,
+html.light .border-violet-500\/30 {
+  border-color: hsl(268 60% 82%) !important;
+}
+
+html.light .text-violet-200,
+html.light .text-violet-300,
+html.light .text-violet-400 {
+  color: hsl(268 75% 45%) !important;
+}
+
+/* === Scrollbar adaptativa === */
+html.light ::-webkit-scrollbar-track {
+  background: hsl(270 30% 94%);
+}
+html.light ::-webkit-scrollbar-thumb {
+  background: hsl(270 30% 80%);
+}
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: hsl(268 60% 65%);
+}
+
 /* BIA Custom Styles */
 @layer components {
   .bia-card {
