@@ -293,9 +293,11 @@ export function PrinterConnection({
   // ─────────────────────────────────────────────────────────
   // QUICK-ACTIONS
   // ─────────────────────────────────────────────────────────
+  // 🚫 G28 (Home) foi REMOVIDO dos quick-actions intencionalmente.
+  // Bioimpressora nunca faz home automático — preserva bandeja/cartucho.
+  // Use "G92 Zero" para zerar coordenadas no ponto atual sem mover.
   const quickActions: Array<{ label: string; cmd: string; title: string }> = [
-    { label: "G28 Home", cmd: "G28", title: "Homing — zera as posições X/Y/Z na origem física" },
-    { label: "G92 Zero", cmd: "G92 X0 Y0 Z0 E0", title: "Zera as posições atuais (sem mover)" },
+    { label: "G92 Zero aqui", cmd: "G92 X0 Y0 Z0 E0", title: "Zera as coordenadas X/Y/Z/E no ponto atual (sem mover, sem home)" },
     { label: "M114 Pos", cmd: "M114", title: "Mostra a posição atual do bico" },
     { label: "M105 Temp", cmd: "M105", title: "Mostra temperaturas do hotend e mesa" },
     { label: "M115 Info", cmd: "M115", title: "Informações do firmware" },

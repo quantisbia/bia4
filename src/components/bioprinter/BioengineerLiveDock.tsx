@@ -29,7 +29,7 @@ import {
   X, Gamepad2, Thermometer, Terminal,
   AlertOctagon, Snowflake, Radio, GripVertical,
   Minimize2, Maximize2, Move,
-  Home as HomeIcon, Crosshair, ShieldAlert, Wind, Target,
+  Crosshair, ShieldAlert, Wind, Target,
   RotateCcw, ChevronUp, ChevronDown,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
@@ -53,7 +53,9 @@ export interface BioengineerLiveDockProps {
 
   /** Handlers do joystick (reaproveitam os da página) */
   onMove: (axis: "X" | "Y" | "Z" | "E", delta: number) => void
-  onHome: (axis: "all" | "X" | "Y" | "Z") => void
+  /** @deprecated G28 (home) NÃO é usado em bioimpressão — preserva bandeja/cartucho. Mantido por compat. */
+  onHome?: (axis: "all" | "X" | "Y" | "Z") => void
+  /** G92 X0 Y0 Z0 E0 — zera coordenadas virtuais AQUI sem mover nada (substitui home) */
   onZero: () => void
   onProbeZ: () => void
   onPurge: () => void
@@ -81,7 +83,7 @@ const STEP_SIZES: number[] = [0.05, 0.1, 0.5, 1, 5, 10]
 
 export function BioengineerLiveDock({
   open, onClose, connected, sendCommand, position,
-  onMove, onHome, onZero, onProbeZ, onPurge, onSterilePause, onGoToRest,
+  onMove, onZero, onProbeZ, onPurge, onSterilePause, onGoToRest,
   onCoolAll, consoleLog, onClearLog,
   cartridgeC, bedC, chamberC, defaultTab = "joystick",
 }: BioengineerLiveDockProps) {
@@ -332,7 +334,6 @@ export function BioengineerLiveDock({
               extrudeStep={extrudeStep}
               setExtrudeStep={setExtrudeStep}
               onMove={onMove}
-              onHome={onHome}
               onZero={onZero}
               onProbeZ={onProbeZ}
               onPurge={onPurge}
@@ -375,7 +376,7 @@ export function BioengineerLiveDock({
 // ═══════════════════════════════════════════════════════════════════════════
 function JoystickTab({
   stepSize, setStepSize, extrudeStep, setExtrudeStep,
-  onMove, onHome, onZero, onProbeZ, onPurge, onSterilePause, onGoToRest,
+  onMove, onZero, onProbeZ, onPurge, onSterilePause, onGoToRest,
   connected,
 }: {
   stepSize: number
@@ -383,7 +384,6 @@ function JoystickTab({
   extrudeStep: number
   setExtrudeStep: (n: number) => void
   onMove: (axis: "X" | "Y" | "Z" | "E", delta: number) => void
-  onHome: (axis: "all" | "X" | "Y" | "Z") => void
   onZero: () => void
   onProbeZ: () => void
   onPurge: () => void
@@ -458,15 +458,19 @@ function JoystickTab({
             <ChevronUp className="w-6 h-6 rotate-90" />
             <span className="absolute bottom-0.5 right-1 text-[8px] font-mono opacity-60">+X</span>
           </button>
-          {/* HOME center */}
+          {/* 🎯 G92 ZERO center · sem home, sem mover */}
           <button
-            onClick={() => onHome("all")}
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-amber-500/20 hover:bg-amber-500/35 border-2 border-amber-500/50 text-amber-200 font-bold flex items-center justify-center transition-all active:scale-90 shadow-lg shadow-amber-900/50"
-            title="G28 - Home todos os eixos"
+            onClick={onZero}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-full bg-emerald-500/20 hover:bg-emerald-500/35 border-2 border-emerald-500/60 text-emerald-100 font-bold flex flex-col items-center justify-center transition-all active:scale-90 shadow-lg shadow-emerald-900/50"
+            title="G92 X0 Y0 Z0 E0 — zera coordenadas AQUI · NÃO faz home"
           >
-            <HomeIcon className="w-5 h-5" />
+            <Crosshair className="w-5 h-5" />
+            <span className="text-[8px] font-mono mt-0.5">G92</span>
           </button>
         </div>
+        <p className="text-[9px] text-emerald-300/70 mt-1.5 text-center font-medium">
+          🎯 Centro: <strong>G92 ZERO aqui</strong> · sem home, sem mover · bioimpressora-safe
+        </p>
       </div>
 
       {/* Z + E side by side */}
@@ -490,10 +494,11 @@ function JoystickTab({
               <ChevronDown className="w-4 h-4" /> -Z
             </button>
             <button
-              onClick={() => onHome("Z")}
-              className="w-full py-1.5 rounded-lg bg-cyan-500/[0.06] hover:bg-cyan-500/15 border border-cyan-500/25 text-cyan-300 font-medium text-[10px] transition-all"
+              onClick={onZero}
+              className="w-full py-1.5 rounded-lg bg-emerald-500/[0.08] hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-semibold text-[10px] transition-all flex items-center justify-center gap-1"
+              title="G92 Z0 — zera Z no ponto atual (sem home)"
             >
-              HOME Z
+              <Crosshair className="w-2.5 h-2.5" /> Zera Z aqui
             </button>
           </div>
         </div>

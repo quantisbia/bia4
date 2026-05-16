@@ -115,9 +115,11 @@ export function RealtimeControls({
     send(`G92 Z0 ; zera Z na altura atual`)
     setZOffsetMm(0)
   }
+  // 🚫 Bioimpressora NÃO faz home (G28) — preserva bandeja/cartucho.
+  // Use G92 ZERO manualmente antes do G29 para definir a referência.
   const probeAutoLevel     = () => {
-    send(`G28 ; home`)
-    send(`G29 ; auto-bed-leveling (probe)`)
+    send(`G92 X0 Y0 Z0 ; zera coords AQUI (sem home)`)
+    send(`G29 ; auto-bed-leveling (probe) a partir do ponto atual`)
   }
 
   return (
@@ -461,7 +463,7 @@ export function RealtimeControls({
               disabled={!connected}
               className="px-2.5 py-1.5 rounded-md text-[10px] font-bold bg-violet-500/20 hover:bg-violet-500/30 border border-violet-500/40 text-violet-100 transition-colors flex items-center gap-1"
             >
-              <Zap className="w-3 h-3" /> Auto-level (G28+G29)
+              <Zap className="w-3 h-3" /> Auto-level (G92+G29) · sem home
             </button>
             <button
               onClick={zeroAtCurrentZ}

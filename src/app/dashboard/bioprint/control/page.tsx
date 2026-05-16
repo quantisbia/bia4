@@ -28,11 +28,11 @@ import {
   Gamepad2, Terminal, Microscope, Beaker, FlaskConical,
   ShieldCheck, Info, AlertTriangle, CheckCircle2, Layers, Droplets,
   PlayCircle, Download, Usb, Radio, ArrowRight, Sliders,
-  Snowflake, Zap as ZapIcon,
+  Snowflake, Zap as ZapIcon, Crosshair,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { useBioprintProcess } from "@/lib/bioprint/process-context"
-import { Joystick3D, type JoystickPosition } from "@/components/bioprinter/Joystick3D"
+import { type JoystickPosition } from "@/components/bioprinter/Joystick3D"
 import { ExtrusionPanel, type ExtrusionState } from "@/components/bioprinter/ExtrusionPanel"
 import { TissueViabilityPanel, type TissueState } from "@/components/bioprinter/TissueViabilityPanel"
 import { PrinterConnection } from "@/components/bioprinting/PrinterConnection"
@@ -214,18 +214,30 @@ export default function BioprintControlPage() {
     void sendToPrinter("G90")
   }, [log, sendToPrinter])
 
-  const handleHome = useCallback((axis: "all" | "X" | "Y" | "Z") => {
-    setPosition({ x: 0, y: 0, z: 0, e: 0 })
-    const cmd = `G28${axis === "all" ? "" : " " + axis}`
-    log(`${cmd} ; home ${axis === "all" ? "todos os eixos" : "eixo " + axis}`)
-    void sendToPrinter(cmd)
-  }, [log, sendToPrinter])
+  // ❌ handleHome (G28) foi REMOVIDO intencionalmente.
+  // Bioimpressora NUNCA faz home automático — preserva a posição da bandeja
+  // (wells, scaffolds, samples) e do cartucho. Posicione manualmente com o
+  // joystick e use G92 ZERO AQUI para definir o zero relativo.
 
-  const handleZero = useCallback(() => {
-    log(`G92 X0 Y0 Z0 E0 ; zera posições virtuais no local atual`)
+  // ── G92 Zero AQUI · zera coordenadas virtuais no ponto atual SEM MOVER NADA ──
+  // 🚫 IMPORTANTE: NUNCA chama G28 (home) — bioimpressora preserva bandeja/cartucho.
+  // ✅ Envio síncrono pra impressora antes de logar — garante feedback real (não "fake zero").
+  const handleZero = useCallback(async () => {
+    const cmd = "G92 X0 Y0 Z0 E0"
+    log(`; ╔══ 🎯 G92 ZERO AQUI · sem home, sem mover ══╗`)
+    log(`${cmd} ; zera posições virtuais no ponto físico atual`)
     setPosition({ x: 0, y: 0, z: 0, e: 0 })
-    void sendToPrinter("G92 X0 Y0 Z0 E0")
-  }, [log, sendToPrinter])
+    if (sendCommandRef.current) {
+      try {
+        await sendCommandRef.current(cmd)
+        log(`; ✓ G92 enviado para a impressora REAL — coordenadas zeradas`)
+      } catch (err) {
+        log(`; ✗ FALHA ao enviar G92: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    } else {
+      log(`; ⚠️ Modo simulação (sem conexão USB) — G92 só zerado virtualmente`)
+    }
+  }, [log])
 
   const handleProbeZ = useCallback(() => {
     log(`; ── Z-Probe suave (0.5N) — modo bio ──`)
@@ -289,6 +301,7 @@ export default function BioprintControlPage() {
   const clearLog = () => setGcodeLog([...initialLog, "; (log limpo)"])
 
   // ── Download do G-code (re-disponibilizado aqui pra conveniência) ──
+  // 🚫 NUNCA inclui G28 (HOME) — bioimpressora preserva cartucho/bandeja, não pode buscar endstop
   const downloadFromContext = useCallback(() => {
     if (!state.slice.gcode) return
     const header = [
@@ -301,10 +314,21 @@ export default function BioprintControlPage() {
         ? `; Células: ${state.bioink.cellType} ${state.bioink.cellDensityMillionMl}×10^6/mL`
         : "; Sem células (scaffold acelular)",
       `; Tecido alvo (Etapa 5): ${state.control.tissueType ?? inferredTissue}`,
+      "; ⚠️ ATENÇÃO: G-code SEM G28 (home) — posicione manualmente e use G92 para zerar.",
       "; ═══════════════════════════════════════════════════════════",
       "",
     ].join("\n")
-    const blob = new Blob([header + state.slice.gcode], { type: "text/plain" })
+
+    // 🚫 Filtra QUALQUER linha que comece com G28 (case-insensitive, ignora espaços iniciais)
+    const sanitizedGcode = state.slice.gcode
+      .split("\n")
+      .filter((line) => {
+        const trimmed = line.trim().toUpperCase()
+        return !trimmed.startsWith("G28")
+      })
+      .join("\n")
+
+    const blob = new Blob([header + sanitizedGcode], { type: "text/plain" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
@@ -322,8 +346,8 @@ export default function BioprintControlPage() {
     log(`M82  ; extrusão absoluta`)
     log(`G21  ; mm`)
     log(`G90  ; coords absolutas`)
-    log(`G28  ; HOME`)
-    log(`G92 X0 Y0 Z0 E0  ; zera posições`)
+    log(`; SEM HOME (G28) — bioimpressora usa G92 no ponto atual para preservar bandeja/cartucho`)
+    log(`G92 X0 Y0 Z0 E0  ; zera posições virtuais AQUI (sem mover)`)
     log(`G1 Z0.4 F300  ; sobe bico 0.4mm`)
     log(`G4 P500  ; pausa 0.5s`)
     log(`; ── PRINT STARTS HERE ──`)
@@ -532,6 +556,30 @@ export default function BioprintControlPage() {
               </InfoButton>
             </button>
 
+            {/* 🎯 G92 ZERO AQUI — funcional, sem home, envia direto pra impressora */}
+            <button
+              onClick={() => { void handleZero() }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/50 text-emerald-100 text-xs font-bold transition-colors"
+              title="G92 X0 Y0 Z0 E0 — zera as coordenadas virtuais NO PONTO ATUAL. SEM home, SEM movimento."
+            >
+              <Crosshair className="w-3.5 h-3.5" />
+              Zerar G92 aqui
+              <InfoButton title="Zerar G92 sem home" align="left" size="sm">
+                <p>
+                  Envia <code>G92 X0 Y0 Z0 E0</code> direto para a impressora —
+                  define o ponto atual como (0,0,0,0) sem mover nenhum eixo.
+                </p>
+                <p className="mt-1">
+                  <strong className="text-emerald-200">🚫 NÃO faz home (G28)</strong> — bioimpressora preserva
+                  a posição da bandeja e do cartucho. Bioimpressão não busca endstop como FDM convencional:
+                  você posiciona manualmente o bico em cima do well/scaffold e zera AQUI.
+                </p>
+                <p className="mt-1 text-amber-200">
+                  Feedback no console: <code>✓ G92 enviado para a impressora REAL</code> se conectado.
+                </p>
+              </InfoButton>
+            </button>
+
             <button
               onClick={() => openDockTab("joystick")}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/40 text-violet-100 text-xs font-bold transition-colors ml-auto"
@@ -543,59 +591,50 @@ export default function BioprintControlPage() {
           </div>
         </section>
 
-        {/* JOYSTICK + CONSOLE — destaque máximo, isolado no DOM para não causar scroll jumps */}
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,380px)_1fr] gap-6 scroll-mt-24" id="joystick-zone">
-          {/* Joystick */}
-          <section className="rounded-2xl bg-gradient-to-br from-violet-500/[0.05] to-violet-500/[0.01] border border-violet-500/25 p-5 space-y-4 self-start lg:sticky lg:top-4">
-            <div className="flex items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-violet-500/20 border border-violet-500/35 flex items-center justify-center">
-                  <Gamepad2 className="w-5 h-5 text-violet-200" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                    Passo 2 · Joystick 3D
-                    <InfoButton title="Joystick BIO" align="left">
-                      <p>Controle manual dos eixos X/Y/Z + extrusor (E) com micropasso 0.05 mm.</p>
-                      <p className="mt-1"><strong className="text-violet-200">Botões especiais:</strong></p>
-                      <ul className="list-disc list-inside text-[10.5px] space-y-0.5">
-                        <li><code>HOME</code> — leva a impressora ao ponto zero da máquina</li>
-                        <li><code>G92</code> — zera as coords virtuais aqui (sem mover)</li>
-                        <li><code>Z-probe suave</code> — bed leveling com 0.5 N (não amassa o gel)</li>
-                        <li><code>Purga</code> — extrude 1 mm devagar para tirar bolha</li>
-                        <li><code>Pausa estéril</code> — para o motor mas mantém pneumática</li>
-                        <li><code>Posição de repouso</code> — sobe Z e vai ao canto para trocar cartucho</li>
-                      </ul>
-                    </InfoButton>
-                  </h3>
-                  <p className="text-[10px] text-gray-500">
-                    {isConnected
-                      ? "Comandos enviados para a máquina REAL"
-                      : "Modo simulação (sem conexão USB)"}
-                  </p>
-                </div>
-              </div>
-              {isConnected && (
-                <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 font-semibold uppercase tracking-wider inline-flex items-center gap-1">
-                  <Radio className="w-2 h-2 animate-pulse" /> LIVE
-                </span>
-              )}
+        {/* ───────────────────────────────────────────────────────────── */}
+        {/*  PASSO 2 · Joystick está no PAINEL BIOENGENHEIRO flutuante    */}
+        {/*  (clique no FAB ou no botão acima para abrir)                  */}
+        {/*  Aqui mantemos apenas o CONSOLE G-code em full width.          */}
+        {/* ───────────────────────────────────────────────────────────── */}
+        <section
+          className="rounded-2xl bg-gradient-to-r from-violet-500/[0.06] to-purple-500/[0.03] border border-violet-500/25 p-4 flex flex-wrap items-center justify-between gap-3"
+          id="joystick-zone"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-violet-500/20 border border-violet-500/35 flex items-center justify-center shrink-0">
+              <Gamepad2 className="w-5 h-5 text-violet-200" />
             </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2 flex-wrap">
+                Passo 2 · Joystick 3D
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-violet-500/20 border border-violet-500/40 text-violet-200 font-semibold uppercase tracking-wider">
+                  no painel flutuante
+                </span>
+                {isConnected && (
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 font-semibold uppercase tracking-wider inline-flex items-center gap-1">
+                    <Radio className="w-2 h-2 animate-pulse" /> LIVE
+                  </span>
+                )}
+              </h3>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                O joystick agora vive no <strong className="text-violet-200">Painel Bioengenheiro</strong> —
+                imune ao scroll da página, com X/Y/Z/E em tempo real, temperaturas e console no mesmo lugar.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => openDockTab("joystick")}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-sm font-bold shadow-lg shadow-violet-500/30 transition-all"
+            title="Abrir painel flutuante com joystick · imune a scroll · atalho G"
+          >
+            <Gamepad2 className="w-4 h-4" />
+            Abrir Joystick
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/15 font-mono hidden sm:inline">G</span>
+          </button>
+        </section>
 
-            <Joystick3D
-              position={position}
-              onMove={handleMove}
-              onHome={handleHome}
-              onZero={handleZero}
-              onProbeZ={handleProbeZ}
-              onPurge={handlePurge}
-              onSterilePause={handleSterilePause}
-              onGoToRest={handleGoToRest}
-              connected={isConnected}
-            />
-          </section>
-
-          {/* Console G-code */}
+        {/* Console G-code · full width */}
+        <div className="grid grid-cols-1 gap-6 scroll-mt-24">
           <section className="rounded-2xl bg-black/40 border border-white/5 p-5 space-y-3 min-h-[600px] flex flex-col">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -868,7 +907,6 @@ export default function BioprintControlPage() {
         }}
         position={position}
         onMove={handleMove}
-        onHome={handleHome}
         onZero={handleZero}
         onProbeZ={handleProbeZ}
         onPurge={handlePurge}
