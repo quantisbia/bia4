@@ -203,6 +203,160 @@ html.light .text-violet-400 {
   color: hsl(268 75% 45%) !important;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   REGRA UNIVERSAL (R12.1): Nenhuma tonalidade clara de texto no modo LIGHT.
+   Toda variação 100/200/300/400 das paletas Tailwind, incluindo opacidades
+   /50, /60, /70, /80, /90, vira um tom escuro legível derivado da cor base.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* AMBER (warning box: "Nenhum especialista está fora do mercado.") */
+html.light .text-amber-100,
+html.light .text-amber-200,
+html.light .text-amber-300,
+html.light .text-amber-400,
+html.light [class*="text-amber-100/"],
+html.light [class*="text-amber-200/"],
+html.light [class*="text-amber-300/"] {
+  color: hsl(32 95% 28%) !important; /* âmbar escuro legível */
+}
+
+/* TEAL (Organoid Builder box: "Construa organoides...", features list) */
+html.light .text-teal-100,
+html.light .text-teal-200,
+html.light .text-teal-300,
+html.light .text-teal-400,
+html.light [class*="text-teal-100/"],
+html.light [class*="text-teal-200/"],
+html.light [class*="text-teal-300/"],
+html.light [class*="text-teal-400/"] {
+  color: hsl(174 80% 22%) !important; /* teal escuro */
+}
+
+/* EMERALD / GREEN */
+html.light .text-emerald-100,
+html.light .text-emerald-200,
+html.light .text-emerald-300,
+html.light .text-emerald-400,
+html.light .text-green-100,
+html.light .text-green-200,
+html.light .text-green-300,
+html.light .text-green-400,
+html.light [class*="text-emerald-200/"],
+html.light [class*="text-emerald-300/"],
+html.light [class*="text-green-200/"],
+html.light [class*="text-green-300/"] {
+  color: hsl(160 70% 22%) !important;
+}
+
+/* CYAN / SKY / BLUE claros */
+html.light .text-cyan-100,
+html.light .text-cyan-200,
+html.light .text-cyan-300,
+html.light .text-cyan-400,
+html.light .text-sky-100,
+html.light .text-sky-200,
+html.light .text-sky-300,
+html.light .text-sky-400,
+html.light .text-blue-100,
+html.light .text-blue-200,
+html.light .text-blue-300,
+html.light .text-blue-400,
+html.light [class*="text-cyan-200/"],
+html.light [class*="text-sky-200/"],
+html.light [class*="text-blue-200/"],
+html.light [class*="text-blue-300/"] {
+  color: hsl(217 80% 32%) !important;
+}
+
+/* INDIGO / PURPLE / FUCHSIA claros */
+html.light .text-indigo-100,
+html.light .text-indigo-200,
+html.light .text-indigo-300,
+html.light .text-indigo-400,
+html.light .text-purple-100,
+html.light .text-purple-200,
+html.light .text-purple-300,
+html.light .text-purple-400,
+html.light .text-fuchsia-200,
+html.light .text-fuchsia-300,
+html.light .text-fuchsia-400,
+html.light [class*="text-indigo-200/"],
+html.light [class*="text-purple-200/"],
+html.light [class*="text-purple-300/"],
+html.light [class*="text-fuchsia-300/"] {
+  color: hsl(268 75% 40%) !important;
+}
+
+/* PINK / ROSE / RED claros */
+html.light .text-pink-100,
+html.light .text-pink-200,
+html.light .text-pink-300,
+html.light .text-pink-400,
+html.light .text-rose-100,
+html.light .text-rose-200,
+html.light .text-rose-300,
+html.light .text-rose-400,
+html.light .text-red-100,
+html.light .text-red-200,
+html.light .text-red-300,
+html.light .text-red-400,
+html.light [class*="text-rose-200/"],
+html.light [class*="text-pink-200/"],
+html.light [class*="text-red-200/"] {
+  color: hsl(348 75% 38%) !important;
+}
+
+/* YELLOW / LIME / ORANGE claros */
+html.light .text-yellow-100,
+html.light .text-yellow-200,
+html.light .text-yellow-300,
+html.light .text-yellow-400,
+html.light .text-lime-200,
+html.light .text-lime-300,
+html.light .text-lime-400,
+html.light .text-orange-100,
+html.light .text-orange-200,
+html.light .text-orange-300,
+html.light .text-orange-400 {
+  color: hsl(35 90% 30%) !important;
+}
+
+/* QUANTIS — variações claras da paleta interna (lilac/gold) */
+html.light .text-quantis-lilac-100,
+html.light .text-quantis-lilac-200,
+html.light .text-quantis-lilac-300,
+html.light .text-quantis-lilac-400,
+html.light [class*="text-quantis-lilac-200/"],
+html.light [class*="text-quantis-lilac-300/"] {
+  color: hsl(268 75% 38%) !important;
+}
+
+html.light .text-quantis-gold-100,
+html.light .text-quantis-gold-200,
+html.light .text-quantis-gold-300,
+html.light .text-quantis-gold-400 {
+  color: hsl(38 85% 30%) !important;
+}
+
+html.light .text-quantis-ink-100,
+html.light .text-quantis-ink-200,
+html.light .text-quantis-ink-300,
+html.light [class*="text-quantis-ink-100/"],
+html.light [class*="text-quantis-ink-200/"] {
+  color: hsl(257 50% 18%) !important;
+}
+
+/* Strong dentro de containers escuros — força tom ainda mais legível */
+html.light .bg-amber-500\/10 strong,
+html.light [class*="bg-amber-"] strong {
+  color: hsl(32 95% 22%) !important;
+}
+
+html.light [class*="bg-teal-"] strong,
+html.light [class*="bg-teal-"] h3 {
+  color: hsl(174 80% 18%) !important;
+}
+
 /* === Scrollbar adaptativa === */
 html.light ::-webkit-scrollbar-track {
   background: hsl(270 30% 94%);
