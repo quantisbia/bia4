@@ -20,12 +20,13 @@
 import { useState, useMemo, useCallback, useEffect } from "react"
 import Link from "next/link"
 import {
-  Microscope, Eye, Play, Download, ArrowRight, ChevronRight,
+  Microscope, Eye, Play, Download, ArrowRight, ChevronRight, Send,
   Activity, BookOpen, Layers as LayersIcon, FileCode, Clock,
   Droplets, AlertTriangle, CheckCircle2, Info, Sparkles,
   ShieldCheck, FlaskConical, Workflow, Heart, Brain as BrainIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
+import { sendToExecute } from "@/lib/bioprint/execute-handoff"
 import {
   TISSUE_STRATEGIES, getTissueStrategy, toolpathLabel, logicLabel,
   crosslinkingLabel, toolpathComplexity,
@@ -669,12 +670,28 @@ export default function MedicalGcodePage() {
                   <StatCard icon={<Droplets className="w-3 h-3" />} label="Biotinta (µL)" value={result.bioinkVolume_uL.toFixed(1)} />
                   <StatCard icon={<Clock className="w-3 h-3" />} label="Tempo (min)" value={result.estimatedTime_min.toFixed(1)} />
                 </div>
-                <button
-                  onClick={handleDownload}
-                  className="mt-3 w-full rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-100 text-xs font-semibold px-4 py-2.5 transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <Download className="w-3.5 h-3.5" /> Baixar .gcode ({(result.gcode.length / 1024).toFixed(1)} kB)
-                </button>
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    onClick={handleDownload}
+                    className="rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-100 text-xs font-semibold px-4 py-2.5 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Baixar .gcode ({(result.gcode.length / 1024).toFixed(1)} kB)
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!result) return
+                      sendToExecute({
+                        gcode: result.gcode,
+                        name: `${tissue}_${level}_${scale}.gcode`,
+                        from: "medical",
+                      })
+                    }}
+                    className="rounded-xl bg-gradient-to-r from-amber-500/20 to-cyan-500/20 hover:from-amber-500/30 hover:to-cyan-500/30 border border-amber-500/40 text-amber-100 text-xs font-bold px-4 py-2.5 transition-all flex items-center justify-center gap-1.5"
+                    title="Carrega este G-code na tela de Execução (USB / Web Serial / Mock)"
+                  >
+                    <Send className="w-3.5 h-3.5" /> Enviar para Execução →
+                  </button>
+                </div>
               </div>
 
               {/* Nelson 2021 score */}
