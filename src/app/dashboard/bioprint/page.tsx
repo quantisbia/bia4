@@ -217,20 +217,20 @@ export default function BioprintHubPage() {
         })}
       </section>
 
-      {/* ─── Atalho rápido · Quick G-Code (R12.12) ────────────────────── */}
+      {/* ─── G-code Hub · 3 níveis (R12.14) ─────────────────────────────── */}
       <section className="space-y-3">
         <div className="flex items-center gap-2">
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-fuchsia-500/30 to-transparent" />
           <span className="text-[10px] uppercase tracking-[0.25em] text-fuchsia-300/70 font-semibold flex items-center gap-1.5">
             <Zap className="w-3 h-3" />
-            Atalho rápido · Quick G-Code
+            G-code · 3 níveis · biologia → trajetória imprimível
           </span>
           <div className="h-px flex-1 bg-gradient-to-r from-fuchsia-500/30 via-transparent to-transparent" />
         </div>
 
         <Link
-          href="/dashboard/bioprint/quick-gcode"
-          className="group block rounded-2xl bg-gradient-to-br from-fuchsia-500/[0.08] via-violet-500/[0.05] to-cyan-500/[0.04] border border-fuchsia-500/25 hover:border-fuchsia-400/50 p-5 transition-all hover:scale-[1.005]"
+          href="/dashboard/bioprint/gcode"
+          className="group block rounded-2xl bg-gradient-to-br from-fuchsia-500/[0.08] via-cyan-500/[0.06] to-violet-500/[0.08] border border-fuchsia-500/25 hover:border-fuchsia-400/50 p-5 transition-all hover:scale-[1.005]"
         >
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-xl bg-fuchsia-500/15 border border-fuchsia-500/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
@@ -239,40 +239,46 @@ export default function BioprintHubPage() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[10px] uppercase tracking-wider text-fuchsia-300/80 font-semibold">
-                  Engine síncrono · R12.12
+                  G-code Hub · R12.14
                 </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 font-semibold uppercase tracking-wider">
-                  &lt; 100 ms
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-fuchsia-500/20 border border-fuchsia-500/40 text-fuchsia-200 font-semibold uppercase tracking-wider">
+                  ⚡ Básico
                 </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-200 font-semibold uppercase tracking-wider">
-                  Sem timeout
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-200 font-semibold uppercase tracking-wider">
+                  🧬 Médico
+                </span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-violet-500/20 border border-violet-500/40 text-violet-200 font-semibold uppercase tracking-wider">
+                  🌐 Avançado · NAATIV3
                 </span>
               </div>
               <h3 className="text-base font-bold text-white mt-0.5 group-hover:text-fuchsia-100 transition-colors">
-                Quick G-Code · biotinta + modelo simples → código pronto
+                Geração de G-code em 3 níveis — biologia como controle de trajetória
               </h3>
               <p className="text-[11.5px] text-gray-300 mt-1.5 leading-relaxed">
-                Fluxo simplificado de 3 passos para gerar G-code em menos de 100 ms.
-                Escolha a biotinta (preset ou vinda do <strong className="text-blue-300">Formulator Pro</strong>),
-                pegue uma das 5 geometrias paramétricas (cubo, disco, grid, patch, esfera oca)
-                e ajuste o infill — o código sai instantâneo, sem LLM, sem timeout de 45 s. Ideal
-                para validar parâmetros, treinar a impressora e imprimir formas básicas.
+                Fluxo profissional que vai do <strong className="text-fuchsia-200">G-code rápido</strong> de geometrias paramétricas
+                até o <strong className="text-violet-200">NAATIV3 vector field</strong> com helicoidal transmural, multi-material
+                e canais sacrificiais. No nível <strong className="text-cyan-200">Médico</strong> a BIA mapeia 16 tecidos
+                (pele, miocárdio, osso, organoide…) em toolpaths biologicamente corretos, com preview conceitual em ~10 ms
+                antes de gerar o G-code final. Cada nível tem racional, análise Nelson 2021 e download .gcode pronto para a impressora.
               </p>
               <div className="flex flex-wrap gap-1.5 mt-3">
                 <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-200">
-                  ⚡ Síncrono &lt; 100 ms
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-200">
-                  🧪 Vem do Formulator Pro
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-200">
-                  🧱 5 geometrias básicas
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-violet-200">
-                  👁 Viewer 3D embutido
+                  ⚡ Básico &lt; 100 ms
                 </span>
                 <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-200">
-                  📖 Racional em PT
+                  🧬 16 tecidos · safe/advanced/experimental
+                </span>
+                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-200">
+                  🧪 Placas SBS 6/12/24/96
+                </span>
+                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-violet-200">
+                  🌐 NAATIV3 vector field
+                </span>
+                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-200">
+                  ❤️ Helicoidal transmural
+                </span>
+                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-200">
+                  👁 Preview antes do G-code
                 </span>
               </div>
             </div>
