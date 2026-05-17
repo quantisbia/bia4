@@ -22,7 +22,7 @@ import {
   FlaskConical, Sparkles, Plus, Trash2, Loader2, AlertTriangle,
   CheckCircle2, Info, Beaker, Target, ChevronRight, ChevronDown,
   Search, Wand2, Save, RefreshCw, Activity, ShieldCheck,
-  BookOpen, Printer, Atom,
+  BookOpen, Printer, Atom, Zap,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
@@ -1409,6 +1409,26 @@ function ResultView({
 
       {/* CTA salvar/exportar */}
       <div className="flex flex-wrap gap-2">
+        {/* R12.12: Botão prioritário — enviar para Quick G-Code */}
+        <button
+          onClick={() => {
+            try {
+              const payload = extractQuickGcodePayload(result)
+              if (typeof window !== "undefined") {
+                window.sessionStorage.setItem("bia.quickgcode.bioink", JSON.stringify(payload))
+              }
+              window.location.href = "/dashboard/bioprint/quick-gcode"
+            } catch (e) {
+              console.error("Falha ao enviar para Quick G-Code:", e)
+              alert("Não foi possível enviar a formulação. Tente novamente.")
+            }
+          }}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-violet-500/20 to-cyan-500/20 hover:from-violet-500/30 hover:to-cyan-500/30 border border-violet-500/40 text-xs text-violet-100 font-semibold transition-colors"
+          title="Carrega esta formulação no Quick G-Code para gerar um arquivo .gcode rápido"
+        >
+          <Zap className="w-3.5 h-3.5" /> Enviar para Quick G-Code
+          <ChevronRight className="w-3 h-3 opacity-70" />
+        </button>
         <button
           onClick={() => {
             const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" })
@@ -1435,6 +1455,54 @@ function ResultView({
       </div>
     </div>
   )
+}
+
+/**
+ * R12.12: extrai os parâmetros de impressão da ProFormulation completa
+ * e devolve no formato que /dashboard/bioprint/quick-gcode espera.
+ *
+ * A ProFormulation tem printingParameters: Record<string, unknown> (flexível).
+ * Tentamos extrair com heurística defensiva. Se algo faltar, fallback para defaults sãos.
+ */
+function extractQuickGcodePayload(r: ProFormulation): Record<string, unknown> {
+  const pp = (r.printingParameters ?? {}) as Record<string, unknown>
+
+  const pickNum = (...keys: string[]): number | undefined => {
+    for (const k of keys) {
+      const v = pp[k]
+      if (typeof v === "number" && Number.isFinite(v)) return v
+      if (typeof v === "string") {
+        const n = parseFloat(v)
+        if (Number.isFinite(n)) return n
+      }
+    }
+    return undefined
+  }
+
+  const nozzle = pickNum("nozzleDiameter_mm", "nozzleDiameter", "nozzle_mm", "nozzleSize") ?? 0.41
+  const visc   = pickNum("viscosity_PaS", "viscosity") ?? 5
+  const speed  = pickNum("printSpeed_mms", "printSpeed", "speed_mms") ?? 8
+  const travel = pickNum("travelSpeed_mms", "travelSpeed") ?? 25
+  const press  = pickNum("pressure_kpa", "pressure", "extrusionPressure_kPa")
+
+  // Tem células?
+  const cellComp = r.components.find((c) => /cell|cell|HUVEC|hMSC|fibroblas|chondro|osteo|stem/i.test(c.name))
+  const hasCells = !!cellComp
+
+  return {
+    materialLabel: r.name,
+    nozzleDiameter_mm: nozzle,
+    viscosity_PaS: visc,
+    printSpeed_mms: speed,
+    travelSpeed_mms: travel,
+    pressure_kpa: press,
+    crosslinker: r.crosslinking?.method ?? null,
+    hasCells,
+    cellType: cellComp?.name ?? null,
+    cellDensity_M_per_mL: null,
+    source: "formulator-pro",
+    sourceTag: `${r.name} · Formulator Pro`,
+  }
 }
 
 function ScoreBadge({ score }: { score: number }) {

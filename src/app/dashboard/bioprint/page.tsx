@@ -18,7 +18,7 @@ import { useRouter } from "next/navigation"
 import {
   Box, Droplets, Layers, Gamepad2, Beaker,
   ArrowRight, RotateCcw, Sparkles, Info, CheckCircle2, Circle,
-  Brain, BookOpen,
+  Brain, BookOpen, Zap,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import {
@@ -215,6 +215,70 @@ export default function BioprintHubPage() {
             />
           )
         })}
+      </section>
+
+      {/* ─── Atalho rápido · Quick G-Code (R12.12) ────────────────────── */}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-fuchsia-500/30 to-transparent" />
+          <span className="text-[10px] uppercase tracking-[0.25em] text-fuchsia-300/70 font-semibold flex items-center gap-1.5">
+            <Zap className="w-3 h-3" />
+            Atalho rápido · Quick G-Code
+          </span>
+          <div className="h-px flex-1 bg-gradient-to-r from-fuchsia-500/30 via-transparent to-transparent" />
+        </div>
+
+        <Link
+          href="/dashboard/bioprint/quick-gcode"
+          className="group block rounded-2xl bg-gradient-to-br from-fuchsia-500/[0.08] via-violet-500/[0.05] to-cyan-500/[0.04] border border-fuchsia-500/25 hover:border-fuchsia-400/50 p-5 transition-all hover:scale-[1.005]"
+        >
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-xl bg-fuchsia-500/15 border border-fuchsia-500/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <Zap className="w-6 h-6 text-fuchsia-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] uppercase tracking-wider text-fuchsia-300/80 font-semibold">
+                  Engine síncrono · R12.12
+                </span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 font-semibold uppercase tracking-wider">
+                  &lt; 100 ms
+                </span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-200 font-semibold uppercase tracking-wider">
+                  Sem timeout
+                </span>
+              </div>
+              <h3 className="text-base font-bold text-white mt-0.5 group-hover:text-fuchsia-100 transition-colors">
+                Quick G-Code · biotinta + modelo simples → código pronto
+              </h3>
+              <p className="text-[11.5px] text-gray-300 mt-1.5 leading-relaxed">
+                Fluxo simplificado de 3 passos para gerar G-code em menos de 100 ms.
+                Escolha a biotinta (preset ou vinda do <strong className="text-blue-300">Formulator Pro</strong>),
+                pegue uma das 5 geometrias paramétricas (cubo, disco, grid, patch, esfera oca)
+                e ajuste o infill — o código sai instantâneo, sem LLM, sem timeout de 45 s. Ideal
+                para validar parâmetros, treinar a impressora e imprimir formas básicas.
+              </p>
+              <div className="flex flex-wrap gap-1.5 mt-3">
+                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-200">
+                  ⚡ Síncrono &lt; 100 ms
+                </span>
+                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-200">
+                  🧪 Vem do Formulator Pro
+                </span>
+                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-200">
+                  🧱 5 geometrias básicas
+                </span>
+                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-violet-200">
+                  👁 Viewer 3D embutido
+                </span>
+                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-200">
+                  📖 Racional em PT
+                </span>
+              </div>
+            </div>
+            <ArrowRight className="w-5 h-5 text-fuchsia-300/60 group-hover:text-fuchsia-200 group-hover:translate-x-0.5 transition-all shrink-0 mt-1" />
+          </div>
+        </Link>
       </section>
 
       {/* ─── Ferramentas auxiliares · BTIE ────────────────────────────── */}
