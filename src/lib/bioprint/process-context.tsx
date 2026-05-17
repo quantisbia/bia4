@@ -62,16 +62,36 @@ export interface ModelStepState {
   } | null
 }
 
-export interface BioinkStepState {
-  status: StepStatus
+/**
+ * Formulação de UM material (uma cabeça/tool da bioimpressora).
+ * Em multi-material, cada tool (T0, T1, T2, T3) tem sua própria formulação.
+ *
+ * Convenção de cor: cor visual no viewer 3D para diferenciar tools.
+ * Convenção de role: papel funcional no scaffold (estrutural, célula, sacrificial...).
+ */
+export type BioinkRole =
+  | "structural"     // Material estrutural / matriz
+  | "cellular"       // Carrega células vivas
+  | "sacrificial"    // Removido depois (Pluronic, GelMA frio)
+  | "vascular"       // Canal vascular (típico Pluronic ou alginato sacrificial)
+  | "support-bath"   // Banho de suporte (FRESH gelatin/Carbopol)
+
+export interface BioinkFormulation {
+  /** Tool slot — T0..T3 (Marlin tool index) */
+  tool: 0 | 1 | 2 | 3
+  /** Cor visual no viewer 3D (hex, ex: "#34d399") */
+  color: string
+  /** Papel funcional no scaffold */
+  role: BioinkRole
   /** Nome do material principal (GelMA, Alginato, Colágeno, ...) */
-  material: string | null
+  material: string
+  materialId: string
   /** Concentração % w/v */
-  concentration: number | null
+  concentration: number
   /** Crosslinker */
   crosslinker: string | null
   crosslinkerConc: number | null
-  /** Tipo celular (chave de CELL_SENSITIVITY) */
+  /** Tipo celular (chave de CELL_SENSITIVITY); null = acelular */
   cellType: string | null
   cellDensityMillionMl: number | null
   /** Aditivos opcionais */
@@ -81,6 +101,40 @@ export interface BioinkStepState {
     viscosityPaS?: number
     flowIndex?: number       // n da power-law
     consistencyK?: number    // K da power-law
+    yieldStressPa?: number
+  } | null
+  /** Label opcional do usuário (ex: "Cartilagem - GelMA 10%") */
+  label?: string
+}
+
+export interface BioinkStepState {
+  status: StepStatus
+  /** R12.10: array de formulações (multi-material).
+   *  Sempre tem pelo menos 1 item quando status != "empty". */
+  formulations: BioinkFormulation[]
+  /** Strategy: "single" | "dual" | "multi" — derivado do array length */
+  strategy: "single" | "dual" | "multi"
+
+  // ─── Campos legacy (R12.0 → R12.9, mantidos p/ backward compat) ───
+  /** @deprecated use formulations[0].material */
+  material: string | null
+  /** @deprecated use formulations[0].concentration */
+  concentration: number | null
+  /** @deprecated use formulations[0].crosslinker */
+  crosslinker: string | null
+  /** @deprecated */
+  crosslinkerConc: number | null
+  /** @deprecated use formulations[0].cellType */
+  cellType: string | null
+  /** @deprecated */
+  cellDensityMillionMl: number | null
+  /** @deprecated */
+  additives: string[]
+  /** @deprecated use formulations[0].rheology */
+  rheology: {
+    viscosityPaS?: number
+    flowIndex?: number
+    consistencyK?: number
     yieldStressPa?: number
   } | null
 }
@@ -157,6 +211,9 @@ const DEFAULT_STATE: BioprintProcessState = {
   },
   bioink: {
     status: "empty",
+    formulations: [],
+    strategy: "single",
+    // legacy
     material: null,
     concentration: null,
     crosslinker: null,
@@ -350,5 +407,78 @@ export function isStepUnlocked(
     case "slice":   return state.bioink.status === "ready"
     case "control": return state.slice.status === "ready"
     case "postBio": return state.control.status === "ready"
+  }
+}
+
+// ─── Helpers Multi-material (R12.10) ─────────────────────────────────────
+
+/**
+ * Paleta de cores padrão para cada tool slot.
+ * T0=violeta (estrutural padrão), T1=ciano (celular), T2=esmeralda (vascular),
+ * T3=âmbar (sacrificial).
+ */
+export const TOOL_COLORS: Record<0 | 1 | 2 | 3, string> = {
+  0: "#a78bfa", // violet-400
+  1: "#22d3ee", // cyan-400
+  2: "#34d399", // emerald-400
+  3: "#fbbf24", // amber-400
+}
+
+/** Label padrão de tool */
+export const TOOL_LABELS: Record<0 | 1 | 2 | 3, string> = {
+  0: "T0 · Cabeça 1",
+  1: "T1 · Cabeça 2",
+  2: "T2 · Cabeça 3",
+  3: "T3 · Cabeça 4",
+}
+
+/** Label visual de um role */
+export const ROLE_LABELS: Record<BioinkRole, string> = {
+  structural: "Estrutural",
+  cellular: "Carrega Células",
+  sacrificial: "Sacrificial",
+  vascular: "Canal Vascular",
+  "support-bath": "Banho FRESH",
+}
+
+/**
+ * Verifica se a biotinta está pronta para o slice/toolpath.
+ * Requer pelo menos 1 formulação com material e concentração definidos.
+ */
+export function isBioinkReady(bioink: BioinkStepState): boolean {
+  if (!bioink.formulations || bioink.formulations.length === 0) {
+    // Fallback legacy: aceita state antigo (material + concentration no nível root)
+    return !!bioink.material && (bioink.concentration ?? 0) > 0
+  }
+  return bioink.formulations.every(
+    (f) => !!f.material && f.concentration > 0
+  )
+}
+
+/** Obtém a formulação ativa (a primeira, ou null se vazio) */
+export function getPrimaryFormulation(
+  bioink: BioinkStepState
+): BioinkFormulation | null {
+  return bioink.formulations?.[0] ?? null
+}
+
+/** Cria uma formulação default (preenche slot novo) */
+export function makeDefaultFormulation(
+  tool: 0 | 1 | 2 | 3,
+  role: BioinkRole = "structural",
+): BioinkFormulation {
+  return {
+    tool,
+    color: TOOL_COLORS[tool],
+    role,
+    material: "GelMA",
+    materialId: "gelma",
+    concentration: 10,
+    crosslinker: "UV 405nm",
+    crosslinkerConc: 0.5,
+    cellType: null,
+    cellDensityMillionMl: null,
+    additives: [],
+    rheology: { viscosityPaS: 5, yieldStressPa: 15, flowIndex: 0.5 },
   }
 }

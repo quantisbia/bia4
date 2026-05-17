@@ -31,7 +31,7 @@ import {
   Lightbulb, ShieldAlert,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
-import { useBioprintProcess } from "@/lib/bioprint/process-context"
+import { useBioprintProcess, isBioinkReady } from "@/lib/bioprint/process-context"
 import { INFILL_PATTERNS, TEMPERATURE_PROFILES } from "@/lib/bioprinter/biomedical-params"
 import { BIOPRINTERS, getBioprinterById, supportsWebSerial } from "@/lib/bioprinting/bioprinters"
 import { SUPPORTED_GEOMETRY_IDS } from "@/lib/gcode/slicer/geometry-bounds"
@@ -121,7 +121,8 @@ export default function BioprintSlicePage() {
 
   // Pré-requisitos
   const modelReady = state.model.status === "ready"
-  const bioinkReady = state.bioink.status === "ready"
+  // R12.10: usa isBioinkReady (verifica formulations[] OU legacy material)
+  const bioinkReady = isBioinkReady(state.bioink)
   const isUnlocked = modelReady && bioinkReady
 
   // ── Tab atual ──

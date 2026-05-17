@@ -27,6 +27,7 @@ import {
   PostBioprintingPanel,
   type PostBioState,
 } from "@/components/bioprinter/PostBioprintingPanel"
+import { MicrofluidicSuggestions } from "@/components/bioprinter/MicrofluidicSuggestions"
 import { InfoButton } from "@/components/ui/InfoButton"
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -391,6 +392,16 @@ export default function BioprintPostPage() {
             </div>
           )}
         </section>
+
+        {/* ─── Sugestões Microfluídicas (R12.10) ─── */}
+        <MicrofluidicSuggestions
+          tissueType={effectiveTissue}
+          hasVascularChannels={
+            (state.bioink.formulations ?? []).some(
+              (f) => f.role === "sacrificial" || f.role === "vascular"
+            )
+          }
+        />
 
         {/* ─── Rodapé com próximos passos ─── */}
         <section className="rounded-xl bg-gradient-to-br from-rose-500/10 to-emerald-500/10 border border-rose-500/20 p-5">

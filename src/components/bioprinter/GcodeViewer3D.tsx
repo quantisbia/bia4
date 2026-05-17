@@ -19,6 +19,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { GcodeMove, ParsedGcode, Vec3 } from "@/lib/bioprint/toolpath-engine"
+import type { BioinkFormulation } from "@/lib/bioprint/process-context"
 import {
   ZoomIn, ZoomOut, Palette, RefreshCw,
 } from "lucide-react"
@@ -32,6 +33,10 @@ export interface GcodeViewer3DProps {
   layerFrom?: number
   layerTo?: number
   showTravels?: boolean
+  /** R12.10: multi-material formulations — quando presente, modo "tool" usa f.color */
+  formulations?: BioinkFormulation[]
+  /** Modo de cor inicial (default: "layer") */
+  initialColorMode?: ColorMode
   className?: string
 }
 
@@ -57,11 +62,13 @@ export function GcodeViewer3D({
   layerFrom,
   layerTo,
   showTravels = false,
+  formulations,
+  initialColorMode = "layer",
   className,
 }: GcodeViewer3DProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [camera, setCamera] = useState<Camera>(DEFAULT_CAMERA)
-  const [colorMode, setColorMode] = useState<ColorMode>("layer")
+  const [colorMode, setColorMode] = useState<ColorMode>(initialColorMode)
   const [isDragging, setIsDragging] = useState(false)
   const dragStart = useRef<{ x: number; y: number; cam: Camera } | null>(null)
 
@@ -120,6 +127,11 @@ export function GcodeViewer3D({
 
     switch (colorMode) {
       case "tool": {
+        // R12.10: usa cor da formulation correspondente ao tool slot (se disponível)
+        if (formulations && formulations.length > 0) {
+          const f = formulations.find((x) => x.tool === m.tool)
+          if (f?.color) return f.color
+        }
         const palette = ["#a78bfa", "#60a5fa", "#34d399", "#fbbf24", "#f87171"]
         return palette[m.tool % palette.length]
       }
@@ -257,7 +269,7 @@ export function GcodeViewer3D({
     )
     ctx.textAlign = "right"
     ctx.fillText(`zoom: ${camera.zoom.toFixed(1)}px/mm`, w - 8, h - 8)
-  }, [parsed, camera, colorMode, layerFrom, layerTo, showTravels, shearValues, center])
+  }, [parsed, camera, colorMode, layerFrom, layerTo, showTravels, shearValues, center, formulations])
 
   // Resize observer
   useEffect(() => {
@@ -359,6 +371,31 @@ export function GcodeViewer3D({
           </button>
         ))}
       </div>
+
+      {/* Legenda multi-material (R12.10) — só aparece em colorMode="tool" + formulations */}
+      {colorMode === "tool" && formulations && formulations.length > 0 && (
+        <div className="absolute bottom-10 right-2 bg-black/70 border border-violet-500/30 rounded-lg p-2 backdrop-blur-sm">
+          <div className="text-[9px] uppercase tracking-wider text-violet-300 font-semibold mb-1.5 flex items-center gap-1">
+            <Palette className="w-2.5 h-2.5" /> Multi-material
+          </div>
+          <div className="space-y-1">
+            {formulations.map((f) => (
+              <div key={f.tool} className="flex items-center gap-1.5 text-[10px]">
+                <span
+                  className="w-3 h-3 rounded-sm border border-white/20"
+                  style={{ backgroundColor: f.color }}
+                />
+                <span className="text-white/90 font-mono">T{f.tool}</span>
+                <span className="text-white/60">·</span>
+                <span className="text-white/80">{f.material}</span>
+                {f.cellType && (
+                  <span className="text-emerald-300/80 text-[9px]">+{f.cellType}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Hint inferior */}
       <div className="absolute bottom-2 left-2 text-[9px] text-white/40 font-mono pointer-events-none">
