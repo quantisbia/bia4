@@ -27,6 +27,7 @@ import {
   Zap, Droplets, Box, Settings2, Play, Download, ArrowRight,
   Sparkles, FlaskConical, CheckCircle2, Info, AlertTriangle, Eye,
   BookOpen, Clock, Layers as LayersIcon, FileCode, ChevronRight,
+  Activity, Microscope,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import {
@@ -42,6 +43,9 @@ import {
   type QuickGcodeOptions,
   type QuickGcodeResult,
 } from "@/lib/bioprint/quick-gcode"
+import {
+  verdictColor, NELSON_2021_CITATION, NELSON_OPTIMAL_WINDOWS,
+} from "@/lib/bioprint/printability-nelson2021"
 import { parseGcode, type ParsedGcode } from "@/lib/bioprint/toolpath-engine"
 import { GcodeViewer3D } from "@/components/bioprinter/GcodeViewer3D"
 
@@ -687,6 +691,105 @@ export default function QuickGCodePage() {
             </div>
           )}
 
+          {/* R12.13: Análise Nelson 2021 — Printability Score */}
+          {result && result.printability && (() => {
+            const p = result.printability
+            const c = verdictColor(p.verdict)
+            return (
+              <div className={cn("rounded-2xl border p-4", c.border, c.bg)}>
+                <header className="flex items-center justify-between gap-2 mb-3">
+                  <h3 className={cn("text-[11px] font-semibold uppercase tracking-wider flex items-center gap-1.5", c.text)}>
+                    <Microscope className="w-3.5 h-3.5" />
+                    Análise de Imprimibilidade
+                  </h3>
+                  <span className={cn("text-[9px] px-2 py-0.5 rounded-full border font-semibold uppercase tracking-wider", c.border, c.bg, c.text)}>
+                    {c.label}
+                  </span>
+                </header>
+
+                {/* Score grande + circular */}
+                <div className="flex items-center gap-4 mb-3">
+                  <div className={cn(
+                    "w-20 h-20 rounded-2xl border-2 flex flex-col items-center justify-center",
+                    c.border, c.bg,
+                  )}>
+                    <span className={cn("text-3xl font-bold leading-none", c.text)}>{p.score}</span>
+                    <span className="text-[9px] text-gray-400 mt-0.5 uppercase tracking-wide">/100</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Score Nelson</div>
+                    <div className={cn("text-sm font-semibold", c.text)}>
+                      {p.closestReference.label}
+                    </div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">
+                      Pr={p.closestReference.Pr.toFixed(2)} · altura máx {p.closestReference.maxBuildHeight_mm} mm
+                    </div>
+                  </div>
+                </div>
+
+                {/* Wall shear + risco celular */}
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <div className="rounded-lg bg-black/20 border border-white/8 px-2.5 py-1.5">
+                    <div className="text-[9px] text-gray-400 uppercase tracking-wide flex items-center gap-1">
+                      <Activity className="w-3 h-3" /> Wall shear
+                    </div>
+                    <div className="text-xs text-white font-mono font-semibold mt-0.5">
+                      {(p.wallShearStress_Pa / 1000).toFixed(2)} kPa
+                    </div>
+                  </div>
+                  <div className={cn(
+                    "rounded-lg border px-2.5 py-1.5",
+                    p.cellShearRisk === "safe" ? "bg-emerald-500/10 border-emerald-500/30"
+                    : p.cellShearRisk === "warning" ? "bg-amber-500/10 border-amber-500/30"
+                    : "bg-rose-500/10 border-rose-500/30",
+                  )}>
+                    <div className="text-[9px] text-gray-400 uppercase tracking-wide">Risco celular</div>
+                    <div className={cn(
+                      "text-xs font-semibold mt-0.5 uppercase",
+                      p.cellShearRisk === "safe" ? "text-emerald-200"
+                      : p.cellShearRisk === "warning" ? "text-amber-200"
+                      : "text-rose-200",
+                    )}>
+                      {p.cellShearRisk === "safe" ? "🟢 Seguro" : p.cellShearRisk === "warning" ? "🟡 Atenção" : "🔴 Crítico"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Janelas Nelson — barras visuais */}
+                <details className="rounded-lg bg-black/15 border border-white/8 overflow-hidden">
+                  <summary className="px-2.5 py-1.5 cursor-pointer text-[10.5px] font-semibold text-gray-300 hover:text-white flex items-center gap-1.5">
+                    <BookOpen className="w-3 h-3" /> Janelas ótimas do paper
+                  </summary>
+                  <div className="px-2.5 pb-2.5 pt-1 space-y-1.5">
+                    <WindowBar
+                      label="Viscosidade @ 1 s⁻¹"
+                      value={bioink.viscosity_PaS}
+                      min={NELSON_OPTIMAL_WINDOWS.initialViscosity_PaS.min}
+                      max={NELSON_OPTIMAL_WINDOWS.initialViscosity_PaS.max}
+                      ideal={NELSON_OPTIMAL_WINDOWS.initialViscosity_PaS.ideal}
+                      unit="Pa·s"
+                    />
+                    <WindowBar
+                      label="Wall shear stress"
+                      value={p.wallShearStress_Pa / 1000}
+                      min={0}
+                      max={NELSON_OPTIMAL_WINDOWS.wallShearStress_Pa.warning / 1000}
+                      ideal={NELSON_OPTIMAL_WINDOWS.wallShearStress_Pa.safe / 1000}
+                      unit="kPa"
+                      inverse
+                    />
+                  </div>
+                </details>
+
+                <p className="text-[9.5px] text-gray-500 mt-2.5 leading-relaxed">
+                  Baseado em <a href={`https://doi.org/${NELSON_2021_CITATION.doi}`} target="_blank" rel="noreferrer" className="text-blue-300 hover:underline font-mono">
+                    {NELSON_2021_CITATION.short}
+                  </a> · {NELSON_2021_CITATION.journal} · DOI {NELSON_2021_CITATION.doi}
+                </p>
+              </div>
+            )
+          })()}
+
           {/* Racional */}
           {result && result.rationale.length > 0 && (
             <div className="rounded-2xl border border-violet-500/25 bg-violet-500/[0.04] p-4">
@@ -807,6 +910,57 @@ function LabeledNumber({
       />
       {hint && <span className="block text-[9.5px] text-gray-500 mt-0.5">{hint}</span>}
     </label>
+  )
+}
+
+/**
+ * R12.13: Barra visual mostrando onde o valor cai na janela ótima Nelson.
+ * Verde se dentro da janela, amarelo se próximo, vermelho se fora.
+ * inverse=true significa "menor é melhor" (ex: shear stress).
+ */
+function WindowBar({
+  label, value, min, max, ideal, unit, inverse = false,
+}: {
+  label: string
+  value: number
+  min: number
+  max: number
+  ideal: number
+  unit: string
+  inverse?: boolean
+}) {
+  const span = Math.max(max - min, 1)
+  const pos = Math.max(0, Math.min(100, ((value - min) / span) * 100))
+  const idealPos = Math.max(0, Math.min(100, ((ideal - min) / span) * 100))
+  const inWindow = inverse
+    ? value <= max
+    : value >= min && value <= max
+  const color = inWindow ? "bg-emerald-500" : value > max ? "bg-rose-500" : "bg-amber-500"
+  return (
+    <div>
+      <div className="flex items-center justify-between text-[9.5px]">
+        <span className="text-gray-400">{label}</span>
+        <span className={cn("font-mono", inWindow ? "text-emerald-300" : "text-amber-300")}>
+          {value.toFixed(2)} {unit}
+        </span>
+      </div>
+      <div className="relative h-1.5 mt-0.5 rounded-full bg-white/5 overflow-visible">
+        {/* zona ideal — verde claro */}
+        <div className="absolute inset-y-0 bg-emerald-500/15"
+             style={{ left: `${Math.max(0, idealPos - 10)}%`, right: `${Math.max(0, 100 - idealPos - 10)}%` }} />
+        {/* marcador do valor */}
+        <div className={cn("absolute -top-0.5 w-1 h-2.5 rounded-sm", color)}
+             style={{ left: `calc(${pos}% - 2px)` }} />
+        {/* tick do ideal */}
+        <div className="absolute -bottom-0.5 w-px h-2 bg-white/30"
+             style={{ left: `${idealPos}%` }} />
+      </div>
+      <div className="flex justify-between text-[8.5px] text-gray-500 mt-0.5">
+        <span>{min}</span>
+        <span className="text-emerald-400/60">★{ideal}</span>
+        <span>{max}</span>
+      </div>
+    </div>
   )
 }
 

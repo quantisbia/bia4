@@ -30,6 +30,7 @@ export interface ScientificRef {
     | "vector-field"
     | "low-cost-printer"
     | "perfusable-scaffold"
+    | "rheology-printability"
   /** Conceitos-chave que esta referência fundamenta */
   keyConcepts: string[]
   /** Algoritmos/fórmulas/parâmetros extraídos */
@@ -203,6 +204,38 @@ export const SCIENTIFIC_REFS: ScientificRef[] = [
       "FRESH printing de collagen-based CHIPS com canais perfusáveis de 100 μm e filamentos de 20 μm; aplicações vasculares e pancreáticas.",
     pdfUrl: "https://www.genspark.ai/api/files/s/vHwt74zL",
     citationLabel: "Shiwarski et al., 2025",
+  },
+  {
+    id: "nelson2021",
+    doi: "10.3390/ijms222413481",
+    title: "3D Bio-Printability of Hybrid Pre-Crosslinked Hydrogels",
+    authors: "Nelson C., Tuladhar S., Launen L. & Habib A.",
+    journal: "Int. J. Mol. Sci.",
+    year: 2021,
+    category: "rheology-printability",
+    keyConcepts: [
+      "Pr index = L² / (16·A)",
+      "Power-Law fluid: η = K·γ̇^(n−1)",
+      "Yield stress via amplitude sweep",
+      "3-interval thixotropic test (3iTT)",
+      "Filament uniformity vs nozzle Ø",
+      "Collapse test pillars 1-20 mm",
+      "Pre-crosslinking CaSO4 vs CaCl2",
+      "Wall shear stress Power-Law (γ̇_w = ((3+1/n)/4)·8v/D)",
+    ],
+    contributions: [
+      "Janela ótima viscosidade inicial: 200-800 Pa·s @ γ̇=1 s⁻¹",
+      "Yield strain ideal > 65% para scaffolds altos",
+      "A3C3CS1.5 imprimiu pirâmide 50 mm / 132 camadas",
+      "CaSO4 > CaCl2 para extrusão lisa e estruturas grandes",
+      "Pr=1 (poro quadrado) é ideal; aceitável 0.80-1.20",
+      "Recovery 120s >94% garante shape fidelity entre passes",
+      "Wall shear stress 0.8-1.5 kPa em bicos 610 µm @ 50 mm/s",
+    ],
+    shortAbstract:
+      "Mediu quantitativamente reologia (Power-Law), Pr index, filament uniformity e collapse de 5 formulações Alginato/CMC pré-crosslinked; estabelece janelas práticas de imprimibilidade.",
+    pdfUrl: "https://www.genspark.ai/api/files/s/DiPYPuuU",
+    citationLabel: "Nelson et al., 2021",
   },
 ]
 

@@ -23,6 +23,8 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
+import { assessPrintability, type PrintabilityAssessment } from "./printability-nelson2021"
+
 // ─── Tipos ──────────────────────────────────────────────────────────────
 
 export type QuickGeometryId = "cube" | "disk" | "grid" | "patch" | "hollow-sphere"
@@ -94,6 +96,13 @@ export interface QuickGcodeResult {
   rationale: string[]
   /** Avisos relevantes */
   warnings: string[]
+  /**
+   * R12.13: Avaliação de imprimibilidade baseada em Nelson et al. 2021
+   * (Int. J. Mol. Sci., doi:10.3390/ijms222413481). Aplica janelas
+   * reológicas validadas + shear stress calculado por Hagen-Poiseuille
+   * Power-Law para hidrogéis shear-thinning.
+   */
+  printability: PrintabilityAssessment
 }
 
 // ─── Helpers internos ────────────────────────────────────────────────────
@@ -489,11 +498,30 @@ export function generateQuickGcode(
     `📊 Estimativa: ~${bioinkVolume_uL.toFixed(0)} µL de bioink, ~${estimatedTime_min.toFixed(1)} min.`,
   )
 
+  // ─── R12.13: Análise de imprimibilidade (Nelson et al. 2021) ───
+  const printability = assessPrintability({
+    viscosity_PaS: bioink.viscosity_PaS,
+    printSpeed_mms: bioink.printSpeed_mms,
+    nozzleDiameter_mm: bioink.nozzleDiameter_mm,
+    hasCells: bioink.hasCells,
+    materialLabel: bioink.materialLabel,
+  })
+
+  // Mescla rationale Nelson no final (com cabeçalho científico)
+  rationale.push(
+    `🔬 Análise de imprimibilidade [Nelson 2021] — score ${printability.score}/100 (${printability.verdict}):`,
+  )
+  for (const r of printability.rationale) rationale.push(`   • ${r}`)
+
+  // Mescla warnings Nelson
+  for (const w of printability.warnings) warnings.push(w)
+
   // ─── Emit final G-code text ───
   const gcode = emitGcodeText(acc.list, bioink, geom, opts, {
     bioinkVolume_uL,
     estimatedTime_min,
     layerCount: numLayers,
+    printability,
   })
 
   return {
@@ -504,6 +532,7 @@ export function generateQuickGcode(
     moveCount,
     rationale,
     warnings,
+    printability,
   }
 }
 
@@ -538,7 +567,12 @@ function emitGcodeText(
   bioink: QuickBioinkParams,
   geom: QuickGeometry,
   opts: QuickGcodeOptions,
-  stats: { bioinkVolume_uL: number; estimatedTime_min: number; layerCount: number },
+  stats: {
+    bioinkVolume_uL: number
+    estimatedTime_min: number
+    layerCount: number
+    printability?: PrintabilityAssessment
+  },
 ): string {
   const now = new Date().toISOString()
   const lines: string[] = []
@@ -572,6 +606,14 @@ function emitGcodeText(
     `;   Volume:          ~${stats.bioinkVolume_uL.toFixed(0)} µL`,
     `;   Tempo:           ~${stats.estimatedTime_min.toFixed(1)} min`,
     `;   Moves:           ${moves.length}`,
+    ...(stats.printability ? [
+      "; ─────────────────────────────────────────────────────────────",
+      "; ANÁLISE DE IMPRIMIBILIDADE [Nelson et al. 2021, IJMS]:",
+      `;   Score:           ${stats.printability.score}/100 (${stats.printability.verdict})`,
+      `;   Wall shear:      ${(stats.printability.wallShearStress_Pa / 1000).toFixed(2)} kPa @ nozzle wall`,
+      `;   Risco celular:   ${stats.printability.cellShearRisk}`,
+      `;   Ref próxima:     ${stats.printability.closestReference.id} (Pr=${stats.printability.closestReference.Pr.toFixed(2)})`,
+    ] : []),
     "; ═══════════════════════════════════════════════════════════════",
     "; ⚠️ POSICIONE o bico MANUALMENTE sobre o bed antes de iniciar.",
     "; ⚠️ NENHUM aquecimento de cartucho/bed/chamber é enviado.",
@@ -739,6 +781,44 @@ export const BIOINK_QUICK_PRESETS: Array<{
     pressure_kpa: 40,
     crosslinker: "Térmico 37°C",
     hint: "Imprime a 4°C · gelifica a 37°C · pele/tendão",
+  },
+  // ─── R12.13: 5 formulações Nelson 2021 validadas cientificamente ───
+  // Bico 610 µm, 50 mm/s, 15-20 psi conforme Table 2 do paper
+  {
+    id: "nelson-a3c3cs1.5",
+    label: "★ Nelson A3C3CS1.5 (paper)",
+    materialLabel: "Alg 3% + CMC 3% + CaSO4 1.5% [Nelson 2021]",
+    nozzleDiameter_mm: 0.61,
+    viscosity_PaS: 608,
+    printSpeed_mms: 50,
+    travelSpeed_mms: 60,
+    pressure_kpa: 124,  // ~18 psi
+    crosslinker: "CaCl₂ 100 mM (post-print)",
+    hint: "★ Vencedora do paper · 50 mm (132 camadas) · Pr=0.84",
+  },
+  {
+    id: "nelson-a3c3cs0.5cl0.5",
+    label: "Nelson A3C3CS0.5CL0.5",
+    materialLabel: "Alg 3% + CMC 3% + CaSO4 0.5% + CaCl2 0.5% [Nelson 2021]",
+    nozzleDiameter_mm: 0.61,
+    viscosity_PaS: 775,
+    printSpeed_mms: 50,
+    travelSpeed_mms: 60,
+    pressure_kpa: 138,
+    crosslinker: "CaCl₂ 100 mM (post-print)",
+    hint: "Pr=0.86 (mais próx. de 1) · híbrido fast+slow gel",
+  },
+  {
+    id: "nelson-a2.5c2.5cs1",
+    label: "Nelson A2.5C2.5CS1",
+    materialLabel: "Alg 2.5% + CMC 2.5% + CaSO4 1% [Nelson 2021]",
+    nozzleDiameter_mm: 0.61,
+    viscosity_PaS: 250,
+    printSpeed_mms: 50,
+    travelSpeed_mms: 60,
+    pressure_kpa: 103,  // ~15 psi
+    crosslinker: "CaCl₂ 100 mM (post-print)",
+    hint: "Lite · scaffolds finos < 15 mm · ótimo recovery",
   },
   {
     id: "custom",
