@@ -18,7 +18,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { requireCredits } from "@/lib/auth/credits"
-import { generateContent, SYSTEM_PROMPTS, BiaAIError, aiErrorToHttp } from "@/lib/ai/gemini"
+import { generateContent, SYSTEM_PROMPTS, BiaAIError, aiErrorToHttp, parseJsonFromAI } from "@/lib/ai/gemini"
 import { prisma } from "@/lib/db/prisma"
 import type { Prisma } from "@prisma/client"
 import { z } from "zod"
@@ -133,9 +133,10 @@ Retorne EXATAMENTE este JSON (sem markdown, apenas o objeto):
     const { text } = await generateContent(prompt, {
       systemPrompt: SYSTEM_PROMPTS.BIOPRINTING_ENGINE_EXPERT,
     })
-    const match = text.match(/\{[\s\S]*\}/)
-    if (!match) throw new Error("Resposta sem JSON")
-    recommendation = JSON.parse(match[0])
+    // R12.11: usa parseJsonFromAI (robusto — limpa markdown, balanceia chaves,
+    // remove trailing commas, repara JSON truncado). Substitui regex frágil
+    // que quebrava em JSONs com vírgulas internas ou trailing commas.
+    recommendation = parseJsonFromAI<Record<string, unknown>>(text)
   } catch (err) {
     console.error("[recommend]", err)
     if (err instanceof BiaAIError) {
