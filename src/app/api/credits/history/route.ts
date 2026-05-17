@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { getCreditHistory } from "@/lib/db/queries"
 
+// Esta rota lê query params em runtime — não pode ser pré-renderizada (R12.14 fix)
+export const dynamic = "force-dynamic"
+
 // GET /api/credits/history — histórico paginado
 export async function GET(req: NextRequest) {
   const session = await auth()

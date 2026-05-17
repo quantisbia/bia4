@@ -10,6 +10,9 @@ import { auth } from "@/lib/auth/config"
 import { prisma } from "@/lib/db/prisma"
 import { z } from "zod"
 
+// Esta rota lê query params em runtime — não pode ser pré-renderizada (R12.14 fix)
+export const dynamic = "force-dynamic"
+
 const createSchema = z.object({
   title:      z.string().min(2).max(200),
   content:    z.string().min(1),

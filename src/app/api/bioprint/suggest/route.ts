@@ -7,6 +7,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { BIOPRINT_DB } from "@/lib/db/bioprint-database"
 
+// Esta rota lê query params em runtime — não pode ser pré-renderizada (R12.14 fix)
+export const dynamic = "force-dynamic"
+
 // Mapeamento de tecidos → materiais mais adequados (baseado em literatura)
 const TISSUE_TO_MATERIALS: Record<string, string[]> = {
   cartilagem:   ["GelMA", "Alginate", "Gelatin", "Hyaluronic Acid", "dECM", "Fibrinogen"],

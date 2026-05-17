@@ -12,6 +12,9 @@ import { retrieveUploads, buildRagContext } from "@/lib/knowledge/rag"
 import { Prisma } from "@prisma/client"
 import { z } from "zod"
 
+// Esta rota lê query params em runtime — não pode ser pré-renderizada (R12.14 fix)
+export const dynamic = "force-dynamic"
+
 // GET /api/chat — listar sessões
 export async function GET(req: NextRequest) {
   const session = await auth()

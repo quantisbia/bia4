@@ -13,6 +13,9 @@ import { generateContent, SYSTEM_PROMPTS, BiaAIError, aiErrorToHttp } from "@/li
 import { Prisma } from "@prisma/client"
 import { z } from "zod"
 
+// Esta rota lê query params em runtime — não pode ser pré-renderizada (R12.14 fix)
+export const dynamic = "force-dynamic"
+
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const PROTOCOL_TYPE_LABELS: Record<string, string> = {
   CULTURE:          "Cultura Celular",

@@ -12,6 +12,9 @@ import { generateContent, SYSTEM_PROMPTS, BiaAIError, aiErrorToHttp } from "@/li
 import { Prisma } from "@prisma/client"
 import { z } from "zod"
 
+// Esta rota lê query params em runtime — não pode ser pré-renderizada (R12.14 fix)
+export const dynamic = "force-dynamic"
+
 // ─── Tipos de análise e seus prompts ──────────────────────────────────────────
 const ANALYSIS_TYPES = {
   MOLECULAR:    { label: "Análise Molecular",          prompt: SYSTEM_PROMPTS.ANALYSIS_MOLECULAR,    credits: 12, minPlan: "ADVANCED" },
