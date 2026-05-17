@@ -864,6 +864,237 @@ export function predictFailures(
   }
 }
 
+// ─── TESTES SIMPLES (R12.9) ────────────────────────────────────────────────
+//
+// G-code MÍNIMOS para validar comandos básicos da bioimpressora.
+// SEM G28 (home), SEM M104/M140/M109/M190 (temperatura).
+// SEM aquecimento, SEM auto-leveling, SEM retract complexo.
+//
+// Filosofia: o operador posiciona o bico MANUALMENTE sobre o bed
+// (numa Petri vazia, lâmina, etc.), chama G92 X0 Y0 Z0 E0 e aperta PLAY.
+// O G-code é puramente cinemático — bom para:
+//   - Testar conexão serial / Web Serial
+//   - Validar resposta a G0/G1
+//   - Confirmar que travels e extrusões estão sendo enviados
+//   - Diagnosticar problemas de feedrate, perda de passos, etc.
+// ───────────────────────────────────────────────────────────────────────────
+
+export interface SimpleTestParams {
+  /** Tamanho da aresta principal em mm (default 20) */
+  size?: number
+  /** Velocidade de extrusão em mm/min (default 600 — bem lento para hidrogel) */
+  feedrate?: number
+  /** Velocidade de travel em mm/min (default 1800) */
+  travelFeedrate?: number
+  /** Quanto extrudar por mm de path (mm de E / mm de XY) (default 0.04) */
+  eFactor?: number
+  /** Z fixo desta camada (default 0.3 — bem encostado) */
+  z?: number
+}
+
+/**
+ * TESTE 1 · "Hello Square" — o teste mais simples possível.
+ *
+ * Imprime um quadrado de `size` mm de aresta em UMA ÚNICA camada.
+ * Total: 4 segmentos G1 + 1 G0 inicial. Termina em ~30 segundos a 600 mm/min.
+ *
+ * Útil para validar:
+ *   • Web Serial conectado e enviando linhas
+ *   • Motores X/Y respondendo
+ *   • Extrusor pressurizando (vê filete saindo)
+ *   • Z fixo (não muda durante o teste)
+ */
+export function generateTestHelloSquare(p: SimpleTestParams = {}): string {
+  const size = p.size ?? 20
+  const f = p.feedrate ?? 600
+  const ft = p.travelFeedrate ?? 1800
+  const eFactor = p.eFactor ?? 0.04
+  const z = p.z ?? 0.3
+
+  const eSide = size * eFactor // E acumulado a cada lado
+  let e = 0
+
+  const lines: string[] = []
+  lines.push("; ╔══════════════════════════════════════════════════════════╗")
+  lines.push("; ║  BIA · TESTE 1: Hello Square                             ║")
+  lines.push("; ║  Quadrado simples · 1 camada · sem temperatura · sem home║")
+  lines.push("; ╚══════════════════════════════════════════════════════════╝")
+  lines.push(`; size=${size} mm · feedrate=${f} mm/min · z=${z} mm`)
+  lines.push("; ⚠️ Posicione o bico MANUALMENTE sobre o bed antes de iniciar.")
+  lines.push("; ⚠️ Este G-code assume que o bico já está na origem desejada.")
+  lines.push("")
+  lines.push("G90              ; coordenadas absolutas")
+  lines.push("M82              ; extrusão absoluta")
+  lines.push("G92 X0 Y0 Z0 E0  ; zera tudo AQUI (sem mover)")
+  lines.push("")
+  lines.push(`; ── desce para Z de impressão ──`)
+  lines.push(`G0 Z${z.toFixed(3)} F${ft}`)
+  lines.push("")
+  lines.push("; ── desenha quadrado ──")
+  lines.push(`G1 X${size.toFixed(3)} Y0 E${(e += eSide).toFixed(4)} F${f}    ; lado 1 (→)`)
+  lines.push(`G1 X${size.toFixed(3)} Y${size.toFixed(3)} E${(e += eSide).toFixed(4)}    ; lado 2 (↑)`)
+  lines.push(`G1 X0 Y${size.toFixed(3)} E${(e += eSide).toFixed(4)}    ; lado 3 (←)`)
+  lines.push(`G1 X0 Y0 E${(e += eSide).toFixed(4)}    ; lado 4 (↓) · fecha`)
+  lines.push("")
+  lines.push("; ── sobe bico (segurança) ──")
+  lines.push(`G0 Z${(z + 5).toFixed(3)} F${ft}`)
+  lines.push("")
+  lines.push("; ── fim do teste ──")
+  return lines.join("\n")
+}
+
+/**
+ * TESTE 2 · "Cross Test" — cruz simples para testar eixos X e Y separadamente.
+ *
+ * Desenha duas linhas perpendiculares (cruz +) de `size` mm cada,
+ * começando do centro. Útil para diagnosticar se um eixo está com folga
+ * ou perdendo passos.
+ */
+export function generateTestCross(p: SimpleTestParams = {}): string {
+  const size = p.size ?? 20
+  const half = size / 2
+  const f = p.feedrate ?? 600
+  const ft = p.travelFeedrate ?? 1800
+  const eFactor = p.eFactor ?? 0.04
+  const z = p.z ?? 0.3
+
+  let e = 0
+  const eHalf = half * eFactor
+  const eFull = size * eFactor
+
+  const lines: string[] = []
+  lines.push("; ╔══════════════════════════════════════════════════════════╗")
+  lines.push("; ║  BIA · TESTE 2: Cross Test                               ║")
+  lines.push("; ║  Cruz X+Y · diagnóstico de eixos                          ║")
+  lines.push("; ╚══════════════════════════════════════════════════════════╝")
+  lines.push(`; size=${size} mm · feedrate=${f} mm/min · z=${z} mm`)
+  lines.push("; ⚠️ Posicione MANUALMENTE no centro da área desejada.")
+  lines.push("")
+  lines.push("G90")
+  lines.push("M82")
+  lines.push("G92 X0 Y0 Z0 E0  ; centro virtual")
+  lines.push("")
+  lines.push(`G0 Z${z.toFixed(3)} F${ft}`)
+  lines.push("")
+  lines.push("; ── linha horizontal (eixo X) ──")
+  lines.push(`G0 X${(-half).toFixed(3)} Y0 F${ft}`)
+  lines.push(`G1 X${half.toFixed(3)} Y0 E${(e += eFull).toFixed(4)} F${f}`)
+  lines.push("")
+  lines.push("; ── linha vertical (eixo Y) ──")
+  lines.push(`G0 X0 Y${(-half).toFixed(3)} F${ft}`)
+  lines.push(`G1 X0 Y${half.toFixed(3)} E${(e += eFull).toFixed(4)} F${f}`)
+  lines.push("")
+  lines.push(`G0 Z${(z + 5).toFixed(3)} F${ft}`)
+  lines.push(`G0 X0 Y0 F${ft}            ; volta ao centro`)
+  lines.push("")
+  return lines.join("\n")
+}
+
+/**
+ * TESTE 3 · "Spiral" — espiral suave para testar continuidade de fluxo.
+ *
+ * Espiral arquimediana de N voltas em 1 camada. Excelente para validar
+ * extrusão contínua sem retract, sem travels — comportamento ideal de
+ * bioimpressão.
+ */
+export function generateTestSpiral(p: SimpleTestParams & { turns?: number } = {}): string {
+  const size = p.size ?? 20
+  const f = p.feedrate ?? 600
+  const ft = p.travelFeedrate ?? 1800
+  const eFactor = p.eFactor ?? 0.04
+  const z = p.z ?? 0.3
+  const turns = p.turns ?? 5
+
+  const rMax = size / 2
+  const steps = turns * 36 // 10° por step
+  let e = 0
+  let prevX = rMax
+  let prevY = 0
+
+  const lines: string[] = []
+  lines.push("; ╔══════════════════════════════════════════════════════════╗")
+  lines.push("; ║  BIA · TESTE 3: Spiral                                   ║")
+  lines.push("; ║  Espiral arquimediana · fluxo contínuo (sem retract)     ║")
+  lines.push("; ╚══════════════════════════════════════════════════════════╝")
+  lines.push(`; size=${size} mm · turns=${turns} · feedrate=${f} mm/min · z=${z} mm`)
+  lines.push("; ⚠️ Posicione MANUALMENTE — espiral começa na borda direita.")
+  lines.push("")
+  lines.push("G90")
+  lines.push("M82")
+  lines.push("G92 X0 Y0 Z0 E0  ; centro virtual")
+  lines.push("")
+  lines.push(`G0 Z${z.toFixed(3)} F${ft}`)
+  lines.push(`G0 X${prevX.toFixed(3)} Y${prevY.toFixed(3)} F${ft}`)
+  lines.push("")
+  lines.push("; ── espiral ──")
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps
+    const angle = t * turns * 2 * Math.PI
+    const r = rMax * (1 - t)
+    const x = r * Math.cos(angle)
+    const y = r * Math.sin(angle)
+    const seg = Math.hypot(x - prevX, y - prevY)
+    e += seg * eFactor
+    lines.push(`G1 X${x.toFixed(3)} Y${y.toFixed(3)} E${e.toFixed(4)} F${f}`)
+    prevX = x
+    prevY = y
+  }
+  lines.push("")
+  lines.push(`G0 Z${(z + 5).toFixed(3)} F${ft}`)
+  lines.push(`G0 X0 Y0 F${ft}`)
+  lines.push("")
+  return lines.join("\n")
+}
+
+/**
+ * TESTE 4 · "Dot Array" — matriz de pontos para testar deposição pontual.
+ *
+ * Grade NxN de "dots" — cada um é uma micro-extrusão sem movimento (E sem XY).
+ * Excelente para validar o motor extrusor isoladamente.
+ */
+export function generateTestDotArray(p: SimpleTestParams & { rows?: number; cols?: number; dotE?: number } = {}): string {
+  const size = p.size ?? 20
+  const rows = p.rows ?? 4
+  const cols = p.cols ?? 4
+  const dotE = p.dotE ?? 0.5 // E extrudado por dot
+  const f = p.feedrate ?? 600
+  const ft = p.travelFeedrate ?? 1800
+  const z = p.z ?? 0.3
+
+  const spacingX = size / Math.max(1, cols - 1)
+  const spacingY = size / Math.max(1, rows - 1)
+  let e = 0
+
+  const lines: string[] = []
+  lines.push("; ╔══════════════════════════════════════════════════════════╗")
+  lines.push("; ║  BIA · TESTE 4: Dot Array                                ║")
+  lines.push("; ║  Matriz de pontos · testa extrusor isolado               ║")
+  lines.push("; ╚══════════════════════════════════════════════════════════╝")
+  lines.push(`; ${rows}×${cols} dots · size=${size} mm · dotE=${dotE} mm · z=${z} mm`)
+  lines.push("; ⚠️ Posicione MANUALMENTE — array cresce em +X / +Y.")
+  lines.push("")
+  lines.push("G90")
+  lines.push("M82")
+  lines.push("G92 X0 Y0 Z0 E0")
+  lines.push("")
+  lines.push(`G0 Z${z.toFixed(3)} F${ft}`)
+  lines.push("")
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = c * spacingX
+      const y = r * spacingY
+      lines.push(`G0 X${x.toFixed(3)} Y${y.toFixed(3)} F${ft}`)
+      e += dotE
+      lines.push(`G1 E${e.toFixed(4)} F${f}     ; dot (${r},${c})`)
+    }
+  }
+  lines.push("")
+  lines.push(`G0 Z${(z + 5).toFixed(3)} F${ft}`)
+  lines.push(`G0 X0 Y0 F${ft}`)
+  lines.push("")
+  return lines.join("\n")
+}
+
 // ─── EXPORT util: G-code BIA header proprietário ──────────────────────────
 
 export function biaHeader(meta: {

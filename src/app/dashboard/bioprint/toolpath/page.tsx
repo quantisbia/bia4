@@ -29,6 +29,7 @@ import { InfoButton } from "@/components/ui/InfoButton"
 import {
   parseGcode, computeShear, analyzeContinuity, predictFailures,
   biaHeader, generateGyroidGcode,
+  generateTestHelloSquare, generateTestCross, generateTestSpiral, generateTestDotArray,
 } from "@/lib/bioprint/toolpath-engine"
 import { useBioprintProcess } from "@/lib/bioprint/process-context"
 import { cn } from "@/lib/utils/helpers"
@@ -95,6 +96,39 @@ export default function ToolpathPage() {
       })
     setGcode(demo)
   }, [])
+
+  // ─── Testes simples (R12.9) ───────────────────────────────────────────
+  // G-code mínimos, sem temperatura, sem home — para validar comandos.
+  const simpleHeader = useCallback((testName: string) => {
+    return [
+      "; ═══════════════════════════════════════════════════════════════",
+      "; BIA · TESTE SIMPLES — sem temperatura · sem home (G28)",
+      `; Test:       ${testName}`,
+      `; Generated:  ${new Date().toISOString()}`,
+      "; ─────────────────────────────────────────────────────────────",
+      "; ⚠️ Posicione o bico MANUALMENTE sobre o bed antes de iniciar.",
+      "; ⚠️ NENHUM aquecimento de cartucho/bed/chamber é enviado.",
+      "; ⚠️ NENHUM G28 (home) é enviado — preserva bandeja/cartucho.",
+      "; ═══════════════════════════════════════════════════════════════",
+      "",
+    ].join("\n")
+  }, [])
+
+  const handleTestSquare = useCallback(() => {
+    setGcode(simpleHeader("Hello Square 20mm") + generateTestHelloSquare())
+  }, [simpleHeader])
+
+  const handleTestCross = useCallback(() => {
+    setGcode(simpleHeader("Cross Test 20mm") + generateTestCross())
+  }, [simpleHeader])
+
+  const handleTestSpiral = useCallback(() => {
+    setGcode(simpleHeader("Spiral Test 5 turns") + generateTestSpiral())
+  }, [simpleHeader])
+
+  const handleTestDots = useCallback(() => {
+    setGcode(simpleHeader("Dot Array 4×4") + generateTestDotArray())
+  }, [simpleHeader])
 
   const handleGenerate = useCallback((g: string, _preset: InfillPreset) => {
     setGcode(g)
@@ -226,6 +260,54 @@ export default function ToolpathPage() {
                     Download
                   </button>
                 )}
+              </div>
+
+              {/* ─── Testes Simples (sem temperatura · sem home) ─── */}
+              <div className="rounded-xl border border-amber-500/25 bg-gradient-to-br from-amber-500/[0.05] to-amber-500/[0.01] p-3">
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center">
+                      <FlaskConical className="w-3.5 h-3.5 text-amber-300" />
+                    </div>
+                    <div>
+                      <h3 className="text-[12px] font-bold text-white flex items-center gap-1.5">
+                        Testes Simples
+                        <span className="text-[8.5px] px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-200 font-semibold uppercase tracking-wider">
+                          sem temp · sem home
+                        </span>
+                      </h3>
+                      <p className="text-[10px] text-amber-200/60">
+                        G-code mínimo para validar comandos da bioimpressora · posicione o bico manualmente antes de iniciar
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <TestButton
+                    icon={<Square className="w-3.5 h-3.5" />}
+                    label="Hello Square"
+                    desc="Quadrado 20mm · 1 camada"
+                    onClick={handleTestSquare}
+                  />
+                  <TestButton
+                    icon={<Plus className="w-3.5 h-3.5" />}
+                    label="Cross Test"
+                    desc="Cruz X+Y · 20mm"
+                    onClick={handleTestCross}
+                  />
+                  <TestButton
+                    icon={<RotateCw className="w-3.5 h-3.5" />}
+                    label="Spiral"
+                    desc="Espiral · 5 voltas · fluxo contínuo"
+                    onClick={handleTestSpiral}
+                  />
+                  <TestButton
+                    icon={<Grid3x3 className="w-3.5 h-3.5" />}
+                    label="Dot Array"
+                    desc="Matriz 4×4 · testa extrusor"
+                    onClick={handleTestDots}
+                  />
+                </div>
               </div>
 
               {/* Viewer 3D */}
@@ -387,6 +469,28 @@ function TabButton({
     >
       {icon}
       {children}
+    </button>
+  )
+}
+
+function TestButton({
+  icon, label, desc, onClick,
+}: {
+  icon: React.ReactNode
+  label: string
+  desc: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="text-left rounded-lg border border-amber-500/30 bg-black/30 hover:bg-amber-500/10 hover:border-amber-400/50 p-2 transition-all group"
+    >
+      <div className="flex items-center gap-1.5 text-amber-200 group-hover:text-amber-100">
+        {icon}
+        <span className="text-[11px] font-semibold">{label}</span>
+      </div>
+      <p className="text-[9.5px] text-gray-400 mt-0.5 leading-snug">{desc}</p>
     </button>
   )
 }
