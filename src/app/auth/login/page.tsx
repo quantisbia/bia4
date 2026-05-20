@@ -91,7 +91,7 @@ export default function LoginPage() {
               <span className="text-xl sm:text-2xl font-bold leading-tight block">
                 BIA <span className="text-violet-400">v4</span>
               </span>
-              <span className="text-[10px] text-purple-400/70 tracking-widest uppercase block">
+              <span className="text-[10px] text-violet-300 tracking-widest uppercase block">
                 Biofabrication AI
               </span>
             </div>

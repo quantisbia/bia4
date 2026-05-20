@@ -25,40 +25,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials) {
         try {
-          console.log("[AUTH] authorize start, email:", (credentials as { email?: string })?.email)
           const parsed = loginSchema.safeParse(credentials)
-          if (!parsed.success) {
-            console.warn("[AUTH] zod parse failed:", parsed.error.flatten())
-            return null
-          }
+          if (!parsed.success) return null
 
           const { email, password } = parsed.data
 
-          let user
-          try {
-            user = await getUserByEmail(email)
-          } catch (dbErr) {
-            console.error("[AUTH] getUserByEmail FAILED:", dbErr instanceof Error ? dbErr.message : String(dbErr))
-            console.error("[AUTH] stack:", dbErr instanceof Error ? dbErr.stack : "no stack")
-            return null
-          }
-
-          if (!user) {
-            console.warn("[AUTH] user not found:", email)
-            return null
-          }
-          if (!user.password) {
-            console.warn("[AUTH] user has no password (oauth-only?):", email)
-            return null
-          }
+          const user = await getUserByEmail(email)
+          if (!user || !user.password) return null
 
           const valid = await bcrypt.compare(password, user.password)
-          if (!valid) {
-            console.warn("[AUTH] bcrypt mismatch for:", email)
-            return null
-          }
-
-          console.log("[AUTH] login OK for:", email, "role:", user.role)
+          if (!valid) return null
 
           // Log login (fire-and-forget)
           prisma.auditLog.create({
@@ -68,7 +44,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               entity: "session",
               metadata: { email: user.email },
             },
-          }).catch((e) => console.warn("[AUTH] audit log failed (non-fatal):", e?.message))
+          }).catch(() => {})
 
           const rawPlan = user.subscription?.plan ?? "FREE"
           const plan = rawPlan === "FREE" ? "DISCOVERY" : rawPlan
@@ -83,8 +59,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             credits: user.creditBalance?.balance ?? 0,
           }
         } catch (error) {
-          console.error("[AUTH] authorize fatal error:", error instanceof Error ? error.message : String(error))
-          console.error("[AUTH] fatal stack:", error instanceof Error ? error.stack : "no stack")
+          console.error("[AUTH] authorize error:", error instanceof Error ? error.message : String(error))
           return null
         }
       },

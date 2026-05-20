@@ -314,11 +314,11 @@ export default function RoadmapPage() {
           <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
             Roteiro Profissional BIA
             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-500/20 border border-violet-500/30 text-violet-300">
-              v4.2
+              v4.3
             </span>
           </h1>
           <p className="text-xs sm:text-sm text-gray-400">
-            Do problema clínico ao tecido funcional impresso · 10 fases · ~3-6 meses
+            Do conceito à clínica · 10 fases guiadas por IA
           </p>
         </div>
       </div>
@@ -334,10 +334,13 @@ export default function RoadmapPage() {
               Por que seguir um roteiro?
             </h2>
             <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">
-              Engenharia de tecidos é uma corrida de longa distância — não um sprint. Pesquisadores que pulam etapas
-              gastam meses re-trabalhando porque escolheram o biomaterial errado, geometria inviável ou
-              esqueceram regulatório. Este roteiro foi destilado de <strong className="text-violet-300">12 anos de
-              experiência da Quantis Biotechnology</strong> em projetos reais com FDA, ANVISA e EMA.
+              Engenharia de tecidos exige método. Pular etapas costuma custar caro — biomaterial errado,
+              geometria inviável ou um requisito regulatório esquecido podem significar meses de
+              re-trabalho. A BIA nasceu dos desafios reais da{" "}
+              <strong className="text-violet-300">Quantis Biotechnology</strong> no
+              desenvolvimento da nossa matriz de colágeno humano: encontramos na IA uma forma de
+              reduzir tentativa-e-erro, evitar gastos altos de investimento e estruturar a jornada
+              do conceito à clínica.
             </p>
           </div>
         </div>
@@ -517,7 +520,7 @@ export default function RoadmapPage() {
       {/* Footer note */}
       <div className="text-center text-[11px] text-gray-600 leading-relaxed pt-2 pb-4">
         <Info className="w-3 h-3 inline-block mr-1 -mt-0.5" />
-        Roteiro destilado de projetos reais com aprovação FDA 510(k), ANVISA RDC e EMA · Quantis Biotechnology · 2026
+        Roteiro estruturado a partir de projetos reais de biofabricação · Quantis Biotechnology · 2026
       </div>
     </div>
   )

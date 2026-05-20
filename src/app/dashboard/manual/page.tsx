@@ -129,10 +129,10 @@ export default function ManualPage() {
           <div>
             <h1 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
               Manual do Usuário
-              <span className="text-[10px] px-1.5 py-0.5 bg-blue-500/15 border border-blue-500/30 text-blue-300 rounded font-mono uppercase">v4.3</span>
+              <span className="text-[10px] px-1.5 py-0.5 bg-blue-500/15 border border-blue-500/30 text-blue-300 rounded font-mono uppercase">v4.4</span>
             </h1>
             <p className="text-[11px] text-gray-400">
-              Tutoriais práticos com racional científico fácil de entender
+              Tutoriais práticos com racional científico — atualizado em 2026
             </p>
           </div>
         </div>
@@ -203,8 +203,13 @@ export default function ManualPage() {
               </div>
               <p className="text-[10px] text-gray-400 leading-relaxed">
                 Cada módulo segue o princípio: <strong className="text-purple-200">descreva o que você quer</strong> →
-                a IA <strong className="text-purple-200">propõe a solução cientificamente fundamentada</strong> →
+                a IA <strong className="text-purple-200">propõe a solução fundamentada</strong> →
                 você <strong className="text-purple-200">valida e refina</strong>.
+              </p>
+              <p className="text-[10px] text-gray-500 leading-relaxed mt-2 pt-2 border-t border-white/5">
+                Nascida dos desafios reais da Quantis no desenvolvimento da matriz de colágeno humano,
+                a BIA conecta design 3D, biomateriais, biofabricação e jornada regulatória —
+                do conceito à clínica.
               </p>
             </div>
           </div>
@@ -783,23 +788,29 @@ function ChapterRoadmapFuture() {
         </p>
       </div>
 
-      {/* v4.4 — Próxima */}
-      <Box2 icon={Sparkles} title="v4.4 (próximo mês) — Visualização & Persistência" tone="info">
+      {/* v4.4 — Atual */}
+      <Box2 icon={Sparkles} title="v4.4 (atual) — Visualização, Persistência & Estabilidade" tone="info">
         <ul className="space-y-3 text-sm text-gray-300">
           <li className="flex items-start gap-2">
             <span className="text-pink-300 mt-0.5">▸</span>
             <div>
-              <strong className="text-white">Preview 3D real (Three.js)</strong> no Gerador STL.
-              Em vez do desenho SVG isométrico, você vai poder <em>orbitar, fazer zoom e medir</em> a peça antes
-              de baixar. Acelera muito a iteração de parâmetros.
+              <strong className="text-white">Autenticação edge-safe</strong> — middleware refatorado
+              em padrão split-config (Auth.js v5) para rodar sem erros no Edge Runtime da Vercel.
+              Login e proteção de rotas mais rápidos e estáveis.
             </div>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-pink-300 mt-0.5">▸</span>
             <div>
-              <strong className="text-white">Histórico de formulações</strong> no Formulador Pro.
-              Toda formulação gerada vai ficar salva no seu painel — você poderá comparar versões, marcar
-              favoritas e exportar relatório consolidado.
+              <strong className="text-white">Preview 3D real (Three.js)</strong> no Gerador STL —
+              <em>orbitar, fazer zoom e medir</em> a peça antes de baixar.
+            </div>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-pink-300 mt-0.5">▸</span>
+            <div>
+              <strong className="text-white">Histórico de formulações</strong> no Formulador Pro —
+              comparar versões, marcar favoritas e exportar relatório consolidado.
             </div>
           </li>
           <li className="flex items-start gap-2">
@@ -915,14 +926,15 @@ function ChapterRoadmapFuture() {
       {/* Como contribuir */}
       <Box2 icon={GitBranch} title="Como contribuir" tone="info">
         <p className="text-xs text-gray-400 mb-3">
-          A BIA é desenvolvida pela <strong className="text-white">Quantis Biotechnology</strong> com colaboração
-          aberta da comunidade científica brasileira:
+          A BIA é a assistente inteligente da <strong className="text-white">Quantis Biotechnology</strong>,
+          construída a partir dos nossos próprios desafios no desenvolvimento de biomateriais humanos.
+          Crescemos com a colaboração de quem usa a plataforma:
         </p>
         <ul className="space-y-1.5 text-xs text-gray-300">
           <li>📝 <strong>Reportar bugs ou pedir features:</strong> use o chat da BIA — sua mensagem vai direto para o time.</li>
           <li>🧪 <strong>Compartilhar dados:</strong> formulações, protocolos e referências validadas ajudam a treinar a IA.</li>
           <li>📚 <strong>Validar publicações:</strong> tem artigo publicado? Adicione DOI ao Knowledge Base e ganhe créditos.</li>
-          <li>👨‍🔬 <strong>Beta-testar versões novas:</strong> usuários ativos têm acesso antecipado a v4.4+.</li>
+          <li>👨‍🔬 <strong>Beta-testar versões novas:</strong> usuários ativos têm acesso antecipado às próximas versões.</li>
         </ul>
       </Box2>
     </article>
@@ -953,13 +965,13 @@ function ChapterVisionFormulator() {
           <Lightbulb className="w-5 h-5 text-cyan-300 mt-0.5 shrink-0" />
           <div className="space-y-2 text-sm text-gray-200">
             <p>
-              <strong className="text-cyan-200">Para a Janaina e a equipe:</strong> esta análise foi feita
+              <strong className="text-cyan-200">Visão de produto:</strong> esta análise foi feita
               sob a ótica de um <em>cientista sênior de biomateriais + product strategist</em>, identificando
               o que falta para o Formulador Pro ser <strong>auditável, reprodutível e aprendiz</strong>.
             </p>
             <p>
-              O documento técnico completo está em <code className="px-1.5 py-0.5 rounded bg-black/40 text-cyan-300">docs/FORMULATOR_PRO_ROADMAP.md</code>.
-              Aqui apresentamos um resumo amigável.
+              Aqui apresentamos um resumo amigável das prioridades — o documento técnico completo
+              fica disponível para o time da Quantis.
             </p>
           </div>
         </div>

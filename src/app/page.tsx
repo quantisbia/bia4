@@ -57,7 +57,7 @@ export default function HomePage() {
             <BiaLogoBox sizeClass="w-9 h-9" size={26} rounded="rounded-xl" />
             <div>
               <span className="text-lg font-bold tracking-tight leading-tight block">BIA</span>
-              <span className="hidden sm:block text-[9px] text-purple-400/80 tracking-widest uppercase leading-tight">
+              <span className="hidden sm:block text-[9px] text-violet-300 tracking-widest uppercase leading-tight">
                 Biofabrication AI
               </span>
             </div>

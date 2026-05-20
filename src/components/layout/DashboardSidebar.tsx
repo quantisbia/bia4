@@ -184,7 +184,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           </div>
           <div>
             <span className="font-bold text-white tracking-tight text-sm leading-none block">BIA</span>
-            <span className="text-[9px] text-violet-400/60 tracking-[0.15em] uppercase leading-none block mt-0.5">
+            <span className="text-[9px] text-violet-300 tracking-[0.15em] uppercase leading-none block mt-0.5">
               Biofabrication AI
             </span>
           </div>
