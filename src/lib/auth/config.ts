@@ -4,55 +4,18 @@ import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/db/prisma"
 import { getUserByEmail } from "@/lib/db/queries"
 import { z } from "zod"
+import { authEdgeConfig } from "@/lib/auth/edge"
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.string().min(6, "Senha muito curta"),
 })
 
-// Detecta se está em HTTPS (sandbox ou produção)
-const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith("https://") ?? false
-
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 dias
-  },
-  pages: {
-    signIn: "/auth/login",
-    error: "/auth/error",
-    newUser: "/dashboard",
-  },
-  // Cookies configurados corretamente para HTTPS sandbox
-  cookies: {
-    sessionToken: {
-      name: useSecureCookies ? "__Secure-next-auth.session-token" : "next-auth.session-token",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: useSecureCookies,
-      },
-    },
-    callbackUrl: {
-      name: useSecureCookies ? "__Secure-next-auth.callback-url" : "next-auth.callback-url",
-      options: {
-        httpOnly: false,
-        sameSite: "lax",
-        path: "/",
-        secure: useSecureCookies,
-      },
-    },
-    csrfToken: {
-      name: useSecureCookies ? "__Host-next-auth.csrf-token" : "next-auth.csrf-token",
-      options: {
-        httpOnly: false,
-        sameSite: "lax",
-        path: "/",
-        secure: useSecureCookies,
-      },
-    },
-  },
+  ...authEdgeConfig,
+  // `cookies`, `session`, `pages`, `trustHost`, etc. já vêm do authEdgeConfig.
+  // Aqui só adicionamos o que é Node-only: o provider Credentials que
+  // acessa Prisma e bcryptjs.
   providers: [
     Credentials({
       name: "credentials",
@@ -103,26 +66,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    authorized({ auth, request: { nextUrl } }) {
-      const isLoggedIn = !!auth?.user
-      const pathname = nextUrl.pathname
-
-      const protectedPaths = ["/dashboard", "/admin"]
-      const authPaths = ["/auth/login", "/auth/register"]
-
-      const isProtected = protectedPaths.some((p) => pathname.startsWith(p))
-      const isAuthPage = authPaths.some((p) => pathname.startsWith(p))
-
-      if (isProtected && !isLoggedIn) {
-        return false
-      }
-
-      if (isAuthPage && isLoggedIn) {
-        return Response.redirect(new URL("/dashboard", nextUrl))
-      }
-
-      return true
-    },
+    ...authEdgeConfig.callbacks,
 
     async jwt({ token, user, trigger, session }) {
       if (user) {
