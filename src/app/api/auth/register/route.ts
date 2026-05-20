@@ -117,18 +117,28 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     )
   } catch (error) {
-    console.error("[REGISTER] Error:", error)
+    const msg = error instanceof Error ? error.message : String(error)
+    const stack = error instanceof Error ? error.stack : "no stack"
+    console.error("[REGISTER] Error message:", msg)
+    console.error("[REGISTER] Error stack:", stack)
+    console.error("[REGISTER] Error code:", (error as { code?: string })?.code)
+    console.error("[REGISTER] Error meta:", JSON.stringify((error as { meta?: unknown })?.meta))
+
     // Log failed attempt
     await prisma.auditLog.create({
       data: {
         action: "user_register_failed",
         ip,
-        metadata: { error: String(error).slice(0, 200) },
+        metadata: { error: msg.slice(0, 500) },
       },
     }).catch(() => {})
 
     return NextResponse.json(
-      { error: "Erro interno. Tente novamente." },
+      {
+        error: "Erro interno. Tente novamente.",
+        // Mensagem técnica curta só pra ajudar debug (não expõe stack)
+        debugMessage: msg.slice(0, 200),
+      },
       { status: 500 }
     )
   }
