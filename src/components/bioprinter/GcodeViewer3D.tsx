@@ -21,7 +21,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import type { GcodeMove, ParsedGcode, Vec3 } from "@/lib/bioprint/toolpath-engine"
 import type { BioinkFormulation } from "@/lib/bioprint/process-context"
 import {
-  ZoomIn, ZoomOut, Palette, RefreshCw,
+  ZoomIn, ZoomOut, Palette, RefreshCw, Move, Layers as LayersIcon, Play, Pause,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
@@ -70,7 +70,15 @@ export function GcodeViewer3D({
   const [camera, setCamera] = useState<Camera>(DEFAULT_CAMERA)
   const [colorMode, setColorMode] = useState<ColorMode>(initialColorMode)
   const [isDragging, setIsDragging] = useState(false)
-  const dragStart = useRef<{ x: number; y: number; cam: Camera } | null>(null)
+  /** R12.11: modo de interação — orbit (rotação) ou pan (arrastar mesa) */
+  const [interactionMode, setInteractionMode] = useState<"orbit" | "pan">("orbit")
+  const dragStart = useRef<{ x: number; y: number; cam: Camera; button: number; shift: boolean } | null>(null)
+
+  /** R12.11: análise camada-a-camada — controles internos do viewer */
+  const [layerAnalysisOpen, setLayerAnalysisOpen] = useState(false)
+  const [activeLayer, setActiveLayer] = useState<number | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const playIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Centro do bounding box (para centralizar a rotação)
   const center = useMemo<Vec3>(() => {
@@ -205,12 +213,12 @@ export function GcodeViewer3D({
     let prev: Vec3 = { x: 0, y: 0, z: 0 }
     for (let i = 0; i < parsed.moves.length; i++) {
       const m = parsed.moves[i]
-      // Filtro de camadas
-      if (layerFrom !== undefined && m.layer < layerFrom) {
+      // Filtro de camadas (usa filtros efetivos — análise camada-a-camada sobrescreve)
+      if (effectiveLayerFrom !== undefined && m.layer < effectiveLayerFrom) {
         prev = m.to
         continue
       }
-      if (layerTo !== undefined && m.layer > layerTo) {
+      if (effectiveLayerTo !== undefined && m.layer > effectiveLayerTo) {
         prev = m.to
         continue
       }
@@ -269,7 +277,7 @@ export function GcodeViewer3D({
     )
     ctx.textAlign = "right"
     ctx.fillText(`zoom: ${camera.zoom.toFixed(1)}px/mm`, w - 8, h - 8)
-  }, [parsed, camera, colorMode, layerFrom, layerTo, showTravels, shearValues, center, formulations])
+  }, [parsed, camera, colorMode, effectiveLayerFrom, effectiveLayerTo, showTravels, shearValues, center, formulations])
 
   // Resize observer
   useEffect(() => {
@@ -293,19 +301,45 @@ export function GcodeViewer3D({
   }, [])
 
   // Mouse interactions
+  // R12.11: suporta tanto orbit (rotação) quanto pan (arrastar mesa)
+  // - Botão esquerdo padrão: usa modo ativo (orbit OU pan)
+  // - Botão do meio (1) OU shift+esquerdo: força pan
+  // - Botão direito (2): força pan
   const onMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true)
-    dragStart.current = { x: e.clientX, y: e.clientY, cam: { ...camera } }
+    dragStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      cam: { ...camera },
+      button: e.button,
+      shift: e.shiftKey,
+    }
   }
   const onMouseMove = (e: React.MouseEvent) => {
     if (!isDragging || !dragStart.current) return
     const dx = e.clientX - dragStart.current.x
     const dy = e.clientY - dragStart.current.y
-    setCamera({
-      ...dragStart.current.cam,
-      rotY: dragStart.current.cam.rotY + dx * 0.01,
-      rotX: Math.max(-Math.PI / 2, Math.min(Math.PI / 2, dragStart.current.cam.rotX + dy * 0.01)),
-    })
+    const forcePan =
+      dragStart.current.button === 1 ||
+      dragStart.current.button === 2 ||
+      dragStart.current.shift
+    const doPan = forcePan || interactionMode === "pan"
+
+    if (doPan) {
+      // Modo PAN — arrasta a mesa/painel
+      setCamera({
+        ...dragStart.current.cam,
+        panX: dragStart.current.cam.panX + dx,
+        panY: dragStart.current.cam.panY + dy,
+      })
+    } else {
+      // Modo ORBIT — rotaciona
+      setCamera({
+        ...dragStart.current.cam,
+        rotY: dragStart.current.cam.rotY + dx * 0.01,
+        rotX: Math.max(-Math.PI / 2, Math.min(Math.PI / 2, dragStart.current.cam.rotX + dy * 0.01)),
+      })
+    }
   }
   const onMouseUp = () => {
     setIsDragging(false)
@@ -316,22 +350,112 @@ export function GcodeViewer3D({
     const factor = e.deltaY > 0 ? 0.9 : 1.1
     setCamera((c) => ({ ...c, zoom: Math.max(0.5, Math.min(100, c.zoom * factor)) }))
   }
+  const onContextMenu = (e: React.MouseEvent) => {
+    // Bloqueia menu de contexto para liberar botão direito para pan
+    e.preventDefault()
+  }
+
+  // R12.11: stats por camada — para o painel de análise
+  const layerStats = useMemo(() => {
+    if (!parsed) return []
+    return parsed.layers.map((layerZ) => {
+      const moves = parsed.moves.filter((m) => m.layer === layerZ)
+      const extrudes = moves.filter((m) => m.type === "G1" && m.e > 0)
+      const travels = moves.filter((m) => m.type === "G0")
+      const totalExtrudeLen = extrudes.reduce((acc, m) => {
+        const dx = m.to.x - 0 // simplificado
+        const dy = m.to.y - 0
+        return acc + Math.sqrt(dx * dx + dy * dy)
+      }, 0)
+      const avgFeedrate = extrudes.length
+        ? extrudes.reduce((a, m) => a + m.feedrate, 0) / extrudes.length
+        : 0
+      return {
+        z: layerZ,
+        moveCount: moves.length,
+        extrudeCount: extrudes.length,
+        travelCount: travels.length,
+        totalExtrudeLen,
+        avgFeedrate,
+      }
+    })
+  }, [parsed])
+
+  // R12.11: animação play/pause — avança a camada ativa
+  useEffect(() => {
+    if (!isPlaying || !parsed) return
+    playIntervalRef.current = setInterval(() => {
+      setActiveLayer((curr) => {
+        if (curr === null) return parsed.layers[0] ?? null
+        const idx = parsed.layers.indexOf(curr)
+        if (idx === -1 || idx >= parsed.layers.length - 1) {
+          setIsPlaying(false)
+          return curr
+        }
+        return parsed.layers[idx + 1]
+      })
+    }, 400)
+    return () => {
+      if (playIntervalRef.current) clearInterval(playIntervalRef.current)
+    }
+  }, [isPlaying, parsed])
+
+  // Filtros de camada efetivos (usa activeLayer se análise está aberta)
+  const effectiveLayerFrom = layerAnalysisOpen && activeLayer !== null
+    ? parsed?.layers[0] ?? layerFrom
+    : layerFrom
+  const effectiveLayerTo = layerAnalysisOpen && activeLayer !== null
+    ? activeLayer
+    : layerTo
 
   return (
     <div className={cn("relative w-full h-full bg-[#05050c] rounded-xl overflow-hidden border border-violet-500/15", className)}>
       {/* Canvas */}
       <canvas
         ref={canvasRef}
-        className="w-full h-full cursor-grab active:cursor-grabbing"
+        className={cn(
+          "w-full h-full",
+          interactionMode === "pan"
+            ? "cursor-move active:cursor-grabbing"
+            : "cursor-grab active:cursor-grabbing"
+        )}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseUp}
         onWheel={onWheel}
+        onContextMenu={onContextMenu}
       />
 
       {/* Toolbar topo-direita */}
       <div className="absolute top-2 right-2 flex flex-col gap-1.5">
+        {/* Toggle Orbit/Pan */}
+        <div className="flex flex-col gap-0.5 bg-black/60 border border-white/10 rounded-lg p-0.5">
+          <button
+            onClick={() => setInteractionMode("orbit")}
+            className={cn(
+              "px-2 py-1.5 rounded text-[10px] flex items-center gap-1 transition-colors",
+              interactionMode === "orbit"
+                ? "bg-violet-500/40 text-white"
+                : "text-white/70 hover:bg-white/10"
+            )}
+            title="Modo rotação (orbit)"
+          >
+            <RefreshCw className="w-3 h-3" /> Orbit
+          </button>
+          <button
+            onClick={() => setInteractionMode("pan")}
+            className={cn(
+              "px-2 py-1.5 rounded text-[10px] flex items-center gap-1 transition-colors",
+              interactionMode === "pan"
+                ? "bg-violet-500/40 text-white"
+                : "text-white/70 hover:bg-white/10"
+            )}
+            title="Modo arrastar (pan) — também: shift+drag ou botão direito"
+          >
+            <Move className="w-3 h-3" /> Pan
+          </button>
+        </div>
         <button
           onClick={() => setCamera(DEFAULT_CAMERA)}
           className="px-2 py-1.5 rounded-lg bg-black/60 hover:bg-violet-500/30 border border-white/10 text-white/80 text-[10px] flex items-center gap-1 transition-colors"
@@ -350,6 +474,25 @@ export function GcodeViewer3D({
           className="px-2 py-1.5 rounded-lg bg-black/60 hover:bg-violet-500/30 border border-white/10 text-white/80 text-[10px] flex items-center gap-1 transition-colors"
         >
           <ZoomOut className="w-3 h-3" />
+        </button>
+        <button
+          onClick={() => {
+            setLayerAnalysisOpen(!layerAnalysisOpen)
+            if (!layerAnalysisOpen && parsed) {
+              setActiveLayer(parsed.layers[parsed.layers.length - 1] ?? null)
+            } else {
+              setIsPlaying(false)
+            }
+          }}
+          className={cn(
+            "px-2 py-1.5 rounded-lg border text-[10px] flex items-center gap-1 transition-colors",
+            layerAnalysisOpen
+              ? "bg-violet-500/40 text-white border-violet-400/50"
+              : "bg-black/60 hover:bg-violet-500/30 border-white/10 text-white/80"
+          )}
+          title="Análise camada-a-camada"
+        >
+          <LayersIcon className="w-3 h-3" /> Camadas
         </button>
       </div>
 
@@ -399,8 +542,96 @@ export function GcodeViewer3D({
 
       {/* Hint inferior */}
       <div className="absolute bottom-2 left-2 text-[9px] text-white/40 font-mono pointer-events-none">
-        🖱️ arraste = rotacionar · scroll = zoom
+        🖱️ {interactionMode === "orbit" ? "arraste = rotacionar" : "arraste = mover mesa"} · shift+drag ou btn direito = pan · scroll = zoom
       </div>
+
+      {/* R12.11: Painel de análise camada-a-camada — bottom */}
+      {layerAnalysisOpen && parsed && parsed.layers.length > 0 && (
+        <div className="absolute bottom-10 left-2 right-2 bg-black/85 border border-violet-400/40 rounded-xl p-3 backdrop-blur-md max-w-md">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[10px] uppercase tracking-wider text-violet-300 font-semibold flex items-center gap-1">
+              <LayersIcon className="w-3 h-3" /> Análise camada-a-camada
+            </div>
+            <button
+              onClick={() => setLayerAnalysisOpen(false)}
+              className="text-white/40 hover:text-white text-xs"
+            >
+              ✕
+            </button>
+          </div>
+          {/* Controles de player */}
+          <div className="flex items-center gap-2 mb-2">
+            <button
+              onClick={() => setIsPlaying(!isPlaying)}
+              className="px-2 py-1 rounded bg-violet-500/30 hover:bg-violet-500/50 border border-violet-400/40 text-white text-[10px] flex items-center gap-1"
+            >
+              {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+              {isPlaying ? "Pausar" : "Reproduzir"}
+            </button>
+            <button
+              onClick={() => setActiveLayer(parsed.layers[0])}
+              className="px-2 py-1 rounded bg-white/10 hover:bg-white/15 text-white text-[10px]"
+              title="Primeira camada"
+            >
+              ⏮
+            </button>
+            <button
+              onClick={() => setActiveLayer(parsed.layers[parsed.layers.length - 1])}
+              className="px-2 py-1 rounded bg-white/10 hover:bg-white/15 text-white text-[10px]"
+              title="Última camada"
+            >
+              ⏭
+            </button>
+            <div className="flex-1 text-right text-[10px] text-white/80 font-mono">
+              {activeLayer !== null
+                ? `Camada ${parsed.layers.indexOf(activeLayer) + 1}/${parsed.layers.length} · Z=${activeLayer.toFixed(3)}mm`
+                : "—"}
+            </div>
+          </div>
+          {/* Slider de camada */}
+          <input
+            type="range"
+            min={0}
+            max={parsed.layers.length - 1}
+            step={1}
+            value={activeLayer !== null ? parsed.layers.indexOf(activeLayer) : 0}
+            onChange={(e) => {
+              const idx = parseInt(e.target.value)
+              setActiveLayer(parsed.layers[idx])
+              setIsPlaying(false)
+            }}
+            className="w-full accent-violet-500"
+          />
+          {/* Stats da camada ativa */}
+          {activeLayer !== null && (() => {
+            const stats = layerStats.find((s) => s.z === activeLayer)
+            if (!stats) return null
+            return (
+              <div className="mt-2 grid grid-cols-3 gap-2 text-[10px]">
+                <div className="rounded bg-violet-500/10 border border-violet-400/20 p-1.5">
+                  <div className="text-violet-300/70">Moves</div>
+                  <div className="text-white font-mono font-bold">{stats.moveCount}</div>
+                </div>
+                <div className="rounded bg-emerald-500/10 border border-emerald-400/20 p-1.5">
+                  <div className="text-emerald-300/70">Extrudes</div>
+                  <div className="text-white font-mono font-bold">{stats.extrudeCount}</div>
+                </div>
+                <div className="rounded bg-amber-500/10 border border-amber-400/20 p-1.5">
+                  <div className="text-amber-300/70">Travels</div>
+                  <div className="text-white font-mono font-bold">{stats.travelCount}</div>
+                </div>
+                <div className="rounded bg-cyan-500/10 border border-cyan-400/20 p-1.5 col-span-3">
+                  <div className="text-cyan-300/70">Feedrate médio</div>
+                  <div className="text-white font-mono font-bold">{stats.avgFeedrate.toFixed(0)} mm/min</div>
+                </div>
+              </div>
+            )
+          })()}
+          <p className="mt-2 text-[9px] text-violet-200/60 leading-tight">
+            🔬 Visualiza como a peça é construída camada a camada — útil para detectar problemas de adesão, voids, ou trajetos longos.
+          </p>
+        </div>
+      )}
     </div>
   )
 }

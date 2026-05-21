@@ -32,7 +32,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { useBioprintProcess, isBioinkReady } from "@/lib/bioprint/process-context"
-import { INFILL_PATTERNS, TEMPERATURE_PROFILES } from "@/lib/bioprinter/biomedical-params"
+import { INFILL_PATTERNS, TEMPERATURE_PROFILES, CLASSIC_INFILL_PATTERNS } from "@/lib/bioprinter/biomedical-params"
 import { BIOPRINTERS, getBioprinterById, supportsWebSerial } from "@/lib/bioprinting/bioprinters"
 import { SUPPORTED_GEOMETRY_IDS } from "@/lib/gcode/slicer/geometry-bounds"
 import { TissueDesigner, type TissueDesignerValue } from "@/components/bioprinting/TissueDesigner"
@@ -125,8 +125,8 @@ export default function BioprintSlicePage() {
   const bioinkReady = isBioinkReady(state.bioink)
   const isUnlocked = modelReady && bioinkReady
 
-  // ── Tab atual ──
-  const [tab, setTab] = useState<"tissue" | "params" | "wells" | "gcode">("tissue")
+  // ── Tab atual (params é o padrão; tissue é OPCIONAL/avançado) ──
+  const [tab, setTab] = useState<"tissue" | "params" | "wells" | "gcode">("params")
 
   // ── TissueDesigner (R10) ─ perfil biomimético inteligente ──
   const [tissueDesign, setTissueDesign] = useState<TissueDesignerValue>({
@@ -147,12 +147,20 @@ export default function BioprintSlicePage() {
   const [layerHeightMm, setLayerHeightMm] = useState<number>(state.slice.layerHeightMm ?? 0.25)
   const [printSpeedMmS, setPrintSpeedMmS] = useState<number>(state.slice.printSpeedMmS ?? 8)
   const [pressureKPa, setPressureKPa] = useState<number>(state.slice.pressureKPa ?? 80)
+  /** R12.11: Pressão pode ser desabilitada (printers FDM puros não usam) */
+  const [pressureEnabled, setPressureEnabled] = useState<boolean>(true)
+  /** R12.11: Multiplicador de extrusão (flow rate, equivalente ao 'Flow' do Cura) */
+  const [extrusionMultiplier, setExtrusionMultiplier] = useState<number>(1.0)
   const [nozzleDiameterUm, setNozzleDiameterUm] = useState<number>(state.slice.nozzleDiameterUm ?? 410)
   const [infillPercent, setInfillPercent] = useState<number>(state.slice.infillPercent ?? 30)
   const [infillPatternId, setInfillPatternId] = useState<string>(state.slice.infillPatternId ?? INFILL_PATTERNS[0].id)
+  /** R12.11: Família do padrão de infill — biomédico (BIA) ou clássico (Cura-style) */
+  const [infillFamily, setInfillFamily] = useState<"biomedical" | "classic">("biomedical")
   const [walls, setWalls] = useState<number>(2)
   const [skirtLoops, setSkirtLoops] = useState<number>(state.slice.skirtLoops ?? 2)
   const [retractionMm, setRetractionMm] = useState<number>(state.slice.retractionMm ?? 0)
+  /** R12.11: Controle térmico pode ser desabilitado (impressão à temp. ambiente) */
+  const [temperatureEnabled, setTemperatureEnabled] = useState<boolean>(true)
 
   // Temperaturas — sugestão automática do perfil mas editável
   const [cartridgeTempC, setCartridgeTempC] = useState<number>(
@@ -572,8 +580,8 @@ export default function BioprintSlicePage() {
 
         {/* Tabs */}
         <div className="mt-5 flex gap-1.5 bg-white/3 border border-white/8 rounded-xl p-1 w-fit max-w-full overflow-x-auto">
-          <TabButton label="Tecido" icon={Microscope} active={tab === "tissue"} onClick={() => setTab("tissue")} dot={tissueDesign.profileId ? "violet" : null} />
           <TabButton label="Parâmetros" icon={Settings2} active={tab === "params"} onClick={() => setTab("params")} />
+          <TabButton label="Tecido (opcional)" icon={Microscope} active={tab === "tissue"} onClick={() => setTab("tissue")} dot={tissueDesign.profileId ? "violet" : null} badge="avançado" />
           <TabButton label="Multi-poço" icon={Beaker} active={tab === "wells"} onClick={() => setTab("wells")} dot={useMultiWell ? "violet" : null} />
           <TabButton label="G-code" icon={FileCode2} active={tab === "gcode"} onClick={() => setTab("gcode")} dot={result ? "emerald" : null} />
         </div>
@@ -649,7 +657,46 @@ export default function BioprintSlicePage() {
       {/* Conteúdo da tab */}
       <main className="flex-1 px-4 sm:px-6 py-6 pb-24">
         {tab === "tissue" && (
-          <div className="max-w-5xl mx-auto">
+          <div className="max-w-5xl mx-auto space-y-5">
+            {/* Banner OPCIONAL — deixa claro que esta etapa não é obrigatória */}
+            <div className="rounded-2xl border border-fuchsia-500/30 bg-gradient-to-br from-fuchsia-500/10 via-violet-500/5 to-transparent p-5">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-fuchsia-500/20 border border-fuchsia-400/30 flex items-center justify-center shrink-0">
+                  <Sparkles className="w-5 h-5 text-fuchsia-300" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <h3 className="text-base font-bold text-white">Designer Inteligente de Tecidos</h3>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-fuchsia-500/20 border border-fuchsia-400/40 text-fuchsia-200">
+                      Etapa opcional · Avançado
+                    </span>
+                  </div>
+                  <p className="text-sm text-fuchsia-100/90 leading-relaxed mb-3">
+                    Você <strong>não precisa</strong> usar esta etapa para gerar o G-code. O tecido-alvo já foi definido
+                    quando você selecionou o modelo (Etapa 1) e formulou a biotinta (Etapa 2). Os parâmetros padrão na aba
+                    <strong className="text-white"> Parâmetros</strong> já consideram o tecido escolhido.
+                  </p>
+                  <p className="text-xs text-fuchsia-100/70 leading-relaxed">
+                    👉 Use o <strong>Designer de Tecidos</strong> se quiser <strong>ajuste fino biomimético</strong>: padrões
+                    inspirados em tecidos nativos (osso trabecular, cartilagem zonal, pele em camadas, vasos perfundíveis,
+                    fígado lobular) com parâmetros otimizados pela literatura científica. Ele <strong>sobrescreve</strong> os
+                    sliders da aba Parâmetros com valores cientificamente validados para o tecido escolhido.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setTab("params")}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 border border-white/15 text-white inline-flex items-center gap-1.5"
+                    >
+                      ← Voltar para Parâmetros (recomendado)
+                    </button>
+                    <span className="text-[11px] text-fuchsia-200/70 px-2 py-1.5">
+                      ou continue abaixo para usar perfis biomiméticos →
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <TissueDesigner
               value={tissueDesign}
               hasCells={!!state.bioink.cellType}
@@ -686,15 +733,19 @@ export default function BioprintSlicePage() {
             layerHeightMm={layerHeightMm} onLayerHeightChange={setLayerHeightMm}
             printSpeedMmS={printSpeedMmS} onPrintSpeedChange={setPrintSpeedMmS}
             pressureKPa={pressureKPa} onPressureChange={setPressureKPa}
+            pressureEnabled={pressureEnabled} onPressureEnabledChange={setPressureEnabled}
+            extrusionMultiplier={extrusionMultiplier} onExtrusionMultiplierChange={setExtrusionMultiplier}
             nozzleDiameterUm={nozzleDiameterUm} onNozzleChange={setNozzleDiameterUm}
             infillPercent={infillPercent} onInfillChange={setInfillPercent}
             infillPatternId={infillPatternId} onInfillPatternChange={setInfillPatternId}
+            infillFamily={infillFamily} onInfillFamilyChange={setInfillFamily}
             walls={walls} onWallsChange={setWalls}
             skirtLoops={skirtLoops} onSkirtLoopsChange={setSkirtLoops}
             retractionMm={retractionMm} onRetractionChange={setRetractionMm}
             cartridgeTempC={cartridgeTempC} onCartridgeTempChange={setCartridgeTempC}
             bedTempC={bedTempC} onBedTempChange={setBedTempC}
             chamberTempC={chamberTempC} onChamberTempChange={setChamberTempC}
+            temperatureEnabled={temperatureEnabled} onTemperatureEnabledChange={setTemperatureEnabled}
             recommendedProfile={recommendedProfile}
             modelCategory={state.model.category}
             hasCells={!!state.bioink.cellType}
@@ -784,9 +835,11 @@ export default function BioprintSlicePage() {
 
 // ─── Tab button ──────────────────────────────────────────────────────────
 function TabButton({
-  label, icon: Icon, active, onClick, dot,
+  label, icon: Icon, active, onClick, dot, badge,
 }: {
-  label: string; icon: typeof Layers; active: boolean; onClick: () => void; dot?: "violet" | "emerald" | null
+  label: string; icon: typeof Layers; active: boolean; onClick: () => void
+  dot?: "violet" | "emerald" | null
+  badge?: string
 }) {
   return (
     <button
@@ -800,6 +853,11 @@ function TabButton({
     >
       <Icon className="w-4 h-4" />
       {label}
+      {badge && (
+        <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-fuchsia-500/15 border border-fuchsia-500/30 text-fuchsia-300">
+          {badge}
+        </span>
+      )}
       {dot && <span className={cn(
         "w-1.5 h-1.5 rounded-full",
         dot === "violet" ? "bg-violet-400" : "bg-emerald-400"
@@ -818,15 +876,19 @@ interface ParamsProps {
   layerHeightMm: number; onLayerHeightChange: (n: number) => void
   printSpeedMmS: number; onPrintSpeedChange: (n: number) => void
   pressureKPa: number; onPressureChange: (n: number) => void
+  pressureEnabled: boolean; onPressureEnabledChange: (b: boolean) => void
+  extrusionMultiplier: number; onExtrusionMultiplierChange: (n: number) => void
   nozzleDiameterUm: number; onNozzleChange: (n: number) => void
   infillPercent: number; onInfillChange: (n: number) => void
   infillPatternId: string; onInfillPatternChange: (id: string) => void
+  infillFamily: "biomedical" | "classic"; onInfillFamilyChange: (f: "biomedical" | "classic") => void
   walls: number; onWallsChange: (n: number) => void
   skirtLoops: number; onSkirtLoopsChange: (n: number) => void
   retractionMm: number; onRetractionChange: (n: number) => void
   cartridgeTempC: number; onCartridgeTempChange: (n: number) => void
   bedTempC: number; onBedTempChange: (n: number) => void
   chamberTempC: number; onChamberTempChange: (n: number) => void
+  temperatureEnabled: boolean; onTemperatureEnabledChange: (b: boolean) => void
   recommendedProfile: typeof TEMPERATURE_PROFILES[number]
   modelCategory: string | null
   hasCells: boolean
@@ -837,6 +899,8 @@ function ParamsPanel(p: ParamsProps) {
   const recommendedAlgo = recommendAlgorithm(p.modelCategory, p.hasCells)
   const algoInfo = ENGINE_ALGORITHMS.find(a => a.id === p.algorithm)
   const patternInfo = INFILL_PATTERNS.find(x => x.id === p.infillPatternId)
+  const classicPatternInfo = CLASSIC_INFILL_PATTERNS.find(x => x.id === p.infillPatternId)
+  const activePatternInfo = patternInfo || classicPatternInfo
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
@@ -960,13 +1024,6 @@ function ParamsPanel(p: ParamsProps) {
             hint={p.hasCells ? "Com células: 3–10 mm/s" : "Acelular: 5–20 mm/s"}
           />
           <SliderField
-            label="Pressão extrusão" icon={Activity}
-            min={5} max={600} step={5}
-            value={p.pressureKPa} onChange={p.onPressureChange}
-            display={`${p.pressureKPa} kPa`}
-            hint="Hidrogéis 10–120 · PCL >300"
-          />
-          <SliderField
             label="Diâmetro bico" icon={Target}
             min={100} max={1200} step={10}
             value={p.nozzleDiameterUm} onChange={p.onNozzleChange}
@@ -974,11 +1031,18 @@ function ParamsPanel(p: ParamsProps) {
             hint="Bio: 200–410 µm padrão"
           />
           <SliderField
-            label="Preenchimento" icon={BarChart3}
-            min={5} max={100} step={5}
+            label="Multiplicador de extrusão" icon={Activity}
+            min={0.5} max={2.0} step={0.05}
+            value={p.extrusionMultiplier} onChange={p.onExtrusionMultiplierChange}
+            display={`${p.extrusionMultiplier.toFixed(2)}×`}
+            hint="Flow rate · 1.0 = padrão · ↑ se faltar material"
+          />
+          <SliderField
+            label="Preenchimento (densidade)" icon={BarChart3}
+            min={0} max={100} step={1}
             value={p.infillPercent} onChange={p.onInfillChange}
             display={`${p.infillPercent}%`}
-            hint="Scaffolds: 20–40% · sólidos: 80–100%"
+            hint="0% = oco · 20–40% scaffolds · 100% sólido"
           />
           <SliderField
             label="Paredes (walls)" icon={Layers}
@@ -1001,84 +1065,249 @@ function ParamsPanel(p: ParamsProps) {
             display={`${p.retractionMm.toFixed(1)} mm`}
             hint={p.hasCells ? "Com células: 0 mm" : "0.3–0.5 mm"}
           />
-          <div>
-            <label className="text-[11px] text-gray-400 mb-1.5 block">Padrão BIO</label>
-            <select
-              value={p.infillPatternId}
-              onChange={e => p.onInfillPatternChange(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white
-                focus:outline-none focus:border-violet-500/40"
-            >
-              {INFILL_PATTERNS.map(x => (
-                <option key={x.id} value={x.id}>{x.name}</option>
-              ))}
-            </select>
-          </div>
         </div>
 
-        {patternInfo && (
-          <div className="mt-4 rounded-xl bg-violet-500/5 border border-violet-500/20 p-3 text-xs">
-            <div className="flex items-start gap-2">
-              <Info className="w-4 h-4 text-violet-400 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="text-violet-200 font-medium">{patternInfo.name}</p>
-                <p className="text-gray-400">{patternInfo.description}</p>
-                <p className="text-gray-500 text-[10px]">
-                  Spacing ideal: {patternInfo.filamentSpacingUm.ideal} µm ·
-                  Porosidade: {patternInfo.porosityPercent.min}–{patternInfo.porosityPercent.max}% ·
-                  Ref: {patternInfo.ref}
-                </p>
-              </div>
+        {/* Pressão de extrusão — TOGGLE OPCIONAL */}
+        <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-4">
+          <label className="flex items-center justify-between gap-3 cursor-pointer mb-2">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-violet-400" />
+              <span className="text-sm font-semibold text-white">Pressão de extrusão (pneumática)</span>
+              <span className="text-[10px] text-gray-500">opcional</span>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={p.pressureEnabled}
+              onClick={() => p.onPressureEnabledChange(!p.pressureEnabled)}
+              className={cn(
+                "relative w-11 h-6 rounded-full transition-colors flex-shrink-0",
+                p.pressureEnabled ? "bg-violet-500" : "bg-white/10"
+              )}
+            >
+              <span
+                className={cn(
+                  "absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform",
+                  p.pressureEnabled && "translate-x-5"
+                )}
+              />
+            </button>
+          </label>
+          <p className="text-[11px] text-gray-400 mb-3">
+            Ative apenas para bioimpressoras <strong>pneumáticas</strong> (CELLINK, Allevi, Regemat, BioEnder com cabeçote pneumático).
+            Para FDM puro (PLA/PCL) deixe desativado.
+          </p>
+          {p.pressureEnabled && (
+            <SliderField
+              label="Pressão (kPa)" icon={Activity}
+              min={0} max={700} step={5}
+              value={p.pressureKPa} onChange={p.onPressureChange}
+              display={`${p.pressureKPa} kPa`}
+              hint="Hidrogéis 10–120 · Alginato 30–80 · PCL >300"
+            />
+          )}
+        </div>
+
+        {/* Padrão de infill — Biomédico ou Clássico */}
+        <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-4">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-violet-400" />
+              <span className="text-sm font-semibold text-white">Padrão de preenchimento</span>
+            </div>
+            <div className="flex items-center gap-1 bg-black/40 rounded-lg p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  p.onInfillFamilyChange("biomedical")
+                  p.onInfillPatternChange(INFILL_PATTERNS[0].id)
+                }}
+                className={cn(
+                  "px-3 py-1 rounded-md text-[11px] font-semibold transition-colors",
+                  p.infillFamily === "biomedical"
+                    ? "bg-violet-500/30 text-violet-100 ring-1 ring-violet-400/40"
+                    : "text-gray-400 hover:text-white"
+                )}
+              >
+                🧬 Biomédico (BIA)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  p.onInfillFamilyChange("classic")
+                  p.onInfillPatternChange(CLASSIC_INFILL_PATTERNS[0].id)
+                }}
+                className={cn(
+                  "px-3 py-1 rounded-md text-[11px] font-semibold transition-colors",
+                  p.infillFamily === "classic"
+                    ? "bg-violet-500/30 text-violet-100 ring-1 ring-violet-400/40"
+                    : "text-gray-400 hover:text-white"
+                )}
+              >
+                ⚙️ Clássico (slicer)
+              </button>
             </div>
           </div>
-        )}
+          <p className="text-[11px] text-gray-400 mb-3">
+            {p.infillFamily === "biomedical"
+              ? "Padrões avançados otimizados para biofabricação — porosidade, vascularização e zonação inspiradas em tecidos nativos."
+              : "Padrões clássicos dos slicers tradicionais (Cura, PrusaSlicer, Simplify3D) — familiar, rápido e bem-validado para FDM/scaffolds."}
+          </p>
+          {p.infillFamily === "biomedical" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {INFILL_PATTERNS.map(x => (
+                <button
+                  key={x.id}
+                  type="button"
+                  onClick={() => p.onInfillPatternChange(x.id)}
+                  className={cn(
+                    "p-2.5 rounded-lg border text-left text-xs transition-all",
+                    p.infillPatternId === x.id
+                      ? "border-violet-500/50 bg-violet-500/10 ring-1 ring-violet-500/30 text-violet-100"
+                      : "border-white/10 bg-white/5 hover:border-white/20 text-gray-300"
+                  )}
+                >
+                  <div className="font-semibold mb-0.5">{x.name}</div>
+                  <div className="text-[10px] text-gray-500 capitalize">{x.category}</div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+              {CLASSIC_INFILL_PATTERNS.map(x => (
+                <button
+                  key={x.id}
+                  type="button"
+                  onClick={() => p.onInfillPatternChange(x.id)}
+                  className={cn(
+                    "p-2.5 rounded-lg border text-left text-xs transition-all",
+                    p.infillPatternId === x.id
+                      ? "border-violet-500/50 bg-violet-500/10 ring-1 ring-violet-500/30 text-violet-100"
+                      : "border-white/10 bg-white/5 hover:border-white/20 text-gray-300"
+                  )}
+                >
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-base">{x.icon}</span>
+                    <span className="text-[9px] text-violet-300/70 font-mono">F{x.strength}/T{x.printTime}</span>
+                  </div>
+                  <div className="font-semibold leading-tight">{x.name}</div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {activePatternInfo && (
+            <div className="mt-3 rounded-lg bg-violet-500/5 border border-violet-500/20 p-3 text-xs">
+              <div className="flex items-start gap-2">
+                <Info className="w-4 h-4 text-violet-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-violet-200 font-medium">{activePatternInfo.name}</p>
+                  <p className="text-gray-400">{activePatternInfo.description}</p>
+                  {patternInfo && (
+                    <p className="text-gray-500 text-[10px]">
+                      Spacing ideal: {patternInfo.filamentSpacingUm.ideal} µm ·
+                      Porosidade: {patternInfo.porosityPercent.min}–{patternInfo.porosityPercent.max}% ·
+                      Ref: {patternInfo.ref}
+                    </p>
+                  )}
+                  {classicPatternInfo && (
+                    <p className="text-gray-500 text-[10px]">
+                      Densidade típica: {classicPatternInfo.typicalDensityPercent.ideal}% ·
+                      Força: {"★".repeat(classicPatternInfo.strength)}{"☆".repeat(5 - classicPatternInfo.strength)} ·
+                      Tempo: {"●".repeat(classicPatternInfo.printTime)}{"○".repeat(5 - classicPatternInfo.printTime)} ·
+                      Uso bio: {classicPatternInfo.bioUse}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </section>
 
       {/* ── Temperaturas ── */}
       <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
-        <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
             <Thermometer className="w-4 h-4 text-violet-400" />
             Perfil térmico
             <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-violet-500/15 border border-violet-500/30 text-violet-300">
               sugerido p/ {p.recommendedProfile.bioinkType}
             </span>
+            <span className="text-[10px] text-gray-500">opcional</span>
           </h3>
-          <button
-            onClick={() => setShowRationale(!showRationale)}
-            className="text-[10px] text-violet-400 hover:text-violet-300 flex items-center gap-1"
-          >
-            {showRationale ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-            Racional
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowRationale(!showRationale)}
+              className="text-[10px] text-violet-400 hover:text-violet-300 flex items-center gap-1"
+            >
+              {showRationale ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              Racional
+            </button>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <span className="text-[11px] text-gray-400">Com temperatura</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={p.temperatureEnabled}
+                onClick={() => p.onTemperatureEnabledChange(!p.temperatureEnabled)}
+                className={cn(
+                  "relative w-11 h-6 rounded-full transition-colors",
+                  p.temperatureEnabled ? "bg-violet-500" : "bg-white/10"
+                )}
+              >
+                <span
+                  className={cn(
+                    "absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform",
+                    p.temperatureEnabled && "translate-x-5"
+                  )}
+                />
+              </button>
+            </label>
+          </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <SliderField
-            label="Cartucho (bico)" icon={Thermometer}
-            min={4} max={100} step={1}
-            value={p.cartridgeTempC} onChange={p.onCartridgeTempChange}
-            display={`${p.cartridgeTempC} °C`}
-            hint={`Ideal: ${p.recommendedProfile.cartridgeTempC.ideal}°C`}
-          />
-          <SliderField
-            label="Mesa (bed)" icon={Thermometer}
-            min={4} max={80} step={1}
-            value={p.bedTempC} onChange={p.onBedTempChange}
-            display={`${p.bedTempC} °C`}
-            hint={`Ideal: ${p.recommendedProfile.bedTempC.ideal}°C`}
-          />
-          <SliderField
-            label="Câmara" icon={Thermometer}
-            min={4} max={50} step={1}
-            value={p.chamberTempC} onChange={p.onChamberTempChange}
-            display={`${p.chamberTempC} °C`}
-            hint={`Ideal: ${p.recommendedProfile.chamberTempC.ideal}°C · UR ${p.recommendedProfile.humidityPercent.ideal}%`}
-          />
-        </div>
-        {showRationale && (
-          <div className="mt-4 rounded-xl bg-violet-500/5 border border-violet-500/20 p-3 text-xs space-y-1">
-            <p className="text-gray-300">{p.recommendedProfile.rationale}</p>
-            <p className="text-gray-500 text-[10px]">Ref: {p.recommendedProfile.ref}</p>
+
+        {p.temperatureEnabled ? (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <SliderField
+                label="Cartucho (bico)" icon={Thermometer}
+                min={4} max={250} step={1}
+                value={p.cartridgeTempC} onChange={p.onCartridgeTempChange}
+                display={`${p.cartridgeTempC} °C`}
+                hint={`Ideal: ${p.recommendedProfile.cartridgeTempC.ideal}°C · PCL/PLA até 220°C`}
+              />
+              <SliderField
+                label="Mesa (bed)" icon={Thermometer}
+                min={4} max={110} step={1}
+                value={p.bedTempC} onChange={p.onBedTempChange}
+                display={`${p.bedTempC} °C`}
+                hint={`Ideal: ${p.recommendedProfile.bedTempC.ideal}°C`}
+              />
+              <SliderField
+                label="Câmara" icon={Thermometer}
+                min={4} max={50} step={1}
+                value={p.chamberTempC} onChange={p.onChamberTempChange}
+                display={`${p.chamberTempC} °C`}
+                hint={`Ideal: ${p.recommendedProfile.chamberTempC.ideal}°C · UR ${p.recommendedProfile.humidityPercent.ideal}%`}
+              />
+            </div>
+            {showRationale && (
+              <div className="mt-4 rounded-xl bg-violet-500/5 border border-violet-500/20 p-3 text-xs space-y-1">
+                <p className="text-gray-300">{p.recommendedProfile.rationale}</p>
+                <p className="text-gray-500 text-[10px]">Ref: {p.recommendedProfile.ref}</p>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="rounded-xl bg-amber-500/5 border border-amber-500/20 p-4 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div className="text-xs text-amber-100/90">
+              <strong>Controle térmico desativado.</strong> Os comandos <code className="px-1 bg-black/30 rounded">M104</code>,
+              <code className="px-1 bg-black/30 rounded">M140</code> e <code className="px-1 bg-black/30 rounded">M141</code> não
+              serão incluídos no G-code. Use apenas para bioinks que <strong>polimerizam à temperatura ambiente</strong>
+              (alginato + CaCl₂, fibrina, FRESH) ou para testes com a impressora já pré-aquecida manualmente.
+            </div>
           </div>
         )}
       </section>

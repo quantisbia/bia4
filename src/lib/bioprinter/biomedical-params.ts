@@ -447,6 +447,152 @@ export const INFILL_PATTERNS: InfillPattern[] = [
 ]
 
 // ═══════════════════════════════════════════════════════════════════════════
+// 6.5  PADRÕES CLÁSSICOS DE SLICER (Cura/PrusaSlicer/Simplify3D)
+//      Adicionados para dar ao usuário a familiaridade dos slicers
+//      tradicionais, lado-a-lado com os padrões biomédicos avançados.
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface ClassicInfillPattern {
+  id: string
+  name: string
+  category: "linear" | "grid" | "triangular" | "wave" | "concentric" | "lattice"
+  description: string
+  /** Densidade típica em slicers tradicionais (%) */
+  typicalDensityPercent: { min: number; ideal: number; max: number }
+  /** Resistência mecânica relativa (1-5) */
+  strength: 1 | 2 | 3 | 4 | 5
+  /** Tempo de impressão relativo (1-5, 5 = mais lento) */
+  printTime: 1 | 2 | 3 | 4 | 5
+  /** Uso recomendado em biofabricação */
+  bioUse: string
+  icon: string
+}
+
+export const CLASSIC_INFILL_PATTERNS: ClassicInfillPattern[] = [
+  {
+    id: "classic-lines",
+    name: "Linhas",
+    category: "linear",
+    description: "Linhas paralelas em cada camada, rotacionadas entre camadas. Padrão mais simples e rápido — equivalente ao 'Lines' do Cura.",
+    typicalDensityPercent: { min: 0, ideal: 20, max: 100 },
+    strength: 2,
+    printTime: 1,
+    bioUse: "Testes rápidos, calibração, scaffolds simples",
+    icon: "▬",
+  },
+  {
+    id: "classic-grid",
+    name: "Grade quadrada",
+    category: "grid",
+    description: "Duas direções de linhas perpendiculares na mesma camada formando quadrados — padrão clássico forte e rápido.",
+    typicalDensityPercent: { min: 0, ideal: 25, max: 100 },
+    strength: 3,
+    printTime: 2,
+    bioUse: "Scaffolds estruturais, blocos de teste, peças que precisam de rigidez XY",
+    icon: "▦",
+  },
+  {
+    id: "classic-triangular",
+    name: "Triangular",
+    category: "triangular",
+    description: "Três direções a 60° formando triângulos — alta resistência multidirecional, ideal quando há cargas em vários eixos.",
+    typicalDensityPercent: { min: 0, ideal: 25, max: 100 },
+    strength: 4,
+    printTime: 3,
+    bioUse: "Scaffolds ortopédicos, peças com cargas multidirecionais",
+    icon: "△",
+  },
+  {
+    id: "classic-trihexagon",
+    name: "Tri-hexagonal (cruzado)",
+    category: "triangular",
+    description: "Combinação de triângulos e hexágonos — boa resistência em todas as direções com porosidade equilibrada.",
+    typicalDensityPercent: { min: 0, ideal: 20, max: 100 },
+    strength: 4,
+    printTime: 3,
+    bioUse: "Constructs estruturais com necessidade de difusão homogênea",
+    icon: "⬡",
+  },
+  {
+    id: "classic-cubic",
+    name: "Cúbico",
+    category: "lattice",
+    description: "Cubos rotacionados 3D — distribui carga em todas as direções (incluindo Z). Bom equilíbrio entre força e tempo.",
+    typicalDensityPercent: { min: 0, ideal: 25, max: 100 },
+    strength: 4,
+    printTime: 3,
+    bioUse: "Scaffolds 3D com carga isotrópica",
+    icon: "▣",
+  },
+  {
+    id: "classic-octet",
+    name: "Octeto (treliça)",
+    category: "lattice",
+    description: "Treliça octeto — uma das estruturas mais resistentes por unidade de massa. Inspirada em lattices da indústria aeroespacial.",
+    typicalDensityPercent: { min: 0, ideal: 20, max: 100 },
+    strength: 5,
+    printTime: 4,
+    bioUse: "Implantes ósseos de alta performance, scaffolds estruturais críticos",
+    icon: "✺",
+  },
+  {
+    id: "classic-concentric",
+    name: "Concêntrico",
+    category: "concentric",
+    description: "Linhas paralelas seguindo o contorno da peça — útil para peças flexíveis e como base para vasos circulares.",
+    typicalDensityPercent: { min: 0, ideal: 100, max: 100 },
+    strength: 2,
+    printTime: 2,
+    bioUse: "Vasos sanguíneos circulares, anéis traqueais, peças flexíveis",
+    icon: "◎",
+  },
+  {
+    id: "classic-zigzag",
+    name: "Zigue-zague",
+    category: "linear",
+    description: "Linhas conectadas em zigue-zague (sem retração) — extrusão contínua, ideal para hidrogéis sensíveis à pressão.",
+    typicalDensityPercent: { min: 0, ideal: 20, max: 100 },
+    strength: 2,
+    printTime: 1,
+    bioUse: "Hidrogéis (GelMA, alginato) — evita perda de pressão por retração",
+    icon: "⌇",
+  },
+  {
+    id: "classic-wave",
+    name: "Wave (onda)",
+    category: "wave",
+    description: "Linhas senoidais — combina extrusão contínua com leve aumento de área de contato entre camadas.",
+    typicalDensityPercent: { min: 0, ideal: 20, max: 100 },
+    strength: 2,
+    printTime: 2,
+    bioUse: "Bioinks viscoelásticos, scaffolds com micro-curvatura",
+    icon: "～",
+  },
+  {
+    id: "classic-crosshatch",
+    name: "Cruzado (crosshatch)",
+    category: "grid",
+    description: "Grade densa com ângulo de 45° em cada camada — boa adesão inter-camadas e resistência ao cisalhamento.",
+    typicalDensityPercent: { min: 0, ideal: 30, max: 100 },
+    strength: 3,
+    printTime: 2,
+    bioUse: "Scaffolds que sofrem cisalhamento (cartilagem, tendões)",
+    icon: "✕",
+  },
+  {
+    id: "classic-gyroid-light",
+    name: "Gyroid (clássico)",
+    category: "lattice",
+    description: "Versão simplificada do gyroid — alta resistência isotrópica e ótima difusão de nutrientes. Disponível em todos os slicers modernos.",
+    typicalDensityPercent: { min: 0, ideal: 25, max: 100 },
+    strength: 4,
+    printTime: 4,
+    bioUse: "Scaffolds ósseos, peças que precisam de difusão homogênea",
+    icon: "🌀",
+  },
+]
+
+// ═══════════════════════════════════════════════════════════════════════════
 // 7. PROTOCOLOS DE CROSSLINKING / CURA
 // ═══════════════════════════════════════════════════════════════════════════
 

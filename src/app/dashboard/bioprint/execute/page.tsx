@@ -169,6 +169,154 @@ export default function BioprintExecutePage() {
     }
   }, [gcodeText])
 
+  // ─── R12.11: Análise de complexidade do G-code ──
+  // Detecta gargalos comuns que fazem prints falharem.
+  const complexityAnalysis = useMemo(() => {
+    if (!parsed || !validation) return null
+    const alerts: Array<{
+      severity: "critical" | "warning" | "info"
+      title: string
+      detail: string
+      suggestion: string
+    }> = []
+
+    // 1. Muitos moves
+    const moveCount = parsed.moves.length
+    if (moveCount > 50000) {
+      alerts.push({
+        severity: "critical",
+        title: "G-code muito longo (>50k moves)",
+        detail: `${moveCount.toLocaleString()} moves — pode sobrecarregar firmware Marlin clássico (buffer pode estourar).`,
+        suggestion: "Considere aumentar layer height, reduzir infill ou dividir em sub-prints.",
+      })
+    } else if (moveCount > 20000) {
+      alerts.push({
+        severity: "warning",
+        title: "G-code longo (>20k moves)",
+        detail: `${moveCount.toLocaleString()} moves — buffer USB pode atrasar. Use SD card se possível.`,
+        suggestion: "Recomendado: imprimir via SD card em vez de USB streaming.",
+      })
+    }
+
+    // 2. Muitas camadas
+    const layerCount = parsed.layers.length
+    if (layerCount > 500) {
+      alerts.push({
+        severity: "warning",
+        title: "Muitas camadas (>500)",
+        detail: `${layerCount} camadas — tempo de impressão será muito longo, risco de desidratação da bioink.`,
+        suggestion: "Aumente layer height para 0.3–0.4 mm ou imprima em câmara umidificada.",
+      })
+    }
+
+    // 3. Bbox fora do build volume
+    const { bbox } = validation.stats
+    const sizeX = bbox.maxX - bbox.minX
+    const sizeY = bbox.maxY - bbox.minY
+    const sizeZ = bbox.maxZ - bbox.minZ
+    if (sizeX > 200 || sizeY > 200) {
+      alerts.push({
+        severity: "critical",
+        title: "Geometria muito grande",
+        detail: `${sizeX.toFixed(0)}×${sizeY.toFixed(0)}×${sizeZ.toFixed(0)} mm — pode exceder o build volume da bioimpressora.`,
+        suggestion: "Verifique as dimensões da mesa da sua bioimpressora antes de enviar.",
+      })
+    }
+
+    // 4. Coordenadas negativas (sem G92 zero)
+    if (bbox.minX < 0 || bbox.minY < 0 || bbox.minZ < 0) {
+      alerts.push({
+        severity: "warning",
+        title: "Coordenadas negativas detectadas",
+        detail: `Min: X=${bbox.minX.toFixed(2)} Y=${bbox.minY.toFixed(2)} Z=${bbox.minZ.toFixed(2)} — pode causar crash do bico contra a mesa.`,
+        suggestion: "Adicione um G92 X0 Y0 Z0 ANTES de zerar a posição da peça.",
+      })
+    }
+
+    // 5. Feedrate fora de faixa para bioimpressão
+    const feedrates = parsed.moves.filter((m) => m.type === "G1").map((m) => m.feedrate)
+    const maxF = feedrates.length ? Math.max(...feedrates) : 0
+    if (maxF > 3000) {
+      alerts.push({
+        severity: "warning",
+        title: "Velocidade alta para bioimpressão",
+        detail: `Feedrate máximo: ${maxF.toFixed(0)} mm/min (${(maxF / 60).toFixed(1)} mm/s) — alto para hidrogéis.`,
+        suggestion: "Para células vivas, mantenha ≤ 600 mm/min (10 mm/s) para preservar viabilidade.",
+      })
+    }
+
+    // 6. Tempo de impressão muito alto
+    if (validation.stats.estTotalTimeMin > 240) {
+      alerts.push({
+        severity: "warning",
+        title: "Tempo de impressão > 4 horas",
+        detail: `Estimativa: ${(validation.stats.estTotalTimeMin / 60).toFixed(1)} horas.`,
+        suggestion: "Bioinks com células perdem viabilidade após 2-3h fora da incubadora. Use câmara controlada.",
+      })
+    }
+
+    // 7. Travels muito longos (indicador de eficiência de path)
+    const travelCount = parsed.moves.filter((m) => m.type === "G0").length
+    const travelRatio = moveCount > 0 ? travelCount / moveCount : 0
+    if (travelRatio > 0.4) {
+      alerts.push({
+        severity: "info",
+        title: "Muitos travels (movimentos sem extrusão)",
+        detail: `${(travelRatio * 100).toFixed(1)}% dos moves são travels — pode indicar slicing ineficiente.`,
+        suggestion: "Considere otimizar o slicer (combine infill, evite ilhas pequenas, ordene paredes).",
+      })
+    }
+
+    // 8. Comandos M104/M140 ausentes (sem aquecimento)
+    const hasHeatCmd = validation.stats.uniqueCommands.some((c) => c === "M104" || c === "M109" || c === "M140")
+    if (!hasHeatCmd && validation.stats.uniqueCommands.includes("G1")) {
+      alerts.push({
+        severity: "info",
+        title: "Sem comandos de aquecimento",
+        detail: "Não há M104/M109 (bico) nem M140/M190 (mesa) no G-code.",
+        suggestion: "OK se a bioink polimeriza à temperatura ambiente OU se você vai pré-aquecer manualmente.",
+      })
+    }
+
+    // 9. Sem G92 inicial (origin reset)
+    if (!validation.stats.uniqueCommands.includes("G92")) {
+      alerts.push({
+        severity: "warning",
+        title: "Sem G92 (zero relativo)",
+        detail: "Não há G92 no G-code — a impressora vai usar a origem atual (pode estar errada).",
+        suggestion: "Adicione G92 X0 Y0 Z0 E0 no início para garantir posicionamento correto.",
+      })
+    }
+
+    // 10. Detecção de complexidade geral
+    const complexityScore =
+      Math.min(50, moveCount / 1000) +
+      Math.min(20, layerCount / 25) +
+      (alerts.filter((a) => a.severity === "critical").length * 15) +
+      (alerts.filter((a) => a.severity === "warning").length * 5)
+
+    const complexityLabel =
+      complexityScore < 20 ? "Baixa" :
+      complexityScore < 50 ? "Média" :
+      complexityScore < 80 ? "Alta" : "Muito alta"
+
+    const complexityColor =
+      complexityScore < 20 ? "emerald" :
+      complexityScore < 50 ? "cyan" :
+      complexityScore < 80 ? "amber" : "rose"
+
+    return {
+      alerts,
+      complexityScore: Math.min(100, complexityScore),
+      complexityLabel,
+      complexityColor,
+      moveCount,
+      layerCount,
+      travelCount,
+      maxFeedrate: maxF,
+    }
+  }, [parsed, validation])
+
   // ─── Transport + Controller ──
   const [mode, setMode] = useState<"mock" | "real">("mock")
   const [baud, setBaud] = useState(DEFAULT_BAUD)
@@ -650,6 +798,107 @@ export default function BioprintExecutePage() {
               </div>
             )}
           </Panel>
+
+          {/* ── 2.5 Análise de Complexidade (R12.11) ──────────────── */}
+          {complexityAnalysis && (
+            <Panel
+              title="2.5 Complexidade do G-code"
+              icon={<Cpu className="w-4 h-4" />}
+              badge={complexityAnalysis.complexityLabel}
+              badgeColor={complexityAnalysis.complexityColor as any}
+            >
+              {/* Score visual */}
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Complexidade geral</span>
+                  <span className={cn(
+                    "text-xs font-bold",
+                    complexityAnalysis.complexityColor === "emerald" && "text-emerald-300",
+                    complexityAnalysis.complexityColor === "cyan" && "text-cyan-300",
+                    complexityAnalysis.complexityColor === "amber" && "text-amber-300",
+                    complexityAnalysis.complexityColor === "rose" && "text-rose-300",
+                  )}>
+                    {complexityAnalysis.complexityScore.toFixed(0)}/100 · {complexityAnalysis.complexityLabel}
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-black/40 rounded-full overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all",
+                      complexityAnalysis.complexityColor === "emerald" && "bg-gradient-to-r from-emerald-500 to-cyan-500",
+                      complexityAnalysis.complexityColor === "cyan" && "bg-gradient-to-r from-cyan-500 to-violet-500",
+                      complexityAnalysis.complexityColor === "amber" && "bg-gradient-to-r from-amber-500 to-orange-500",
+                      complexityAnalysis.complexityColor === "rose" && "bg-gradient-to-r from-rose-500 to-red-500",
+                    )}
+                    style={{ width: `${complexityAnalysis.complexityScore}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Stats compactos */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                <Stat label="Moves" value={complexityAnalysis.moveCount.toLocaleString()} />
+                <Stat label="Camadas" value={complexityAnalysis.layerCount.toString()} />
+                <Stat label="Travels" value={complexityAnalysis.travelCount.toLocaleString()} />
+                <Stat label="Feedrate max" value={`${complexityAnalysis.maxFeedrate.toFixed(0)} mm/min`} />
+              </div>
+
+              {/* Alertas */}
+              {complexityAnalysis.alerts.length === 0 ? (
+                <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-3 flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <div className="text-xs text-emerald-100">
+                    <strong>G-code limpo!</strong> Nenhum alerta de complexidade. Pronto para enviar à bioimpressora.
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <div className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-1">
+                    {complexityAnalysis.alerts.length} alerta{complexityAnalysis.alerts.length > 1 ? "s" : ""} ·
+                    {" "}{complexityAnalysis.alerts.filter(a => a.severity === "critical").length} crítico{complexityAnalysis.alerts.filter(a => a.severity === "critical").length !== 1 ? "s" : ""},
+                    {" "}{complexityAnalysis.alerts.filter(a => a.severity === "warning").length} aviso{complexityAnalysis.alerts.filter(a => a.severity === "warning").length !== 1 ? "s" : ""},
+                    {" "}{complexityAnalysis.alerts.filter(a => a.severity === "info").length} info
+                  </div>
+                  {complexityAnalysis.alerts.map((alert, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        "rounded-lg border p-2.5 text-xs",
+                        alert.severity === "critical" && "bg-rose-500/10 border-rose-500/40",
+                        alert.severity === "warning" && "bg-amber-500/10 border-amber-500/30",
+                        alert.severity === "info" && "bg-cyan-500/10 border-cyan-500/30",
+                      )}
+                    >
+                      <div className="flex items-start gap-2">
+                        {alert.severity === "critical" && <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />}
+                        {alert.severity === "warning" && <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />}
+                        {alert.severity === "info" && <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />}
+                        <div className="flex-1 min-w-0">
+                          <div className={cn(
+                            "font-semibold mb-0.5",
+                            alert.severity === "critical" && "text-rose-100",
+                            alert.severity === "warning" && "text-amber-100",
+                            alert.severity === "info" && "text-cyan-100",
+                          )}>
+                            {alert.title}
+                          </div>
+                          <div className="text-gray-300 text-[11px] mb-1 leading-relaxed">{alert.detail}</div>
+                          <div className={cn(
+                            "text-[11px] italic flex items-start gap-1",
+                            alert.severity === "critical" && "text-rose-200/80",
+                            alert.severity === "warning" && "text-amber-200/80",
+                            alert.severity === "info" && "text-cyan-200/80",
+                          )}>
+                            <span>💡</span> <span>{alert.suggestion}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Panel>
+          )}
 
           {/* ── 3. Preview 3D ─────────────────────────────────────── */}
           <Panel
