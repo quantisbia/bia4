@@ -57,6 +57,7 @@ import { PrinterController, type ControllerState, type StreamProgress } from "@/
 
 // Reutiliza preview 3D existente
 import { GcodeViewer3D, type ColorMode } from "@/components/bioprinter/GcodeViewer3D"
+import { GcodeValidatorPanel } from "@/components/bioprinter/GcodeValidatorPanel"
 import { parseGcode, type ParsedGcode } from "@/lib/bioprint/toolpath-engine"
 
 // ─── Constantes ──────────────────────────────────────────────────────────
@@ -898,6 +899,15 @@ export default function BioprintExecutePage() {
                 </div>
               )}
             </Panel>
+          )}
+
+          {/* ── 🔬 Validador Visual Unificado — viewer + validação + complexidade em tabs ── */}
+          {gcodeText.trim() && (
+            <GcodeValidatorPanel
+              gcode={gcodeText}
+              title="Validação visual do G-code · pré-execução"
+              viewerHeight={460}
+            />
           )}
 
           {/* ── 3. Preview 3D ─────────────────────────────────────── */}

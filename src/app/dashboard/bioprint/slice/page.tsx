@@ -37,6 +37,7 @@ import { BIOPRINTERS, getBioprinterById, supportsWebSerial } from "@/lib/bioprin
 import { SUPPORTED_GEOMETRY_IDS } from "@/lib/gcode/slicer/geometry-bounds"
 import { TissueDesigner, type TissueDesignerValue } from "@/components/bioprinting/TissueDesigner"
 import { PrinterConnection } from "@/components/bioprinting/PrinterConnection"
+import { GcodeValidatorPanel } from "@/components/bioprinter/GcodeValidatorPanel"
 
 // Timeout máximo de geração — evita rodar para sempre se o engine travar
 const GCODE_TIMEOUT_MS = 45_000
@@ -1860,6 +1861,13 @@ function GCodePanel({
               <p className="mt-3 text-[10px] text-emerald-300/60">Créditos usados: {result.creditsUsed}</p>
             )}
           </section>
+
+          {/* 🔬 VALIDADOR VISUAL PROFISSIONAL — toolpath 3D + validação + complexidade */}
+          <GcodeValidatorPanel
+            gcode={result.gcode}
+            title="Validação visual do G-code · Slice"
+            viewerHeight={460}
+          />
 
           {/* Warnings */}
           {result.warnings && result.warnings.length > 0 && (

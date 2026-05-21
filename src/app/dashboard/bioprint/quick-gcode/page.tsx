@@ -49,6 +49,7 @@ import {
 } from "@/lib/bioprint/printability-nelson2021"
 import { parseGcode, type ParsedGcode } from "@/lib/bioprint/toolpath-engine"
 import { GcodeViewer3D } from "@/components/bioprinter/GcodeViewer3D"
+import { GcodeValidatorPanel } from "@/components/bioprinter/GcodeValidatorPanel"
 
 // ─── Tipo de "carga" vinda do Formulator Pro ──────────────────────────────
 
@@ -648,28 +649,28 @@ export default function QuickGCodePage() {
 
         {/* ════════════ COLUNA DIREITA — Resultado ═══════════════════════ */}
         <div className="space-y-4 lg:sticky lg:top-4">
-          {/* Viewer 3D */}
-          <div className="rounded-2xl border border-white/10 bg-black/30 overflow-hidden">
-            <header className="flex items-center gap-2 px-4 py-2.5 border-b border-white/10 bg-white/[0.02]">
-              <Eye className="w-3.5 h-3.5 text-cyan-300" />
-              <span className="text-[11px] font-semibold text-white">Visualização 3D</span>
-              {result && (
-                <span className="ml-auto text-[10px] text-gray-400">
-                  {stats?.moves} moves · {stats?.layers} camadas
-                </span>
-              )}
-            </header>
-            <div className="h-[360px] sm:h-[420px] relative">
-              {parsedViz ? (
-                <GcodeViewer3D parsed={parsedViz} initialColorMode="layer" className="h-full" />
-              ) : (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-gray-500">
-                  <Sparkles className="w-6 h-6 opacity-40" />
-                  <p className="text-xs">Clique em <strong>Gerar G-code</strong> para visualizar</p>
-                </div>
-              )}
+          {/* Validador visual profissional (toolpath + validação + complexidade) */}
+          {result?.gcode ? (
+            <GcodeValidatorPanel
+              gcode={result.gcode}
+              title="Validação visual do G-code · Quick"
+              viewerHeight={420}
+            />
+          ) : (
+            <div className="rounded-2xl border border-white/10 bg-black/30 overflow-hidden">
+              <header className="flex items-center gap-2 px-4 py-2.5 border-b border-white/10 bg-white/[0.02]">
+                <Eye className="w-3.5 h-3.5 text-cyan-300" />
+                <span className="text-[11px] font-semibold text-white">Visualização 3D · Validação</span>
+              </header>
+              <div className="h-[280px] flex flex-col items-center justify-center gap-2 text-gray-500">
+                <Sparkles className="w-6 h-6 opacity-40" />
+                <p className="text-xs">Clique em <strong>Gerar G-code</strong> para visualizar</p>
+                <p className="text-[10px] text-gray-600">
+                  Toolpath 3D · validação estática · alertas de complexidade
+                </p>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Estatísticas */}
           {result && stats && (

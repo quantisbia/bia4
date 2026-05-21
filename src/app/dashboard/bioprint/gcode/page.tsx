@@ -21,7 +21,7 @@ import Link from "next/link"
 import {
   Zap, Microscope, Brain, ArrowRight, Sparkles, CheckCircle2,
   Clock, Layers as LayersIcon, ShieldCheck, GitBranch, Network,
-  FlaskConical, Workflow, BookOpen, AlertTriangle, Info,
+  FlaskConical, Workflow, BookOpen, AlertTriangle, Info, Eye, Activity,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
@@ -197,6 +197,64 @@ export default function GcodeHubPage() {
         {LEVELS.map((lvl) => (
           <LevelCardEl key={lvl.id} lvl={lvl} />
         ))}
+      </section>
+
+      {/* ─── 🔬 Validador Visual Profissional — disponível em TODOS os níveis ─── */}
+      <section className="rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/[0.08] via-cyan-500/[0.05] to-violet-500/[0.06] p-5">
+        <div className="flex items-start gap-3 flex-wrap">
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center shrink-0">
+            <Eye className="w-5 h-5 text-emerald-300" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className="text-[10px] uppercase tracking-wider text-emerald-300/90 font-semibold flex items-center gap-1.5">
+              <ShieldCheck className="w-3 h-3" /> Validação visual profissional · embutida em todos os níveis
+            </span>
+            <h2 className="text-base font-bold text-white mt-0.5">
+              Toolpath 3D + Validação Estática + Análise de Complexidade
+            </h2>
+            <p className="text-[11.5px] text-gray-300 mt-1.5 leading-relaxed max-w-3xl">
+              Todos os 3 níveis (Básico, Médico, Avançado) agora incluem o <strong className="text-emerald-200">Validador Visual de G-code</strong>:
+              após gerar o arquivo, você vê o toolpath em 3D pannable, recebe veredicto <strong className="text-emerald-200">safe / review / blocked</strong>{" "}
+              em tempo real e uma análise de 10 pontos críticos (limites de envelope, feedrate, temperaturas, comandos faltantes, tempo estimado).
+              <strong className="text-cyan-200"> Você valida ANTES de imprimir.</strong>
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4">
+          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.05] p-3">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-emerald-300 font-semibold mb-1">
+              <Eye className="w-3 h-3" /> Tab 1 · Viewer 3D
+            </div>
+            <p className="text-[10.5px] text-emerald-100/90 leading-snug">
+              Canvas 3D rotativo + pan, layer-by-layer, color modes (camada / velocidade / tipo), filtro de travels G0.
+            </p>
+          </div>
+          <div className="rounded-xl border border-cyan-500/25 bg-cyan-500/[0.05] p-3">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-cyan-300 font-semibold mb-1">
+              <ShieldCheck className="w-3 h-3" /> Tab 2 · Validação estática
+            </div>
+            <p className="text-[10.5px] text-cyan-100/90 leading-snug">
+              Marlin / RepRap / GRBL. Veredicto safe · review · blocked. Erros bloqueantes destacados, warnings agrupados, sugestões reais.
+            </p>
+          </div>
+          <div className="rounded-xl border border-violet-500/25 bg-violet-500/[0.05] p-3">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-violet-300 font-semibold mb-1">
+              <Activity className="w-3 h-3" /> Tab 3 · Complexidade
+            </div>
+            <p className="text-[10.5px] text-violet-100/90 leading-snug">
+              10 checks: moves &gt; 50k, camadas &gt; 500, bbox vs envelope, feedrate, tempo &gt; 240 min, comandos faltantes, etc.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-amber-500/25 bg-amber-500/[0.05] p-3 flex items-start gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-300 shrink-0 mt-0.5" />
+          <p className="text-[10.5px] text-amber-100/90 leading-snug">
+            <strong className="text-amber-200">Gating de execução:</strong> se o validador retornar <code className="px-1 py-0.5 rounded bg-rose-500/20 text-rose-200 font-mono text-[10px]">blocked</code>, a página /execute
+            não permitirá iniciar o stream para a bioimpressora. Você corrige o G-code (ou os parâmetros que o geraram) e re-valida.
+          </p>
+        </div>
       </section>
 
       {/* ─── Comparativo rápido ────────────────────────────────────────── */}

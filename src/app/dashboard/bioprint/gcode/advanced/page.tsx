@@ -35,6 +35,7 @@ import {
 import { verdictColor, NELSON_2021_CITATION } from "@/lib/bioprint/printability-nelson2021"
 import { parseGcode, type ParsedGcode } from "@/lib/bioprint/toolpath-engine"
 import { GcodeViewer3D } from "@/components/bioprinter/GcodeViewer3D"
+import { GcodeValidatorPanel } from "@/components/bioprinter/GcodeValidatorPanel"
 
 // ─── Default material ─────────────────────────────────────────────────────
 
@@ -607,31 +608,31 @@ export default function AdvancedGcodePage() {
             </section>
           )}
 
-          {/* Viewer 3D */}
-          <div className="rounded-2xl border border-white/10 bg-black/30 overflow-hidden">
-            <header className="flex items-center gap-2 px-4 py-2.5 border-b border-white/10 bg-white/[0.02]">
-              <Eye className="w-3.5 h-3.5 text-violet-300" />
-              <span className="text-[11px] font-semibold text-white">Visualização 3D NAATIV3</span>
-              {result && (
-                <span className="ml-auto text-[10px] text-gray-400">
-                  {result.moveCount.toLocaleString("pt-BR")} moves · {result.streamlineCount} streamlines
-                </span>
-              )}
-            </header>
-            <div className="h-[360px] sm:h-[420px] relative">
-              {parsedViz ? (
-                <GcodeViewer3D parsed={parsedViz} initialColorMode="layer" className="h-full" />
-              ) : (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-gray-500">
-                  <Sparkles className="w-6 h-6 opacity-40" />
-                  <p className="text-xs">
-                    {stage === "config" && "Configure os 3 passos e gere preview"}
-                    {stage === "previewed" && "Preview pronto. Clique Gerar G-code para visualizar 3D"}
-                  </p>
-                </div>
-              )}
+          {/* Validador visual profissional (toolpath + validação + complexidade) */}
+          {result?.gcode ? (
+            <GcodeValidatorPanel
+              gcode={result.gcode}
+              title="Validação visual do G-code · Advanced NAATIV3"
+              viewerHeight={420}
+            />
+          ) : (
+            <div className="rounded-2xl border border-white/10 bg-black/30 overflow-hidden">
+              <header className="flex items-center gap-2 px-4 py-2.5 border-b border-white/10 bg-white/[0.02]">
+                <Eye className="w-3.5 h-3.5 text-violet-300" />
+                <span className="text-[11px] font-semibold text-white">Visualização 3D · Validação NAATIV3</span>
+              </header>
+              <div className="h-[280px] flex flex-col items-center justify-center gap-2 text-gray-500">
+                <Sparkles className="w-6 h-6 opacity-40" />
+                <p className="text-xs">
+                  {stage === "config" && "Configure os 3 passos e gere preview"}
+                  {stage === "previewed" && "Preview pronto. Clique Gerar G-code para visualização completa"}
+                </p>
+                <p className="text-[10px] text-gray-600">
+                  Quando gerar, este painel mostra: toolpath 3D · validação estática · alertas de complexidade
+                </p>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* G-code final */}
           {result && (

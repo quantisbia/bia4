@@ -39,6 +39,7 @@ import {
   Droplets, Beaker, AlertTriangle, CheckCircle2, Cpu, ChevronRight,
 } from "lucide-react"
 import { GcodeViewer3D } from "@/components/bioprinter/GcodeViewer3D"
+import { GcodeValidatorPanel } from "@/components/bioprinter/GcodeValidatorPanel"
 import { ToolpathAnalyzer } from "@/components/bioprinter/ToolpathAnalyzer"
 import { InfillStudio, type InfillPreset } from "@/components/bioprinter/InfillStudio"
 import { ScientificRefsPanel } from "@/components/bioprinter/ScientificRefsPanel"
@@ -362,6 +363,15 @@ export default function ToolpathPage() {
                     initialColorMode={formulations.length > 1 ? "tool" : "layer"}
                   />
                 </div>
+              )}
+
+              {/* 🔬 VALIDADOR VISUAL PROFISSIONAL — validação estática + complexidade do G-code */}
+              {bioinkReady && gcode && (
+                <GcodeValidatorPanel
+                  gcode={gcode}
+                  title="Validação visual do G-code · Toolpath Studio"
+                  viewerHeight={440}
+                />
               )}
 
               {/* Testes simples */}
