@@ -11,7 +11,7 @@
  * 5.  Tubo Oco                 — vaso sanguíneo grande calibre
  * 6.  Hexágono Prismático      — tecido hepático
  * 7.  Fêmur Simplificado       — osso anatômico educacional
- * 8.  Nariz                    — cartilagem anatômica educacional
+ * 8.  Nariz ANATÔMICO          — mesh real 11.974 tri · cartilagem nasal (R12.13)
  * 9.  Meia-Lua (menisco)       — cartilagem articular
  * 10. Meia-Lua Espessa (córnea)— córnea/lente
  * 11. Cilindro Oval (cristalino)— cristalino/lente
@@ -157,14 +157,19 @@ export const GEOMETRIES: STLGeometry[] = [
   },
   {
     id: "nose",
-    label: "Nariz (Cartilagem)",
-    description: "Estrutura nasal simplificada para reconstrução de cartilagem e educação",
+    label: "Nariz (Cartilagem · Anatômico)",
+    description: "Mesh anatômico real de nariz humano (11.974 triângulos · cartilagem nasal). Altura, largura e profundidade ajustáveis para personalização do paciente.",
     tissue: "Cartilagem nasal",
-    application: "Prótese nasal, reconstrução facial, modelo educacional",
+    application: "Prótese nasal personalizada, reconstrução facial pós-traumática, modelo educacional anatomicamente fiel",
     icon: "👃",
-    defaultParams: { width: 24, height: 30, depth: 18, segments: 24 },
-    paramLabels: { width: "Largura (mm)", height: "Altura (mm)", depth: "Profundidade (mm)" },
-    creditCost: 6,
+    // Dimensões nativas da mesh: 15.81 × 25.51 × 9.96 mm — escalonadas para um nariz adulto médio
+    defaultParams: { width: 32, height: 20, depth: 51 },
+    paramLabels: {
+      width: "Largura asa-a-asa (mm)",
+      height: "Altura do dorso (mm)",
+      depth: "Profundidade base→ponta (mm)",
+    },
+    creditCost: 8,
   },
   {
     id: "meniscus",
@@ -521,23 +526,39 @@ function genFemur(radius: number, length: number, wallT: number, segs: number): 
   return tris
 }
 
-/** Nariz simplificado: pirâmide oval arredondada */
-function genNose(width: number, height: number, depth: number, segs: number): Triangle[] {
-  const tris: Triangle[] = []
-  const hw = width/2, hd = depth/2
-  // Base oval
-  const base: Vec3[] = Array.from({length: segs}, (_, i) => {
-    const a = (2*Math.PI*i)/segs
-    return [hw*Math.cos(a)*0.9, hd*Math.sin(a), 0]
-  })
-  // Ponta do nariz
-  const tip: Vec3 = [0, -depth*0.3, height]
-  for (let i=0; i<segs; i++) {
-    const j = (i+1)%segs
-    // Base fill
-    tris.push(tri([0,0,0], base[j], base[i]))
-    // Side to tip
-    tris.push(tri(base[i], base[j], tip))
+/**
+ * Nariz ANATÔMICO real (R12.13):
+ *   - Mesh fiel de nariz humano com 11.974 triângulos (cartilagem nasal)
+ *   - Substitui a pirâmide oval paramétrica antiga
+ *   - Aceita escala anisotrópica: width (X) · height (Z) · depth (Y)
+ *   - Mesh nativa centralizada em X/Y, base em Z=0
+ *   - Lazy load: a mesh (~686 KB) só carrega quando o usuário escolhe "nose"
+ *
+ * Parâmetros = dimensões ALVO em mm:
+ *   - width  → largura asa-a-asa (escalada de NOSE_MESH_NATIVE.width)
+ *   - height → altura do dorso  (escalada de NOSE_MESH_NATIVE.height)
+ *   - depth  → profundidade base→ponta (escalada de NOSE_MESH_NATIVE.depth)
+ */
+function genNoseAnatomical(width: number, height: number, depth: number): Triangle[] {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const meshMod = require("./meshes/nose-mesh-data") as typeof import("./meshes/nose-mesh-data")
+  const { NOSE_MESH_VERTICES, NOSE_MESH_NATIVE } = meshMod
+
+  // Fatores de escala anisotrópica (dimensões alvo / dimensões nativas)
+  const sx = width  / NOSE_MESH_NATIVE.width   // X
+  const sy = depth  / NOSE_MESH_NATIVE.depth   // Y
+  const sz = height / NOSE_MESH_NATIVE.height  // Z
+
+  const verts = NOSE_MESH_VERTICES
+  const n = verts.length / 9  // 9 floats por triângulo (3 vértices × 3)
+  const tris: Triangle[] = new Array(n)
+
+  for (let i = 0; i < n; i++) {
+    const k = i * 9
+    const v1: Vec3 = [verts[k]   * sx, verts[k+1] * sy, verts[k+2] * sz]
+    const v2: Vec3 = [verts[k+3] * sx, verts[k+4] * sy, verts[k+5] * sz]
+    const v3: Vec3 = [verts[k+6] * sx, verts[k+7] * sy, verts[k+8] * sz]
+    tris[i] = tri(v1, v2, v3)  // re-computa normal a partir dos vértices escalados
   }
   return tris
 }
@@ -867,7 +888,8 @@ export function generateGeometry(id: string, params: GeometryParams): Triangle[]
     case "femur":
       return genFemur(p.radius ?? 8, p.tubeLength ?? 60, p.wallThickness ?? 2.5, p.segments ?? 32)
     case "nose":
-      return genNose(p.width ?? 24, p.height ?? 30, p.depth ?? 18, p.segments ?? 24)
+      // R12.13: mesh anatômico real (substituiu pirâmide oval algorítmica)
+      return genNoseAnatomical(p.width ?? 32, p.height ?? 20, p.depth ?? 51)
     case "meniscus":
       return genMeniscus(p.outerR ?? 20, p.innerR ?? 10, p.thickness ?? 5, p.arcAngle ?? 180, p.segments ?? 48)
     case "cornea":

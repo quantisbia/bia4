@@ -229,22 +229,33 @@ export function getGeometryBounds(
     }
 
     case "nose": {
-      const w = params.width ?? 24
-      const h = params.height ?? 30
-      const d = params.depth ?? 18
+      // R12.13: Nariz ANATÔMICO real — aproximação de bounds para slicing.
+      //   - width  → largura asa-a-asa (X)
+      //   - height → altura do dorso (Z)
+      //   - depth  → profundidade base→ponta (Y)
+      //
+      // O nariz anatômico afunila tanto em largura quanto em profundidade
+      // conforme sobe (asas largas na base → ponta estreita no topo).
+      // Modelagem: perfil elipsoidal modulado por (0.55 + 0.45 · (1 - z/h)).
+      const w = params.width ?? 32
+      const h = params.height ?? 20
+      const d = params.depth ?? 51
+      const taperAtZ = (z: number) => {
+        const t = Math.max(0, Math.min(1, 1 - z / h))
+        return 0.55 + 0.45 * t   // 1.0 na base, ~0.55 no topo
+      }
       return {
         height_mm: h, zMin: 0, zMax: h,
         getBoundsAtZ: (z) => {
-          // afunila no topo
-          const t = 1 - z / h
-          const ww = w * (0.5 + 0.5 * t)
-          const dd = d * (0.5 + 0.5 * t)
+          const k = taperAtZ(z)
+          const ww = w * k
+          const dd = d * k
           return { minX: cx - ww/2, maxX: cx + ww/2, minY: cy - dd/2, maxY: cy + dd/2 }
         },
         getPerimetersAtZ: (z, walls, spacing) => {
-          const t = 1 - z / h
-          const ww = w * (0.5 + 0.5 * t)
-          const dd = d * (0.5 + 0.5 * t)
+          const k = taperAtZ(z)
+          const ww = w * k
+          const dd = d * k
           return rectPerimeters(cx, cy, ww, dd, walls, spacing)
         },
       }
