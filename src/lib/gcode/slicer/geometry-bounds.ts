@@ -219,12 +219,58 @@ export function getGeometryBounds(
     }
 
     case "femur": {
-      const r = params.radius ?? 8
-      const L = params.tubeLength ?? 60
+      // R12.15: Fêmur ANATÔMICO real — aproximação de bounds para slicing.
+      //   - width  → largura medial→lateral (X, epicôndilos máximos)
+      //   - height → comprimento total côndilos→cabeça (Z, eixo longo)
+      //   - depth  → profundidade anterior→posterior (Y)
+      //
+      // Perfil do fêmur (eixo Z):
+      //   - 0 a 15% H   → côndilos (epífise distal) — largura 100%
+      //   - 15% a 85% H → diáfise — largura ~45% do máximo
+      //   - 85% a 100% H → cabeça+colo+trocânter (epífise proximal) — largura 85%
+      const W = params.width ?? 85
+      const H = params.height ?? 450
+      const D = params.depth ?? 30
+      const profileAtZ = (z: number) => {
+        const t = Math.max(0, Math.min(1, z / H))
+        if (t < 0.15) {
+          // Côndilos: largo
+          return 1.0 - 0.55 * (t / 0.15)  // 1.0 → 0.45
+        } else if (t < 0.85) {
+          // Diáfise: cilíndrica estreita
+          return 0.45
+        } else {
+          // Cabeça+colo+trocânter: alarga novamente
+          const u = (t - 0.85) / 0.15
+          return 0.45 + 0.40 * u  // 0.45 → 0.85
+        }
+      }
       return {
-        height_mm: L, zMin: 0, zMax: L,
-        getBoundsAtZ: () => ({ minX: cx - r, maxX: cx + r, minY: cy - r, maxY: cy + r }),
-        getPerimetersAtZ: (_z, walls, spacing) => circlePerimeters(cx, cy, r, walls, spacing),
+        height_mm: H, zMin: 0, zMax: H,
+        getBoundsAtZ: (z) => {
+          const k = profileAtZ(z)
+          const a = (W / 2) * k
+          const b = (D / 2) * k
+          return { minX: cx - a, maxX: cx + a, minY: cy - b, maxY: cy + b }
+        },
+        getPerimetersAtZ: (z, walls, spacing) => {
+          const k = profileAtZ(z)
+          const rx = (W / 2) * k
+          const ry = (D / 2) * k
+          const polys: Polygon2D[] = []
+          for (let w = 0; w < walls; w++) {
+            const aw = rx - w * spacing
+            const bw = ry - w * spacing
+            if (aw <= 0.1 || bw <= 0.1) break
+            const poly: Polygon2D = []
+            for (let i = 0; i < 64; i++) {
+              const ang = (2 * Math.PI * i) / 64
+              poly.push({ x: cx + aw * Math.cos(ang), y: cy + bw * Math.sin(ang) })
+            }
+            polys.push(poly)
+          }
+          return polys
+        },
       }
     }
 

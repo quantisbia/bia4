@@ -10,7 +10,7 @@
  * 4.  Cubo Poroso              — tecidos diversos
  * 5.  Tubo Oco                 — vaso sanguíneo grande calibre
  * 6.  Hexágono Prismático      — tecido hepático
- * 7.  Fêmur Simplificado       — osso anatômico educacional
+ * 7.  Fêmur ANATÔMICO          — mesh real 59.430 tri · osso longo da coxa (R12.15)
  * 8.  Nariz ANATÔMICO          — mesh real 11.974 tri · cartilagem nasal (R12.13)
  * 9.  Meia-Lua (menisco)       — cartilagem articular
  * 10. Meia-Lua Espessa (córnea)— córnea/lente
@@ -146,14 +146,20 @@ export const GEOMETRIES: STLGeometry[] = [
   },
   {
     id: "femur",
-    label: "Fêmur Educacional",
-    description: "Osso anatômico simplificado para educação e impressão demonstrativa",
+    label: "Fêmur (Anatômico)",
+    description: "Mesh anatômica real de fêmur humano (14.858 triângulos). Cabeça, colo, trocânter maior, diáfise e côndilos preservados. Altura, largura e profundidade ajustáveis.",
     tissue: "Osso (Fêmur)",
-    application: "Modelo anatômico educacional, biomecânica, ensino cirúrgico",
+    application: "Modelo cirúrgico anatomicamente fiel, planejamento de osteotomia, próteses de quadril/joelho personalizadas, biomecânica e ensino",
     icon: "🦴",
-    defaultParams: { radius: 8, tubeLength: 60, wallThickness: 2.5, segments: 32 },
-    paramLabels: { radius: "Raio da diáfise (mm)", tubeLength: "Comprimento total (mm)", wallThickness: "Espessura cortical (mm)" },
-    creditCost: 6,
+    // Dimensões nativas (escala CAD normalizada): 2.10 × 1.26 × 9.06.
+    // Fêmur adulto médio humano: comprimento ~45cm, largura epicôndilos ~85mm, profundidade ~30mm
+    defaultParams: { width: 85, height: 450, depth: 30 },
+    paramLabels: {
+      width: "Largura medial→lateral (mm)",
+      height: "Comprimento total (mm)",
+      depth: "Profundidade anterior→posterior (mm)",
+    },
+    creditCost: 10,
   },
   {
     id: "nose",
@@ -513,23 +519,49 @@ function genOvalCylinder(rA: number, rB: number, height: number, segs: number): 
   return tris
 }
 
-/** Fêmur simplificado: tubo oco (diáfise) com esferas nas epífises */
-function genFemur(radius: number, length: number, wallT: number, segs: number): Triangle[] {
-  const innerR = Math.max(1, radius - wallT)
-  const tris: Triangle[] = []
-  // Diáfise
-  tris.push(...genTube(radius, innerR, length, segs))
-  // Epífises (esferas maiores)
-  const epiphR = radius * 1.5
-  const botSphere = genSphere(epiphR, Math.max(8, Math.floor(segs/4)))
-  const topSphere = genSphere(epiphR * 1.1, Math.max(8, Math.floor(segs/4)))
-  // Translate top sphere
-  topSphere.forEach(t => {
-    t.v1[2] += length; t.v2[2] += length; t.v3[2] += length
-  })
-  tris.push(...botSphere, ...topSphere)
+/**
+ * Fêmur ANATÔMICO real (R12.15):
+ *   - Mesh fiel de fêmur humano (14.858 triângulos após sub-amostragem stride=8)
+ *   - Substitui o algoritmo antigo (cilindro oco + 2 esferas como epífises)
+ *   - Aceita escala anisotrópica: width (X) · height (Z = comprimento) · depth (Y)
+ *   - Mesh nativa centralizada em X/Y, base em Z=0 (côndilos no chão)
+ *   - Lazy require: a mesh (~830 KB) só carrega quando o usuário escolhe "femur"
+ *
+ * Parâmetros = dimensões ALVO em mm:
+ *   - width  → largura medial→lateral (epicôndilos)
+ *   - height → comprimento total côndilos→cabeça do fêmur (eixo longo)
+ *   - depth  → profundidade anterior→posterior
+ *
+ * Detalhes anatômicos preservados: cabeça do fêmur · colo · trocânter
+ * maior · diáfise · côndilos medial e lateral.
+ */
+function genFemurAnatomical(width: number, height: number, depth: number): Triangle[] {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const meshMod = require("./meshes/femur-mesh-data") as typeof import("./meshes/femur-mesh-data")
+  const { FEMUR_MESH_VERTICES, FEMUR_MESH_NATIVE } = meshMod
+
+  // Fatores de escala anisotrópica (dimensões alvo / dimensões nativas)
+  const sx = width  / FEMUR_MESH_NATIVE.width   // X
+  const sy = depth  / FEMUR_MESH_NATIVE.depth   // Y
+  const sz = height / FEMUR_MESH_NATIVE.height  // Z (eixo longo)
+
+  const verts = FEMUR_MESH_VERTICES
+  const n = verts.length / 9
+  const tris: Triangle[] = new Array(n)
+
+  for (let i = 0; i < n; i++) {
+    const k = i * 9
+    const v1: Vec3 = [verts[k]   * sx, verts[k+1] * sy, verts[k+2] * sz]
+    const v2: Vec3 = [verts[k+3] * sx, verts[k+4] * sy, verts[k+5] * sz]
+    const v3: Vec3 = [verts[k+6] * sx, verts[k+7] * sy, verts[k+8] * sz]
+    tris[i] = tri(v1, v2, v3)  // re-computa normal a partir dos vértices escalados
+  }
   return tris
 }
+
+// NOTA: a função antiga genFemur() — cilindro oco + 2 esferas — foi REMOVIDA
+// em R12.15. O fêmur agora é uma mesh anatômica real (ver genFemurAnatomical).
+// Para histórico: ver commit anterior a 59356ab no git log.
 
 /**
  * Nariz ANATÔMICO real (R12.13):
@@ -883,7 +915,8 @@ export function generateGeometry(id: string, params: GeometryParams): Triangle[]
     case "hexagonal_liver":
       return genCylinder(p.radius ?? 8, p.thickness ?? 4, 6) // hexagon = 6 segments
     case "femur":
-      return genFemur(p.radius ?? 8, p.tubeLength ?? 60, p.wallThickness ?? 2.5, p.segments ?? 32)
+      // R12.15: mesh anatômica real (substituiu cilindro oco + 2 esferas)
+      return genFemurAnatomical(p.width ?? 85, p.height ?? 450, p.depth ?? 30)
     case "nose":
       // R12.13: mesh anatômico real (substituiu pirâmide oval algorítmica)
       return genNoseAnatomical(p.width ?? 32, p.height ?? 20, p.depth ?? 51)
