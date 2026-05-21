@@ -217,14 +217,19 @@ export const GEOMETRIES: STLGeometry[] = [
   },
   {
     id: "ear",
-    label: "Orelha (Pavilhão Auricular)",
-    description: "Pavilhão auricular simplificado para reconstrução de orelha e educação em otorrinolaringologia",
+    label: "Orelha (Pavilhão Auricular · Anatômico)",
+    description: "Mesh anatômico real de pavilhão auricular humano (4.432 triângulos). Altura, largura e profundidade ajustáveis para reconstrução de microtia e próteses personalizadas.",
     tissue: "Cartilagem auricular",
-    application: "Microtia, reconstrução auricular, próteses externas",
+    application: "Microtia, reconstrução auricular pós-traumática, próteses externas personalizadas, educação em otorrinolaringologia",
     icon: "👂",
-    defaultParams: { height: 60, width: 35, thickness: 4, segments: 32 },
-    paramLabels: { height: "Altura (mm)", width: "Largura (mm)", thickness: "Espessura (mm)", segments: "Resolução" },
-    creditCost: 6,
+    // Dimensões nativas da mesh: 28.07 × 47.15 × 15.16 mm — escaladas para orelha adulta média
+    defaultParams: { width: 35, height: 60, depth: 18 },
+    paramLabels: {
+      width: "Largura lateral (mm)",
+      height: "Altura superior→lobo (mm)",
+      depth: "Profundidade hélice→tragus (mm)",
+    },
+    creditCost: 8,
   },
   {
     id: "heart",
@@ -613,51 +618,43 @@ function genBoneBlock(width: number, height: number, depth: number, wallT: numbe
   return tris
 }
 
-/** Orelha: pavilhão auricular como meia-elipse deformada, baseado em meniscus + textura C-scroll */
-function genEar(height: number, width: number, thickness: number, segs: number): Triangle[] {
-  const tris: Triangle[] = []
-  // Perfil externo de orelha (formato de C invertido + lobo)
-  // Usa contorno paramétrico de elipse distorcida, depois extrude
-  const outerPts: Vec3[] = []
-  const innerPts: Vec3[] = []
-  const n = Math.max(24, segs)
-  for (let i=0; i<n; i++) {
-    const t = i/n
-    const ang = t * Math.PI * 2
-    // Formato de orelha: elipse alongada + curva C + lobo inferior
-    let rx = width/2
-    let ry = height/2
-    // Achatamento lateral superior
-    if (Math.sin(ang) > 0.3) rx *= 0.7
-    // Lobo mais arredondado embaixo
-    if (Math.sin(ang) < -0.6) ry *= 0.75
-    const x = rx * Math.cos(ang)
-    const y = ry * Math.sin(ang) * 0.95
-    outerPts.push([x, y, 0])
-    // Contorno interno (concha): ~55% do tamanho, offset
-    const ix = rx * 0.55 * Math.cos(ang)
-    const iy = ry * 0.55 * Math.sin(ang) - height*0.08
-    innerPts.push([ix, iy, thickness*0.6])
-  }
-  // Face frontal (extrude outer contour com profundidade)
-  const cx: Vec3 = [0, 0, 0]
-  const cxBack: Vec3 = [0, 0, thickness]
-  for (let i=0; i<n; i++) {
-    const j = (i+1) % n
-    // Frente
-    tris.push(tri(cx, outerPts[j], outerPts[i]))
-    // Trás
-    const bi: Vec3 = [outerPts[i][0], outerPts[i][1], thickness]
-    const bj: Vec3 = [outerPts[j][0], outerPts[j][1], thickness]
-    tris.push(tri(cxBack, bi, bj))
-    // Laterais (parede)
-    tris.push(tri(outerPts[i], outerPts[j], bj))
-    tris.push(tri(outerPts[i], bj, bi))
-  }
-  // Concha interna (depressão simulada como relevo)
-  for (let i=0; i<n; i++) {
-    const j = (i+1) % n
-    tris.push(tri([0,-height*0.08, thickness*0.6], innerPts[j], innerPts[i]))
+/**
+ * Orelha ANATÔMICA real (R12.14):
+ *   - Mesh fiel de pavilhão auricular humano (4.432 triângulos)
+ *   - Substitui o algoritmo paramétrico antigo (elipse deformada + C-scroll)
+ *   - Aceita escala anisotrópica: width (X) · height (Z) · depth (Y)
+ *   - Mesh nativa centralizada em X/Y, base em Z=0
+ *   - Lazy load: a mesh (~256 KB) só carrega quando o usuário escolhe "ear"
+ *
+ * Parâmetros = dimensões ALVO em mm:
+ *   - width  → largura lateral (escalada de EAR_MESH_NATIVE.width)
+ *   - height → altura superior→lobo (escalada de EAR_MESH_NATIVE.height)
+ *   - depth  → profundidade hélice→tragus (escalada de EAR_MESH_NATIVE.depth)
+ *
+ * Observação semântica: o parâmetro 'thickness' do algoritmo antigo foi
+ * substituído por 'depth' (Y) — que representa a profundidade real da concha,
+ * preservando a anatomia 3D em vez da extrusão plana.
+ */
+function genEarAnatomical(width: number, height: number, depth: number): Triangle[] {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const meshMod = require("./meshes/ear-mesh-data") as typeof import("./meshes/ear-mesh-data")
+  const { EAR_MESH_VERTICES, EAR_MESH_NATIVE } = meshMod
+
+  // Fatores de escala anisotrópica (dimensões alvo / dimensões nativas)
+  const sx = width  / EAR_MESH_NATIVE.width   // X
+  const sy = depth  / EAR_MESH_NATIVE.depth   // Y
+  const sz = height / EAR_MESH_NATIVE.height  // Z
+
+  const verts = EAR_MESH_VERTICES
+  const n = verts.length / 9  // 9 floats por triângulo (3 vértices × 3)
+  const tris: Triangle[] = new Array(n)
+
+  for (let i = 0; i < n; i++) {
+    const k = i * 9
+    const v1: Vec3 = [verts[k]   * sx, verts[k+1] * sy, verts[k+2] * sz]
+    const v2: Vec3 = [verts[k+3] * sx, verts[k+4] * sy, verts[k+5] * sz]
+    const v3: Vec3 = [verts[k+6] * sx, verts[k+7] * sy, verts[k+8] * sz]
+    tris[i] = tri(v1, v2, v3)  // re-computa normal a partir dos vértices escalados
   }
   return tris
 }
@@ -899,7 +896,8 @@ export function generateGeometry(id: string, params: GeometryParams): Triangle[]
     case "organoid_sphere":
       return genSphere(p.radius ?? 5, p.segments ?? 32)
     case "ear":
-      return genEar(p.height ?? 60, p.width ?? 35, p.thickness ?? 4, p.segments ?? 32)
+      // R12.14: mesh anatômico real (substituiu elipse deformada + C-scroll algorítmico)
+      return genEarAnatomical(p.width ?? 35, p.height ?? 60, p.depth ?? 18)
     case "heart":
       return genHeart(p.radius ?? 20, p.height ?? 50, p.segments ?? 32)
     case "kidney":

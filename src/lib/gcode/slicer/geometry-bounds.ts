@@ -261,18 +261,35 @@ export function getGeometryBounds(
       }
     }
 
-    // ─── Orelha (pavilhão auricular) ─────────────────────────────────────
+    // ─── Orelha ANATÔMICA (R12.14) ────────────────────────────────────────
     case "ear": {
-      // Aproximação: elipse achatada em XY com altura "thickness".
-      // params: height=60 (Y), width=35 (X), thickness=4 (Z)
+      // Mesh anatômico real do pavilhão auricular. Aproximação de bounds:
+      //   - width  → largura lateral (X)
+      //   - height → altura superior→lobo (Z, eixo de impressão)
+      //   - depth  → profundidade hélice→tragus (Y)
+      //
+      // A orelha tem perfil de elipse alongada que afunila levemente conforme
+      // sobe (lobo mais cheio na base, hélice estreita no topo). Modelagem:
+      // taper de 1.0 (base) → 0.85 (topo) em ambos X e Y.
       const W = params.width ?? 35
       const H = params.height ?? 60
-      const t = params.thickness ?? 4
-      const a = W / 2, b = H / 2
+      const D = params.depth ?? 18
+      const taperAtZ = (z: number) => {
+        const t = Math.max(0, Math.min(1, 1 - z / H))
+        return 0.85 + 0.15 * t   // 1.0 na base, 0.85 no topo
+      }
       return {
-        height_mm: t, zMin: 0, zMax: t,
-        getBoundsAtZ: () => ({ minX: cx - a, maxX: cx + a, minY: cy - b, maxY: cy + b }),
-        getPerimetersAtZ: (_z, walls, spacing) => {
+        height_mm: H, zMin: 0, zMax: H,
+        getBoundsAtZ: (z) => {
+          const k = taperAtZ(z)
+          const a = (W / 2) * k
+          const b = (D / 2) * k
+          return { minX: cx - a, maxX: cx + a, minY: cy - b, maxY: cy + b }
+        },
+        getPerimetersAtZ: (z, walls, spacing) => {
+          const k = taperAtZ(z)
+          const a = (W / 2) * k
+          const b = (D / 2) * k
           const polys: Polygon2D[] = []
           for (let w = 0; w < walls; w++) {
             const aw = a - w * spacing

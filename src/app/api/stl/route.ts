@@ -48,7 +48,9 @@ export async function GET() {
     description: "Gerador de geometrias 3D para bioimpressão",
     geometries: [
       "membrane", "disk", "bone_block", "cube_tissue", "vessel",
-      "hexagonal_liver", "femur", "nose", "meniscus", "cornea", "lens", "organoid_sphere"
+      "hexagonal_liver", "femur", "nose", "meniscus", "cornea", "lens", "organoid_sphere",
+      "ear", "heart", "kidney", "liver_anatomical", "hand",
+      "tpms_gyroid", "tpms_schwarz", "tpms_diamond",
     ],
     formats: ["stl_binary", "stl_ascii", "obj"],
     usage: "POST /api/stl { geometry: 'disk', format: 'stl_binary', params: { radius: 10, thickness: 3 } }",
