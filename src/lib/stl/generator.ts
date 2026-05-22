@@ -239,14 +239,18 @@ export const GEOMETRIES: STLGeometry[] = [
   },
   {
     id: "heart",
-    label: "Coração (Forma Anatômica)",
-    description: "Coração simplificado (forma de pêra cardíaca) para modelos cardíacos educacionais e patches miocárdicos",
+    label: "Coração (Anatômico Real)",
+    description: "Coração humano anatômico real (mesh 14.913 triângulos) — átrios, ventrículos, sulco interventricular e ápice. Para modelos cardíacos educacionais e patches miocárdicos.",
     tissue: "Miocárdio",
-    application: "Patch cardíaco, modelo anatômico, educação em cardiologia",
+    application: "Patch cardíaco, modelo anatômico, educação em cardiologia, planejamento cirúrgico",
     icon: "❤️",
-    defaultParams: { radius: 20, height: 50, segments: 32 },
-    paramLabels: { radius: "Raio base (mm)", height: "Altura (mm)", segments: "Resolução" },
-    creditCost: 6,
+    defaultParams: { width: 80, height: 100, depth: 95 },
+    paramLabels: {
+      width: "Largura átrios E↔D (mm)",
+      height: "Altura ápice→base (mm)",
+      depth: "Profundidade ant→post (mm)",
+    },
+    creditCost: 10,
   },
   {
     id: "kidney",
@@ -691,55 +695,49 @@ function genEarAnatomical(width: number, height: number, depth: number): Triangl
   return tris
 }
 
-/** Coração: forma de "pêra cardíaca" — combinação de duas esferas + ápice */
-function genHeart(radius: number, height: number, segs: number): Triangle[] {
-  const tris: Triangle[] = []
-  const r = radius
-  const h = height
-  const n = Math.max(16, segs)
-  // Gera malha paramétrica: duas "bolhas" em cima + ponta em baixo
-  // theta: longitude [0, 2π], phi: latitude [0, π]
-  const vertices: Vec3[][] = []
-  for (let i=0; i<=n; i++) {
-    const row: Vec3[] = []
-    const phi = (i/n) * Math.PI // 0 → π
-    for (let j=0; j<=n; j++) {
-      const theta = (j/n) * Math.PI * 2
-      // Raio varia com phi para criar forma de coração:
-      // topo (phi<π/3): duas lóbulos (bolinhas)
-      // meio: corpo
-      // base (phi>2π/3): ponta
-      let rad = r
-      const zNorm = Math.cos(phi) // 1 no topo, -1 no fundo
-      // Lóbulos superiores (quando phi pequeno)
-      if (zNorm > 0.3) {
-        const lobeFactor = 1 + 0.5 * Math.abs(Math.cos(theta*2)) * zNorm
-        rad = r * lobeFactor * 0.8
-      } else if (zNorm < -0.5) {
-        // Ponta: raio diminui rápido
-        rad = r * (1 + zNorm) * 1.5
-        if (rad < 0) rad = 0.1
-      }
-      const x = rad * Math.sin(phi) * Math.cos(theta)
-      const y = rad * Math.sin(phi) * Math.sin(theta)
-      const z = (h/2) * Math.cos(phi) + h/2 // shift para z>=0
-      row.push([x, y, z])
-    }
-    vertices.push(row)
-  }
-  // Triangulize mesh
-  for (let i=0; i<n; i++) {
-    for (let j=0; j<n; j++) {
-      const v00 = vertices[i][j]
-      const v01 = vertices[i][j+1]
-      const v10 = vertices[i+1][j]
-      const v11 = vertices[i+1][j+1]
-      tris.push(tri(v00, v10, v11))
-      tris.push(tri(v00, v11, v01))
-    }
+/**
+ * Coração ANATÔMICO real (R12.16):
+ *   - Mesh fiel de coração humano com 14.913 triângulos (decimação stride=30)
+ *   - Substitui a "pêra cardíaca" paramétrica (duas esferas + ápice)
+ *   - Mesh nativa: 28.832 × 34.109 × 35.966 mm (X×Y×Z) — fonte 3MF
+ *     "Coracao maior 3.1" (PrusaSlicer 2.7 export, unit=millimeter)
+ *   - Origem: centrada em X/Y, base apoiada em Z=0
+ *
+ * Parâmetros = dimensões ALVO em mm:
+ *   - width  → largura átrios E↔D (X)
+ *   - height → altura ápice→base/átrios (Z, eixo longo)
+ *   - depth  → profundidade anterior→posterior (Y)
+ *
+ * Detalhes preservados: dois lobos superiores (átrios/aurículas) · ventrículos ·
+ * sulco interventricular · ápice cardíaco.
+ */
+function genHeartAnatomical(width: number, height: number, depth: number): Triangle[] {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const meshMod = require("./meshes/heart-mesh-data") as typeof import("./meshes/heart-mesh-data")
+  const { HEART_MESH_VERTICES, HEART_MESH_NATIVE } = meshMod
+
+  // Fatores de escala anisotrópica (dimensões alvo / dimensões nativas)
+  const sx = width  / HEART_MESH_NATIVE.width   // X
+  const sy = depth  / HEART_MESH_NATIVE.depth   // Y
+  const sz = height / HEART_MESH_NATIVE.height  // Z (eixo longo)
+
+  const verts = HEART_MESH_VERTICES
+  const n = verts.length / 9
+  const tris: Triangle[] = new Array(n)
+
+  for (let i = 0; i < n; i++) {
+    const k = i * 9
+    const v1: Vec3 = [verts[k]   * sx, verts[k+1] * sy, verts[k+2] * sz]
+    const v2: Vec3 = [verts[k+3] * sx, verts[k+4] * sy, verts[k+5] * sz]
+    const v3: Vec3 = [verts[k+6] * sx, verts[k+7] * sy, verts[k+8] * sz]
+    tris[i] = tri(v1, v2, v3)  // re-computa normal a partir dos vértices escalados
   }
   return tris
 }
+
+// NOTA: a função antiga genHeart() — pêra cardíaca paramétrica (duas esferas + ápice)
+// — foi REMOVIDA em R12.16. O coração agora é uma mesh anatômica real
+// (ver genHeartAnatomical, importa de meshes/heart-mesh-data.ts).
 
 /** Rim: forma de feijão — elipsoide com indentação lateral */
 function genKidney(length: number, width: number, thickness: number, segs: number): Triangle[] {
@@ -932,7 +930,7 @@ export function generateGeometry(id: string, params: GeometryParams): Triangle[]
       // R12.14: mesh anatômico real (substituiu elipse deformada + C-scroll algorítmico)
       return genEarAnatomical(p.width ?? 35, p.height ?? 60, p.depth ?? 18)
     case "heart":
-      return genHeart(p.radius ?? 20, p.height ?? 50, p.segments ?? 32)
+      return genHeartAnatomical(p.width ?? 80, p.height ?? 100, p.depth ?? 95)
     case "kidney":
       return genKidney(p.length ?? 45, p.width ?? 25, p.thickness ?? 15, p.segments ?? 32)
     case "liver_anatomical":

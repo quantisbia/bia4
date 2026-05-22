@@ -353,24 +353,59 @@ export function getGeometryBounds(
       }
     }
 
-    // ─── Coração (pêra cardíaca) ─────────────────────────────────────────
+    // ─── Coração ANATÔMICO real (R12.16) ─────────────────────────────────
     case "heart": {
-      // Aproximação: elipse que afunila ao topo (ápice).
-      // params: radius=20 (raio base XY), height=50 (Z), segments=32
-      const r = params.radius ?? 20
-      const H = params.height ?? 50
+      // Aproximação de bounds para a mesh anatômica real:
+      //   - width  → largura átrios E↔D (X)
+      //   - height → altura ápice→base (Z, eixo longo)
+      //   - depth  → profundidade anterior→posterior (Y)
+      //
+      // Perfil cardíaco (eixo Z, z=0 no ápice, z=H na base/átrios):
+      //   - 0 a 15% H    → ápice (estreito, ~25% → 60% da largura)
+      //   - 15% a 70% H  → ventrículos (corpo principal, 60% → 100%)
+      //   - 70% a 100% H → átrios+aurículas (alarga para 100% no topo)
+      const W = params.width ?? 80
+      const H = params.height ?? 100
+      const D = params.depth ?? 95
+      const profileAtZ = (z: number) => {
+        const t = Math.max(0, Math.min(1, z / H))
+        if (t < 0.15) {
+          // Ápice: estreito e cônico
+          return 0.25 + (0.60 - 0.25) * (t / 0.15)  // 0.25 → 0.60
+        } else if (t < 0.70) {
+          // Ventrículos: corpo principal alargando
+          const u = (t - 0.15) / 0.55
+          return 0.60 + 0.40 * u  // 0.60 → 1.00
+        } else {
+          // Átrios+aurículas: mantém-se largo no topo
+          return 1.00
+        }
+      }
       return {
         height_mm: H, zMin: 0, zMax: H,
         getBoundsAtZ: (z) => {
-          const t = 1 - z / H              // 1 na base, 0 no ápice
-          const rz = r * (0.4 + 0.6 * t)   // afunila até 40% no topo
-          return { minX: cx - rz, maxX: cx + rz, minY: cy - rz, maxY: cy + rz }
+          const k = profileAtZ(z)
+          const a = (W / 2) * k
+          const b = (D / 2) * k
+          return { minX: cx - a, maxX: cx + a, minY: cy - b, maxY: cy + b }
         },
         getPerimetersAtZ: (z, walls, spacing) => {
-          const t = 1 - z / H
-          const rz = r * (0.4 + 0.6 * t)
-          if (rz < 0.1) return []
-          return circlePerimeters(cx, cy, rz, walls, spacing)
+          const k = profileAtZ(z)
+          const rx = (W / 2) * k
+          const ry = (D / 2) * k
+          const polys: Polygon2D[] = []
+          for (let w = 0; w < walls; w++) {
+            const aw = rx - w * spacing
+            const bw = ry - w * spacing
+            if (aw <= 0.1 || bw <= 0.1) break
+            const poly: Polygon2D = []
+            for (let i = 0; i < 64; i++) {
+              const ang = (2 * Math.PI * i) / 64
+              poly.push({ x: cx + aw * Math.cos(ang), y: cy + bw * Math.sin(ang) })
+            }
+            polys.push(poly)
+          }
+          return polys
         },
       }
     }
