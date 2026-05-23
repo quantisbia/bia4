@@ -56,9 +56,57 @@ import {
 import { PrinterController, type ControllerState, type StreamProgress } from "@/lib/bioprint/printer-controller"
 
 // Reutiliza preview 3D existente
-import { GcodeViewer3D, type ColorMode } from "@/components/bioprinter/GcodeViewer3D"
+import { type ColorMode } from "@/components/bioprinter/GcodeViewer3D"
+import { SafeGcodeViewer3D } from "@/components/bioprinter/SafeGcodeViewer3D"
 import { GcodeValidatorPanel } from "@/components/bioprinter/GcodeValidatorPanel"
 import { parseGcode, type ParsedGcode } from "@/lib/bioprint/toolpath-engine"
+
+// R12.17: ErrorBoundary local pra isolar crashes de sub-componentes
+import { Component, type ReactNode } from "react"
+
+class SectionErrorBoundary extends Component<
+  { children: ReactNode; title: string },
+  { hasError: boolean; error: Error | null }
+> {
+  state = { hasError: false, error: null as Error | null }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+  componentDidCatch(error: Error) {
+    // eslint-disable-next-line no-console
+    console.error(`[Section: ${this.props.title}]`, error)
+  }
+  reset = () => this.setState({ hasError: false, error: null })
+  render() {
+    if (this.state.hasError) {
+      const e = this.state.error
+      return (
+        <section className="rounded-2xl bg-rose-500/[0.05] border border-rose-500/30 overflow-hidden">
+          <div className="px-3 py-2 border-b border-rose-500/20 flex items-center gap-2 bg-rose-500/10">
+            <AlertTriangle className="w-4 h-4 text-rose-300" />
+            <h3 className="text-xs font-bold text-rose-100">{this.props.title} — falhou</h3>
+          </div>
+          <div className="p-3 text-xs text-rose-100/90 space-y-2">
+            <div>Este painel não pôde ser renderizado. O resto da página continua funcionando.</div>
+            {e?.message && (
+              <pre className="text-[10px] bg-black/40 rounded p-2 font-mono whitespace-pre-wrap break-words max-h-32 overflow-auto">
+                {e.name}: {e.message}
+              </pre>
+            )}
+            <button
+              onClick={this.reset}
+              className="px-2.5 py-1 rounded text-[11px] font-semibold bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-100 inline-flex items-center gap-1.5"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Tentar de novo
+            </button>
+          </div>
+        </section>
+      )
+    }
+    return this.props.children
+  }
+}
 
 // ─── Constantes ──────────────────────────────────────────────────────────
 
@@ -531,9 +579,26 @@ export default function BioprintExecutePage() {
   // ─── Load demo ──
   const loadDemo = useCallback(() => {
     setGcodeText(DEMO_GCODE)
-    setGcodeName("demo-hello-square.gcode")
+    setGcodeName("comece-agora-hello-square.gcode")
     setValidation(null)
-    loggerRef.current.info("G-code de demo carregado.")
+    loggerRef.current.info("G-code de exemplo carregado — quadrado 20×20 mm em 2 camadas. Próximo passo: clicar em 'Validar G-code'.")
+    // R12.17: dispara validação automática para que o painel visual do
+    // toolpath apareça imediatamente sem o usuário precisar clicar.
+    setTimeout(() => {
+      try {
+        const result = validateGcode(DEMO_GCODE, DEFAULT_BIO_LIMITS, "marlin")
+        setValidation(result)
+        const v = verdictLabel(result.verdict)
+        loggerRef.current.info(`Validação automática: ${v.text} (${result.errorCount} erros, ${result.warningCount} avisos)`, "validator")
+      } catch (e) {
+        loggerRef.current.warn(`Validação automática falhou: ${e instanceof Error ? e.message : String(e)}`)
+      }
+      // Scroll suave para o painel visual recém-aparecido
+      try {
+        const el = document.getElementById("toolpath-visual-panel")
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
+      } catch {}
+    }, 50)
   }, [])
 
   // ─── Auto-scroll terminal ──
@@ -688,10 +753,10 @@ export default function BioprintExecutePage() {
               </button>
               <button
                 onClick={loadDemo}
-                className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/30 text-violet-200 transition-colors flex items-center gap-1.5"
-                title="Carrega um G-code Hello Square 20×20 mm para teste"
+                className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-gradient-to-r from-violet-500/25 to-fuchsia-500/25 hover:from-violet-500/40 hover:to-fuchsia-500/40 border border-violet-500/40 text-violet-100 transition-colors flex items-center gap-1.5 shadow-md shadow-violet-900/30"
+                title="Carrega um G-code de exemplo (quadrado 20×20 mm em 2 camadas) para você começar agora — ideal para o aluno"
               >
-                <Sparkles className="w-3.5 h-3.5" /> Demo
+                <Sparkles className="w-3.5 h-3.5" /> G-code começe agora
               </button>
               <button
                 onClick={async () => {
@@ -903,11 +968,15 @@ export default function BioprintExecutePage() {
 
           {/* ── 🔬 Validador Visual Unificado — viewer + validação + complexidade em tabs ── */}
           {gcodeText.trim() && (
-            <GcodeValidatorPanel
-              gcode={gcodeText}
-              title="Validação visual do G-code · pré-execução"
-              viewerHeight={460}
-            />
+            <div id="toolpath-visual-panel" className="scroll-mt-24">
+              <SectionErrorBoundary title="Validador visual do G-code">
+                <GcodeValidatorPanel
+                  gcode={gcodeText}
+                  title="Validação visual do G-code · pré-execução"
+                  viewerHeight={460}
+                />
+              </SectionErrorBoundary>
+            </div>
           )}
 
           {/* ── 3. Preview 3D ─────────────────────────────────────── */}
@@ -940,7 +1009,7 @@ export default function BioprintExecutePage() {
             {showPreview ? (
               parsed && parsed.moves.length > 0 ? (
                 <div className="rounded-lg overflow-hidden border border-white/5 bg-black/40">
-                  <GcodeViewer3D
+                  <SafeGcodeViewer3D
                     parsed={parsed}
                     initialColorMode={colorMode}
                     className="h-[460px] w-full"

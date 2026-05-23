@@ -80,6 +80,18 @@ export function GcodeViewer3D({
   const [isPlaying, setIsPlaying] = useState(false)
   const playIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
+  // R12.17 BUGFIX: filtros de camada efetivos PRECISAM ser declarados ANTES
+  // dos useEffects/useMemos que os referenciam. Antes estavam no fim do
+  // componente (linha ~404) e o useEffect de render (linha ~179) acessava-os
+  // na dependency array — causando ReferenceError (Temporal Dead Zone) no
+  // primeiro render = crash "Algo deu errado" da página inteira.
+  const effectiveLayerFrom = layerAnalysisOpen && activeLayer !== null
+    ? parsed?.layers[0] ?? layerFrom
+    : layerFrom
+  const effectiveLayerTo = layerAnalysisOpen && activeLayer !== null
+    ? activeLayer
+    : layerTo
+
   // Centro do bounding box (para centralizar a rotação)
   const center = useMemo<Vec3>(() => {
     if (!parsed) return { x: 0, y: 0, z: 0 }
@@ -400,13 +412,7 @@ export function GcodeViewer3D({
     }
   }, [isPlaying, parsed])
 
-  // Filtros de camada efetivos (usa activeLayer se análise está aberta)
-  const effectiveLayerFrom = layerAnalysisOpen && activeLayer !== null
-    ? parsed?.layers[0] ?? layerFrom
-    : layerFrom
-  const effectiveLayerTo = layerAnalysisOpen && activeLayer !== null
-    ? activeLayer
-    : layerTo
+  // (declarações de effectiveLayerFrom/To movidas para o topo do componente em R12.17 — vide bugfix comment)
 
   return (
     <div className={cn("relative w-full h-full bg-[#05050c] rounded-xl overflow-hidden border border-violet-500/15", className)}>

@@ -32,7 +32,8 @@ import {
   validateGcode, verdictLabel, DEFAULT_BIO_LIMITS,
   type ValidationResult, type FirmwareKind, type PrinterLimits,
 } from "@/lib/bioprint/gcode-validator"
-import { GcodeViewer3D, type ColorMode } from "./GcodeViewer3D"
+import { type ColorMode } from "./GcodeViewer3D"
+import { SafeGcodeViewer3D } from "./SafeGcodeViewer3D"
 
 export interface GcodeValidatorPanelProps {
   /** G-code em texto puro */
@@ -449,7 +450,7 @@ export function GcodeValidatorPanel({
           </div>
           {showViewer && (
             <div className="rounded-lg overflow-hidden border border-white/10 bg-black/40" style={{ height: vH }}>
-              <GcodeViewer3D
+              <SafeGcodeViewer3D
                 parsed={parsed}
                 initialColorMode={colorMode}
                 className="w-full h-full"

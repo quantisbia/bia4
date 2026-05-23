@@ -39,7 +39,6 @@ import {
 } from "@/lib/bioprint/medical-gcode"
 import { verdictColor, NELSON_2021_CITATION } from "@/lib/bioprint/printability-nelson2021"
 import { parseGcode, type ParsedGcode } from "@/lib/bioprint/toolpath-engine"
-import { GcodeViewer3D } from "@/components/bioprinter/GcodeViewer3D"
 import { GcodeValidatorPanel } from "@/components/bioprinter/GcodeValidatorPanel"
 
 export default function MedicalGcodePage() {

@@ -240,7 +240,7 @@ export const GEOMETRIES: STLGeometry[] = [
   {
     id: "heart",
     label: "Coração (Anatômico Real)",
-    description: "Coração humano anatômico real (mesh 14.913 triângulos) — átrios, ventrículos, sulco interventricular e ápice. Para modelos cardíacos educacionais e patches miocárdicos.",
+    description: "Coração humano anatômico real (mesh ~8.000 triângulos) — átrios, ventrículos, sulco interventricular e ápice. Para modelos cardíacos educacionais e patches miocárdicos.",
     tissue: "Miocárdio",
     application: "Patch cardíaco, modelo anatômico, educação em cardiologia, planejamento cirúrgico",
     icon: "❤️",
@@ -697,7 +697,7 @@ function genEarAnatomical(width: number, height: number, depth: number): Triangl
 
 /**
  * Coração ANATÔMICO real (R12.16):
- *   - Mesh fiel de coração humano com 14.913 triângulos (decimação stride=30)
+ *   - Mesh fiel de coração humano com ~8.000 triângulos (decimação stride=56)
  *   - Substitui a "pêra cardíaca" paramétrica (duas esferas + ápice)
  *   - Mesh nativa: 28.832 × 34.109 × 35.966 mm (X×Y×Z) — fonte 3MF
  *     "Coracao maior 3.1" (PrusaSlicer 2.7 export, unit=millimeter)

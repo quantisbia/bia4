@@ -38,7 +38,7 @@ import {
   Sliders, Activity, FlaskConical, Square, Plus, RotateCw, Grid3x3,
   Droplets, Beaker, AlertTriangle, CheckCircle2, Cpu, ChevronRight,
 } from "lucide-react"
-import { GcodeViewer3D } from "@/components/bioprinter/GcodeViewer3D"
+import { SafeGcodeViewer3D as GcodeViewer3D } from "@/components/bioprinter/SafeGcodeViewer3D"
 import { GcodeValidatorPanel } from "@/components/bioprinter/GcodeValidatorPanel"
 import { ToolpathAnalyzer } from "@/components/bioprinter/ToolpathAnalyzer"
 import { InfillStudio, type InfillPreset } from "@/components/bioprinter/InfillStudio"

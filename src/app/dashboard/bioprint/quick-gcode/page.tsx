@@ -48,7 +48,6 @@ import {
   verdictColor, NELSON_2021_CITATION, NELSON_OPTIMAL_WINDOWS,
 } from "@/lib/bioprint/printability-nelson2021"
 import { parseGcode, type ParsedGcode } from "@/lib/bioprint/toolpath-engine"
-import { GcodeViewer3D } from "@/components/bioprinter/GcodeViewer3D"
 import { GcodeValidatorPanel } from "@/components/bioprinter/GcodeValidatorPanel"
 
 // ─── Tipo de "carga" vinda do Formulator Pro ──────────────────────────────
