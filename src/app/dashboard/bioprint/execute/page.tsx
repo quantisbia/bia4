@@ -40,7 +40,7 @@ import {
   Upload, FileCode2, Eye, Terminal as TerminalIcon, Cpu, Zap, Radio,
   ChevronDown, ChevronRight, Download, Trash2, Gamepad2, Sparkles,
   ShieldAlert, Info, RotateCcw, Wand2, X, Clipboard, ArrowLeft,
-  Wrench, Undo2, Settings2,
+  Wrench, Undo2, Settings2, Droplet,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
@@ -418,6 +418,25 @@ export default function BioprintExecutePage() {
   const [autoHomeOnConnect, setAutoHomeOnConnect] = useState<boolean>(true)
   const [didAutoHome, setDidAutoHome] = useState<boolean>(false)
 
+  /**
+   * R12.24: Controle de fluxo (extrusão) em tempo real para hidrogéis.
+   *
+   * G-codes "filamento" tradicionais (FDM) calculam E com base em nozzle ×
+   * layerHeight e assumem material termoplástico. Para hidrogéis o fluxo
+   * ideal costuma ser muito menor — tipicamente 30%–60% dos valores
+   * calculados. Usamos Marlin M221 S{percent} (Set Flow Percentage) que
+   * multiplica TODOS os valores E subsequentes em runtime, permitindo
+   * otimização em tempo real durante a impressão.
+   *
+   * Default: 50 (apropriado para a maioria dos hidrogéis genéricos).
+   *
+   * flowAppliedRef rastreia o último valor efetivamente enviado, evitando
+   * reenvios redundantes quando o slider só muda visualmente.
+   */
+  const [flowPercent, setFlowPercent] = useState<number>(50)
+  const flowAppliedRef = useRef<number | null>(null)
+  const flowSendTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const transportRef = useRef<PrinterTransport | null>(null)
   const controllerRef = useRef<PrinterController | null>(null)
 
@@ -491,6 +510,16 @@ export default function BioprintExecutePage() {
         loggerRef.current.warn(`Não foi possível desabilitar timeout do motor: ${e instanceof Error ? e.message : String(e)}`)
       }
 
+      // R12.24: aplica fluxo inicial (default 50% — apropriado para hidrogéis).
+      // O usuário pode ajustar em tempo real depois via o painel "Fluxo do hidrogel".
+      try {
+        await controllerRef.current?.sendOnce(`M221 S${flowPercent} ; fluxo inicial ${flowPercent}% para hidrogel (R12.24)`)
+        flowAppliedRef.current = flowPercent
+        loggerRef.current.info(`Fluxo do hidrogel definido em ${flowPercent}% (M221). Ajustável em tempo real no painel "Fluxo do hidrogel".`, "controller")
+      } catch (e) {
+        loggerRef.current.warn(`Não foi possível definir fluxo inicial: ${e instanceof Error ? e.message : String(e)}`)
+      }
+
       // R12.23: Auto-home ao conectar envia APENAS G28 (home mecânico).
       // O G92 (definir ponto inicial / origem lógica) foi desacoplado e agora é uma
       // ação manual do usuário, disponível no painel de Comandos rápidos como
@@ -518,7 +547,7 @@ export default function BioprintExecutePage() {
       controllerRef.current = null
       setConnected(false)
     }
-  }, [connected, mode, supported, baud, autoHomeOnConnect])
+  }, [connected, mode, supported, baud, autoHomeOnConnect, flowPercent])
 
   // ─── DISCONNECT ──
   const handleDisconnect = useCallback(async () => {
@@ -560,11 +589,15 @@ export default function BioprintExecutePage() {
       return
     }
     try {
+      // R12.24: garante que o fluxo configurado (default 50% para hidrogéis)
+      // está aplicado ANTES do streaming começar. Sem isso, Marlin usaria o
+      // último M221 da sessão (pode ser 100% após reset).
+      await applyFlow(flowPercent)
       await controllerRef.current.start(gcodeText)
     } catch (e) {
       loggerRef.current.error(`Stream falhou: ${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [connected, gcodeText, validation, handleValidate])
+  }, [connected, gcodeText, validation, handleValidate, applyFlow, flowPercent])
 
   // ─── PAUSE / RESUME / CANCEL / EMERGENCY ──
   const handlePause = useCallback(() => controllerRef.current?.pause(), [])
@@ -612,6 +645,48 @@ export default function BioprintExecutePage() {
       loggerRef.current.error(`G92 falhou: ${e instanceof Error ? e.message : String(e)}`)
     }
   }, [connected])
+
+  /**
+   * R12.24: Aplica fluxo (M221) na impressora.
+   *
+   * Pode ser chamado em qualquer momento (antes ou durante o streaming) —
+   * Marlin processa M221 imediatamente e aplica nas próximas linhas de E.
+   * Usa sendOnce (fire-and-forget) pois M221 é instantâneo e não bloqueia.
+   *
+   * Idempotente: se o valor não mudou desde o último envio, não reenvía.
+   */
+  const applyFlow = useCallback(async (percent: number) => {
+    if (!controllerRef.current || !connected) return
+    const clamped = Math.max(10, Math.min(200, Math.round(percent)))
+    if (flowAppliedRef.current === clamped) return // sem mudança real
+    try {
+      await controllerRef.current.sendOnce(`M221 S${clamped} ; fluxo ${clamped}% (R12.24)`)
+      flowAppliedRef.current = clamped
+      loggerRef.current.ok(`Fluxo aplicado: ${clamped}% (M221 S${clamped}).`, "controller")
+    } catch (e) {
+      loggerRef.current.warn(`M221 falhou: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }, [connected])
+
+  /**
+   * R12.24: Handler do slider/preset — atualiza estado imediatamente e
+   * debounce o envio para M221 (evita spam quando o usuário arrasta).
+   * Durante o streaming, debounce é menor (120ms) para resposta rápida;
+   * fora dele, 250ms.
+   */
+  const handleFlowChange = useCallback((next: number) => {
+    setFlowPercent(next)
+    if (flowSendTimerRef.current) clearTimeout(flowSendTimerRef.current)
+    const delay = controllerState === "streaming" ? 120 : 250
+    flowSendTimerRef.current = setTimeout(() => { void applyFlow(next) }, delay)
+  }, [applyFlow, controllerState])
+
+  // Cleanup do timer ao desmontar
+  useEffect(() => {
+    return () => {
+      if (flowSendTimerRef.current) clearTimeout(flowSendTimerRef.current)
+    }
+  }, [])
 
   // R12.22: Home All manual (espelha o auto-home, mas sob demanda)
   const handleHomeAll = useCallback(async () => {
@@ -1657,6 +1732,191 @@ export default function BioprintExecutePage() {
               <div>
                 <div className="text-[9px] text-gray-500 uppercase">E</div>
                 <div className="text-emerald-300">{position.e.toFixed(2)}</div>
+              </div>
+            </div>
+          </Panel>
+
+          {/* ── R12.24: Fluxo do hidrogel (M221 em tempo real) ───── */}
+          <Panel
+            title="Fluxo do hidrogel"
+            icon={<Droplet className="w-4 h-4" />}
+            badge={`${flowPercent}%`}
+            badgeColor={
+              flowPercent < 30 ? "amber" :
+              flowPercent <= 70 ? "cyan" :
+              flowPercent <= 110 ? "emerald" : "violet"
+            }
+          >
+            <div className="space-y-2">
+              {/* Display grande + status */}
+              <div className="flex items-end justify-between">
+                <div className="flex items-baseline gap-1">
+                  <span className={cn(
+                    "text-2xl font-bold tabular-nums",
+                    flowPercent < 30 ? "text-amber-300" :
+                    flowPercent <= 70 ? "text-cyan-200" :
+                    flowPercent <= 110 ? "text-emerald-200" : "text-violet-200"
+                  )}>
+                    {flowPercent}
+                  </span>
+                  <span className="text-sm text-gray-400">%</span>
+                </div>
+                <div className="text-right text-[9px] leading-tight">
+                  {!connected ? (
+                    <span className="text-gray-500">Conecte para aplicar</span>
+                  ) : flowAppliedRef.current === flowPercent ? (
+                    <span className="text-emerald-400 flex items-center gap-0.5 justify-end">
+                      <CheckCircle2 className="w-2.5 h-2.5" /> M221 ativo
+                    </span>
+                  ) : (
+                    <span className="text-amber-300 animate-pulse">
+                      ajustando…
+                    </span>
+                  )}
+                  <div className="text-gray-500 mt-0.5">multiplica E em runtime</div>
+                </div>
+              </div>
+
+              {/* Slider 10–200% */}
+              <div>
+                <input
+                  type="range"
+                  min={10}
+                  max={200}
+                  step={1}
+                  value={flowPercent}
+                  onChange={(e) => handleFlowChange(parseInt(e.target.value, 10))}
+                  disabled={!connected}
+                  className="w-full accent-cyan-400 disabled:opacity-40"
+                  style={{
+                    background: `linear-gradient(to right,
+                      rgba(251,191,36,0.3) 0%,
+                      rgba(251,191,36,0.3) 15%,
+                      rgba(34,211,238,0.4) 15%,
+                      rgba(34,211,238,0.4) 47%,
+                      rgba(16,185,129,0.4) 47%,
+                      rgba(16,185,129,0.4) 58%,
+                      rgba(139,92,246,0.3) 58%,
+                      rgba(139,92,246,0.3) 100%)`
+                  }}
+                />
+                <div className="flex justify-between text-[8px] text-gray-500 mt-0.5 font-mono">
+                  <span>10%</span>
+                  <span className="text-amber-400/70">30</span>
+                  <span className="text-cyan-400/70">50</span>
+                  <span className="text-cyan-400/70">70</span>
+                  <span className="text-emerald-400/70">100</span>
+                  <span>200%</span>
+                </div>
+              </div>
+
+              {/* Presets */}
+              <div className="grid grid-cols-4 gap-1">
+                <button
+                  onClick={() => handleFlowChange(30)}
+                  disabled={!connected}
+                  title="Hidrogel leve / baixa viscosidade (alginato diluído, colágeno baixa conc.)"
+                  className={cn(
+                    "px-1 py-1 rounded text-[9px] font-bold border transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+                    flowPercent === 30
+                      ? "bg-amber-500/30 border-amber-400/60 text-amber-100"
+                      : "bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-200"
+                  )}
+                >
+                  <div>30%</div>
+                  <div className="text-[7px] font-normal opacity-70 leading-tight">Leve</div>
+                </button>
+                <button
+                  onClick={() => handleFlowChange(50)}
+                  disabled={!connected}
+                  title="Padrão para hidrogéis genéricos (GelMA, alginato 2%, Pluronic F-127)"
+                  className={cn(
+                    "px-1 py-1 rounded text-[9px] font-bold border transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+                    flowPercent === 50
+                      ? "bg-cyan-500/30 border-cyan-400/60 text-cyan-100"
+                      : "bg-cyan-500/10 hover:bg-cyan-500/20 border-cyan-500/30 text-cyan-200"
+                  )}
+                >
+                  <div>50%</div>
+                  <div className="text-[7px] font-normal opacity-70 leading-tight">Padrão</div>
+                </button>
+                <button
+                  onClick={() => handleFlowChange(70)}
+                  disabled={!connected}
+                  title="Hidrogel denso / alta viscosidade (alginato 5%, GelMA com fillers)"
+                  className={cn(
+                    "px-1 py-1 rounded text-[9px] font-bold border transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+                    flowPercent === 70
+                      ? "bg-cyan-500/30 border-cyan-400/60 text-cyan-100"
+                      : "bg-cyan-500/10 hover:bg-cyan-500/20 border-cyan-500/30 text-cyan-200"
+                  )}
+                >
+                  <div>70%</div>
+                  <div className="text-[7px] font-normal opacity-70 leading-tight">Denso</div>
+                </button>
+                <button
+                  onClick={() => handleFlowChange(100)}
+                  disabled={!connected}
+                  title="Sem ajuste — usa os valores E calculados pelo slicer (filamento FDM)"
+                  className={cn(
+                    "px-1 py-1 rounded text-[9px] font-bold border transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+                    flowPercent === 100
+                      ? "bg-emerald-500/30 border-emerald-400/60 text-emerald-100"
+                      : "bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-200"
+                  )}
+                >
+                  <div>100%</div>
+                  <div className="text-[7px] font-normal opacity-70 leading-tight">Filamento</div>
+                </button>
+              </div>
+
+              {/* Ajuste fino ±1% / ±5% */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleFlowChange(Math.max(10, flowPercent - 5))}
+                  disabled={!connected || flowPercent <= 10}
+                  className="flex-1 px-1 py-1 rounded text-[10px] font-mono bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 disabled:opacity-30"
+                  title="−5%"
+                >
+                  −5
+                </button>
+                <button
+                  onClick={() => handleFlowChange(Math.max(10, flowPercent - 1))}
+                  disabled={!connected || flowPercent <= 10}
+                  className="flex-1 px-1 py-1 rounded text-[10px] font-mono bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 disabled:opacity-30"
+                  title="−1%"
+                >
+                  −1
+                </button>
+                <button
+                  onClick={() => handleFlowChange(Math.min(200, flowPercent + 1))}
+                  disabled={!connected || flowPercent >= 200}
+                  className="flex-1 px-1 py-1 rounded text-[10px] font-mono bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 disabled:opacity-30"
+                  title="+1%"
+                >
+                  +1
+                </button>
+                <button
+                  onClick={() => handleFlowChange(Math.min(200, flowPercent + 5))}
+                  disabled={!connected || flowPercent >= 200}
+                  className="flex-1 px-1 py-1 rounded text-[10px] font-mono bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 disabled:opacity-30"
+                  title="+5%"
+                >
+                  +5
+                </button>
+              </div>
+
+              {/* Dica contextual */}
+              <div className={cn(
+                "rounded-md px-2 py-1.5 text-[9px] leading-tight border",
+                isStreaming
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-200"
+                  : "bg-cyan-500/5 border-cyan-500/20 text-cyan-200/80"
+              )}>
+                <Info className="w-2.5 h-2.5 inline mr-1 -mt-0.5" />
+                {isStreaming
+                  ? "Imprimindo — ajuste agora se notar sub-extrusão (linhas falhadas) ou super-extrusão (excesso na ponta)."
+                  : "Para hidrogéis, comece em 50%. Ajustável em tempo real durante a impressão via Marlin M221."}
               </div>
             </div>
           </Panel>
