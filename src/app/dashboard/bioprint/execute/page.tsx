@@ -40,12 +40,22 @@ import {
   Upload, FileCode2, Eye, Terminal as TerminalIcon, Cpu, Zap, Radio,
   ChevronDown, ChevronRight, Download, Trash2, Gamepad2, Sparkles,
   ShieldAlert, Info, RotateCcw, Wand2, X, Clipboard, ArrowLeft,
+  Wrench, Undo2, Settings2,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
 // Módulos novos R12.15
 import { PrintLogger, formatEntryText, type LogEntry, type LogSeverity } from "@/lib/bioprint/print-logger"
 import { validateGcode, verdictLabel, DEFAULT_BIO_LIMITS, type ValidationResult } from "@/lib/bioprint/gcode-validator"
+// R12.21: auto-fix inteligente de G-code bloqueado/com avisos
+import {
+  autoFixGcode,
+  summarizeAutoFix,
+  FIX_CODE_LABEL,
+  DEFAULT_AUTOFIX_OPTS,
+  type AutoFixOptions,
+  type AutoFixResult,
+} from "@/lib/bioprint/gcode-autofix"
 import { PrinterMock } from "@/lib/bioprint/printer-mock"
 import {
   PrinterConnection as RealPrinterConnection,
@@ -174,6 +184,58 @@ export default function BioprintExecutePage() {
     const v = verdictLabel(result.verdict)
     loggerRef.current.info(`Validação: ${v.text} (${result.errorCount} erros, ${result.warningCount} avisos)`, "validator")
   }, [gcodeText])
+
+  // ─── R12.21: Auto-fix inteligente ──
+  const [showAutoFixPanel, setShowAutoFixPanel] = useState(false)
+  const [autoFixOpts, setAutoFixOpts] = useState<AutoFixOptions>(DEFAULT_AUTOFIX_OPTS)
+  const [autoFixResult, setAutoFixResult] = useState<AutoFixResult | null>(null)
+  const [gcodeTextBeforeFix, setGcodeTextBeforeFix] = useState<string | null>(null)
+
+  /** Resumo do que dá pra corrigir (memoizado) — atualiza ao revalidar. */
+  const autoFixSummary = useMemo(() => {
+    if (!validation) return null
+    return summarizeAutoFix(validation)
+  }, [validation])
+
+  const handleAutoFix = useCallback(() => {
+    if (!validation) {
+      loggerRef.current.warn("Rode a validação primeiro para que o auto-fix saiba o que corrigir.")
+      return
+    }
+    if (!gcodeText.trim()) return
+    const result = autoFixGcode(gcodeText, validation, autoFixOpts)
+    if (result.applied.length === 0) {
+      loggerRef.current.warn("Nenhuma correção automática aplicável foi encontrada.")
+      return
+    }
+    // backup do original para Undo
+    setGcodeTextBeforeFix(gcodeText)
+    setGcodeText(result.fixedGcode)
+    setAutoFixResult(result)
+    loggerRef.current.ok(
+      `Auto-fix aplicou ${result.applied.length} correção(ões) em ${Object.keys(result.countByCode).length} categoria(s).`,
+      "validator",
+    )
+    // Revalidar automaticamente
+    const reval = validateGcode(result.fixedGcode, DEFAULT_BIO_LIMITS, "marlin")
+    setValidation(reval)
+    const v = verdictLabel(reval.verdict)
+    loggerRef.current.info(
+      `Após auto-fix: ${v.text} (${reval.errorCount} erros, ${reval.warningCount} avisos).`,
+      "validator",
+    )
+  }, [validation, gcodeText, autoFixOpts])
+
+  const handleUndoAutoFix = useCallback(() => {
+    if (gcodeTextBeforeFix == null) return
+    setGcodeText(gcodeTextBeforeFix)
+    setGcodeTextBeforeFix(null)
+    setAutoFixResult(null)
+    // Revalidar com o texto restaurado
+    const reval = validateGcode(gcodeTextBeforeFix, DEFAULT_BIO_LIMITS, "marlin")
+    setValidation(reval)
+    loggerRef.current.info("Auto-fix desfeito. G-code original restaurado.", "validator")
+  }, [gcodeTextBeforeFix])
 
   // ─── Preview 3D ──
   const [showPreview, setShowPreview] = useState(true)
@@ -783,14 +845,226 @@ export default function BioprintExecutePage() {
             badge={validation ? verdictLabel(validation.verdict).text : "Não validado"}
             badgeColor={validation ? (verdictLabel(validation.verdict).color as any) : "gray"}
           >
-            <button
-              onClick={handleValidate}
-              disabled={!gcodeText.trim()}
-              className="w-full px-3 py-2 rounded-lg text-xs font-bold bg-gradient-to-r from-cyan-500/20 to-violet-500/20 hover:from-cyan-500/30 hover:to-violet-500/30 border border-cyan-500/40 text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              <ShieldAlert className="w-4 h-4" />
-              Validar G-code
-            </button>
+            {/* R12.21: Validar + Auto-fix lado a lado */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                onClick={handleValidate}
+                disabled={!gcodeText.trim()}
+                className="px-3 py-2 rounded-lg text-xs font-bold bg-gradient-to-r from-cyan-500/20 to-violet-500/20 hover:from-cyan-500/30 hover:to-violet-500/30 border border-cyan-500/40 text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <ShieldAlert className="w-4 h-4" />
+                Validar G-code
+              </button>
+              <button
+                onClick={handleAutoFix}
+                disabled={!validation || !autoFixSummary || autoFixSummary.totalFixable === 0}
+                title={
+                  !validation
+                    ? "Rode a validação primeiro"
+                    : autoFixSummary && autoFixSummary.totalFixable > 0
+                      ? `Corrigir automaticamente ${autoFixSummary.totalFixable} problema(s)`
+                      : "Nada a corrigir automaticamente"
+                }
+                className={cn(
+                  "px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 border",
+                  autoFixSummary && autoFixSummary.totalFixable > 0
+                    ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 border-amber-300 text-black shadow-lg shadow-amber-500/30 animate-pulse"
+                    : "bg-white/5 border-white/10 text-gray-500 cursor-not-allowed opacity-50",
+                )}
+              >
+                <Wrench className="w-4 h-4" />
+                {autoFixSummary && autoFixSummary.totalFixable > 0
+                  ? `Corrigir ${autoFixSummary.totalFixable} problema(s)`
+                  : "Sem correções"}
+              </button>
+            </div>
+
+            {/* R12.21: Bloco de detalhes / opções do auto-fix */}
+            {validation && autoFixSummary && (autoFixSummary.totalFixable > 0 || autoFixResult) && (
+              <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/5 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowAutoFixPanel((v) => !v)}
+                  className="w-full px-3 py-2 flex items-center justify-between text-[11px] font-semibold text-amber-100 hover:bg-amber-500/10 transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <Settings2 className="w-3.5 h-3.5" />
+                    Ajustes do Auto-fix
+                    {autoFixResult && (
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 text-[9px] font-mono">
+                        {autoFixResult.applied.length} aplicada(s)
+                      </span>
+                    )}
+                  </span>
+                  {showAutoFixPanel ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                </button>
+
+                {showAutoFixPanel && (
+                  <div className="px-3 pb-3 pt-1 space-y-3 text-[10px]">
+                    {/* Lista do que será corrigido */}
+                    {autoFixSummary.totalFixable > 0 && (
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wider text-amber-200/80 font-semibold mb-1">
+                          O auto-fix pode corrigir:
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                          {Object.entries(autoFixSummary.fixableByCode).map(([code, count]) => (
+                            <div
+                              key={code}
+                              className="px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 flex items-center justify-between gap-2"
+                            >
+                              <span className="text-amber-100">
+                                {FIX_CODE_LABEL[code] || code}
+                              </span>
+                              <span className="font-mono text-amber-300 font-bold">
+                                ×{count}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Parâmetros ajustáveis */}
+                    <div className="pt-2 border-t border-amber-500/20">
+                      <div className="text-[10px] uppercase tracking-wider text-amber-200/80 font-semibold mb-1">
+                        Parâmetros (ajuste e clique em Corrigir):
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="flex flex-col gap-0.5">
+                          <span className="text-gray-400">F default (mm/min)</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={autoFixOpts.limits.feedrateMaxMmMin}
+                            step={50}
+                            value={autoFixOpts.defaultFeedrate}
+                            onChange={(e) => setAutoFixOpts((o) => ({ ...o, defaultFeedrate: Math.max(1, parseInt(e.target.value || "0", 10)) }))}
+                            className="px-2 py-1 bg-black/40 border border-amber-500/30 rounded text-[11px] font-mono text-amber-100 focus:outline-none focus:border-amber-400"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-0.5">
+                          <span className="text-gray-400">Hotend seguro (°C)</span>
+                          <input
+                            type="number"
+                            min={20}
+                            max={autoFixOpts.limits.hotendMaxC}
+                            step={1}
+                            value={autoFixOpts.safeHotendC}
+                            onChange={(e) => setAutoFixOpts((o) => ({ ...o, safeHotendC: Math.max(20, parseInt(e.target.value || "37", 10)) }))}
+                            className="px-2 py-1 bg-black/40 border border-amber-500/30 rounded text-[11px] font-mono text-amber-100 focus:outline-none focus:border-amber-400"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-0.5">
+                          <span className="text-gray-400">Retração máx (mm)</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={50}
+                            step={0.5}
+                            value={autoFixOpts.maxRetractMm}
+                            onChange={(e) => setAutoFixOpts((o) => ({ ...o, maxRetractMm: Math.max(1, parseFloat(e.target.value || "10")) }))}
+                            className="px-2 py-1 bg-black/40 border border-amber-500/30 rounded text-[11px] font-mono text-amber-100 focus:outline-none focus:border-amber-400"
+                          />
+                        </label>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-gray-400">Comportamento</span>
+                          <div className="flex flex-wrap gap-1">
+                            <label className="flex items-center gap-1 text-[10px] text-amber-100/90 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={autoFixOpts.commentUnknown}
+                                onChange={(e) => setAutoFixOpts((o) => ({ ...o, commentUnknown: e.target.checked }))}
+                                className="accent-amber-400"
+                              />
+                              Comentar cmd. desconhecidos
+                            </label>
+                            <label className="flex items-center gap-1 text-[10px] text-amber-100/90 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={autoFixOpts.commentG28}
+                                onChange={(e) => setAutoFixOpts((o) => ({ ...o, commentG28: e.target.checked }))}
+                                className="accent-amber-400"
+                              />
+                              Comentar G28
+                            </label>
+                            <label className="flex items-center gap-1 text-[10px] text-amber-100/90 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={autoFixOpts.injectUnits}
+                                onChange={(e) => setAutoFixOpts((o) => ({ ...o, injectUnits: e.target.checked }))}
+                                className="accent-amber-400"
+                              />
+                              Inserir G21
+                            </label>
+                            <label className="flex items-center gap-1 text-[10px] text-amber-100/90 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={autoFixOpts.injectPositioning}
+                                onChange={(e) => setAutoFixOpts((o) => ({ ...o, injectPositioning: e.target.checked }))}
+                                className="accent-amber-400"
+                              />
+                              Inserir G90
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Issues que NÃO podem ser auto-corrigidas */}
+                    {autoFixSummary.totalUnfixable > 0 && (
+                      <div className="pt-2 border-t border-amber-500/20">
+                        <div className="text-[10px] uppercase tracking-wider text-rose-300/80 font-semibold mb-1">
+                          Precisam de revisão manual:
+                        </div>
+                        <div className="space-y-0.5">
+                          {Object.entries(autoFixSummary.unfixableByCode).map(([code, count]) => (
+                            <div key={code} className="text-[10px] text-rose-200/90">
+                              <span className="font-mono">[{code}]</span> ×{count}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Resultado da última passada */}
+                    {autoFixResult && autoFixResult.applied.length > 0 && (
+                      <div className="pt-2 border-t border-amber-500/20">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] uppercase tracking-wider text-emerald-300/80 font-semibold">
+                            Últimas correções aplicadas:
+                          </span>
+                          <button
+                            onClick={handleUndoAutoFix}
+                            className="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-100 flex items-center gap-1"
+                          >
+                            <Undo2 className="w-3 h-3" />
+                            Desfazer
+                          </button>
+                        </div>
+                        <div className="max-h-32 overflow-y-auto space-y-0.5 text-[10px] font-mono">
+                          {autoFixResult.applied.slice(0, 20).map((fix, i) => (
+                            <div
+                              key={i}
+                              className="px-2 py-1 rounded bg-emerald-500/5 border border-emerald-500/20 text-emerald-100/90"
+                            >
+                              <span className="font-bold">L{fix.line}</span>{" "}
+                              <span className="text-[9px] uppercase opacity-60">[{fix.code}]</span>{" "}
+                              {fix.description}
+                            </div>
+                          ))}
+                          {autoFixResult.applied.length > 20 && (
+                            <div className="text-center text-[10px] text-gray-400">
+                              ... e mais {autoFixResult.applied.length - 20} correção(ões).
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {validation && (
               <div className="mt-3 space-y-2">
@@ -823,21 +1097,36 @@ export default function BioprintExecutePage() {
                       )}
                     </div>
                     <div className="max-h-48 overflow-y-auto space-y-0.5 text-[10px] font-mono">
-                      {(showAllIssues ? validation.issues : validation.issues.slice(0, 8)).map((iss, i) => (
-                        <div
-                          key={i}
-                          className={cn(
-                            "px-2 py-1 rounded border",
-                            iss.severity === "error" && "bg-rose-500/10 border-rose-500/30 text-rose-200",
-                            iss.severity === "warning" && "bg-amber-500/10 border-amber-500/30 text-amber-200",
-                            iss.severity === "info" && "bg-cyan-500/10 border-cyan-500/30 text-cyan-200",
-                          )}
-                        >
-                          <span className="font-bold">L{iss.line}</span>{" "}
-                          <span className="text-[9px] uppercase opacity-60">[{iss.code}]</span>{" "}
-                          {iss.message}
-                        </div>
-                      ))}
+                      {(showAllIssues ? validation.issues : validation.issues.slice(0, 8)).map((iss, i) => {
+                        const fixable = FIX_CODE_LABEL[iss.code] !== undefined
+                        return (
+                          <div
+                            key={i}
+                            className={cn(
+                              "px-2 py-1 rounded border flex items-start gap-2",
+                              iss.severity === "error" && "bg-rose-500/10 border-rose-500/30 text-rose-200",
+                              iss.severity === "warning" && "bg-amber-500/10 border-amber-500/30 text-amber-200",
+                              iss.severity === "info" && "bg-cyan-500/10 border-cyan-500/30 text-cyan-200",
+                            )}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <span className="font-bold">L{iss.line}</span>{" "}
+                              <span className="text-[9px] uppercase opacity-60">[{iss.code}]</span>{" "}
+                              {iss.message}
+                            </div>
+                            {/* R12.21: badge "auto-fix disponível" */}
+                            {fixable && (
+                              <span
+                                title="Esta issue pode ser corrigida pelo botão Auto-fix"
+                                className="shrink-0 px-1.5 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[9px] uppercase tracking-wider font-bold flex items-center gap-1"
+                              >
+                                <Wrench className="w-2.5 h-2.5" />
+                                fix
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
@@ -1024,9 +1313,24 @@ export default function BioprintExecutePage() {
               </div>
             )}
             {connected && validation?.verdict === "blocked" && (
-              <div className="mb-3 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/40 text-rose-200 text-xs flex items-start gap-2">
-                <ShieldAlert className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                <span>O G-code está BLOQUEADO ({validation.errorCount} erros). Corrija antes de enviar.</span>
+              <div className="mb-3 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/40 text-rose-200 text-xs flex flex-col sm:flex-row sm:items-center gap-2">
+                <div className="flex items-start gap-2 flex-1">
+                  <ShieldAlert className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>O G-code está BLOQUEADO ({validation.errorCount} erros). Corrija antes de enviar.</span>
+                </div>
+                {/* R12.21: atalho de auto-fix dentro do próprio alerta de bloqueio */}
+                {autoFixSummary && autoFixSummary.totalFixable > 0 && (
+                  <button
+                    onClick={() => {
+                      handleAutoFix()
+                      setShowAutoFixPanel(true)
+                    }}
+                    className="shrink-0 px-3 py-1.5 rounded-md text-[11px] font-bold bg-amber-500 hover:bg-amber-400 text-black border border-amber-300 shadow-lg shadow-amber-500/30 flex items-center gap-1.5 animate-pulse"
+                  >
+                    <Wrench className="w-3.5 h-3.5" />
+                    Corrigir {autoFixSummary.totalFixable} automaticamente
+                  </button>
+                )}
               </div>
             )}
             <div className="flex flex-wrap gap-2">
