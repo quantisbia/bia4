@@ -404,6 +404,17 @@ export default function BioprintExecutePage() {
   const [connected, setConnected] = useState(false)
   const [firmware, setFirmware] = useState<FirmwareInfo | null>(null)
   const [supported, setSupported] = useState(false)
+  /**
+   * R12.22: Auto-home ao conectar. Default ON. Sequência ao conectar:
+   *   1) Handshake M115
+   *   2) M18 S0 (motor sempre ligado)
+   *   3) Se autoHomeOnConnect=true → G28 (home all eixos)
+   *   4) G92 X0 Y0 Z0 E0 (zera coordenadas — G-codes começam de onde o cabeçote está)
+   * Assim os G-codes gerados NÃO precisam mais incluir G28 e podem assumir
+   * que (0,0,0) é a posição corrente. Em mock, sempre faz (não há risco).
+   */
+  const [autoHomeOnConnect, setAutoHomeOnConnect] = useState<boolean>(true)
+  const [didAutoHome, setDidAutoHome] = useState<boolean>(false)
 
   const transportRef = useRef<PrinterTransport | null>(null)
   const controllerRef = useRef<PrinterController | null>(null)
@@ -477,6 +488,28 @@ export default function BioprintExecutePage() {
       } catch (e) {
         loggerRef.current.warn(`Não foi possível desabilitar timeout do motor: ${e instanceof Error ? e.message : String(e)}`)
       }
+
+      // R12.22: Auto-home all + G92 (zera referência). G-codes geradores não incluem
+      // mais G28 — o home é feito UMA VEZ ao conectar, e o G92 estabelece a origem
+      // no ponto atual do cabeçote para que os G-codes posteriores comecem dali.
+      if (autoHomeOnConnect) {
+        try {
+          loggerRef.current.info("Auto-home: enviando G28 (home all eixos)…", "controller")
+          // Marlin: G28 retorna ok só ao terminar o home; timeout padrão do controller (30s) basta
+          await controllerRef.current?.sendAndWait("G28 ; auto-home all (R12.22)")
+          loggerRef.current.ok("Home concluído em todos os eixos (G28).", "controller")
+          await controllerRef.current?.sendOnce("G92 X0 Y0 Z0 E0 ; zera referência no ponto atual")
+          loggerRef.current.ok("Coordenadas zeradas: G-codes posteriores começam de (0,0,0).", "controller")
+          setPosition({ x: 0, y: 0, z: 0, e: 0 })
+          setDidAutoHome(true)
+        } catch (e) {
+          loggerRef.current.warn(`Auto-home falhou: ${e instanceof Error ? e.message : String(e)}. Use o botão "Home All" do painel se a impressora estiver pronta.`)
+          setDidAutoHome(false)
+        }
+      } else {
+        loggerRef.current.info("Auto-home desabilitado — use o botão \"Home All\" se necessário.", "controller")
+        setDidAutoHome(false)
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       loggerRef.current.error(`Falha ao conectar: ${msg}`)
@@ -484,7 +517,7 @@ export default function BioprintExecutePage() {
       controllerRef.current = null
       setConnected(false)
     }
-  }, [connected, mode, supported, baud])
+  }, [connected, mode, supported, baud, autoHomeOnConnect])
 
   // ─── DISCONNECT ──
   const handleDisconnect = useCallback(async () => {
@@ -578,6 +611,29 @@ export default function BioprintExecutePage() {
       loggerRef.current.error(`G92 falhou: ${e instanceof Error ? e.message : String(e)}`)
     }
   }, [connected])
+
+  // R12.22: Home All manual (espelha o auto-home, mas sob demanda)
+  const handleHomeAll = useCallback(async () => {
+    if (!controllerRef.current || !connected) {
+      loggerRef.current.warn("Conecte antes de fazer home.")
+      return
+    }
+    if (controllerState === "streaming") {
+      loggerRef.current.warn("Aguarde o streaming terminar antes de fazer home.")
+      return
+    }
+    try {
+      loggerRef.current.info("Home All: enviando G28…", "controller")
+      await controllerRef.current.sendAndWait("G28 ; home all (manual)")
+      loggerRef.current.ok("Home All concluído.", "controller")
+      await controllerRef.current.sendOnce("G92 X0 Y0 Z0 E0 ; zera referência")
+      setPosition({ x: 0, y: 0, z: 0, e: 0 })
+      setDidAutoHome(true)
+      loggerRef.current.ok("Coordenadas zeradas no ponto atual.", "controller")
+    } catch (e) {
+      loggerRef.current.error(`Home All falhou: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }, [connected, controllerState])
 
   // ─── Manual command ──
   const [manualCmd, setManualCmd] = useState("")
@@ -1408,6 +1464,25 @@ export default function BioprintExecutePage() {
                     </select>
                   </div>
                 )}
+                {/* R12.22: Toggle auto-home — explícito antes de conectar */}
+                <label className="flex items-start gap-2 mb-2 p-2 rounded-lg bg-cyan-500/5 border border-cyan-500/20 cursor-pointer hover:bg-cyan-500/10 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={autoHomeOnConnect}
+                    onChange={(e) => setAutoHomeOnConnect(e.target.checked)}
+                    className="mt-0.5 accent-cyan-400"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[11px] font-semibold text-cyan-100 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> Auto-home ao conectar
+                    </div>
+                    <div className="text-[9px] text-cyan-200/70 leading-tight mt-0.5">
+                      Faz <span className="font-mono">G28</span> +{" "}
+                      <span className="font-mono">G92</span> assim que conectar. Os G-codes
+                      não precisam mais incluir home — começam de onde o cabeçote estiver.
+                    </div>
+                  </div>
+                </label>
                 <button
                   onClick={handleConnect}
                   disabled={mode === "real" && !supported}
@@ -1447,6 +1522,28 @@ export default function BioprintExecutePage() {
                     )}
                   </div>
                 )}
+                {/* R12.22: Status do auto-home + botão de Home All manual */}
+                <div className={cn(
+                  "mb-2 px-2.5 py-1.5 rounded-lg border text-[10px] flex items-start gap-2",
+                  didAutoHome
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-200"
+                    : "bg-amber-500/10 border-amber-500/30 text-amber-200"
+                )}>
+                  <Sparkles className="w-3 h-3 mt-0.5 shrink-0" />
+                  <span>
+                    {didAutoHome
+                      ? "Home concluído · origem (0,0,0) no ponto atual. G-codes começarão daqui."
+                      : "Sem home neste sessão. Faça Home All antes de imprimir."}
+                  </span>
+                </div>
+                <button
+                  onClick={handleHomeAll}
+                  disabled={controllerState === "streaming"}
+                  className="w-full mb-2 px-3 py-2 rounded-lg text-xs font-bold bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-100 transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Home All (G28 + G92)
+                </button>
                 <button
                   onClick={handleDisconnect}
                   className="w-full px-3 py-2 rounded-lg text-xs font-bold bg-red-600/30 hover:bg-red-600/50 border border-red-500/50 text-red-100 transition-colors flex items-center justify-center gap-2"

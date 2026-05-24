@@ -84,6 +84,41 @@ function recommendAlgorithm(category: string | null, hasCells: boolean): EngineA
   return "gyroid_tpms"
 }
 
+// ─── R12.22: Mapeamento direto pattern (UI) → algorithm (engine) ─────────────
+// Antes existiam DOIS seletores (Algoritmo + Padrão BIA/Clássico) e o usuário
+// podia escolher combinações conflitantes. Agora o algoritmo é DERIVADO do
+// padrão escolhido (família + id) — uma única decisão.
+const PATTERN_TO_ALGORITHM: Record<string, EngineAlgorithm> = {
+  // Biomédico (BIA) — escolhas que mapeiam a algoritmos do engine
+  "parallel-lines":       "linear",
+  "sacrificial-vascular": "voronoi_2d",
+  "hex-macropores":       "honeycomb",
+  "gradient-micropores":  "gradient",
+  "zonal-multimaterial":  "gradient",
+  "embedded-spheroids":   "voronoi_3d",
+  "freeform-suspension":  "perlin_noise",
+  // Clássico (slicer)
+  "classic-lines":         "linear",
+  "classic-grid":          "rectilinear",
+  "classic-triangular":    "rectilinear",
+  "classic-trihexagon":    "honeycomb",
+  "classic-cubic":         "rectilinear",
+  "classic-octet":         "honeycomb",
+  "classic-concentric":    "concentric",
+  "classic-zigzag":        "rectilinear",
+  "classic-wave":          "perlin_noise",
+  "classic-crosshatch":    "rectilinear",
+  "classic-gyroid-light":  "gyroid_tpms",
+}
+
+function patternToAlgorithm(
+  patternId: string,
+  category: string | null,
+  hasCells: boolean,
+): EngineAlgorithm {
+  return PATTERN_TO_ALGORITHM[patternId] ?? recommendAlgorithm(category, hasCells)
+}
+
 // ─── Tipo do resultado do engine ────────────────────────────────────────────
 interface GCodeResponse {
   success: boolean
@@ -138,9 +173,6 @@ export default function BioprintSlicePage() {
   // ── Parâmetros do slicer ──
   // Inicializa do state.slice (se houver) ou de defaults conservadores
   const [bioprinterId, setBioprinterId] = useState<string>("cellink_biox")
-  const [algorithm, setAlgorithm] = useState<EngineAlgorithm>(
-    () => recommendAlgorithm(state.model.category, !!state.bioink.cellType)
-  )
 
   // Recomendar perfil térmico baseado na biotinta
   const recommendedProfile = useMemo(() => pickTempProfile(state.bioink.material), [state.bioink.material])
@@ -157,6 +189,17 @@ export default function BioprintSlicePage() {
   const [infillPatternId, setInfillPatternId] = useState<string>(state.slice.infillPatternId ?? INFILL_PATTERNS[0].id)
   /** R12.11: Família do padrão de infill — biomédico (BIA) ou clássico (Cura-style) */
   const [infillFamily, setInfillFamily] = useState<"biomedical" | "classic">("biomedical")
+
+  /**
+   * R12.22: O algorithm é DERIVADO automaticamente do padrão escolhido (família +
+   * id) em vez de ser uma escolha independente. Isso elimina o conflito anterior
+   * entre o seletor "Algoritmo de preenchimento" e o seletor "Biomédico/Clássico"
+   * (que podiam apontar para coisas incompatíveis). Uma única decisão do usuário.
+   */
+  const algorithm: EngineAlgorithm = useMemo(
+    () => patternToAlgorithm(infillPatternId, state.model.category, !!state.bioink.cellType),
+    [infillPatternId, state.model.category, state.bioink.cellType],
+  )
   const [walls, setWalls] = useState<number>(2)
   const [skirtLoops, setSkirtLoops] = useState<number>(state.slice.skirtLoops ?? 2)
   const [retractionMm, setRetractionMm] = useState<number>(state.slice.retractionMm ?? 0)
@@ -730,7 +773,7 @@ export default function BioprintSlicePage() {
           <ParamsPanel
             bioprinterId={bioprinterId} onBioprinterChange={setBioprinterId}
             currentPrinter={currentPrinter}
-            algorithm={algorithm} onAlgorithmChange={setAlgorithm}
+            algorithm={algorithm} /* R12.22: derivado do padrão (sem setter) */
             layerHeightMm={layerHeightMm} onLayerHeightChange={setLayerHeightMm}
             printSpeedMmS={printSpeedMmS} onPrintSpeedChange={setPrintSpeedMmS}
             pressureKPa={pressureKPa} onPressureChange={setPressureKPa}
@@ -873,7 +916,8 @@ function TabButton({
 interface ParamsProps {
   bioprinterId: string; onBioprinterChange: (id: string) => void
   currentPrinter: ReturnType<typeof getBioprinterById>
-  algorithm: EngineAlgorithm; onAlgorithmChange: (a: EngineAlgorithm) => void
+  /** R12.22: agora só-leitura — derivado do padrão de infill escolhido. */
+  algorithm: EngineAlgorithm
   layerHeightMm: number; onLayerHeightChange: (n: number) => void
   printSpeedMmS: number; onPrintSpeedChange: (n: number) => void
   pressureKPa: number; onPressureChange: (n: number) => void
@@ -954,51 +998,46 @@ function ParamsPanel(p: ParamsProps) {
         )}
       </section>
 
-      {/* ── Algoritmo de infill ── */}
-      <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-violet-400" />
-            Algoritmo de preenchimento
-          </h3>
-          {recommendedAlgo === p.algorithm && (
-            <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
-              ✓ Recomendado
+      {/*
+        R12.22: A seção "Algoritmo de preenchimento" foi REMOVIDA daqui.
+        O algoritmo do engine agora é derivado automaticamente do "Padrão
+        de infill" escolhido logo abaixo (Biomédico ou Clássico) — uma
+        única decisão do usuário, sem conflito entre os dois seletores.
+        Um pequeno indicador mostra qual algoritmo está ativo, com dica de
+        otimização da BIA quando o padrão escolhido difere do recomendado.
+      */}
+      <section className="rounded-2xl border border-violet-500/20 bg-gradient-to-r from-violet-500/[0.07] to-fuchsia-500/[0.05] p-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 min-w-0">
+            <Sparkles className="w-4 h-4 text-violet-400 shrink-0" />
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase tracking-wider text-violet-300/80 font-semibold">
+                Algoritmo do engine (auto-derivado do padrão)
+              </div>
+              <div className="text-sm font-bold text-violet-100 truncate">
+                {algoInfo?.icon} {algoInfo?.name ?? p.algorithm}
+                <span className="ml-2 text-[10px] font-normal text-violet-300/70">
+                  · {algoInfo?.category}
+                </span>
+              </div>
+            </div>
+          </div>
+          {recommendedAlgo === p.algorithm ? (
+            <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 shrink-0">
+              ✓ BIA recomenda este algoritmo
+            </span>
+          ) : (
+            <span
+              className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-200 shrink-0"
+              title={`Para sua biotinta + modelo, a BIA recomendaria: ${ENGINE_ALGORITHMS.find(a => a.id === recommendedAlgo)?.name}`}
+            >
+              ⚠ BIA sugere: {ENGINE_ALGORITHMS.find(a => a.id === recommendedAlgo)?.name}
             </span>
           )}
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-3">
-          {ENGINE_ALGORITHMS.map(algo => (
-            <button
-              key={algo.id}
-              onClick={() => p.onAlgorithmChange(algo.id)}
-              className={cn(
-                "p-2.5 rounded-xl border text-left transition-all",
-                p.algorithm === algo.id
-                  ? "border-violet-500/50 bg-violet-500/10 ring-1 ring-violet-500/30"
-                  : "border-white/8 bg-white/3 hover:border-white/15 hover:bg-white/5",
-                recommendedAlgo === algo.id && p.algorithm !== algo.id && "border-emerald-500/30"
-              )}
-            >
-              <div className="flex items-center justify-between mb-0.5">
-                <span className="text-sm">{algo.icon}</span>
-                {recommendedAlgo === algo.id && p.algorithm !== algo.id && (
-                  <span className="text-[8px] text-emerald-400 font-bold">REC</span>
-                )}
-              </div>
-              <div className={cn(
-                "text-xs font-semibold leading-tight",
-                p.algorithm === algo.id ? "text-violet-200" : "text-white"
-              )}>
-                {algo.name}
-              </div>
-              <div className="text-[9px] text-gray-500 mt-0.5">{algo.category}</div>
-            </button>
-          ))}
-        </div>
         {algoInfo && (
-          <div className="rounded-xl bg-violet-500/5 border border-violet-500/20 p-3 text-xs text-violet-100/85">
-            <strong className="text-violet-300">Melhor para:</strong> {algoInfo.bestFor.join(", ")}
+          <div className="mt-2 text-[11px] text-violet-100/80">
+            <strong className="text-violet-300">Melhor para:</strong> {algoInfo.bestFor.join(" · ")}
           </div>
         )}
       </section>
