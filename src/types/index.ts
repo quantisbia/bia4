@@ -83,12 +83,12 @@ export const PLANS: PlanConfig[] = [
   {
     id: "ADVANCED",
     name: "Biofabricação 3D",
-    price: 490,
+    price: 190,
     credits: 1500,
     color: "blue",
     popular: true,
     features: [
-      "1.500 créditos/mês",
+      "1.500 créditos",
       "Todos os módulos",
       "Formulador avançado",
       "Organoid Builder",
@@ -99,11 +99,11 @@ export const PLANS: PlanConfig[] = [
   {
     id: "ENTERPRISE",
     name: "Biofabricação 3D Avançada",
-    price: 990,
+    price: 375,
     credits: 5000,
     color: "purple",
     features: [
-      "5.000 créditos/mês",
+      "5.000 créditos",
       "Tudo do Biofabricação 3D",
       "807+ formulações validadas",
       "RAG científico avançado",
@@ -118,7 +118,7 @@ export const PLANS: PlanConfig[] = [
     credits: 20000,
     color: "amber",
     features: [
-      "20.000 créditos/mês",
+      "20.000 créditos (6 meses)",
       "Tudo do Biofabricação 3D Avançada",
       "Workspace para equipes",
       "Treinamento IA personalizado",

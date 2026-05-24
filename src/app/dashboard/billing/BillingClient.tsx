@@ -6,8 +6,8 @@ import {
   Zap, Star, CheckCircle2, Clock, TrendingDown, TrendingUp,
   CreditCard, RefreshCw, ExternalLink, Calendar, Crown,
   ChevronDown, ChevronUp, FlaskConical,
-  Brain, Microscope, Package, Gift, Percent, ArrowRight,
-  ShieldCheck, Tag, Timer, Info, GraduationCap,
+  Brain, Microscope, Package, ArrowRight,
+  ShieldCheck, Timer, Info, GraduationCap,
 } from "lucide-react"
 import { CreditProgressBar, CreditBadge } from "@/components/credits/CreditWidgets"
 import { useToast } from "@/components/ui/Toast"
@@ -24,22 +24,20 @@ const LEGACY_PLAN_PRICES: Record<string, number> = {
   ORGANOID_LAB: 150,
   DISCOVERY:    270,
 }
+// R12.26: COMPRA DE CRÉDITOS (não é mais assinatura mensal).
+// Preços e nomes finais; ids preservados para compat. com backend.
+// Toggle mensal/anual removido — é uma compra única de pacote de créditos.
 const PLANS = [
-  // R12.25: catálogo reduzido a 2 planos principais + Academy.
-  // ids ADVANCED/ENTERPRISE preservados para compatibilidade com backend
-  // (hierarquia de features em src/lib/config.ts e assinaturas existentes).
   {
     id: "ADVANCED",
     name: "Biofabricação 3D",
-    price: 490,
-    annualPrice: 392,
+    price: 190,
     credits: 1500,
     color: "blue",
     badge: "POPULAR",
     paymentUrl: "https://www.asaas.com/c/kfvg9q66i3odmtsu",
-    annualPaymentUrl: "https://www.asaas.com/c/kfvg9q66i3odmtsu",
     features: [
-      "1.500 créditos/mês",
+      "1.500 créditos",
       "Todos os módulos",
       "Formulador avançado",
       "Organoid Builder",
@@ -51,15 +49,13 @@ const PLANS = [
     id: "ENTERPRISE",
     name: "Biofabricação 3D Avançada",
     name_short: "Biofab 3D Avançada",
-    price: 990,
-    annualPrice: 792,
+    price: 375,
     credits: 5000,
     color: "purple",
     badge: null,
     paymentUrl: "https://www.asaas.com/c/87510sceyl5as6n7",
-    annualPaymentUrl: "https://www.asaas.com/c/87510sceyl5as6n7",
     features: [
-      "5.000 créditos/mês",
+      "5.000 créditos",
       "Tudo do Biofabricação 3D",
       "807+ formulações validadas",
       "RAG científico avançado",
@@ -71,12 +67,10 @@ const PLANS = [
     id: "ACADEMY",
     name: "BIA Academy",
     price: 4970,
-    annualPrice: 4970,
     credits: 20000,
     color: "amber",
     badge: "6 MESES + CURSO",
     paymentUrl: "https://www.asaas.com/c/9nvzkrlezi7ht2u5",
-    annualPaymentUrl: "https://www.asaas.com/c/9nvzkrlezi7ht2u5",
     features: [
       "6 meses de acesso completo",
       "Curso presencial incluso",
@@ -223,62 +217,8 @@ const PLAN_CREDITS_MAX: Record<string, number> = {
 /* ─────────────────────────────────────────────────────────────────────────
    Annual Savings Calculator
 ───────────────────────────────────────────────────────────────────────── */
-function AnnualSavingsBanner({ billingCycle }: { billingCycle: "monthly" | "annual" }) {
-  if (billingCycle !== "annual") return null
-
-  return (
-    <div className="flex items-center gap-3 bg-emerald-500/[0.06] border border-emerald-500/15 rounded-xl px-4 py-3 mb-4 animate-fadeIn">
-      <div className="w-8 h-8 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
-        <Percent className="w-4 h-4 text-emerald-400" />
-      </div>
-      <div>
-        <p className="text-sm text-emerald-300 font-semibold">Economize 20% com plano anual</p>
-        <p className="text-[11px] text-gray-400">Pague 10 meses e ganhe 12. Cancele quando quiser.</p>
-      </div>
-      <Tag className="w-5 h-5 text-emerald-400/50 shrink-0 ml-auto" />
-    </div>
-  )
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   Billing Cycle Toggle
-───────────────────────────────────────────────────────────────────────── */
-function BillingCycleToggle({
-  billingCycle, setBillingCycle,
-}: {
-  billingCycle: "monthly" | "annual"
-  setBillingCycle: (v: "monthly" | "annual") => void
-}) {
-  return (
-    <div className="flex items-center justify-center gap-3 mb-5">
-      <button
-        onClick={() => setBillingCycle("monthly")}
-        className={cn(
-          "px-4 py-2 rounded-xl text-sm font-medium transition-all",
-          billingCycle === "monthly"
-            ? "bg-violet-500/15 text-violet-300 border border-violet-500/25"
-            : "text-gray-500 hover:text-gray-300"
-        )}
-      >
-        Mensal
-      </button>
-      <button
-        onClick={() => setBillingCycle("annual")}
-        className={cn(
-          "px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2",
-          billingCycle === "annual"
-            ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/25"
-            : "text-gray-500 hover:text-gray-300"
-        )}
-      >
-        Anual
-        <span className="text-[10px] font-bold bg-emerald-500 text-white px-1.5 py-0.5 rounded-full">
-          -20%
-        </span>
-      </button>
-    </div>
-  )
-}
+// R12.26: AnnualSavingsBanner e BillingCycleToggle removidos —
+// não há mais ciclo de cobrança (compra única de créditos).
 
 /* ─────────────────────────────────────────────────────────────────────────
    Credit Packs Section
@@ -379,10 +319,10 @@ function CreditPacksSection() {
       <div className="flex items-start gap-3 bg-blue-500/[0.04] border border-blue-500/10 rounded-xl px-4 py-3">
         <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
         <div>
-          <p className="text-xs text-blue-300 font-medium">Créditos avulsos não expiram</p>
+          <p className="text-xs text-blue-300 font-medium">Créditos não expiram</p>
           <p className="text-[11px] text-gray-500 mt-0.5">
-            Créditos comprados em pacotes são adicionados ao saldo e nunca expiram. 
-            Diferente dos créditos mensais do plano, que renovam a cada ciclo.
+            Todos os créditos comprados (avulsos ou em pacotes) são adicionados ao seu saldo
+            e nunca expiram. Use no seu próprio ritmo, sem prazo de validade.
           </p>
         </div>
       </div>
@@ -495,7 +435,6 @@ export function BillingClient({
   const [upgrading, setUpgrading]           = useState<string | null>(null)
   const [activeTab, setActiveTab]           = useState<"plans" | "packs" | "history" | "insights">("plans")
   const [expandedPlan, setExpandedPlan]     = useState<string | null>(null)
-  const [billingCycle, setBillingCycle]     = useState<"monthly" | "annual">("monthly")
 
   // Animated counter for balance
   const [displayBalance, setDisplayBalance] = useState(0)
@@ -544,18 +483,11 @@ export function BillingClient({
   /* For paid plans: redirect to Asaas payment */
   const handlePaymentRedirect = (planId: string, plan: typeof PLANS[0]) => {
     if (planId === currentPlan) { info("Plano atual", "Você já está neste plano."); return }
-    const url = billingCycle === "annual" ? plan.annualPaymentUrl : plan.paymentUrl
-    window.open(url, "_blank", "noopener,noreferrer")
+    window.open(plan.paymentUrl, "_blank", "noopener,noreferrer")
   }
 
   const planIndex = (id: string) => PLANS.findIndex(p => p.id === id)
   const currentIdx = planIndex(currentPlan)
-
-  const getPrice = (plan: typeof PLANS[0]) =>
-    billingCycle === "annual" ? plan.annualPrice : plan.price
-
-  const getAnnualSavings = (plan: typeof PLANS[0]) =>
-    (plan.price - plan.annualPrice) * 12
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-5 sm:space-y-7 max-w-5xl mx-auto w-full">
@@ -563,8 +495,8 @@ export function BillingClient({
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white mb-0.5">Assinatura & Créditos</h1>
-          <p className="text-xs sm:text-sm text-gray-400">Gerencie seu plano, compre créditos e acompanhe o uso</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-white mb-0.5">Créditos</h1>
+          <p className="text-xs sm:text-sm text-gray-400">Compre créditos e acompanhe seu consumo</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-gray-600 uppercase tracking-wider font-medium">Saldo</span>
@@ -623,7 +555,7 @@ export function BillingClient({
       {/* ── Tabs ── */}
       <div className="flex border-b border-white/[0.08] overflow-x-auto scrollbar-hide">
         {([
-          { id: "plans",    label: "Planos",               icon: Star },
+          { id: "plans",    label: "Créditos",              icon: Star },
           { id: "packs",    label: "Pacotes de Créditos",  icon: Package },
           { id: "insights", label: "Insights",             icon: TrendingUp },
           { id: "history",  label: "Histórico",            icon: Clock },
@@ -646,21 +578,17 @@ export function BillingClient({
       ══════════════════════════════════════════════════════════════════ */}
       {activeTab === "plans" && (
         <>
-          {/* Billing cycle toggle */}
-          <BillingCycleToggle billingCycle={billingCycle} setBillingCycle={setBillingCycle} />
+          {/* R12.26: BillingCycleToggle e AnnualSavingsBanner removidos —
+              não há mais ciclo de cobrança (compra única de créditos). */}
 
-          {/* Annual savings banner */}
-          <AnnualSavingsBanner billingCycle={billingCycle} />
-
-          {/* Desktop: grid — R12.25: 3 planos (Biofab 3D, Biofab 3D Avançada, Academy) */}
+          {/* Desktop: grid — R12.25: 3 opções (Biofab 3D, Biofab 3D Avançada, Academy) */}
           <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {PLANS.map(plan => {
               const c       = COLOR[plan.color as keyof typeof COLOR]
               const isCur   = plan.id === currentPlan
               const isDown  = planIndex(plan.id) < currentIdx
               const isUp    = upgrading === plan.id
-              const price   = getPrice(plan)
-              const savings = getAnnualSavings(plan)
+              const price   = plan.price
 
               return (
                 <div key={plan.id}
@@ -694,26 +622,12 @@ export function BillingClient({
                         <p className="text-2xl font-bold text-white">
                           R$ {price.toLocaleString("pt-BR")}
                         </p>
-                        <span className="text-xs text-gray-500 font-normal">
-                          {plan.id === "ACADEMY" ? "· 6 meses" : "/mês"}
-                        </span>
+                        {plan.id === "ACADEMY" && (
+                          <span className="text-xs text-gray-500 font-normal">
+                            · 6 meses
+                          </span>
+                        )}
                       </div>
-                      {billingCycle === "annual" && plan.id !== "ACADEMY" && (
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <span className="text-[10px] line-through text-gray-600">
-                            R$ {plan.price.toLocaleString("pt-BR")}
-                          </span>
-                          <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
-                            -20%
-                          </span>
-                        </div>
-                      )}
-                      {billingCycle === "annual" && savings > 0 && plan.id !== "ACADEMY" && (
-                        <p className="text-[10px] text-emerald-400 mt-1 flex items-center gap-1">
-                          <Gift className="w-3 h-3" />
-                          Economize R$ {savings.toLocaleString("pt-BR")}/ano
-                        </p>
-                      )}
                       {plan.id === "ACADEMY" && (
                         <p className="text-[10px] text-indigo-400 mt-1 flex items-center gap-1">
                           <GraduationCap className="w-3 h-3" />
@@ -722,9 +636,7 @@ export function BillingClient({
                       )}
                       <p className={cn("text-xs mt-1 font-medium", c.text)}>
                         <Zap className="w-3 h-3 inline mr-0.5" />
-                        {plan.id === "ACADEMY"
-                          ? `${plan.credits.toLocaleString("pt-BR")} créditos (pacote completo)`
-                          : `${plan.credits.toLocaleString("pt-BR")} créditos/mês`}
+                        {`${plan.credits.toLocaleString("pt-BR")} créditos`}
                       </p>
                     </div>
 
@@ -757,7 +669,7 @@ export function BillingClient({
                         )}>
                         {isUp
                           ? <><RefreshCw className="w-3 h-3 animate-spin" /> Processando...</>
-                          : <><ExternalLink className="w-3 h-3" /> Assinar agora</>
+                          : <><ExternalLink className="w-3 h-3" /> Comprar agora</>
                         }
                       </button>
                     )}
@@ -773,8 +685,7 @@ export function BillingClient({
               const c       = COLOR[plan.color as keyof typeof COLOR]
               const isCur   = plan.id === currentPlan
               const isDown  = planIndex(plan.id) < currentIdx
-              const price   = getPrice(plan)
-              const savings = getAnnualSavings(plan)
+              const price   = plan.price
               const isExp   = expandedPlan === plan.id
 
               return (
@@ -809,13 +720,8 @@ export function BillingClient({
                       </p>
                       <div className="flex items-center gap-2 mt-1">
                         <p className={cn("text-xs font-medium", c.text)}>
-                          R$ {price.toLocaleString("pt-BR")}/mês
+                          R$ {price.toLocaleString("pt-BR")}
                         </p>
-                        {billingCycle === "annual" && (
-                          <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
-                            -20%
-                          </span>
-                        )}
                         <span className="text-gray-600">·</span>
                         <span className={cn("text-xs", c.text)}>{plan.credits.toLocaleString("pt-BR")} cr</span>
                       </div>
@@ -829,14 +735,6 @@ export function BillingClient({
                   {/* Expanded content */}
                   {isExp && (
                     <div className={cn("px-4 pb-4 border-t border-white/[0.05]", c.bg)}>
-                      {billingCycle === "annual" && savings > 0 && (
-                        <div className="flex items-center gap-2 mt-3 mb-2 bg-emerald-500/[0.06] border border-emerald-500/15 rounded-lg px-3 py-2">
-                          <Gift className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                          <span className="text-[11px] text-emerald-300 font-medium">
-                            Economize R$ {savings.toLocaleString("pt-BR")}/ano
-                          </span>
-                        </div>
-                      )}
                       <ul className="space-y-2 mt-3 mb-4">
                         {plan.features.map(f => (
                           <li key={f} className="flex items-start gap-2 text-sm text-gray-300">
@@ -856,7 +754,7 @@ export function BillingClient({
                         </div>
                       ) : (
                         <a
-                          href={billingCycle === "annual" ? plan.annualPaymentUrl : plan.paymentUrl}
+                          href={plan.paymentUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className={cn(
@@ -865,7 +763,7 @@ export function BillingClient({
                           )}
                         >
                           <ExternalLink className="w-4 h-4" />
-                          Assinar {plan.name_short ?? plan.name} agora
+                          Comprar {plan.name_short ?? plan.name} agora
                         </a>
                       )}
                     </div>
@@ -885,9 +783,8 @@ export function BillingClient({
             <div>
               <p className="text-sm text-violet-300 font-semibold mb-1">Pagamento seguro via Asaas</p>
               <p className="text-xs text-gray-400 leading-relaxed">
-                Ao clicar em &quot;Assinar agora&quot;, você será redirecionado para o checkout seguro do Asaas.
-                Após a confirmação do pagamento, seu plano será ativado automaticamente em até 24h.
-                {billingCycle === "annual" && " Planos anuais são cobrados em uma única parcela com 20% de desconto."}
+                Ao clicar em &quot;Comprar agora&quot;, você será redirecionado para o checkout seguro do Asaas.
+                Após a confirmação do pagamento, seus créditos serão liberados automaticamente em até 24h.
                 {" "}Em caso de dúvidas, entre em contato pelo suporte.
               </p>
             </div>

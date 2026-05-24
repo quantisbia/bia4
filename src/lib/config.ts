@@ -188,14 +188,14 @@ export const PLAN_INFO = {
   // R12.25: nomes comerciais atualizados (ids preservados p/ compatibilidade)
   ADVANCED: {
     name: "Biofabricação 3D",
-    price: 490,
+    price: 190,
     credits: 1500,
     badge: "POPULAR",
     color: "blue",
     paymentUrl: "https://www.asaas.com/c/kfvg9q66i3odmtsu",
     highlight: "Pesquisadores e laboratórios — módulos completos",
     features: [
-      "1.500 créditos/mês",
+      "1.500 créditos",
       "Todos os módulos",
       "Formulador avançado",
       "Organoid Builder",
@@ -206,14 +206,14 @@ export const PLAN_INFO = {
   },
   ENTERPRISE: {
     name: "Biofabricação 3D Avançada",
-    price: 990,
+    price: 375,
     credits: 5000,
     badge: null as string | null,
     color: "purple",
     paymentUrl: "https://www.asaas.com/c/87510sceyl5as6n7",
     highlight: "Farmacêuticas e institutos — todos os recursos avançados",
     features: [
-      "5.000 créditos/mês",
+      "5.000 créditos",
       "Tudo do Biofabricação 3D",
       "807+ formulações validadas",
       "RAG científico avançado",
@@ -231,7 +231,7 @@ export const PLAN_INFO = {
     paymentUrl: "https://www.asaas.com/c/9nvzkrlezi7ht2u5",
     highlight: "Instituições de ensino, CROs e pharmas globais",
     features: [
-      "20.000 créditos/mês",
+      "20.000 créditos (6 meses)",
       "Tudo do Biofabricação 3D Avançada",
       "Workspace para equipes",
       "Treinamento de IA personalizado",

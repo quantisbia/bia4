@@ -68,7 +68,7 @@ export const NAV_ITEMS = [
 ]
 
 const BOTTOM_ITEMS = [
-  { href: "/dashboard/billing",  label: "Assinatura", icon: CreditCard,  exact: false },
+  { href: "/dashboard/billing",  label: "Créditos",   icon: CreditCard,  exact: false },
   { href: "/dashboard/settings", label: "Configurações", icon: Settings, exact: false },
 ]
 

@@ -24,7 +24,7 @@ const MORE_TABS = [
   { href: "/dashboard/knowledge",           label: "Base de Conhecimento", icon: BookOpen },
   { href: "/dashboard/notebook",            label: "Notebook",             icon: BookMarked },
   { href: "/dashboard/tools",               label: "Ferramentas",          icon: Wrench },
-  { href: "/dashboard/billing",             label: "Assinatura",           icon: CreditCard },
+  { href: "/dashboard/billing",             label: "Créditos",             icon: CreditCard },
 ]
 
 export function MobileBottomNav() {

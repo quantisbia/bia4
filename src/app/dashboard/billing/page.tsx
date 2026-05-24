@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import { getCreditBalance, getCreditHistory, getUserSubscription } from "@/lib/db/queries"
 import { BillingClient } from "./BillingClient"
 
-export const metadata: Metadata = { title: "Assinatura & Créditos" }
+export const metadata: Metadata = { title: "Créditos" }
 
 export default async function BillingPage() {
   const session = await auth()

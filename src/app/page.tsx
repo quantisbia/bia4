@@ -395,12 +395,11 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="mb-4">
-                <span className="text-2xl sm:text-3xl font-bold">R$ 490</span>
-                <span className="text-gray-400 text-sm">/mês</span>
-                <div className="credit-pill mt-2 w-fit text-xs bg-blue-500/10 border-blue-500/20 text-blue-400"><Zap className="w-3 h-3" />1.500 créditos/mês</div>
+                <span className="text-2xl sm:text-3xl font-bold">R$ 190</span>
+                <div className="credit-pill mt-2 w-fit text-xs bg-blue-500/10 border-blue-500/20 text-blue-400"><Zap className="w-3 h-3" />1.500 créditos</div>
               </div>
               <ul className="space-y-2 mb-6 flex-1 text-xs sm:text-sm text-gray-300">
-                {["1.500 créditos/mês","Todos os módulos","Formulador avançado","Organoid Builder","Protocolos ilimitados","20 projetos ativos"].map((f) => (
+                {["1.500 créditos","Todos os módulos","Formulador avançado","Organoid Builder","Protocolos ilimitados","20 projetos ativos"].map((f) => (
                   <li key={f} className="flex items-start gap-2">
                     <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
                     <span>{f}</span>
@@ -409,7 +408,7 @@ export default function HomePage() {
               </ul>
               <Link href="https://www.asaas.com/c/kfvg9q66i3odmtsu" target="_blank"
                 className="w-full text-center py-2.5 px-4 rounded-xl font-semibold text-sm bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-90 transition-opacity">
-                Assinar Biofabricação 3D →
+                Comprar créditos Biofabricação 3D →
               </Link>
             </div>
 
@@ -425,12 +424,11 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="mb-4">
-                <span className="text-2xl sm:text-3xl font-bold">R$ 990</span>
-                <span className="text-gray-400 text-sm">/mês</span>
-                <div className="credit-pill mt-2 w-fit text-xs bg-purple-500/10 border-purple-500/20 text-purple-400"><Zap className="w-3 h-3" />5.000 créditos/mês</div>
+                <span className="text-2xl sm:text-3xl font-bold">R$ 375</span>
+                <div className="credit-pill mt-2 w-fit text-xs bg-purple-500/10 border-purple-500/20 text-purple-400"><Zap className="w-3 h-3" />5.000 créditos</div>
               </div>
               <ul className="space-y-2 mb-6 flex-1 text-xs sm:text-sm text-gray-300">
-                {["5.000 créditos/mês","Tudo do Biofabricação 3D","807+ formulações validadas","RAG científico avançado","Acesso à API","Projetos ilimitados"].map((f) => (
+                {["5.000 créditos","Tudo do Biofabricação 3D","807+ formulações validadas","RAG científico avançado","Acesso à API","Projetos ilimitados"].map((f) => (
                   <li key={f} className="flex items-start gap-2">
                     <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 mt-0.5 shrink-0" />
                     <span>{f}</span>
@@ -439,7 +437,7 @@ export default function HomePage() {
               </ul>
               <Link href="https://www.asaas.com/c/87510sceyl5as6n7" target="_blank"
                 className="w-full text-center py-2.5 px-4 rounded-xl font-semibold text-sm bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white hover:opacity-90 transition-opacity">
-                Assinar Biofab 3D Avançada →
+                Comprar créditos Biofab 3D Avançada →
               </Link>
             </div>
 
