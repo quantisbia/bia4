@@ -1676,3 +1676,254 @@ html {
 .plan-card:hover {
   transform: translateY(-2px);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   R12.19 — LIGHT MODE: FUNDOS PRETOS PRESERVADOS COM TEXTO CLARO
+   ═══════════════════════════════════════════════════════════════════════════
+   Problema: páginas de bioprint (execute, quick-gcode, toolpath, gcode/*)
+   possuem painéis específicos com fundo preto INTENCIONAL (visualizadores
+   3D de toolpath, consoles de comandos G-code, editores de código,
+   previews de gcode, drawers de log).
+   
+   Em modo claro, o R12.5 transformava texto-branco/cinza em texto-preto,
+   resultando em PRETO-SOBRE-PRETO (ilegível).
+   
+   Solução: para descendentes de containers que mantêm fundo escuro
+   (bg-black/X, bg-[#...] escuros), forçar texto CLARO (branco/cinza-claro)
+   mesmo em html.light. Alta especificidade via :is() / encadeamento.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Tokens para texto claro sobre fundo escuro preservado */
+html.light {
+  --on-dark-ink:        hsl(0 0% 98%);       /* texto principal branco */
+  --on-dark-text:       hsl(0 0% 88%);       /* texto secundário */
+  --on-dark-muted:      hsl(0 0% 72%);       /* texto terciário */
+  --on-dark-disabled:   hsl(0 0% 55%);       /* desabilitado */
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   1) Marcadores: containers com fundo preto puro que DEVEM permanecer pretos
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* bg-black/X (X de 20 a 95) — painéis bioprint que mantém fundo escuro */
+html.light [class*="bg-black/2"]:not([class*="bg-black/20%"]):not(.text-on-dark-skip),
+html.light [class*="bg-black/3"],
+html.light [class*="bg-black/4"],
+html.light [class*="bg-black/5"],
+html.light [class*="bg-black/6"],
+html.light [class*="bg-black/7"],
+html.light [class*="bg-black/8"],
+html.light [class*="bg-black/9"],
+html.light .bg-black {
+  /* Mantém o fundo escuro nativo (não força hsl(--background)) */
+  /* Apenas SELECIONA esses containers para escopo das regras abaixo */
+}
+
+/* Mas a seção bioprint inteira fazia bg-black → claro: remover esse override
+   especificamente para gcode/execute/quick-gcode/toolpath onde o preto deve
+   ser preservado. As páginas bia-control/post/slice/model/bioink/hub ainda
+   convertem (regras das linhas 113-120 do CSS antigo continuam ativas). */
+
+/* ──────────────────────────────────────────────────────────────────────────
+   2) Texto dentro de fundos pretos preservados → SEMPRE claro
+   Usa seletor descendente: qualquer text-* dentro de um bg-black/X ou bg-black
+   ──────────────────────────────────────────────────────────────────────────
+   Aplica-se apenas a containers escuros NÃO-bia-page (que já foram
+   convertidos para claro). Quer dizer: usamos um wrapper especial OU
+   confiamos em :where/:is para alta especificidade.
+   
+   Estratégia: forçar texto claro em qualquer descendente de bg-black/X,
+   mas ressalvar páginas bia-control/post/slice/model/bioink/hub onde o
+   bg-black/X foi convertido para claro. */
+
+/* Texto principal (text-white e variações) dentro de bg-black/X */
+html.light :where(
+  [class*="bg-black/2"],
+  [class*="bg-black/3"],
+  [class*="bg-black/4"],
+  [class*="bg-black/5"],
+  [class*="bg-black/6"],
+  [class*="bg-black/7"],
+  [class*="bg-black/8"],
+  [class*="bg-black/9"],
+  .bg-black
+) .text-white,
+html.light :where(
+  [class*="bg-black/2"],
+  [class*="bg-black/3"],
+  [class*="bg-black/4"],
+  [class*="bg-black/5"],
+  [class*="bg-black/6"],
+  [class*="bg-black/7"],
+  [class*="bg-black/8"],
+  [class*="bg-black/9"],
+  .bg-black
+) [class*="text-white/"] {
+  color: var(--on-dark-ink) !important;
+}
+
+/* Texto secundário (gray-200/300/400/500) dentro de bg-black/X */
+html.light :where(
+  [class*="bg-black/2"],
+  [class*="bg-black/3"],
+  [class*="bg-black/4"],
+  [class*="bg-black/5"],
+  [class*="bg-black/6"],
+  [class*="bg-black/7"],
+  [class*="bg-black/8"],
+  [class*="bg-black/9"],
+  .bg-black
+) :is(.text-gray-100, .text-gray-200, .text-gray-300, .text-slate-200, .text-slate-300, .text-zinc-200, .text-zinc-300, .text-neutral-200, .text-neutral-300) {
+  color: var(--on-dark-ink) !important;
+}
+
+html.light :where(
+  [class*="bg-black/2"],
+  [class*="bg-black/3"],
+  [class*="bg-black/4"],
+  [class*="bg-black/5"],
+  [class*="bg-black/6"],
+  [class*="bg-black/7"],
+  [class*="bg-black/8"],
+  [class*="bg-black/9"],
+  .bg-black
+) :is(.text-gray-400, .text-slate-400, .text-zinc-400, .text-neutral-400) {
+  color: var(--on-dark-text) !important;
+}
+
+html.light :where(
+  [class*="bg-black/2"],
+  [class*="bg-black/3"],
+  [class*="bg-black/4"],
+  [class*="bg-black/5"],
+  [class*="bg-black/6"],
+  [class*="bg-black/7"],
+  [class*="bg-black/8"],
+  [class*="bg-black/9"],
+  .bg-black
+) :is(.text-gray-500, .text-gray-600, .text-slate-500, .text-zinc-500, .text-neutral-500) {
+  color: var(--on-dark-muted) !important;
+}
+
+/* Cores semânticas claras (emerald-100/200/300, cyan-100/200/300, etc.)
+   também precisam permanecer CLARAS dentro de fundos pretos */
+html.light :where(
+  [class*="bg-black/2"],
+  [class*="bg-black/3"],
+  [class*="bg-black/4"],
+  [class*="bg-black/5"],
+  [class*="bg-black/6"],
+  [class*="bg-black/7"],
+  [class*="bg-black/8"],
+  [class*="bg-black/9"],
+  .bg-black
+) :is(
+  .text-emerald-100, .text-emerald-200, .text-emerald-300, .text-emerald-400,
+  .text-green-100, .text-green-200, .text-green-300, .text-green-400,
+  .text-cyan-100, .text-cyan-200, .text-cyan-300, .text-cyan-400,
+  .text-sky-100, .text-sky-200, .text-sky-300, .text-sky-400,
+  .text-blue-100, .text-blue-200, .text-blue-300, .text-blue-400,
+  .text-violet-100, .text-violet-200, .text-violet-300, .text-violet-400,
+  .text-purple-100, .text-purple-200, .text-purple-300, .text-purple-400,
+  .text-fuchsia-200, .text-fuchsia-300, .text-fuchsia-400,
+  .text-indigo-200, .text-indigo-300, .text-indigo-400,
+  .text-pink-200, .text-pink-300, .text-pink-400,
+  .text-rose-100, .text-rose-200, .text-rose-300, .text-rose-400,
+  .text-red-200, .text-red-300, .text-red-400,
+  .text-amber-100, .text-amber-200, .text-amber-300, .text-amber-400,
+  .text-yellow-200, .text-yellow-300, .text-yellow-400,
+  .text-orange-200, .text-orange-300, .text-orange-400,
+  .text-teal-100, .text-teal-200, .text-teal-300, .text-teal-400,
+  .text-lime-200, .text-lime-300, .text-lime-400
+) {
+  /* Recupera o tom claro original (anula o R12.5) */
+  color: revert-layer !important;
+}
+
+/* Fallback se revert-layer não funcionar: usa cor original do Tailwind */
+@supports not (color: revert-layer) {
+  html.light :where([class*="bg-black/"]) .text-emerald-100 { color: rgb(209 250 229) !important; }
+  html.light :where([class*="bg-black/"]) .text-emerald-200 { color: rgb(167 243 208) !important; }
+  html.light :where([class*="bg-black/"]) .text-emerald-300 { color: rgb(110 231 183) !important; }
+  html.light :where([class*="bg-black/"]) .text-cyan-100    { color: rgb(207 250 254) !important; }
+  html.light :where([class*="bg-black/"]) .text-cyan-200    { color: rgb(165 243 252) !important; }
+  html.light :where([class*="bg-black/"]) .text-cyan-300    { color: rgb(103 232 249) !important; }
+  html.light :where([class*="bg-black/"]) .text-violet-200  { color: rgb(221 214 254) !important; }
+  html.light :where([class*="bg-black/"]) .text-violet-300  { color: rgb(196 181 253) !important; }
+  html.light :where([class*="bg-black/"]) .text-amber-200   { color: rgb(253 230 138) !important; }
+  html.light :where([class*="bg-black/"]) .text-amber-300   { color: rgb(252 211 77) !important; }
+  html.light :where([class*="bg-black/"]) .text-rose-200    { color: rgb(254 205 211) !important; }
+  html.light :where([class*="bg-black/"]) .text-rose-300    { color: rgb(253 164 175) !important; }
+}
+
+/* Strong/b dentro de bg-black/X → branco puro */
+html.light :where(
+  [class*="bg-black/2"],
+  [class*="bg-black/3"],
+  [class*="bg-black/4"],
+  [class*="bg-black/5"],
+  [class*="bg-black/6"],
+  [class*="bg-black/7"],
+  [class*="bg-black/8"],
+  [class*="bg-black/9"],
+  .bg-black
+) :is(strong, b, h1, h2, h3, h4, h5, h6) {
+  color: var(--on-dark-ink) !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   3) Containers que tinham bg-black/X "convertido para claro" pelo R12.3
+   nas páginas bia-control/post/slice/model/bioink/hub PERMANECEM CLAROS.
+   A regra das linhas ~113-120 do CSS (que muda bg-black/X → bg-claro APENAS
+   nessas páginas-hook) continua ativa. Portanto nossa regra acima só
+   age onde o fundo NÃO foi convertido (i.e., páginas execute/quick-gcode/
+   gcode/* e toolpath SEM hook). Funcionamento correto.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Para garantir que NÃO afetamos as bia-pages (que viraram claras),
+   sobrescrevemos a regra acima especificamente para elas (texto volta
+   ao tom escuro do R12.5). Maior especificidade ganha. */
+html.light :is(.bia-control-page, .bia-post-page, .bia-slice-page, .bia-model-page, .bia-bioink-page, .bia-hub-page) :where(
+  [class*="bg-black/2"],
+  [class*="bg-black/3"],
+  [class*="bg-black/4"],
+  [class*="bg-black/5"],
+  [class*="bg-black/6"]
+) :is(.text-white, [class*="text-white/"], .text-gray-100, .text-gray-200, .text-gray-300, .text-gray-400) {
+  /* Reverte para o token escuro do tema light (volta ao R12.5) */
+  color: var(--light-ink, hsl(257 65% 8%)) !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   4) Code blocks (pre, code) com fundo preto preservado
+   ────────────────────────────────────────────────────────────────────────── */
+
+html.light pre[class*="bg-black/"],
+html.light code[class*="bg-black/"],
+html.light pre.bg-black,
+html.light code.bg-black {
+  color: hsl(0 0% 88%) !important;
+}
+
+html.light pre[class*="bg-black/"] *,
+html.light code[class*="bg-black/"] *,
+html.light pre.bg-black *,
+html.light code.bg-black * {
+  color: inherit !important;
+}
+
+/* Inputs/textareas com fundo escuro preservado */
+html.light input[class*="bg-black/"],
+html.light textarea[class*="bg-black/"],
+html.light select[class*="bg-black/"] {
+  color: hsl(0 0% 95%) !important;
+}
+
+html.light input[class*="bg-black/"]::placeholder,
+html.light textarea[class*="bg-black/"]::placeholder {
+  color: hsl(0 0% 55%) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FIM R12.19
+   ═══════════════════════════════════════════════════════════════════════════ */
