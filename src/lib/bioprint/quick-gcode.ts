@@ -194,6 +194,9 @@ const generateGridWalls = generateCubeWalls
 /**
  * Gera segmentos de linhas paralelas dentro de um retângulo (alinhamento por ângulo).
  * Usa raster simples; alterna ângulo 0°/90° por camada (cross-hatch).
+ *
+ * R12.18: agora respeita geometria circular (disk) — clipa cada linha ao círculo
+ * inscrito (raio = min(width,depth)/2) para evitar o bug "quadrado com círculos dentro".
  */
 function generateRectilinearInfill(
   geom: QuickGeometry,
@@ -206,6 +209,12 @@ function generateRectilinearInfill(
 
   const w2 = geom.width / 2
   const d2 = geom.depth / 2
+  const isDisk = geom.id === "disk"
+  // Raio efetivo p/ clipping circular (disk usa o menor entre w/2 e d/2)
+  const r = isDisk ? Math.min(w2, d2) : 0
+  // Margem interna p/ não sobrepor a parede (1 diâmetro do bico)
+  const inset = isDisk ? nozzle_mm * 0.6 : 0
+  const r_eff = Math.max(0.1, r - inset)
 
   // Spacing baseado em densidade (100% = nozzle_mm, 0% = nunca)
   const spacing = Math.max(nozzle_mm * 1.2, nozzle_mm / (density_pct / 100))
@@ -217,8 +226,22 @@ function generateRectilinearInfill(
     let y = -d2 + spacing / 2
     let dirRight = true
     while (y < d2 - spacing / 4) {
-      const a: Point = { x: dirRight ? -w2 : w2, y }
-      const b: Point = { x: dirRight ? w2 : -w2, y }
+      let x_lo = -w2
+      let x_hi = w2
+      if (isDisk) {
+        // Clip à circunferência: x ∈ [-√(r²-y²), +√(r²-y²)]
+        const disc = r_eff * r_eff - y * y
+        if (disc <= 0) {
+          y += spacing
+          dirRight = !dirRight
+          continue  // linha não cruza o círculo
+        }
+        const xMax = Math.sqrt(disc)
+        x_lo = -xMax
+        x_hi = xMax
+      }
+      const a: Point = { x: dirRight ? x_lo : x_hi, y }
+      const b: Point = { x: dirRight ? x_hi : x_lo, y }
       segs.push([a, b])
       y += spacing
       dirRight = !dirRight  // serpentina (boustrophedon)
@@ -228,8 +251,21 @@ function generateRectilinearInfill(
     let x = -w2 + spacing / 2
     let dirUp = true
     while (x < w2 - spacing / 4) {
-      const a: Point = { x, y: dirUp ? -d2 : d2 }
-      const b: Point = { x, y: dirUp ? d2 : -d2 }
+      let y_lo = -d2
+      let y_hi = d2
+      if (isDisk) {
+        const disc = r_eff * r_eff - x * x
+        if (disc <= 0) {
+          x += spacing
+          dirUp = !dirUp
+          continue
+        }
+        const yMax = Math.sqrt(disc)
+        y_lo = -yMax
+        y_hi = yMax
+      }
+      const a: Point = { x, y: dirUp ? y_lo : y_hi }
+      const b: Point = { x, y: dirUp ? y_hi : y_lo }
       segs.push([a, b])
       x += spacing
       dirUp = !dirUp
@@ -240,16 +276,41 @@ function generateRectilinearInfill(
 
 /**
  * Para grid: linhas mais espaçadas formando malha aberta (scaffold poroso).
+ *
+ * R12.18: agora respeita `pattern`:
+ *  - "rectilinear": cross-hatch 0°/90° por camada (malha aberta clássica)
+ *  - "concentric":  retângulos concêntricos com offset = pitch (porosidade radial)
  */
 function generateGridInfill(
   geom: QuickGeometry,
   layerIdx: number,
   pitch_mm: number,
+  pattern: QuickInfillPattern = "rectilinear",
 ): Array<[Point, Point]> {
   const w2 = geom.width / 2
   const d2 = geom.depth / 2
   const segs: Array<[Point, Point]> = []
 
+  if (pattern === "concentric") {
+    // Retângulos concêntricos offset por pitch — scaffold com anéis quadrados
+    let off = pitch_mm
+    while (off < Math.min(w2, d2)) {
+      const x_lo = -w2 + off
+      const x_hi = w2 - off
+      const y_lo = -d2 + off
+      const y_hi = d2 - off
+      if (x_hi - x_lo < pitch_mm * 0.5 || y_hi - y_lo < pitch_mm * 0.5) break
+      // Desenha o retângulo como 4 segmentos (continua sequencial)
+      segs.push([{ x: x_lo, y: y_lo }, { x: x_hi, y: y_lo }])
+      segs.push([{ x: x_hi, y: y_lo }, { x: x_hi, y: y_hi }])
+      segs.push([{ x: x_hi, y: y_hi }, { x: x_lo, y: y_hi }])
+      segs.push([{ x: x_lo, y: y_hi }, { x: x_lo, y: y_lo }])
+      off += pitch_mm
+    }
+    return segs
+  }
+
+  // rectilinear (default): cross-hatch 0°/90° por camada
   if (layerIdx % 2 === 0) {
     let y = -d2 + pitch_mm
     let dirRight = true
@@ -466,12 +527,13 @@ export function generateQuickGcode(
     if (opts.infillPattern !== "none" && (geom.id === "cube" || geom.id === "patch" || geom.id === "disk" || geom.id === "grid")) {
       let segs: Array<[Point, Point]> = []
       if (geom.id === "grid") {
-        // Grid usa pitch fixo (malha aberta)
+        // R12.18: grid agora respeita pattern (rectilinear/concentric)
         const pitch = geom.pitch ?? Math.max(1.0, nozzle * 5)
-        segs = generateGridInfill(geom, li, pitch)
+        segs = generateGridInfill(geom, li, pitch, opts.infillPattern)
       } else if (opts.infillPattern === "concentric" && geom.id === "disk") {
         segs = generateConcentricInfill(geom, opts.infillDensity_pct, nozzle)
       } else {
+        // Rectilinear (clipa círculo se geom.id === "disk")
         segs = generateRectilinearInfill(geom, li, opts.infillDensity_pct, nozzle)
       }
       emitSegments(acc, segs, bioink.printSpeed_mms, bioink.travelSpeed_mms, `infill L${li + 1}`)
@@ -668,7 +730,7 @@ export function geometryLabel(id: QuickGeometryId): string {
 
 export function infillLabel(p: QuickInfillPattern): string {
   return {
-    rectilinear: "Linhas paralelas (cross-hatch 0°/90°)",
+    rectilinear: "Retilíneo (cross-hatch 0°/90°)",
     concentric:  "Concêntrico (espirais)",
     none:        "Sem preenchimento (oco)",
   }[p]

@@ -60,6 +60,7 @@ import { type ColorMode } from "@/components/bioprinter/GcodeViewer3D"
 import { SafeGcodeViewer3D } from "@/components/bioprinter/SafeGcodeViewer3D"
 import { GcodeValidatorPanel } from "@/components/bioprinter/GcodeValidatorPanel"
 import { parseGcode, type ParsedGcode } from "@/lib/bioprint/toolpath-engine"
+import { DEMO_GYROID_GCODE } from "@/lib/bioprint/demo-gyroid-gcode"
 
 // R12.17: ErrorBoundary local pra isolar crashes de sub-componentes
 import { Component, type ReactNode } from "react"
@@ -114,41 +115,10 @@ const BAUD_OPTIONS = [9600, 19200, 38400, 57600, 115200, 230400, 250000]
 const DEFAULT_BAUD = 115200
 
 // G-code de demo (hello world quadrado pequeno)
-const DEMO_GCODE = `; ═════════════════════════════════════════════════
-; BIA · G-code de demo — Hello Square 20×20 mm
-; Use este para validar conexão e preview antes de
-; enviar G-code real para a bioimpressora.
-; ═════════════════════════════════════════════════
-G21 ; mm
-G90 ; absoluto
-M82 ; extrusão absoluta
-G92 X0 Y0 Z0 E0 ; zero relativo (NÃO faz home)
-
-; Sobe segurança
-G1 Z2 F300
-
-; Primeiro layer
-G1 Z0.2 F300
-G1 X10 Y10 F1500
-G1 X30 Y10 E0.5 F800
-G1 X30 Y30 E1.0 F800
-G1 X10 Y30 E1.5 F800
-G1 X10 Y10 E2.0 F800
-
-; Segundo layer
-G1 Z0.4 F300
-G1 X10 Y10 E2.5 F800
-G1 X30 Y10 E3.0 F800
-G1 X30 Y30 E3.5 F800
-G1 X10 Y30 E4.0 F800
-G1 X10 Y10 E4.5 F800
-
-; Volta para segurança
-G1 Z10 F300
-M104 S0 ; bico off
-M140 S0 ; cama off
-M84     ; motores off
-`
+// R12.18: G-code demo agora é um cubo 20×20 com 2 camadas de infill TPMS
+// gyroid (Triply Periodic Minimal Surface) — substitui o antigo "Hello Square"
+// simples. Permite validar visualização 3D real do toolpath complexo.
+const DEMO_GCODE = DEMO_GYROID_GCODE
 
 // Step sizes do joystick
 type StepSize = 0.05 | 0.1 | 0.5 | 1 | 5 | 10

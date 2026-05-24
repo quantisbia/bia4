@@ -585,7 +585,7 @@ export default function QuickGCodePage() {
                 </label>
                 <div className="grid grid-cols-3 gap-1.5">
                   {[
-                    { id: "rectilinear", label: "Rectilinear", hint: "Linhas cruzadas 0°/90°" },
+                    { id: "rectilinear", label: "Retilíneo", hint: "Linhas cruzadas 0°/90°" },
                     { id: "concentric",  label: "Concêntrico", hint: "Espirais (ideal p/ disco)" },
                     { id: "none",        label: "Sem infill",  hint: "Apenas paredes (oco)" },
                   ].map((it) => (
