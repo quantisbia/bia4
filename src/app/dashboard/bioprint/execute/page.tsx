@@ -405,13 +405,15 @@ export default function BioprintExecutePage() {
   const [firmware, setFirmware] = useState<FirmwareInfo | null>(null)
   const [supported, setSupported] = useState(false)
   /**
-   * R12.22: Auto-home ao conectar. Default ON. Sequência ao conectar:
+   * R12.23: Auto-home ao conectar. Default ON. Sequência ao conectar:
    *   1) Handshake M115
    *   2) M18 S0 (motor sempre ligado)
-   *   3) Se autoHomeOnConnect=true → G28 (home all eixos)
-   *   4) G92 X0 Y0 Z0 E0 (zera coordenadas — G-codes começam de onde o cabeçote está)
-   * Assim os G-codes gerados NÃO precisam mais incluir G28 e podem assumir
-   * que (0,0,0) é a posição corrente. Em mock, sempre faz (não há risco).
+   *   3) Se autoHomeOnConnect=true → APENAS G28 (home all eixos)
+   *
+   * O G92 X0 Y0 Z0 E0 (definir origem lógica) foi DESACOPLADO do home: agora é
+   * uma ação manual via botão "Ponto inicial" nos Comandos rápidos. Isso
+   * permite ao usuário fazer jog até o ponto desejado (centro de poço, etc.)
+   * e só então definir aquele ponto como (0,0,0). Em mock, G28 sempre roda.
    */
   const [autoHomeOnConnect, setAutoHomeOnConnect] = useState<boolean>(true)
   const [didAutoHome, setDidAutoHome] = useState<boolean>(false)
@@ -489,18 +491,17 @@ export default function BioprintExecutePage() {
         loggerRef.current.warn(`Não foi possível desabilitar timeout do motor: ${e instanceof Error ? e.message : String(e)}`)
       }
 
-      // R12.22: Auto-home all + G92 (zera referência). G-codes geradores não incluem
-      // mais G28 — o home é feito UMA VEZ ao conectar, e o G92 estabelece a origem
-      // no ponto atual do cabeçote para que os G-codes posteriores comecem dali.
+      // R12.23: Auto-home ao conectar envia APENAS G28 (home mecânico).
+      // O G92 (definir ponto inicial / origem lógica) foi desacoplado e agora é uma
+      // ação manual do usuário, disponível no painel de Comandos rápidos como
+      // "Ponto inicial". Isso permite ao usuário fazer o jog até a posição desejada
+      // (centro de poço, etc.) e só então definir aquele ponto como (0,0,0).
       if (autoHomeOnConnect) {
         try {
           loggerRef.current.info("Auto-home: enviando G28 (home all eixos)…", "controller")
           // Marlin: G28 retorna ok só ao terminar o home; timeout padrão do controller (30s) basta
-          await controllerRef.current?.sendAndWait("G28 ; auto-home all (R12.22)")
-          loggerRef.current.ok("Home concluído em todos os eixos (G28).", "controller")
-          await controllerRef.current?.sendOnce("G92 X0 Y0 Z0 E0 ; zera referência no ponto atual")
-          loggerRef.current.ok("Coordenadas zeradas: G-codes posteriores começam de (0,0,0).", "controller")
-          setPosition({ x: 0, y: 0, z: 0, e: 0 })
+          await controllerRef.current?.sendAndWait("G28 ; auto-home all (R12.23)")
+          loggerRef.current.ok("Home concluído em todos os eixos (G28). Use \"Ponto inicial\" nos Comandos rápidos para definir a origem (0,0,0) quando estiver no ponto desejado.", "controller")
           setDidAutoHome(true)
         } catch (e) {
           loggerRef.current.warn(`Auto-home falhou: ${e instanceof Error ? e.message : String(e)}. Use o botão "Home All" do painel se a impressora estiver pronta.`)
@@ -625,11 +626,8 @@ export default function BioprintExecutePage() {
     try {
       loggerRef.current.info("Home All: enviando G28…", "controller")
       await controllerRef.current.sendAndWait("G28 ; home all (manual)")
-      loggerRef.current.ok("Home All concluído.", "controller")
-      await controllerRef.current.sendOnce("G92 X0 Y0 Z0 E0 ; zera referência")
-      setPosition({ x: 0, y: 0, z: 0, e: 0 })
       setDidAutoHome(true)
-      loggerRef.current.ok("Coordenadas zeradas no ponto atual.", "controller")
+      loggerRef.current.ok("Home All concluído (G28). Para definir a origem (0,0,0), use \"Ponto inicial\" nos Comandos rápidos.", "controller")
     } catch (e) {
       loggerRef.current.error(`Home All falhou: ${e instanceof Error ? e.message : String(e)}`)
     }
@@ -649,12 +647,15 @@ export default function BioprintExecutePage() {
 
   // ─── Quick actions ──
   const quickActions: Array<{ label: string; cmd: string; title: string }> = [
-    { label: "M114",     cmd: "M114",     title: "Posição atual" },
-    { label: "M105",     cmd: "M105",     title: "Temperaturas" },
-    { label: "M115",     cmd: "M115",     title: "Firmware info" },
-    { label: "M18 Off",  cmd: "M18",      title: "Motores off" },
-    { label: "M84 Off",  cmd: "M84",      title: "Disable steppers" },
-    { label: "Cool All", cmd: "M104 S0\nM140 S0\nM141 S0", title: "Desliga todos os aquecedores" },
+    { label: "M114",          cmd: "M114",                     title: "Posição atual" },
+    { label: "M105",          cmd: "M105",                     title: "Temperaturas" },
+    { label: "M115",          cmd: "M115",                     title: "Firmware info" },
+    // R12.23: G92 desacoplado do Home All — ação manual do usuário para definir
+    // o ponto atual como origem lógica (0,0,0). Útil após jog manual.
+    { label: "Ponto inicial", cmd: "G92 X0 Y0 Z0 E0",          title: "Define o ponto atual como origem (0,0,0) — origem lógica" },
+    { label: "M18 Off",       cmd: "M18",                      title: "Motores off" },
+    { label: "M84 Off",       cmd: "M84",                      title: "Disable steppers" },
+    { label: "Cool All",      cmd: "M104 S0\nM140 S0\nM141 S0", title: "Desliga todos os aquecedores" },
   ]
 
   const runQuickAction = useCallback(async (cmds: string) => {
@@ -1477,9 +1478,10 @@ export default function BioprintExecutePage() {
                       <Sparkles className="w-3 h-3" /> Auto-home ao conectar
                     </div>
                     <div className="text-[9px] text-cyan-200/70 leading-tight mt-0.5">
-                      Faz <span className="font-mono">G28</span> +{" "}
-                      <span className="font-mono">G92</span> assim que conectar. Os G-codes
-                      não precisam mais incluir home — começam de onde o cabeçote estiver.
+                      Faz apenas <span className="font-mono">G28</span> (home mecânico)
+                      ao conectar. Para definir o ponto atual como origem (0,0,0),
+                      clique em <span className="font-mono">Ponto inicial</span> nos
+                      Comandos rápidos quando quiser.
                     </div>
                   </div>
                 </label>
@@ -1532,8 +1534,8 @@ export default function BioprintExecutePage() {
                   <Sparkles className="w-3 h-3 mt-0.5 shrink-0" />
                   <span>
                     {didAutoHome
-                      ? "Home concluído · origem (0,0,0) no ponto atual. G-codes começarão daqui."
-                      : "Sem home neste sessão. Faça Home All antes de imprimir."}
+                      ? "Home concluído (G28). Defina a origem com \"Ponto inicial\" nos Comandos rápidos antes de imprimir."
+                      : "Sem home nesta sessão. Faça Home All antes de imprimir."}
                   </span>
                 </div>
                 <button
@@ -1542,7 +1544,7 @@ export default function BioprintExecutePage() {
                   className="w-full mb-2 px-3 py-2 rounded-lg text-xs font-bold bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-100 transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  Home All (G28 + G92)
+                  Home All (G28)
                 </button>
                 <button
                   onClick={handleDisconnect}
