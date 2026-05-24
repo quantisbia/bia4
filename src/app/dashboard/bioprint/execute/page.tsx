@@ -569,6 +569,31 @@ export default function BioprintExecutePage() {
     loggerRef.current.ok("Desconectado.")
   }, [connected])
 
+  /**
+   * R12.24: Aplica fluxo (M221) na impressora.
+   *
+   * Pode ser chamado em qualquer momento (antes ou durante o streaming) —
+   * Marlin processa M221 imediatamente e aplica nas próximas linhas de E.
+   * Usa sendOnce (fire-and-forget) pois M221 é instantâneo e não bloqueia.
+   *
+   * Idempotente: se o valor não mudou desde o último envio, não reenvía.
+   *
+   * NOTA: declarado ANTES de handleSend para evitar "Cannot access before
+   * initialization" (temporal dead zone) — handleSend o usa em suas deps.
+   */
+  const applyFlow = useCallback(async (percent: number) => {
+    if (!controllerRef.current || !connected) return
+    const clamped = Math.max(10, Math.min(200, Math.round(percent)))
+    if (flowAppliedRef.current === clamped) return // sem mudança real
+    try {
+      await controllerRef.current.sendOnce(`M221 S${clamped} ; fluxo ${clamped}% (R12.24)`)
+      flowAppliedRef.current = clamped
+      loggerRef.current.ok(`Fluxo aplicado: ${clamped}% (M221 S${clamped}).`, "controller")
+    } catch (e) {
+      loggerRef.current.warn(`M221 falhou: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }, [connected])
+
   // ─── SEND G-CODE ──
   const handleSend = useCallback(async () => {
     if (!connected || !controllerRef.current) {
@@ -647,28 +672,6 @@ export default function BioprintExecutePage() {
   }, [connected])
 
   /**
-   * R12.24: Aplica fluxo (M221) na impressora.
-   *
-   * Pode ser chamado em qualquer momento (antes ou durante o streaming) —
-   * Marlin processa M221 imediatamente e aplica nas próximas linhas de E.
-   * Usa sendOnce (fire-and-forget) pois M221 é instantâneo e não bloqueia.
-   *
-   * Idempotente: se o valor não mudou desde o último envio, não reenvía.
-   */
-  const applyFlow = useCallback(async (percent: number) => {
-    if (!controllerRef.current || !connected) return
-    const clamped = Math.max(10, Math.min(200, Math.round(percent)))
-    if (flowAppliedRef.current === clamped) return // sem mudança real
-    try {
-      await controllerRef.current.sendOnce(`M221 S${clamped} ; fluxo ${clamped}% (R12.24)`)
-      flowAppliedRef.current = clamped
-      loggerRef.current.ok(`Fluxo aplicado: ${clamped}% (M221 S${clamped}).`, "controller")
-    } catch (e) {
-      loggerRef.current.warn(`M221 falhou: ${e instanceof Error ? e.message : String(e)}`)
-    }
-  }, [connected])
-
-  /**
    * R12.24: Handler do slider/preset — atualiza estado imediatamente e
    * debounce o envio para M221 (evita spam quando o usuário arrasta).
    * Durante o streaming, debounce é menor (120ms) para resposta rápida;
@@ -681,7 +684,7 @@ export default function BioprintExecutePage() {
     flowSendTimerRef.current = setTimeout(() => { void applyFlow(next) }, delay)
   }, [applyFlow, controllerState])
 
-  // Cleanup do timer ao desmontar
+  // R12.24: Cleanup do timer ao desmontar (evita setState em componente desmontado)
   useEffect(() => {
     return () => {
       if (flowSendTimerRef.current) clearTimeout(flowSendTimerRef.current)
