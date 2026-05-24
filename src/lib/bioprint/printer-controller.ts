@@ -18,7 +18,8 @@
  *    · start(gcode) — começa streaming
  *    · pause() — espera fim da linha atual, depois para
  *    · resume() — continua de onde parou
- *    · cancel() — para e envia footer de segurança (M104 S0, M140 S0, M84)
+ *    · cancel() — para e envia footer de segurança (M104 S0, M140 S0, M141 S0)
+ *      [R12.20] M84 removido do footer — motor fica ligado até o usuário desligar manualmente.
  *    · emergency() — envia M112 imediato (via transport)
  *    · sendOnce(cmd) — manda comando fora do stream (jog do joystick, M114, etc.)
  *
@@ -76,7 +77,8 @@ const DEFAULT_OPTS: Required<ControllerOptions> = {
     "M104 S0  ; desliga hotend (cartucho)",
     "M140 S0  ; desliga bed (cama)",
     "M141 S0  ; desliga câmara",
-    "M84      ; desabilita motores",
+    // R12.20: M84 removido — motor permanece ligado até o usuário desligar
+    // manualmente via botões "M18 Off" / "M84 Off" no painel de comandos rápidos.
   ],
   stripComments: true,
 }

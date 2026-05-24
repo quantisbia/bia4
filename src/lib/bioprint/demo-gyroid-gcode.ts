@@ -997,7 +997,7 @@ G1 X20.00 Y19.51 Z0.40 E44.527 F480
 G1 Z10 F300
 M104 S0 ; bico off
 M140 S0 ; cama off
-M84     ; motores off
+; R12.20: M84 removido — motor permanece ligado até desligamento manual.
 
 Lines: 981
 `

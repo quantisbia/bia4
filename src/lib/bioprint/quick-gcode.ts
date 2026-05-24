@@ -712,7 +712,8 @@ function emitGcodeText(
     lines.push(parts.join(" "))
   }
 
-  lines.push("", "; ─── FIM ───", "M84        ; desliga motores", "")
+  // R12.20: M84 removido — motor permanece ligado até desligamento manual do usuário.
+  lines.push("", "; ─── FIM ───", "")
   return lines.filter((l) => l !== "").join("\n") + "\n"
 }
 

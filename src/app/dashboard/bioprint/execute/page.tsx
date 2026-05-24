@@ -405,6 +405,16 @@ export default function BioprintExecutePage() {
         loggerRef.current.warn(`Handshake M115 sem resposta completa: ${e instanceof Error ? e.message : String(e)} — continuando assim mesmo.`)
         setFirmware({ raw: "", family: "unknown", caps: {} })
       }
+
+      // R12.20: Desabilita o timeout interno de inatividade do firmware (Marlin "M18 S0" /
+      // "M84 S0") para que os motores permaneçam energizados até o usuário desligar
+      // manualmente. Caso o firmware não suporte o parâmetro, ignoramos silenciosamente.
+      try {
+        await controllerRef.current?.sendOnce("M18 S0 ; mantém steppers sempre habilitados (sem timeout)")
+        loggerRef.current.info("Timeout interno de inatividade do motor desabilitado (M18 S0).", "controller")
+      } catch (e) {
+        loggerRef.current.warn(`Não foi possível desabilitar timeout do motor: ${e instanceof Error ? e.message : String(e)}`)
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       loggerRef.current.error(`Falha ao conectar: ${msg}`)
@@ -1150,24 +1160,37 @@ export default function BioprintExecutePage() {
             badge={`${step} mm`}
             badgeColor="cyan"
           >
-            {/* Step size */}
+            {/* Step size — R12.20: contraste reforçado p/ light mode + log no console técnico */}
             <div className="mb-2">
-              <div className="text-[9px] uppercase tracking-wider text-gray-500 mb-1">Step (mm)</div>
+              <div className="flex items-center justify-between mb-1">
+                <div className="text-[9px] uppercase tracking-wider text-gray-500">Step (mm)</div>
+                <div className="text-[10px] font-mono text-cyan-300 font-bold">
+                  ativo: {step} mm
+                </div>
+              </div>
               <div className="grid grid-cols-6 gap-1">
-                {JOYSTICK_STEPS.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setStep(s)}
-                    className={cn(
-                      "px-1 py-1 rounded text-[10px] font-mono transition-colors",
-                      step === s
-                        ? "bg-cyan-500/30 border border-cyan-500/50 text-cyan-100"
-                        : "bg-white/5 border border-white/10 text-gray-400 hover:text-white"
-                    )}
-                  >
-                    {s}
-                  </button>
-                ))}
+                {JOYSTICK_STEPS.map((s) => {
+                  const active = step === s
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => {
+                        setStep(s)
+                        loggerRef.current?.info(`Joystick step alterado: ${s} mm`, "controller")
+                      }}
+                      aria-pressed={active}
+                      className={cn(
+                        "px-1 py-1 rounded text-[10px] font-mono transition-all",
+                        active
+                          ? "bg-cyan-500 text-black font-bold border-2 border-cyan-300 ring-2 ring-cyan-400/60 shadow-[0_0_8px_rgba(34,211,238,0.6)] scale-105"
+                          : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/30"
+                      )}
+                    >
+                      {s}
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
