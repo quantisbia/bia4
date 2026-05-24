@@ -132,13 +132,15 @@ export function requiredPlanLabel(feature: string): string {
   const tier = PLAN_FEATURES[feature]
   const LABELS: Record<string, string> = {
     FREE:         "Gratuito",
-    ORGANOID_LAB: "Organoid Lab",
-    DISCOVERY:    "Discovery",
-    ADVANCED:     "Advanced",
-    ENTERPRISE:   "Enterprise",
+    // R12.25: planos descontinuados mantêm label original para usuários legados
+    ORGANOID_LAB: "Organoid Lab (legado)",
+    DISCOVERY:    "Discovery (legado)",
+    // Planos ativos com novos nomes comerciais
+    ADVANCED:     "Biofabricação 3D",
+    ENTERPRISE:   "Biofabricação 3D Avançada",
     ACADEMY:      "Academy",
   }
-  return LABELS[tier ?? "FREE"] ?? "Discovery"
+  return LABELS[tier ?? "FREE"] ?? "Biofabricação 3D"
 }
 
 // ─── Descrição dos planos (para UI) ──────────────────────────────────────────
@@ -183,46 +185,40 @@ export const PLAN_INFO = {
     ],
     limits: { projects: 5, protocols: 20, pipelines: 5 },
   },
+  // R12.25: nomes comerciais atualizados (ids preservados p/ compatibilidade)
   ADVANCED: {
-    name: "BIA Advanced",
+    name: "Biofabricação 3D",
     price: 490,
     credits: 1500,
     badge: "POPULAR",
     color: "blue",
-    paymentUrl: "https://www.asaas.com/c/qsnp08rvpuwlj8ip",
+    paymentUrl: "https://www.asaas.com/c/kfvg9q66i3odmtsu",
     highlight: "Pesquisadores e laboratórios — módulos completos",
     features: [
       "1.500 créditos/mês",
       "Todos os módulos",
-      "Formulador avançado (807+ formulações)",
-      "Organoid Builder completo",
-      "Protocolos avançados + Dossiê Regulatório",
-      "Bioimpressão 3D com STL/G-Code",
-      "Reologia CFD (Herschel-Bulkley, Casson)",
-      "Análises: molecular, bioquímica, celular, in vitro",
-      "Eletrofiação avançada",
+      "Formulador avançado",
+      "Organoid Builder",
+      "Protocolos ilimitados",
       "20 projetos ativos",
     ],
     limits: { projects: 20, protocols: -1, pipelines: 20 },
   },
   ENTERPRISE: {
-    name: "BIA Enterprise",
+    name: "Biofabricação 3D Avançada",
     price: 990,
     credits: 5000,
     badge: null as string | null,
     color: "purple",
-    paymentUrl: "https://www.asaas.com/c/j983il0upnkiab2w",
-    highlight: "Farmacêuticas e institutos — dossiê regulatório completo",
+    paymentUrl: "https://www.asaas.com/c/87510sceyl5as6n7",
+    highlight: "Farmacêuticas e institutos — todos os recursos avançados",
     features: [
       "5.000 créditos/mês",
-      "Tudo do Advanced",
-      "Dossiê Regulatório completo (FDA/ANVISA/EMA)",
-      "CTD, 510k, DOSSIE ANVISA automatizados",
-      "Análises in vivo, pré-clínicas e clínicas",
-      "Inteligência de mercado",
+      "Tudo do Biofabricação 3D",
+      "807+ formulações validadas",
+      "RAG científico avançado",
       "Acesso à API",
       "Projetos ilimitados",
-      "Suporte prioritário",
     ],
     limits: { projects: -1, protocols: -1, pipelines: -1 },
   },
@@ -236,7 +232,7 @@ export const PLAN_INFO = {
     highlight: "Instituições de ensino, CROs e pharmas globais",
     features: [
       "20.000 créditos/mês",
-      "Tudo do Enterprise",
+      "Tudo do Biofabricação 3D Avançada",
       "Workspace para equipes",
       "Treinamento de IA personalizado",
       "Suporte dedicado",

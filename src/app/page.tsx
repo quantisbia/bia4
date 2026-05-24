@@ -3,7 +3,7 @@ import {
   ArrowRight, FlaskConical, Brain, Layers, Microscope, Zap,
   Shield, BarChart3, CheckCircle2, Star,
   Pill, Heart, Leaf, Building2, GraduationCap, TestTube2,
-  TrendingUp, AlertCircle, Crown, CircleDot,
+  TrendingUp, AlertCircle, Crown,
   ChevronRight
 } from "lucide-react"
 import { FloatingThemeLocale } from "@/components/ui/FloatingThemeLocale"
@@ -373,85 +373,14 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Organoid Lab highlight — plano especialista */}
-          <div className="max-w-3xl mx-auto mb-8 rounded-2xl border border-teal-500/30 bg-gradient-to-br from-teal-500/8 via-cyan-500/4 to-transparent p-5 sm:p-6 hover:border-teal-500/50 transition-all">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-              <div className="flex items-center gap-3 sm:flex-1">
-                <div className="w-11 h-11 rounded-2xl bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0">
-                  <CircleDot className="w-5 h-5 text-teal-400" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base font-bold text-white">Organoid Builder</h3>
-                    <span className="px-2 py-0.5 rounded-full bg-teal-600 text-white text-[10px] font-bold">ESPECIALISTA</span>
-                  </div>
-                  <p className="text-xs text-teal-200/70 mt-0.5">
-                    Construa organoides e esferoides com orientação inteligente, seleção celular guiada e protocolos personalizados.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 sm:shrink-0">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-white">R$ 150</div>
-                  <div className="text-[10px] text-gray-400">/mês · 300 créditos</div>
-                </div>
-                <Link href="https://www.asaas.com/c/24p0skdjkpacozta" target="_blank"
-                  className="px-5 py-2.5 rounded-xl bg-teal-500 text-white text-sm font-semibold hover:bg-teal-400 transition-all whitespace-nowrap shadow-lg shadow-teal-900/40">
-                  Assinar →
-                </Link>
-              </div>
-            </div>
-            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {[
-                "Builder de organoides guiado",
-                "Builder de esferoides monocelulares",
-                "Seleção celular inteligente",
-                "Protocolos automatizados por IA",
-                "Sugestões de biomateriais",
-                "Estratégia experimental guiada",
-              ].map((f) => (
-                <div key={f} className="flex items-center gap-1.5 text-xs text-teal-200/80">
-                  <CheckCircle2 className="w-3 h-3 text-teal-400 shrink-0" />
-                  <span>{f}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* R12.25: Catálogo enxuto — 2 planos principais + Academy.
+              Organoid Lab e Discovery descontinuados (Organoid Builder
+              agora incluso no Biofabricação 3D). */}
 
-          {/* Paid plans — scroll horizontal on mobile */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
+          {/* Paid plans — grid responsivo */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6 max-w-6xl mx-auto">
 
-            {/* DISCOVERY */}
-            <div className="rounded-xl sm:rounded-2xl border border-violet-500/30 bg-white/2 p-5 sm:p-6 flex flex-col hover:border-violet-500/50 transition-all">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-                  <Star className="w-4 h-4 text-violet-400" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold">Discovery</h3>
-                  <span className="text-[10px] text-violet-400 uppercase tracking-wider">Plano inicial</span>
-                </div>
-              </div>
-              <div className="mb-4">
-                <span className="text-2xl sm:text-3xl font-bold">R$ 270</span>
-                <span className="text-gray-400 text-sm">/mês</span>
-                <div className="credit-pill mt-2 w-fit text-xs"><Zap className="w-3 h-3" />500 créditos/mês</div>
-              </div>
-              <ul className="space-y-2 mb-6 flex-1 text-xs sm:text-sm text-gray-300">
-                {["500 créditos/mês","Pipeline 12 etapas","Formulador (50 formulações)","Chat IA limitado","Base de conhecimento","Suporte email"].map((f) => (
-                  <li key={f} className="flex items-start gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-violet-400 mt-0.5 shrink-0" />
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <Link href="/auth/register"
-                className="w-full text-center py-2.5 px-4 rounded-xl font-medium text-sm border border-violet-500/30 text-violet-300 hover:bg-violet-500/10 transition-all">
-                Começar Discovery
-              </Link>
-            </div>
-
-            {/* ADVANCED — most popular */}
+            {/* BIOFABRICAÇÃO 3D (era ADVANCED) — mais popular */}
             <div className="relative rounded-xl sm:rounded-2xl border-2 border-blue-500/50 bg-blue-500/5 p-5 sm:p-6 flex flex-col">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold px-4 py-1 rounded-full whitespace-nowrap">
                 MAIS POPULAR
@@ -461,7 +390,7 @@ export default function HomePage() {
                   <Brain className="w-4 h-4 text-blue-400" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold">Advanced</h3>
+                  <h3 className="text-base font-bold">Biofabricação 3D</h3>
                   <span className="text-[10px] text-blue-400 uppercase tracking-wider">Profissional</span>
                 </div>
               </div>
@@ -471,27 +400,27 @@ export default function HomePage() {
                 <div className="credit-pill mt-2 w-fit text-xs bg-blue-500/10 border-blue-500/20 text-blue-400"><Zap className="w-3 h-3" />1.500 créditos/mês</div>
               </div>
               <ul className="space-y-2 mb-6 flex-1 text-xs sm:text-sm text-gray-300">
-                {["1.500 créditos/mês","Pipeline completo","Formulador (807 formulações)","Organoid Builder","Chat IA ilimitado","Base completa (100+ artigos)","Suporte prioritário"].map((f) => (
+                {["1.500 créditos/mês","Todos os módulos","Formulador avançado","Organoid Builder","Protocolos ilimitados","20 projetos ativos"].map((f) => (
                   <li key={f} className="flex items-start gap-2">
                     <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
                     <span>{f}</span>
                   </li>
                 ))}
               </ul>
-              <Link href="/auth/register"
+              <Link href="https://www.asaas.com/c/kfvg9q66i3odmtsu" target="_blank"
                 className="w-full text-center py-2.5 px-4 rounded-xl font-semibold text-sm bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-90 transition-opacity">
-                Começar Advanced
+                Assinar Biofabricação 3D →
               </Link>
             </div>
 
-            {/* ENTERPRISE */}
+            {/* BIOFABRICAÇÃO 3D AVANÇADA (era ENTERPRISE) */}
             <div className="rounded-xl sm:rounded-2xl border border-purple-500/30 bg-white/2 p-5 sm:p-6 flex flex-col hover:border-purple-500/50 transition-all">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
                   <Crown className="w-4 h-4 text-purple-400" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold">Enterprise</h3>
+                  <h3 className="text-base font-bold">Biofabricação 3D Avançada</h3>
                   <span className="text-[10px] text-purple-400 uppercase tracking-wider">Corporativo</span>
                 </div>
               </div>
@@ -501,16 +430,16 @@ export default function HomePage() {
                 <div className="credit-pill mt-2 w-fit text-xs bg-purple-500/10 border-purple-500/20 text-purple-400"><Zap className="w-3 h-3" />5.000 créditos/mês</div>
               </div>
               <ul className="space-y-2 mb-6 flex-1 text-xs sm:text-sm text-gray-300">
-                {["5.000 créditos/mês","Todos os módulos","API access","Relatórios avançados","SLA garantido","Suporte dedicado","Multi-usuário"].map((f) => (
+                {["5.000 créditos/mês","Tudo do Biofabricação 3D","807+ formulações validadas","RAG científico avançado","Acesso à API","Projetos ilimitados"].map((f) => (
                   <li key={f} className="flex items-start gap-2">
                     <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 mt-0.5 shrink-0" />
                     <span>{f}</span>
                   </li>
                 ))}
               </ul>
-              <Link href="/auth/register"
-                className="w-full text-center py-2.5 px-4 rounded-xl font-medium text-sm border border-purple-500/30 text-purple-300 hover:bg-purple-500/10 transition-all">
-                Começar Enterprise
+              <Link href="https://www.asaas.com/c/87510sceyl5as6n7" target="_blank"
+                className="w-full text-center py-2.5 px-4 rounded-xl font-semibold text-sm bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white hover:opacity-90 transition-opacity">
+                Assinar Biofab 3D Avançada →
               </Link>
             </div>
 

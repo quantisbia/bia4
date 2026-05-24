@@ -5,8 +5,8 @@ import { useSession } from "next-auth/react"
 import {
   Zap, Star, CheckCircle2, Clock, TrendingDown, TrendingUp,
   CreditCard, RefreshCw, ExternalLink, Calendar, Crown,
-  ChevronDown, ChevronUp, CircleDot, Layers, FlaskConical,
-  Brain, Microscope, Dna, Package, Gift, Percent, ArrowRight,
+  ChevronDown, ChevronUp, FlaskConical,
+  Brain, Microscope, Package, Gift, Percent, ArrowRight,
   ShieldCheck, Tag, Timer, Info, GraduationCap,
 } from "lucide-react"
 import { CreditProgressBar, CreditBadge } from "@/components/credits/CreditWidgets"
@@ -14,57 +14,30 @@ import { useToast } from "@/components/ui/Toast"
 import { cn } from "@/lib/utils/helpers"
 
 /* ─────────────────────────────────────────────────────────────────────────
-   PLANOS  (sem FREE — 10 créditos ficam no Discovery)
+   PLANOS — R12.25: catálogo enxuto (Biofabricação 3D + Biofab 3D Avançada
+   + Academy). Planos antigos (Organoid Lab, Discovery) descontinuados;
+   assinantes legados continuam tendo acesso via ids preservados no backend.
 ───────────────────────────────────────────────────────────────────────── */
+// Preços históricos para cálculo retroativo de custo/crédito de planos
+// descontinuados (usuários ainda assinantes verão valor correto).
+const LEGACY_PLAN_PRICES: Record<string, number> = {
+  ORGANOID_LAB: 150,
+  DISCOVERY:    270,
+}
 const PLANS = [
-  {
-    id: "ORGANOID_LAB",
-    name: "Organoid Lab",
-    price: 150,
-    annualPrice: 120,       // 20% desconto
-    credits: 300,
-    color: "teal",
-    badge: "ESPECIALISTA",
-    paymentUrl: "https://www.asaas.com/c/24p0skdjkpacozta",
-    annualPaymentUrl: "https://www.asaas.com/c/24p0skdjkpacozta",
-    features: [
-      "300 créditos/mês",
-      "Organoid Builder completo",
-      "Protocolo QMicroNiche™ integrado",
-      "7 tipos de organoides por IA",
-      "QMatrix™ + moldes não-adesivos",
-      "Chat IA BIA (contexto organoides)",
-    ],
-  },
-  {
-    id: "DISCOVERY",
-    name: "BIA Discovery",
-    price: 270,
-    annualPrice: 216,
-    credits: 500,
-    color: "violet",
-    badge: null,
-    paymentUrl: "https://www.asaas.com/c/rneusgbvs6mvm2kg",
-    annualPaymentUrl: "https://www.asaas.com/c/rneusgbvs6mvm2kg",
-    features: [
-      "500 créditos/mês",
-      "10 créditos iniciais grátis",
-      "Pipeline de 12 etapas",
-      "Formulador básico",
-      "Chat IA",
-      "5 projetos ativos",
-    ],
-  },
+  // R12.25: catálogo reduzido a 2 planos principais + Academy.
+  // ids ADVANCED/ENTERPRISE preservados para compatibilidade com backend
+  // (hierarquia de features em src/lib/config.ts e assinaturas existentes).
   {
     id: "ADVANCED",
-    name: "BIA Advanced",
+    name: "Biofabricação 3D",
     price: 490,
     annualPrice: 392,
     credits: 1500,
     color: "blue",
     badge: "POPULAR",
-    paymentUrl: "https://www.asaas.com/c/qsnp08rvpuwlj8ip",
-    annualPaymentUrl: "https://www.asaas.com/c/qsnp08rvpuwlj8ip",
+    paymentUrl: "https://www.asaas.com/c/kfvg9q66i3odmtsu",
+    annualPaymentUrl: "https://www.asaas.com/c/kfvg9q66i3odmtsu",
     features: [
       "1.500 créditos/mês",
       "Todos os módulos",
@@ -76,18 +49,18 @@ const PLANS = [
   },
   {
     id: "ENTERPRISE",
-    name: "BIA Enterprise / Global Pharma",
-    name_short: "Enterprise",
+    name: "Biofabricação 3D Avançada",
+    name_short: "Biofab 3D Avançada",
     price: 990,
     annualPrice: 792,
     credits: 5000,
     color: "purple",
     badge: null,
-    paymentUrl: "https://www.asaas.com/c/j983il0upnkiab2w",
-    annualPaymentUrl: "https://www.asaas.com/c/j983il0upnkiab2w",
+    paymentUrl: "https://www.asaas.com/c/87510sceyl5as6n7",
+    annualPaymentUrl: "https://www.asaas.com/c/87510sceyl5as6n7",
     features: [
       "5.000 créditos/mês",
-      "Tudo do Advanced",
+      "Tudo do Biofabricação 3D",
       "807+ formulações validadas",
       "RAG científico avançado",
       "Acesso à API",
@@ -418,174 +391,9 @@ function CreditPacksSection() {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Organoid Lab — Proposta de Valor Detalhada
+   R12.25: OrganoidLabValueCard removido — plano descontinuado.
+   Organoid Builder agora está incluso no plano Biofabricação 3D.
 ───────────────────────────────────────────────────────────────────────── */
-function OrganoidLabValueCard({ currentPlan }: { currentPlan: string }) {
-  const isActive = currentPlan === "ORGANOID_LAB"
-
-  const benefits = [
-    {
-      icon: Layers,
-      color: "text-teal-400",
-      bg: "bg-teal-500/10 border-teal-500/20",
-      title: "QMicroNiche™ integrado ao protocolo",
-      desc: "Metodologia publicada na JoVE (2022) por Janaína Dernowsek — moldes não-adesivos de agarose 2% para geração de até 4.716 esferoides por placa, com diâmetro homogêneo (123 ± 3 µm) e viabilidade >95%. Sem precisar de equipamentos caros.",
-    },
-    {
-      icon: Brain,
-      color: "text-cyan-400",
-      bg: "bg-cyan-500/10 border-cyan-500/20",
-      title: "Protocolos de diferenciação gerados por IA",
-      desc: "A IA BIA gera protocolos completos com objetivo, materiais, etapas, parâmetros críticos e checkpoints de qualidade para intestinal, hepático, neural, cardíaco, renal, pancreático e pulmonar — adaptados à sua célula-fonte (iPSC, ESC, primária, tronco adulta).",
-    },
-    {
-      icon: Microscope,
-      color: "text-violet-400",
-      bg: "bg-violet-500/10 border-violet-500/20",
-      title: "Redução de custo e tempo no desenvolvimento",
-      desc: "Esferoides e organoides substituem modelos animais e culturas 2D com maior relevância biológica. Com o Organoid Lab você acelera triagem de drogas, modelagem de doenças e testes de toxicidade com custo até 10× menor que serviços terceirizados.",
-    },
-    {
-      icon: Dna,
-      color: "text-emerald-400",
-      bg: "bg-emerald-500/10 border-emerald-500/20",
-      title: "QMatrix™ + ECM para maturação acelerada",
-      desc: "Inclui guias de bioativação com QMatrix™ — peptídeo patenteado Quantis — para revestimento de superfície, aditivo de adesão celular e integração em hidrogéis. Concentrações e janelas temporais validadas para cada fase do protocolo.",
-    },
-    {
-      icon: FlaskConical,
-      color: "text-amber-400",
-      bg: "bg-amber-500/10 border-amber-500/20",
-      title: "Agilidade sem complexidade operacional",
-      desc: "Elimina a necessidade de equipamentos de hanging drop ou placas U-bottom de alto custo. O dispositivo QMicroNiche é reutilizável, autoclavável e compatível com placas de Petri 35–150 mm e placas 6-, 12-, 24- e 96-well — já disponíveis em qualquer laboratório.",
-    },
-    {
-      icon: CircleDot,
-      color: "text-rose-400",
-      bg: "bg-rose-500/10 border-rose-500/20",
-      title: "Acesso focado — sem pagar pelo que não usa",
-      desc: "Plano desenhado para pesquisadores, startups e laboratórios que trabalham especificamente com esferoides e organoides. Acesso exclusivo ao Organoid Builder + Chat IA contextualizado + Base de conhecimento científica — R$ 150/mês, 300 créditos.",
-    },
-  ]
-
-  return (
-    <div className="rounded-2xl border border-teal-500/20 bg-gradient-to-br from-teal-500/5 via-cyan-500/3 to-[#060f1a] overflow-hidden">
-      {/* Header */}
-      <div className="px-5 pt-5 pb-4 border-b border-white/[0.06]">
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-          <div className="w-9 h-9 rounded-xl bg-teal-500/15 border border-teal-500/25 flex items-center justify-center">
-            <CircleDot className="w-5 h-5 text-teal-400" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-bold text-white">Plano Organoid Lab</h3>
-              {isActive && (
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center gap-1">
-                  <CheckCircle2 className="w-2.5 h-2.5" /> SEU PLANO
-                </span>
-              )}
-              <span className="px-2 py-0.5 rounded-full bg-teal-600 text-white text-[10px] font-bold">
-                ESPECIALISTA
-              </span>
-            </div>
-            <p className="text-xs text-gray-400 mt-0.5">
-              Acesso focado ao Organoid Builder — R$ 150/mês · 300 créditos
-            </p>
-          </div>
-        </div>
-
-        {/* Destaque proposta */}
-        <div className="rounded-xl bg-teal-500/8 border border-teal-500/15 p-3 mb-4">
-          <p className="text-xs text-teal-200 leading-relaxed">
-            <span className="font-bold text-teal-300">Para quem:</span>{" "}
-            pesquisadores, startups de biotecnologia, laboratórios universitários e
-            empresas de cosméticos/farmacêuticos que desenvolvem{" "}
-            <span className="font-semibold">esferoides e organoides</span> e
-            precisam de agilidade, baixo custo e reprodutibilidade sem complexidade operacional.
-          </p>
-        </div>
-
-        {/* 3 métricas de impacto */}
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            { v: "4.716", label: "esferoides/placa", sub: "produção em larga escala" },
-            { v: ">95%", label: "viabilidade", sub: "metodologia validada" },
-            { v: "10×", label: "menor custo", sub: "vs. serviços terceirizados" },
-          ].map((m, i) => (
-            <div key={i} className="text-center py-3 px-2 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-              <div className="text-lg font-bold text-teal-300">{m.v}</div>
-              <div className="text-[10px] font-semibold text-gray-300">{m.label}</div>
-              <div className="text-[9px] text-gray-600 mt-0.5 leading-tight">{m.sub}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Benefits grid */}
-      <div className="p-5">
-        <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold mb-3">
-          O que você recebe com o Organoid Lab
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
-          {benefits.map((b, i) => (
-            <div key={i} className={cn("rounded-xl border p-3.5 flex gap-3", b.bg)}>
-              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-black/20 border", b.bg)}>
-                <b.icon className={cn("w-4 h-4", b.color)} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className={cn("text-[11px] font-bold mb-1", b.color)}>{b.title}</p>
-                <p className="text-[10px] text-gray-400 leading-relaxed">{b.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Comparação rápida */}
-        <div className="rounded-xl bg-white/[0.02] border border-white/[0.05] p-4 mb-4">
-          <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold mb-3">
-            Organoid Lab vs. métodos tradicionais
-          </p>
-          <div className="space-y-2">
-            {[
-              { item: "Hanging drop (96-well comprado)", trad: "~R$ 450/placa", lab: "Agarose 2% — ~R$ 12/placa" },
-              { item: "Tempo para protocolo completo", trad: "2–4 semanas (literatura)", lab: "Gerado em segundos pela IA" },
-              { item: "Esferoide homogêneo garantido", trad: "Alta variabilidade", lab: "123 ± 3 µm (validado JoVE)" },
-              { item: "Bioativação com ECM", trad: "Não inclusa", lab: "QMatrix™ integrado" },
-            ].map((row, i) => (
-              <div key={i} className="grid grid-cols-3 gap-2 text-[10px]">
-                <div className="text-gray-400 font-medium">{row.item}</div>
-                <div className="text-red-400 text-center">{row.trad}</div>
-                <div className="text-teal-300 font-semibold text-center">{row.lab}</div>
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-3 gap-2 text-[9px] text-gray-600 mt-2 pt-2 border-t border-white/5">
-            <div />
-            <div className="text-center">Tradicional</div>
-            <div className="text-center text-teal-500">Organoid Lab</div>
-          </div>
-        </div>
-
-        {/* CTA */}
-        {!isActive ? (
-          <a
-            href="https://www.asaas.com/c/24p0skdjkpacozta"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 w-full py-3.5 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-teal-900/40 active:scale-[0.98]"
-          >
-            <ExternalLink className="w-4 h-4" />
-            Assinar Organoid Lab — R$ 150/mês
-          </a>
-        ) : (
-          <div className="flex items-center justify-center gap-2 w-full py-3 border border-teal-500/25 text-teal-400 text-sm font-semibold rounded-xl bg-teal-500/5">
-            <CheckCircle2 className="w-4 h-4" /> Plano Organoid Lab ativo
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
 
 /* ─────────────────────────────────────────────────────────────────────────
    Usage Insights - Quick Analytics
@@ -653,7 +461,7 @@ function UsageInsights({
           <span className="text-[10px] text-gray-500 font-medium">Eficiência</span>
         </div>
         <p className="text-xl font-bold text-white">
-          {totalSpent > 0 ? `R$ ${((plan === "FREE" ? 0 : (PLANS.find(p => p.id === plan)?.price ?? 0)) / Math.max(1, totalSpent)).toFixed(2)}` : "—"}
+          {totalSpent > 0 ? `R$ ${((plan === "FREE" ? 0 : (PLANS.find(p => p.id === plan)?.price ?? LEGACY_PLAN_PRICES[plan] ?? 0)) / Math.max(1, totalSpent)).toFixed(2)}` : "—"}
         </p>
         <p className="text-[10px] text-gray-600 mt-1">custo/crédito</p>
       </div>
@@ -844,8 +652,8 @@ export function BillingClient({
           {/* Annual savings banner */}
           <AnnualSavingsBanner billingCycle={billingCycle} />
 
-          {/* Desktop: grid */}
-          <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          {/* Desktop: grid — R12.25: 3 planos (Biofab 3D, Biofab 3D Avançada, Academy) */}
+          <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {PLANS.map(plan => {
               const c       = COLOR[plan.color as keyof typeof COLOR]
               const isCur   = plan.id === currentPlan
@@ -1067,8 +875,9 @@ export function BillingClient({
             })}
           </div>
 
-          {/* ── Organoid Lab — Proposta de valor detalhada ── */}
-          <OrganoidLabValueCard currentPlan={currentPlan} />
+          {/* R12.25: OrganoidLabValueCard removido — plano Organoid Lab
+              foi descontinuado. Organoid Builder agora está incluso no
+              plano Biofabricação 3D. */}
 
           {/* Payment info notice */}
           <div className="bg-violet-500/[0.05] border border-violet-500/15 rounded-xl px-4 py-4 flex gap-3">
