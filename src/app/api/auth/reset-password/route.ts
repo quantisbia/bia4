@@ -26,6 +26,7 @@ import bcrypt from "bcryptjs"
 import { z } from "zod"
 import { prisma } from "@/lib/db/prisma"
 import { hashToken, isWellFormedToken } from "@/lib/auth/password-reset-token"
+import { ensurePasswordResetTable } from "@/lib/auth/password-reset-bootstrap"
 
 const resetSchema = z.object({
   token: z.string().min(8).max(256),
@@ -41,6 +42,9 @@ export async function GET(req: NextRequest) {
       { status: 400 },
     )
   }
+
+  // R12.31: garante tabela antes de qualquer query
+  await ensurePasswordResetTable()
 
   try {
     const tokenHash = await hashToken(token)
@@ -111,6 +115,9 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     )
   }
+
+  // R12.31: garante tabela antes de qualquer query
+  await ensurePasswordResetTable()
 
   try {
     const tokenHash = await hashToken(token)

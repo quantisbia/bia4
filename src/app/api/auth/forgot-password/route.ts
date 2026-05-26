@@ -1,24 +1,17 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
- *  POST /api/auth/forgot-password (R12.30)
+ *  POST /api/auth/forgot-password (R12.31 — revisado)
  *  ─────────────────────────────────────────────────────────────────────
- *  Inicia o fluxo de redefinição de senha.
+ *  R12.31 muda a postura: o link de reset SEMPRE aparece na resposta
+ *  quando o email existe. Email continua sendo enviado quando RESEND
+ *  está configurado, mas o usuário NUNCA fica preso esperando algo
+ *  que pode não chegar (spam, DNS, infra não configurada).
  *
- *  Comportamento:
- *    1. Recebe { email }
- *    2. Procura usuário (sem expor se existe — anti-enumeração)
- *    3. Se existe:
- *         · invalida tokens anteriores não usados
- *         · gera novo token (256 bits) e salva o HASH no DB
- *         · monta URL: ${origin}/auth/reset-password?token=<plain>
- *         · tenta enviar email via Resend
- *    4. Sempre retorna 200 com { ok: true } — mas se RESEND não estiver
- *       configurado E o usuário existir, retorna ALSO `resetUrl` para
- *       fallback (modo dev / infra ainda não pronta). Isso evita travar
- *       o usuário esperando email que nunca vai chegar.
+ *  Bootstrap da tabela: chama ensurePasswordResetTable() antes do
+ *  INSERT — torna o endpoint resiliente a migrations não aplicadas.
  *
- *  Rate limiting: básico in-memory (não distribuído — OK para early stage;
- *  Cloudflare WAF lida com abuso massivo).
+ *  Anti-enumeração mantida: emails NÃO cadastrados recebem mensagem
+ *  genérica sem `resetUrl`. Atacante não consegue distinguir.
  *
  *  Janaina Dernowsek / Quantis Biotechnology — 2026
  * ═══════════════════════════════════════════════════════════════════════
@@ -33,6 +26,7 @@ import {
   tokenExpiry,
   TOKEN_TTL_MIN,
 } from "@/lib/auth/password-reset-token"
+import { ensurePasswordResetTable } from "@/lib/auth/password-reset-bootstrap"
 import { sendPasswordResetEmail } from "@/lib/email/send-password-reset"
 
 const forgotSchema = z.object({
@@ -41,7 +35,7 @@ const forgotSchema = z.object({
 
 // Rate limit simples em memória (por IP)
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000 // 15 min
-const RATE_LIMIT_MAX = 5
+const RATE_LIMIT_MAX = 10 // R12.31: subido de 5→10 para diminuir fricção
 const rateLimitBucket = new Map<string, { count: number; resetAt: number }>()
 
 function checkRateLimit(ip: string): { allowed: boolean; retryAfterSec?: number } {
@@ -95,12 +89,25 @@ export async function POST(req: NextRequest) {
 
   const email = parsed.data.email.trim().toLowerCase()
 
+  // ─── BOOTSTRAP — garante tabela disponível ──
+  const tableReady = await ensurePasswordResetTable()
+  if (!tableReady) {
+    console.error("[forgot-password] tabela password_reset_tokens indisponível")
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          "Sistema de recuperação temporariamente indisponível. " +
+          "Entre em contato com o suporte: contato@quantisbiotech.com",
+      },
+      { status: 503 },
+    )
+  }
+
   // Resposta padrão (anti-enumeração) — sempre 200 OK
   const successResponse = (extra: Record<string, unknown> = {}) =>
     NextResponse.json({
       ok: true,
-      message:
-        "Se este email tem uma conta na BIA, você receberá um link de redefinição em alguns instantes. Verifique também a pasta de spam.",
       expiresInMin: TOKEN_TTL_MIN,
       ...extra,
     })
@@ -108,13 +115,18 @@ export async function POST(req: NextRequest) {
   try {
     const user = await getUserByEmail(email)
 
-    // Usuário não existe → resposta padrão (não revela)
+    // ─── Email NÃO cadastrado → resposta neutra (anti-enumeração) ──
     if (!user) {
-      console.log(`[forgot-password] email não encontrado: ${email.slice(0, 3)}***`)
-      return successResponse()
+      console.log(`[forgot-password] email não cadastrado: ${email.slice(0, 3)}***`)
+      return successResponse({
+        accountExists: false,
+        message:
+          "Se este email tem uma conta na BIA, geramos um link de redefinição. " +
+          "Verifique sua caixa de entrada e spam.",
+      })
     }
 
-    // Gera token e salva hash
+    // ─── Gera token e salva hash ──
     const { plainToken, tokenHash } = await generateResetToken()
     const expires = tokenExpiry()
 
@@ -145,14 +157,14 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // Monta URL absoluta
+    // ─── Monta URL absoluta de reset ──
     const origin =
       req.headers.get("origin") ||
       process.env.NEXTAUTH_URL ||
       `https://${req.headers.get("host")}`
     const resetUrl = `${origin.replace(/\/$/, "")}/auth/reset-password?token=${encodeURIComponent(plainToken)}`
 
-    // Tenta enviar email
+    // ─── Tenta enviar email (não-bloqueante para a UX) ──
     const emailResult = await sendPasswordResetEmail({
       to: user.email,
       resetUrl,
@@ -170,31 +182,36 @@ export async function POST(req: NextRequest) {
           metadata: {
             email: user.email,
             emailSent: emailResult.emailSent,
-            provider: emailResult.provider,
+            emailProvider: emailResult.provider,
+            emailError: emailResult.error ?? null,
             ip,
           },
         },
       })
       .catch(() => {})
 
-    // Se email FALHOU ou não está configurado → expõe o link na resposta.
-    // Isso é a "Camada 2" da estratégia: garante que o usuário SEMPRE
-    // consegue redefinir, mesmo sem infra de email.
-    if (!emailResult.emailSent) {
-      return successResponse({
-        emailDelivered: false,
-        fallbackResetUrl: resetUrl,
-        notice:
-          "O envio automático de email não está disponível no momento. Use o link abaixo (ele expira em " +
-          TOKEN_TTL_MIN +
-          " minutos):",
-      })
-    }
-
-    return successResponse({ emailDelivered: true })
+    // ─── R12.31: SEMPRE devolve o resetUrl quando a conta existe ──
+    // O usuário pode usar imediatamente sem depender do email chegar.
+    // Isso resolve o problema de "o email não chega" definitivamente.
+    return successResponse({
+      accountExists: true,
+      emailDelivered: emailResult.emailSent,
+      emailProvider: emailResult.provider,
+      resetUrl,
+      message: emailResult.emailSent
+        ? "Enviamos um link de redefinição para o seu email. " +
+          "Você também pode usar o link abaixo agora mesmo (sem esperar o email):"
+        : "Link de redefinição gerado. Use o botão abaixo para criar uma nova senha agora:",
+    })
   } catch (e) {
     console.error("[forgot-password] erro:", e instanceof Error ? e.message : String(e))
-    // Mesmo em erro interno, retorna 200 para não vazar info
-    return successResponse({ emailDelivered: false })
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          "Não foi possível gerar o link de redefinição. Tente novamente em alguns segundos.",
+      },
+      { status: 500 },
+    )
   }
 }
