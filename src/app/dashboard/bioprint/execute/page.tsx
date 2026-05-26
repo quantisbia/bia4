@@ -155,6 +155,9 @@ export default function BioprintExecutePage() {
   const [gcodeName, setGcodeName] = useState<string>("(sem nome)")
 
   // Carrega handoff vindo de outras páginas
+  // R12.29: também valida + auto-corrige automaticamente (igual aos demais
+  // canais de carga). Não pode usar loadGcodeWithAutoFix aqui porque o
+  // useCallback é declarado depois — então a lógica é inline (curta).
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem(HANDOFF_KEY)
@@ -165,6 +168,30 @@ export default function BioprintExecutePage() {
           setGcodeName(obj.name ?? "G-code importado")
           loggerRef.current.info(`G-code importado de ${obj.from ?? "outra página"} — ${obj.gcode.split("\n").length} linhas`)
           sessionStorage.removeItem(HANDOFF_KEY)
+
+          // R12.29: valida + auto-fix em background
+          try {
+            const result = validateGcode(obj.gcode, DEFAULT_BIO_LIMITS, "marlin")
+            const summary = summarizeAutoFix(result)
+            if (summary.totalFixable > 0) {
+              const fix = autoFixGcode(obj.gcode, result, DEFAULT_AUTOFIX_OPTS)
+              if (fix.applied.length > 0) {
+                setGcodeText(fix.fixedGcode)
+                const reval = validateGcode(fix.fixedGcode, DEFAULT_BIO_LIMITS, "marlin")
+                setValidation(reval)
+                loggerRef.current.ok(
+                  `Auto-fix aplicou ${fix.applied.length} correção(ões) no G-code importado.`,
+                  "validator",
+                )
+              } else {
+                setValidation(result)
+              }
+            } else {
+              setValidation(result)
+            }
+          } catch (e) {
+            loggerRef.current.warn(`Validação automática do handoff falhou: ${e instanceof Error ? e.message : String(e)}`)
+          }
         }
       }
     } catch {}
@@ -563,9 +590,23 @@ export default function BioprintExecutePage() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       loggerRef.current.error(`Falha ao conectar: ${msg}`)
+      // R12.29: cleanup defensivo — se a falha aconteceu APÓS o transport
+      // ter aberto o port (ex.: handshake falhou), precisamos garantir que
+      // o port USB seja liberado e o listener do controller seja removido.
+      // Sem isso, o port fica "ocupado" e tentativas de reconectar dão
+      // "Failed to open serial port" — o usuário só consegue se sair, ou
+      // clicar em "Reiniciar Tudo".
+      try { controllerRef.current?.destroy() } catch {}
+      try { await transportRef.current?.disconnect() } catch {}
       transportRef.current = null
       controllerRef.current = null
       setConnected(false)
+      setFirmware(null)
+      setControllerState("idle")
+      loggerRef.current.info(
+        "Dica: se a falha persistir, clique em \"Reiniciar Tudo\" no painel de conexão para limpar a sessão e tentar de novo.",
+        "controller",
+      )
     }
   }, [connected, mode, supported, baud, autoHomeOnConnect, flowPercent])
 
@@ -588,6 +629,104 @@ export default function BioprintExecutePage() {
     setProgress(null)
     loggerRef.current.ok("Desconectado.")
   }, [connected])
+
+  // ─── R12.29: RESET TOTAL (botão "Reiniciar Tudo") ──
+  //
+  // Limpa COMPLETAMENTE o estado da sessão para começar do zero, sem
+  // resíduos de comandos pendentes, validações antigas ou conexões
+  // travadas. Endereça o cenário do usuário:
+  //   1) impressora conectada com fila travada / 'ok' pendente capturando
+  //      o waiter errado (joystick não move);
+  //   2) G-code carregado com erros / paths inválidos que bloqueiam a
+  //      validação e impedem o envio;
+  //   3) controller em estado "error" / "aborting" sem caminho de volta
+  //      para "idle".
+  //
+  // Esta função NÃO envia M112 (emergency) — isso forçaria o usuário a
+  // reiniciar a impressora fisicamente. Em vez disso:
+  //   · cancel() do stream (se houver) — interrompe loop interno
+  //   · destroy() do controller — remove listener de mensagens
+  //   · disconnect() do transport — fecha o port USB / mock
+  //   · zera TODOS os estados de UI (G-code, validação, posição,
+  //     progresso, fluxo, firmware, autofix, etc.)
+  //   · preserva o logger (audit trail da sessão fica acessível)
+  //
+  // Após o reset, o usuário pode clicar em "Conectar USB" de novo e
+  // começar uma sessão limpa, sem race condition nem fila suja.
+  const handleResetAll = useCallback(async () => {
+    const ok = confirm(
+      "🔄 Reiniciar Tudo\n\n" +
+      "Isso vai:\n" +
+      "  • Cancelar qualquer impressão em andamento\n" +
+      "  • Desconectar a bioimpressora (sem M112 / sem restart físico)\n" +
+      "  • Limpar o G-code carregado e a validação\n" +
+      "  • Zerar posição, progresso e fluxo aplicado\n" +
+      "  • Manter o log técnico (auditoria)\n\n" +
+      "Use isso se o joystick travou, a conexão deu erro ou o G-code está com problema. " +
+      "Depois, conecte de novo normalmente.\n\n" +
+      "Confirmar reset?"
+    )
+    if (!ok) return
+
+    loggerRef.current.info("══ RESET TOTAL solicitado pelo usuário (R12.29) ══", "controller")
+
+    // 1) Cancela streaming (se houver) e destrói controller
+    try {
+      if (controllerRef.current) {
+        try { controllerRef.current.cancel() } catch {}
+        try { controllerRef.current.destroy() } catch {}
+        controllerRef.current = null
+      }
+    } catch (e) {
+      loggerRef.current.warn(`Reset · destruir controller: ${e instanceof Error ? e.message : String(e)}`)
+    }
+
+    // 2) Desconecta transport (port USB / mock)
+    try {
+      if (transportRef.current) {
+        try { await transportRef.current.disconnect() } catch {}
+        transportRef.current = null
+      }
+    } catch (e) {
+      loggerRef.current.warn(`Reset · desconectar transport: ${e instanceof Error ? e.message : String(e)}`)
+    }
+
+    // 3) Cancela qualquer timer pendente de fluxo
+    if (flowSendTimerRef.current) {
+      clearTimeout(flowSendTimerRef.current)
+      flowSendTimerRef.current = null
+    }
+    flowAppliedRef.current = null
+
+    // 4) Estados de conexão
+    setConnected(false)
+    setFirmware(null)
+    setControllerState("idle")
+    setProgress(null)
+    setDidAutoHome(false)
+
+    // 5) Estados de G-code / validação / auto-fix
+    setGcodeText("")
+    setGcodeName("(sem nome)")
+    setValidation(null)
+    setShowAllIssues(false)
+    setAutoFixResult(null)
+    setGcodeTextBeforeFix(null)
+    setShowAutoFixPanel(false)
+
+    // 6) Joystick / posição / comando manual
+    setPosition({ x: 0, y: 0, z: 0, e: 0 })
+    setManualCmd("")
+
+    // 7) Fluxo volta ao default seguro de 50% (hidrogel)
+    setFlowPercent(50)
+
+    loggerRef.current.ok(
+      "Reset concluído. Sessão limpa: sem conexão, sem G-code, sem fila pendente. " +
+      "Clique em \"Conectar USB\" (ou \"Iniciar Simulador\") para começar do zero.",
+      "controller",
+    )
+  }, [])
 
   /**
    * R12.24: Aplica fluxo (M221) na impressora.
@@ -801,40 +940,114 @@ export default function BioprintExecutePage() {
     }
   }, [connected])
 
+  // ─── R12.29: Helper de carga com validação + auto-fix automático ──
+  //
+  // Sempre que um G-code entra no app (upload, demo, paste, deep-link),
+  // rodamos imediatamente:
+  //   1) validateGcode → ValidationResult (errors + warnings + stats)
+  //   2) Se houver issues corrigíveis → autoFixGcode aplica patches
+  //   3) Re-validateGcode no texto corrigido → mostra verdict final
+  //
+  // Antes da R12.29, o usuário precisava clicar Validar e depois Auto-Fix
+  // manualmente — e se esquecia, o "Enviar" bloqueava com "Valide
+  // primeiro" / "Bloqueado: N erros". Agora isso é transparente: o
+  // G-code chega já pronto para enviar (na maioria dos casos).
+  const loadGcodeWithAutoFix = useCallback((text: string, name: string) => {
+    setGcodeText(text)
+    setGcodeName(name)
+    setShowAllIssues(false)
+    setAutoFixResult(null)
+    setGcodeTextBeforeFix(null)
+
+    const lineCount = text.split("\n").length
+    loggerRef.current.info(`G-code carregado: ${name} (${lineCount} linhas)`, "validator")
+
+    // 1) Validação inicial
+    let result: ValidationResult
+    try {
+      result = validateGcode(text, DEFAULT_BIO_LIMITS, "marlin")
+    } catch (e) {
+      loggerRef.current.warn(`Validação automática falhou: ${e instanceof Error ? e.message : String(e)}`)
+      setValidation(null)
+      return
+    }
+    setValidation(result)
+
+    const initialVerdict = verdictLabel(result.verdict)
+    loggerRef.current.info(
+      `Validação automática: ${initialVerdict.text} (${result.errorCount} erros, ${result.warningCount} avisos).`,
+      "validator",
+    )
+
+    // 2) Se houver issues corrigíveis → aplica auto-fix
+    let fixable = 0
+    try {
+      const summary = summarizeAutoFix(result)
+      fixable = summary.totalFixable
+    } catch {}
+
+    if (fixable === 0) {
+      if (result.verdict === "safe") {
+        loggerRef.current.ok("G-code limpo — pronto para enviar à bioimpressora.", "validator")
+      }
+      return
+    }
+
+    try {
+      const fixResult = autoFixGcode(text, result, autoFixOpts)
+      if (fixResult.applied.length === 0) return
+
+      // Aplica
+      setGcodeTextBeforeFix(text)
+      setGcodeText(fixResult.fixedGcode)
+      setAutoFixResult(fixResult)
+      loggerRef.current.ok(
+        `Auto-fix automático aplicou ${fixResult.applied.length} correção(ões) em ${Object.keys(fixResult.countByCode).length} categoria(s). ` +
+        `Use "Desfazer" no painel de validação para reverter.`,
+        "validator",
+      )
+
+      // 3) Revalida com o texto corrigido
+      const reval = validateGcode(fixResult.fixedGcode, DEFAULT_BIO_LIMITS, "marlin")
+      setValidation(reval)
+      const v = verdictLabel(reval.verdict)
+      loggerRef.current.info(
+        `Após auto-fix: ${v.text} (${reval.errorCount} erros, ${reval.warningCount} avisos).`,
+        "validator",
+      )
+      if (reval.verdict === "safe") {
+        loggerRef.current.ok("G-code aprovado após auto-fix — pronto para enviar.", "validator")
+      } else if (reval.verdict === "blocked") {
+        loggerRef.current.warn(
+          `G-code ainda bloqueado após auto-fix (${reval.errorCount} erros não auto-corrigíveis). ` +
+          `Veja o painel de validação para detalhes.`,
+          "validator",
+        )
+      }
+    } catch (e) {
+      loggerRef.current.warn(`Auto-fix automático falhou: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }, [autoFixOpts])
+
   // ─── File upload ──
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const handleFile = useCallback(async (file: File) => {
     const text = await file.text()
-    setGcodeText(text)
-    setGcodeName(file.name)
-    setValidation(null)
-    loggerRef.current.info(`G-code carregado: ${file.name} (${text.split("\n").length} linhas)`)
-  }, [])
+    loadGcodeWithAutoFix(text, file.name)
+  }, [loadGcodeWithAutoFix])
 
   // ─── Load demo ──
+  // R12.29: usa loadGcodeWithAutoFix → valida + auto-corrige automaticamente.
   const loadDemo = useCallback(() => {
-    setGcodeText(DEMO_GCODE)
-    setGcodeName("comece-agora-hello-square.gcode")
-    setValidation(null)
-    loggerRef.current.info("G-code de exemplo carregado — quadrado 20×20 mm em 2 camadas. Próximo passo: clicar em 'Validar G-code'.")
-    // R12.17: dispara validação automática para que o painel visual do
-    // toolpath apareça imediatamente sem o usuário precisar clicar.
+    loadGcodeWithAutoFix(DEMO_GCODE, "comece-agora-hello-square.gcode")
+    // Scroll suave para o painel visual após render
     setTimeout(() => {
-      try {
-        const result = validateGcode(DEMO_GCODE, DEFAULT_BIO_LIMITS, "marlin")
-        setValidation(result)
-        const v = verdictLabel(result.verdict)
-        loggerRef.current.info(`Validação automática: ${v.text} (${result.errorCount} erros, ${result.warningCount} avisos)`, "validator")
-      } catch (e) {
-        loggerRef.current.warn(`Validação automática falhou: ${e instanceof Error ? e.message : String(e)}`)
-      }
-      // Scroll suave para o painel visual recém-aparecido
       try {
         const el = document.getElementById("toolpath-visual-panel")
         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
       } catch {}
-    }, 50)
-  }, [])
+    }, 80)
+  }, [loadGcodeWithAutoFix])
 
   // ─── Auto-scroll terminal ──
   const terminalRef = useRef<HTMLDivElement>(null)
@@ -998,10 +1211,8 @@ export default function BioprintExecutePage() {
                   try {
                     const txt = await navigator.clipboard.readText()
                     if (txt.trim()) {
-                      setGcodeText(txt)
-                      setGcodeName("(colado da área de transferência)")
-                      setValidation(null)
-                      loggerRef.current.info(`G-code colado: ${txt.split("\n").length} linhas`)
+                      // R12.29: paste também passa pelo auto-fix automático.
+                      loadGcodeWithAutoFix(txt, "(colado da área de transferência)")
                     }
                   } catch (e) {
                     loggerRef.current.error("Não foi possível ler a área de transferência.")
@@ -1690,6 +1901,25 @@ export default function BioprintExecutePage() {
                 </button>
               </>
             )}
+
+            {/* R12.29: Botão "Reiniciar Tudo" — fail-safe sempre visível.
+                Limpa estado, cancela stream, desconecta transport, zera
+                G-code/validação/posição. Usado quando o joystick trava,
+                a conexão dá erro ou o G-code está com problema. */}
+            <div className="mt-3 pt-3 border-t border-white/10">
+              <button
+                onClick={handleResetAll}
+                className="w-full px-3 py-2 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-500/25 to-orange-500/25 hover:from-amber-500/40 hover:to-orange-500/40 border border-amber-500/50 text-amber-100 transition-all flex items-center justify-center gap-2 shadow-md shadow-amber-900/30"
+                title="Limpa toda a sessão: cancela stream, desconecta, zera G-code/validação/posição. Use se o joystick travou, a conexão deu erro ou o G-code está com problema."
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Reiniciar Tudo
+              </button>
+              <div className="text-[9px] text-amber-200/60 leading-tight mt-1 px-0.5">
+                Começa do zero — limpa G-code, fila e conexão.
+                Use se travou ou está com erro.
+              </div>
+            </div>
           </Panel>
 
           {/* ── Joystick lateral ─────────────────────────────────── */}
