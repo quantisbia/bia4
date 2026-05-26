@@ -500,11 +500,17 @@ export default function BioprintExecutePage() {
         setFirmware({ raw: "", family: "unknown", caps: {} })
       }
 
+      // R12.27: TODO o handshake agora usa sendAndWait — sendOnce não espera 'ok'
+      // do firmware, e em sequência os comandos se atropelam: o 'ok' do M18
+      // pode ser capturado pelo waiter do G28, fazendo o sendAndWait do G28
+      // resolver ANTES do home realmente terminar — deixando os eixos travados
+      // ("axis not homed") e bloqueando todo movimento subsequente (jog/joystick).
+
       // R12.20: Desabilita o timeout interno de inatividade do firmware (Marlin "M18 S0" /
       // "M84 S0") para que os motores permaneçam energizados até o usuário desligar
       // manualmente. Caso o firmware não suporte o parâmetro, ignoramos silenciosamente.
       try {
-        await controllerRef.current?.sendOnce("M18 S0 ; mantém steppers sempre habilitados (sem timeout)")
+        await controllerRef.current?.sendAndWait("M18 S0 ; mantém steppers sempre habilitados (sem timeout)")
         loggerRef.current.info("Timeout interno de inatividade do motor desabilitado (M18 S0).", "controller")
       } catch (e) {
         loggerRef.current.warn(`Não foi possível desabilitar timeout do motor: ${e instanceof Error ? e.message : String(e)}`)
@@ -513,7 +519,7 @@ export default function BioprintExecutePage() {
       // R12.24: aplica fluxo inicial (default 50% — apropriado para hidrogéis).
       // O usuário pode ajustar em tempo real depois via o painel "Fluxo do hidrogel".
       try {
-        await controllerRef.current?.sendOnce(`M221 S${flowPercent} ; fluxo inicial ${flowPercent}% para hidrogel (R12.24)`)
+        await controllerRef.current?.sendAndWait(`M221 S${flowPercent} ; fluxo inicial ${flowPercent}% para hidrogel (R12.24)`)
         flowAppliedRef.current = flowPercent
         loggerRef.current.info(`Fluxo do hidrogel definido em ${flowPercent}% (M221). Ajustável em tempo real no painel "Fluxo do hidrogel".`, "controller")
       } catch (e) {
@@ -539,6 +545,20 @@ export default function BioprintExecutePage() {
       } else {
         loggerRef.current.info("Auto-home desabilitado — use o botão \"Home All\" se necessário.", "controller")
         setDidAutoHome(false)
+      }
+
+      // R12.27: Após o home, garante modo POSICIONAMENTO ABSOLUTO (G90) +
+      // EXTRUSORA RELATIVA (M83). Sem M83, jog do eixo E falha silenciosamente:
+      // o Marlin pode estar em modo extrusora absoluta após boot/G28; o
+      // primeiro G1 E0.1 move uma vez (vai p/ E=0.1mm absoluto), o segundo
+      // não move (já está em 0.1). Com M83, todo G1 E<n> passa a ser delta.
+      // G91/G90 controla apenas X/Y/Z; o modo do extrusor é independente.
+      try {
+        await controllerRef.current?.sendAndWait("G90 ; XYZ em modo absoluto")
+        await controllerRef.current?.sendAndWait("M83 ; extrusora em modo relativo (R12.27)")
+        loggerRef.current.info("Modo de coordenadas pronto: XYZ absoluto (G90) + E relativo (M83).", "controller")
+      } catch (e) {
+        loggerRef.current.warn(`Não foi possível ajustar modo de coordenadas: ${e instanceof Error ? e.message : String(e)}`)
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -574,7 +594,11 @@ export default function BioprintExecutePage() {
    *
    * Pode ser chamado em qualquer momento (antes ou durante o streaming) —
    * Marlin processa M221 imediatamente e aplica nas próximas linhas de E.
-   * Usa sendOnce (fire-and-forget) pois M221 é instantâneo e não bloqueia.
+   *
+   * R12.27: usa sendAndWait (não sendOnce). M221 é instantâneo mas se ele
+   * for enviado entre outros comandos via sendOnce, seu 'ok' pode ser
+   * capturado pelo waiter de um sendAndWait subsequente — corrompendo o
+   * handshake.
    *
    * Idempotente: se o valor não mudou desde o último envio, não reenvía.
    *
@@ -586,7 +610,7 @@ export default function BioprintExecutePage() {
     const clamped = Math.max(10, Math.min(200, Math.round(percent)))
     if (flowAppliedRef.current === clamped) return // sem mudança real
     try {
-      await controllerRef.current.sendOnce(`M221 S${clamped} ; fluxo ${clamped}% (R12.24)`)
+      await controllerRef.current.sendAndWait(`M221 S${clamped} ; fluxo ${clamped}% (R12.24)`)
       flowAppliedRef.current = clamped
       loggerRef.current.ok(`Fluxo aplicado: ${clamped}% (M221 S${clamped}).`, "controller")
     } catch (e) {
@@ -649,11 +673,33 @@ export default function BioprintExecutePage() {
       return
     }
     const feedrate = axis === "Z" ? 300 : axis === "E" ? 200 : 1500
-    const sign = delta >= 0 ? "" : ""
+    // R12.27: BUGFIX — joystick não movia após o home.
+    //
+    // Causa: usávamos sendOnce (fire-and-forget) para G91/G1/G90. O Marlin
+    // recebe os 3 comandos no buffer USB de uma vez e o 'ok' do G91 ainda
+    // estava sendo aguardado pelo waiter de um sendAndWait anterior (G28).
+    // Pior: como o sendOnce não bloqueia, G91 e G90 chegavam quase juntos
+    // ao parser, e o G1 podia ser interpretado em modo absoluto — um
+    // "G1 X1" virava "vá para X=1", e nas chamadas seguintes a impressora
+    // já estava em X=1 → nada se mexia.
+    //
+    // Solução:
+    //   1) Tudo via sendAndWait — cada comando só sai depois do 'ok' do
+    //      anterior, garantindo ordem determinística.
+    //   2) Eixo E NÃO usa G91/G90: configuramos M83 no handshake, então o
+    //      G1 E<delta> já é tratado como relativo permanentemente, sem
+    //      precisar alternar o modo (evita 2 round-trips extras).
+    //   3) XYZ: G91 → G1 (relativo) → G90, mantendo o invariante "impressora
+    //      sempre volta para absoluto entre operações".
     try {
-      await controllerRef.current.sendOnce("G91")
-      await controllerRef.current.sendOnce(`G1 ${axis}${sign}${delta} F${feedrate}`)
-      await controllerRef.current.sendOnce("G90")
+      if (axis === "E") {
+        // E já está em relativo permanente (M83) — basta o G1
+        await controllerRef.current.sendAndWait(`G1 E${delta} F${feedrate}`)
+      } else {
+        await controllerRef.current.sendAndWait("G91")
+        await controllerRef.current.sendAndWait(`G1 ${axis}${delta} F${feedrate}`)
+        await controllerRef.current.sendAndWait("G90")
+      }
       setPosition((p) => ({ ...p, [axis.toLowerCase()]: +(p[axis.toLowerCase() as "x" | "y" | "z" | "e"] + delta).toFixed(3) }))
     } catch (e) {
       loggerRef.current.error(`Jog ${axis}${delta} falhou: ${e instanceof Error ? e.message : String(e)}`)
@@ -663,7 +709,9 @@ export default function BioprintExecutePage() {
   const sendZero = useCallback(async () => {
     if (!controllerRef.current || !connected) return
     try {
-      await controllerRef.current.sendOnce("G92 X0 Y0 Z0 E0")
+      // R12.27: sendAndWait para garantir que o G92 termine antes de qualquer
+      // próximo comando — evita race com clique imediato no joystick.
+      await controllerRef.current.sendAndWait("G92 X0 Y0 Z0 E0")
       setPosition({ x: 0, y: 0, z: 0, e: 0 })
       loggerRef.current.ok("G92 ZERO AQUI — coordenadas zeradas no ponto atual (sem mover).")
     } catch (e) {
@@ -704,8 +752,13 @@ export default function BioprintExecutePage() {
     try {
       loggerRef.current.info("Home All: enviando G28…", "controller")
       await controllerRef.current.sendAndWait("G28 ; home all (manual)")
+      // R12.27: re-aplica G90 + M83 após o home para garantir que o modo de
+      // coordenadas continue consistente (alguns firmwares resetam o modo do
+      // extrusor para absoluto após G28).
+      await controllerRef.current.sendAndWait("G90 ; XYZ absoluto")
+      await controllerRef.current.sendAndWait("M83 ; E relativo (R12.27)")
       setDidAutoHome(true)
-      loggerRef.current.ok("Home All concluído (G28). Para definir a origem (0,0,0), use \"Ponto inicial\" nos Comandos rápidos.", "controller")
+      loggerRef.current.ok("Home All concluído (G28) + modo XYZ absoluto / E relativo. Para definir a origem (0,0,0), use \"Ponto inicial\" nos Comandos rápidos.", "controller")
     } catch (e) {
       loggerRef.current.error(`Home All falhou: ${e instanceof Error ? e.message : String(e)}`)
     }
@@ -716,7 +769,9 @@ export default function BioprintExecutePage() {
   const handleManualSend = useCallback(async () => {
     if (!controllerRef.current || !manualCmd.trim()) return
     try {
-      await controllerRef.current.sendOnce(manualCmd)
+      // R12.27: sendAndWait — usuário digita um comando por vez e espera ver
+      // o 'ok' antes de digitar outro. Evita race com qualquer outro envio.
+      await controllerRef.current.sendAndWait(manualCmd)
       setManualCmd("")
     } catch (e) {
       loggerRef.current.error(`Comando manual falhou: ${e instanceof Error ? e.message : String(e)}`)
@@ -738,8 +793,11 @@ export default function BioprintExecutePage() {
 
   const runQuickAction = useCallback(async (cmds: string) => {
     if (!controllerRef.current || !connected) return
+    // R12.27: sendAndWait sequencial — quick actions como "Cool All" (M104+M140+M141)
+    // têm múltiplas linhas que precisam ser executadas em ordem. Sem o waiter,
+    // os 'ok's de cada uma podem ser capturados por outro sendAndWait pendente.
     for (const c of cmds.split("\n")) {
-      try { await controllerRef.current.sendOnce(c) } catch {}
+      try { await controllerRef.current.sendAndWait(c) } catch {}
     }
   }, [connected])
 
