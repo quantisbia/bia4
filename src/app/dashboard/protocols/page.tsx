@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import {
   FileText, Plus, Loader2, Zap, Download, ChevronLeft,
   AlertCircle, CheckCircle2, RefreshCw, BookOpen, Beaker,
@@ -196,7 +196,9 @@ export default function ProtocolsPage() {
   useEffect(() => { loadProtocols() }, [loadProtocols])
 
   // ── Load full protocol content ──────────────────────────────────────────────
-  async function loadProtocolContent(p: Protocol) {
+  // Definido como useCallback porque o effect de deep-link (R12.28) depende
+  // dele, e queremos resolver a referência atualizada via deps array.
+  const loadProtocolContent = useCallback(async (p: Protocol) => {
     if (p.content) { setSelected(p); setSaved(false); return }
     setLoadingContent(true)
     try {
@@ -209,7 +211,31 @@ export default function ProtocolsPage() {
       }
     } catch { setSelected(p) }
     finally { setLoadingContent(false) }
-  }
+  }, [])
+
+  // R12.28: deep-link ?open=<id> — usado pelo Formulador Pro após "Salvar
+  // protocolo" e por qualquer outro link externo. Espera a lista carregar,
+  // localiza o protocolo e abre o painel de visualização automaticamente.
+  // Roda apenas uma vez por carregamento da lista (controlado pelo ref para
+  // evitar reabrir se o usuário fechar manualmente).
+  const deepLinkOpenedRef = useRef(false)
+  useEffect(() => {
+    if (deepLinkOpenedRef.current) return
+    if (loading) return
+    if (typeof window === "undefined") return
+    const id = new URLSearchParams(window.location.search).get("open")
+    if (!id) return
+    const found = protocols.find(p => p.id === id)
+    if (!found) return
+    deepLinkOpenedRef.current = true
+    void loadProtocolContent(found)
+    // Limpa o query param para que refresh não reabra (cosmético)
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.delete("open")
+      window.history.replaceState({}, "", url.toString())
+    } catch { /* no-op */ }
+  }, [loading, protocols, loadProtocolContent])
 
   // ── Generate protocol ───────────────────────────────────────────────────────
   async function generateProtocol() {

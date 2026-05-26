@@ -22,7 +22,7 @@ import {
   FlaskConical, Sparkles, Plus, Trash2, Loader2, AlertTriangle,
   CheckCircle2, Info, Beaker, Target, ChevronRight, ChevronDown,
   Search, Wand2, Save, RefreshCw, Activity, ShieldCheck,
-  BookOpen, Printer, Atom, Zap,
+  BookOpen, Printer, Atom, Zap, FolderHeart, ExternalLink,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
@@ -1076,7 +1076,12 @@ export default function FormulatorProPage() {
               )}
 
               {result && !loading && (
-                <ResultView result={result} expandedProtocol={expandedProtocol} setExpandedProtocol={setExpandedProtocol} />
+                <ResultView
+                  result={result}
+                  expandedProtocol={expandedProtocol}
+                  setExpandedProtocol={setExpandedProtocol}
+                  inputContext={{ goal, goalCategory, targetTissue }}
+                />
               )}
             </div>
           )}
@@ -1149,13 +1154,50 @@ function ToggleChip({
 }
 
 function ResultView({
-  result, expandedProtocol, setExpandedProtocol,
+  result, expandedProtocol, setExpandedProtocol, inputContext,
 }: {
   result: ProFormulation
   expandedProtocol: boolean
   setExpandedProtocol: (v: boolean) => void
+  /**
+   * R12.28: contexto do wizard (objetivo clínico, tecido alvo, texto livre) —
+   * incluído no payload de "Salvar protocolo" para reabrir a formulação
+   * com o estado completo do Step 1 em sessões futuras.
+   */
+  inputContext: { goal: string; goalCategory: ClinicalGoal; targetTissue: string }
 }) {
   const score = result.scientificScore ?? { overall: 0, mechanical: 0, biological: 0, manufacturability: 0, regulatory: 0 }
+
+  // R12.28: "Salvar protocolo" — persiste o resultado no backend para que o
+  // usuário possa acessá-lo em /dashboard/protocols, de outro dispositivo,
+  // ou em outra sessão. Não cobra créditos (a formação já foi paga na
+  // geração). Idempotência leve: após salvar, o botão vira "Salvo ✓ — abrir"
+  // e linka direto para o protocolo persistido. Para salvar de novo (ex.
+  // edição), basta clicar de novo — cria uma nova entrada com timestamp.
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle")
+  const [savedId, setSavedId] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const handleSaveProtocol = useCallback(async () => {
+    setSaveState("saving")
+    setSaveError(null)
+    try {
+      const res = await fetch("/api/protocols/save-formulation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ formulation: result, inputContext }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data?.error ?? `Falha ao salvar (HTTP ${res.status})`)
+      }
+      setSavedId(data.id ?? null)
+      setSaveState("saved")
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Erro desconhecido")
+      setSaveState("error")
+    }
+  }, [result, inputContext])
 
   return (
     <div className="space-y-4">
@@ -1429,6 +1471,36 @@ function ResultView({
           <Zap className="w-3.5 h-3.5" /> Enviar para Quick G-Code
           <ChevronRight className="w-3 h-3 opacity-70" />
         </button>
+
+        {/* R12.28: Salvar protocolo no backend ("em outros locais") */}
+        {saveState === "saved" && savedId ? (
+          <a
+            href={`/dashboard/protocols?open=${savedId}`}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-xs text-emerald-200 font-semibold hover:bg-emerald-500/25 transition-colors"
+            title="Protocolo salvo — clique para abrir em Meus Protocolos"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" /> Salvo — abrir
+            <ExternalLink className="w-3 h-3 opacity-70" />
+          </a>
+        ) : (
+          <button
+            onClick={handleSaveProtocol}
+            disabled={saveState === "saving"}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-500/15 to-teal-500/15 hover:from-emerald-500/25 hover:to-teal-500/25 border border-emerald-500/40 text-xs text-emerald-100 font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            title="Salva esta formulação em Meus Protocolos para acessar de outros dispositivos"
+          >
+            {saveState === "saving" ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Salvando…
+              </>
+            ) : (
+              <>
+                <FolderHeart className="w-3.5 h-3.5" /> Salvar protocolo
+              </>
+            )}
+          </button>
+        )}
+
         <button
           onClick={() => {
             const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" })
@@ -1453,6 +1525,22 @@ function ResultView({
           📋 Copiar Markdown
         </button>
       </div>
+
+      {/* R12.28: feedback de erro do save (raro — IA não é chamada aqui, só DB write) */}
+      {saveState === "error" && saveError && (
+        <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-xs text-red-200">
+          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <div>
+            <strong>Não foi possível salvar:</strong> {saveError}
+            <button
+              onClick={handleSaveProtocol}
+              className="ml-2 underline hover:text-red-100"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
