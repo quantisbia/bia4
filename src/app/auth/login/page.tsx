@@ -34,12 +34,16 @@ export default function LoginPage() {
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get("callbackUrl") || "/dashboard"
   const registered = searchParams.get("registered")
+  // R12.30: usuário acabou de redefinir senha em /auth/reset-password
+  const resetOk = searchParams.get("reset") === "ok"
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  // R12.30: contador de tentativas falhadas — após 2, sugere reset com mais ênfase
+  const [failedAttempts, setFailedAttempts] = useState(0)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -52,6 +56,7 @@ export default function LoginPage() {
         redirect: false,
       })
       if (result?.error) {
+        setFailedAttempts((n) => n + 1)
         setError("Email ou senha incorretos. Tente novamente.")
       } else {
         // Quando usuário vem do "Ver demonstração guiada", anexa welcome=tour
@@ -108,11 +113,33 @@ export default function LoginPage() {
           </div>
         )}
 
+        {/* R12.30: senha redefinida com sucesso */}
+        {resetOk && (
+          <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-4 py-3 mb-5 text-sm text-emerald-300">
+            <Zap className="w-4 h-4 shrink-0 text-emerald-400" />
+            <span>Senha redefinida com sucesso! Entre com a nova senha.</span>
+          </div>
+        )}
+
         {/* Error */}
         {error && (
-          <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 mb-5 text-sm text-red-400">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
+          <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 mb-5 text-sm text-red-400 space-y-2">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+            {/* R12.30: após 2 erros, sugere recuperação de senha com ênfase */}
+            {failedAttempts >= 2 && (
+              <div className="pt-2 border-t border-red-500/15 text-xs text-red-300/90 flex items-center justify-between gap-2">
+                <span>Não lembra a senha?</span>
+                <Link
+                  href={`/auth/forgot-password${email ? `?email=${encodeURIComponent(email)}` : ""}`}
+                  className="font-semibold text-violet-300 hover:text-violet-200 underline underline-offset-2"
+                >
+                  Redefinir senha →
+                </Link>
+              </div>
+            )}
           </div>
         )}
 
@@ -142,7 +169,13 @@ export default function LoginPage() {
                 <label className="text-sm font-medium text-gray-300" htmlFor="password">
                   Senha
                 </label>
-                <span className="text-xs text-violet-400/60">Esqueceu?</span>
+                {/* R12.30: link agora funcional → /auth/forgot-password */}
+                <Link
+                  href={`/auth/forgot-password${email ? `?email=${encodeURIComponent(email)}` : ""}`}
+                  className="text-xs text-violet-400 hover:text-violet-300 transition-colors font-medium"
+                >
+                  Esqueceu?
+                </Link>
               </div>
               <div className="relative">
                 <input

@@ -70,6 +70,27 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
+// R12.30: Recuperação de senha via email.
+// Armazena APENAS o hash SHA-256 do token — nunca o token em claro.
+// O usuário recebe o token em claro por email/UI; ao postar /reset-password
+// nós comparamos hash(input) == tokenHash.
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  email     String   // snapshot para anti-enumeração / auditoria
+  tokenHash String   @unique
+  expires   DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  ip        String?
+  userAgent String?
+
+  @@index([userId])
+  @@index([email])
+  @@index([expires])
+  @@map("password_reset_tokens")
+}
+
 model Subscription {
   id                 String             @id @default(cuid())
   userId             String             @unique
