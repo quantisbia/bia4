@@ -522,6 +522,78 @@ export default function BioprintExecutePage() {
     }
   }, [])
 
+  // ─── R12.33: Move cabeçote para CENTRO da mesa (com clearance Z) ──
+  //
+  // R12.38: MOVIDO PARA ANTES de handleConnect/handleHomeAll para evitar
+  // TDZ (Temporal Dead Zone) — esses callbacks usam `moveToSafeCenterAfterHome`
+  // nos seus arrays de deps. Em produção minificada, o array é avaliado
+  // durante `useCallback(...)` e referenciar a const ANTES dela ser
+  // declarada (mais abaixo no corpo do componente) lança
+  // ReferenceError: Cannot access 'moveToSafeCenterAfterHome' before initialization.
+  //
+  // Helper compartilhado entre auto-home (no connect) e handleHomeAll
+  // (botão manual). Sequência idêntica em ambos os pontos:
+  //   1) G91 (relativo) → G1 Z+30 F600 → G90 (absoluto)   — clearance Z
+  //   2) G1 X<cx> Y<cy> F3000                             — centro da mesa
+  //   3) M400                                              — aguarda fim do movimento
+  //
+  // Após esta função:
+  //   · cabeçote está no centro com 30mm de altura → seguro p/ placa de cultura
+  //   · todos os eixos saíram dos soft endstops (X=0/Y=0/Z=0) — joystick livre
+  //   · próximo G-code enviado pode começar com posicionamento absoluto
+  //
+  // O M400 é CRÍTICO: ele faz o Marlin aguardar o BUFFER DE PLANEJAMENTO
+  // esvaziar antes de responder 'ok'. Sem isso, o sendAndWait resolveria
+  // assim que o G1 entrasse no planner, e os comandos seguintes do
+  // handshake (G90/M83) viriam ANTES do movimento terminar fisicamente.
+  // Resultado prático: o joystick travaria porque o Marlin ainda estaria
+  // processando o movimento de centralização quando o usuário clicasse.
+  const moveToSafeCenterAfterHome = useCallback(async (
+    bedX: number = BIOENDER_BED_X_MM,
+    bedY: number = BIOENDER_BED_Y_MM,
+  ): Promise<void> => {
+    if (!controllerRef.current) {
+      loggerRef.current.warn("moveToSafeCenterAfterHome: sem controller — ignorando.")
+      return
+    }
+    const cx = +(bedX / 2).toFixed(2)
+    const cy = +(bedY / 2).toFixed(2)
+    loggerRef.current.info(
+      `Pós-home: subindo Z+${POST_HOME_Z_CLEARANCE_MM}mm e indo para o centro (${cx}, ${cy}) …`,
+      "controller",
+    )
+    // 1) Clearance Z relativo
+    await controllerRef.current.sendAndWait("G91 ; modo relativo p/ clearance Z")
+    await controllerRef.current.sendAndWait(
+      `G1 Z${POST_HOME_Z_CLEARANCE_MM} F${POST_HOME_Z_FEEDRATE} ; clearance Z (não bater na placa de cultura)`,
+    )
+    await controllerRef.current.sendAndWait("G90 ; volta para absoluto")
+    // 2) Move XY para o centro
+    await controllerRef.current.sendAndWait(
+      `G1 X${cx} Y${cy} F${POST_HOME_XY_FEEDRATE} ; centro da mesa Bioender ${bedX}×${bedY}mm`,
+    )
+    // 3) SINCRONIZA — aguarda o buffer do planner esvaziar antes do próximo cmd
+    //
+    // Sem o M400 + sendAndWait, o Marlin libera o 'ok' assim que o G1 entra
+    // no planner — mas o cabeçote ainda está se movendo fisicamente. Como o
+    // handshake continua imediatamente (G90, M83, jog do usuário), o
+    // próximo comando pode tentar setar modo de coordenadas DURANTE o
+    // movimento, ou o joystick pode disparar G91/G1/G90 enquanto o
+    // movimento de centralização ainda está em curso → resultado:
+    // joystick aparenta estar TRAVADO até o cabeçote finalmente parar
+    // (que pode levar 2-4 segundos a 50 mm/s atravessando 100mm).
+    // O M400 bloqueia o firmware até o motion buffer estar VAZIO.
+    await controllerRef.current.sendAndWait("M400 ; aguarda fim do movimento (sincroniza)")
+    // Atualiza estado de UI da posição (cabeçote agora está no centro)
+    // NOTA: setPosition é declarado mais abaixo mas só é CHAMADO quando
+    // a função executa (runtime, não na criação do callback) → seguro.
+    setPosition((p) => ({ ...p, x: cx, y: cy, z: +(p.z + POST_HOME_Z_CLEARANCE_MM).toFixed(2) }))
+    loggerRef.current.ok(
+      `Cabeçote no centro (${cx}, ${cy}) com Z elevado em ${POST_HOME_Z_CLEARANCE_MM}mm. Joystick e G-code prontos.`,
+      "controller",
+    )
+  }, [])
+
   // ─── CONNECT ──
   const handleConnect = useCallback(async () => {
     if (connected) return
@@ -866,68 +938,9 @@ export default function BioprintExecutePage() {
     await controllerRef.current.emergency()
   }, [])
 
-  // ─── R12.33: Move cabeçote para CENTRO da mesa (com clearance Z) ──
-  //
-  // Helper compartilhado entre auto-home (no connect) e handleHomeAll
-  // (botão manual). Sequência idêntica em ambos os pontos:
-  //   1) G91 (relativo) → G1 Z+30 F600 → G90 (absoluto)   — clearance Z
-  //   2) G1 X<cx> Y<cy> F3000                             — centro da mesa
-  //   3) M400                                              — aguarda fim do movimento
-  //
-  // Após esta função:
-  //   · cabeçote está no centro com 30mm de altura → seguro p/ placa de cultura
-  //   · todos os eixos saíram dos soft endstops (X=0/Y=0/Z=0) — joystick livre
-  //   · próximo G-code enviado pode começar com posicionamento absoluto
-  //
-  // O M400 é CRÍTICO: ele faz o Marlin aguardar o BUFFER DE PLANEJAMENTO
-  // esvaziar antes de responder 'ok'. Sem isso, o sendAndWait resolveria
-  // assim que o G1 entrasse no planner, e os comandos seguintes do
-  // handshake (G90/M83) viriam ANTES do movimento terminar fisicamente.
-  // Resultado prático: o joystick travaria porque o Marlin ainda estaria
-  // processando o movimento de centralização quando o usuário clicasse.
-  const moveToSafeCenterAfterHome = useCallback(async (
-    bedX: number = BIOENDER_BED_X_MM,
-    bedY: number = BIOENDER_BED_Y_MM,
-  ): Promise<void> => {
-    if (!controllerRef.current) {
-      loggerRef.current.warn("moveToSafeCenterAfterHome: sem controller — ignorando.")
-      return
-    }
-    const cx = +(bedX / 2).toFixed(2)
-    const cy = +(bedY / 2).toFixed(2)
-    loggerRef.current.info(
-      `Pós-home: subindo Z+${POST_HOME_Z_CLEARANCE_MM}mm e indo para o centro (${cx}, ${cy}) …`,
-      "controller",
-    )
-    // 1) Clearance Z relativo
-    await controllerRef.current.sendAndWait("G91 ; modo relativo p/ clearance Z")
-    await controllerRef.current.sendAndWait(
-      `G1 Z${POST_HOME_Z_CLEARANCE_MM} F${POST_HOME_Z_FEEDRATE} ; clearance Z (não bater na placa de cultura)`,
-    )
-    await controllerRef.current.sendAndWait("G90 ; volta para absoluto")
-    // 2) Move XY para o centro
-    await controllerRef.current.sendAndWait(
-      `G1 X${cx} Y${cy} F${POST_HOME_XY_FEEDRATE} ; centro da mesa Bioender ${bedX}×${bedY}mm`,
-    )
-    // 3) SINCRONIZA — aguarda o buffer do planner esvaziar antes do próximo cmd
-    //
-    // Sem o M400 + sendAndWait, o Marlin libera o 'ok' assim que o G1 entra
-    // no planner — mas o cabeçote ainda está se movendo fisicamente. Como o
-    // handshake continua imediatamente (G90, M83, jog do usuário), o
-    // próximo comando pode tentar setar modo de coordenadas DURANTE o
-    // movimento, ou o joystick pode disparar G91/G1/G90 enquanto o
-    // movimento de centralização ainda está em curso → resultado:
-    // joystick aparenta estar TRAVADO até o cabeçote finalmente parar
-    // (que pode levar 2-4 segundos a 50 mm/s atravessando 100mm).
-    // O M400 bloqueia o firmware até o motion buffer estar VAZIO.
-    await controllerRef.current.sendAndWait("M400 ; aguarda fim do movimento (sincroniza)")
-    // Atualiza estado de UI da posição (cabeçote agora está no centro)
-    setPosition((p) => ({ ...p, x: cx, y: cy, z: +(p.z + POST_HOME_Z_CLEARANCE_MM).toFixed(2) }))
-    loggerRef.current.ok(
-      `Cabeçote no centro (${cx}, ${cy}) com Z elevado em ${POST_HOME_Z_CLEARANCE_MM}mm. Joystick e G-code prontos.`,
-      "controller",
-    )
-  }, [])
+  // R12.38: `moveToSafeCenterAfterHome` foi movido para ANTES de
+  // `handleConnect` (acima) para evitar TDZ em produção minificada.
+  // Ver comentário detalhado na declaração original.
 
   // ─── JOYSTICK ──
   const [step, setStep] = useState<StepSize>(1)
