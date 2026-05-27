@@ -503,6 +503,28 @@ export default function BioprintExecutePage() {
   const flowAppliedRef = useRef<number | null>(null)
   const flowSendTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  /**
+   * R12.39: Controle de VELOCIDADE em tempo real via Marlin M220.
+   *
+   * M220 S{percent} = Set Feedrate Percentage — multiplica TODA velocidade
+   * F<...> dos próximos comandos por esse fator. É o "irmão" do M221 (flow):
+   *   • M220 → afeta velocidade de TODOS os movimentos (XYZ + E)
+   *   • M221 → afeta apenas o fluxo de extrusão (E)
+   *
+   * Para bioimpressão é crítico ter ambos:
+   *   • Slow-mo (M220 S30) — útil para depositar com precisão em geometrias
+   *     delicadas ou quando o usuário quer observar visualmente.
+   *   • Acelera (M220 S150) — útil em travels longos ou para terminar
+   *     impressões rapidamente quando a viabilidade não está em risco.
+   *
+   * Faixa segura: 25–200% (clamp). Default: 100% (sem override).
+   *
+   * speedAppliedRef rastreia o último valor efetivo, evita reenvios redundantes.
+   */
+  const [speedPercent, setSpeedPercent] = useState<number>(100)
+  const speedAppliedRef = useRef<number | null>(null)
+  const speedSendTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const transportRef = useRef<PrinterTransport | null>(null)
   const controllerRef = useRef<PrinterController | null>(null)
 
@@ -889,12 +911,49 @@ export default function BioprintExecutePage() {
     if (!controllerRef.current || !connected) return
     const clamped = Math.max(10, Math.min(200, Math.round(percent)))
     if (flowAppliedRef.current === clamped) return // sem mudança real
+    const ctrl = controllerRef.current
+    const state = ctrl.getState()
+    const cmd = `M221 S${clamped} ; fluxo ${clamped}% (R12.24)`
     try {
-      await controllerRef.current.sendAndWait(`M221 S${clamped} ; fluxo ${clamped}% (R12.24)`)
-      flowAppliedRef.current = clamped
-      loggerRef.current.ok(`Fluxo aplicado: ${clamped}% (M221 S${clamped}).`, "controller")
+      // R12.39: durante streaming, usa inject (não conflita com waiter do runLoop).
+      // Idle/ready/paused: usa sendAndWait para feedback imediato no log.
+      if (state === "streaming" || state === "paused") {
+        ctrl.inject(cmd, "flow")
+        flowAppliedRef.current = clamped
+        loggerRef.current.info(`Fluxo ${clamped}% (M221) injetado durante ${state}.`, "flow")
+      } else {
+        await ctrl.sendAndWait(cmd)
+        flowAppliedRef.current = clamped
+        loggerRef.current.ok(`Fluxo aplicado: ${clamped}% (M221 S${clamped}).`, "controller")
+      }
     } catch (e) {
       loggerRef.current.warn(`M221 falhou: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }, [connected])
+
+  /**
+   * R12.39: Aplica feedrate override (M220) em tempo real.
+   * Mesmo padrão de applyFlow: inject durante streaming, sendAndWait quando idle.
+   */
+  const applySpeed = useCallback(async (percent: number) => {
+    if (!controllerRef.current || !connected) return
+    const clamped = Math.max(25, Math.min(200, Math.round(percent)))
+    if (speedAppliedRef.current === clamped) return // sem mudança real
+    const ctrl = controllerRef.current
+    const state = ctrl.getState()
+    const cmd = `M220 S${clamped} ; velocidade ${clamped}% (R12.39)`
+    try {
+      if (state === "streaming" || state === "paused") {
+        ctrl.inject(cmd, "speed")
+        speedAppliedRef.current = clamped
+        loggerRef.current.info(`Velocidade ${clamped}% (M220) injetada durante ${state}.`, "speed")
+      } else {
+        await ctrl.sendAndWait(cmd)
+        speedAppliedRef.current = clamped
+        loggerRef.current.ok(`Velocidade aplicada: ${clamped}% (M220 S${clamped}).`, "controller")
+      }
+    } catch (e) {
+      loggerRef.current.warn(`M220 falhou: ${e instanceof Error ? e.message : String(e)}`)
     }
   }, [connected])
 
@@ -922,11 +981,13 @@ export default function BioprintExecutePage() {
       // está aplicado ANTES do streaming começar. Sem isso, Marlin usaria o
       // último M221 da sessão (pode ser 100% após reset).
       await applyFlow(flowPercent)
+      // R12.39: idem para velocidade — M220 da UI deve refletir antes do stream.
+      await applySpeed(speedPercent)
       await controllerRef.current.start(gcodeText)
     } catch (e) {
       loggerRef.current.error(`Stream falhou: ${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [connected, gcodeText, validation, handleValidate, applyFlow, flowPercent])
+  }, [connected, gcodeText, validation, handleValidate, applyFlow, flowPercent, applySpeed, speedPercent])
 
   // ─── PAUSE / RESUME / CANCEL / EMERGENCY ──
   const handlePause = useCallback(() => controllerRef.current?.pause(), [])
@@ -952,39 +1013,52 @@ export default function BioprintExecutePage() {
       loggerRef.current.warn("Conecte para usar o joystick.")
       return
     }
-    if (controllerState === "streaming") {
-      loggerRef.current.warn("Pause a impressão antes de jog manual.")
-      return
-    }
     const feedrate = axis === "Z" ? 300 : axis === "E" ? 200 : 1500
+
+    // R12.39: jog AGORA funciona durante streaming (tempo real) via fila
+    // de injeção do controller. Comandos entram em `injectionQueue` e são
+    // processados pelo runLoop ANTES da próxima linha do stream — latência
+    // típica 50-300ms (uma linha) sem conflito de waiters.
+    //
+    // Quando idle/paused: usa sendAndWait diretamente (latência <100ms).
+    // Quando streaming: usa inject (fire-and-forget, processado entre linhas).
+    //
     // R12.27: BUGFIX — joystick não movia após o home.
-    //
-    // Causa: usávamos sendOnce (fire-and-forget) para G91/G1/G90. O Marlin
-    // recebe os 3 comandos no buffer USB de uma vez e o 'ok' do G91 ainda
-    // estava sendo aguardado pelo waiter de um sendAndWait anterior (G28).
-    // Pior: como o sendOnce não bloqueia, G91 e G90 chegavam quase juntos
-    // ao parser, e o G1 podia ser interpretado em modo absoluto — um
-    // "G1 X1" virava "vá para X=1", e nas chamadas seguintes a impressora
-    // já estava em X=1 → nada se mexia.
-    //
-    // Solução:
     //   1) Tudo via sendAndWait — cada comando só sai depois do 'ok' do
     //      anterior, garantindo ordem determinística.
     //   2) Eixo E NÃO usa G91/G90: configuramos M83 no handshake, então o
-    //      G1 E<delta> já é tratado como relativo permanentemente, sem
-    //      precisar alternar o modo (evita 2 round-trips extras).
+    //      G1 E<delta> já é tratado como relativo permanentemente.
     //   3) XYZ: G91 → G1 (relativo) → G90, mantendo o invariante "impressora
     //      sempre volta para absoluto entre operações".
+    const isStreamingOrPaused = controllerState === "streaming" || controllerState === "paused"
+    const ctrl = controllerRef.current
     try {
       if (axis === "E") {
         // E já está em relativo permanente (M83) — basta o G1
-        await controllerRef.current.sendAndWait(`G1 E${delta} F${feedrate}`)
+        const cmd = `G1 E${delta} F${feedrate}`
+        if (isStreamingOrPaused) {
+          ctrl.inject(cmd, "joystick")
+        } else {
+          await ctrl.sendAndWait(cmd)
+        }
       } else {
-        await controllerRef.current.sendAndWait("G91")
-        await controllerRef.current.sendAndWait(`G1 ${axis}${delta} F${feedrate}`)
-        await controllerRef.current.sendAndWait("G90")
+        if (isStreamingOrPaused) {
+          // Durante streaming/paused: enfileira na ordem certa — fila é FIFO
+          // e o runLoop drena tudo antes da próxima linha. Não há race.
+          ctrl.inject("G91", "joystick")
+          ctrl.inject(`G1 ${axis}${delta} F${feedrate}`, "joystick")
+          ctrl.inject("G90", "joystick")
+        } else {
+          await ctrl.sendAndWait("G91")
+          await ctrl.sendAndWait(`G1 ${axis}${delta} F${feedrate}`)
+          await ctrl.sendAndWait("G90")
+        }
       }
+      // Atualiza UI da posição imediatamente (otimista — o comando chegará)
       setPosition((p) => ({ ...p, [axis.toLowerCase()]: +(p[axis.toLowerCase() as "x" | "y" | "z" | "e"] + delta).toFixed(3) }))
+      if (isStreamingOrPaused) {
+        loggerRef.current.info(`Jog ${axis}${delta >= 0 ? "+" : ""}${delta} injetado durante ${controllerState} (latência ~50-300ms).`, "joystick")
+      }
     } catch (e) {
       loggerRef.current.error(`Jog ${axis}${delta} falhou: ${e instanceof Error ? e.message : String(e)}`)
     }
@@ -1016,10 +1090,20 @@ export default function BioprintExecutePage() {
     flowSendTimerRef.current = setTimeout(() => { void applyFlow(next) }, delay)
   }, [applyFlow, controllerState])
 
-  // R12.24: Cleanup do timer ao desmontar (evita setState em componente desmontado)
+  // R12.39: handler do slider/preset de Velocidade (M220) com debounce.
+  // Mesmo comportamento do handleFlowChange.
+  const handleSpeedChange = useCallback((next: number) => {
+    setSpeedPercent(next)
+    if (speedSendTimerRef.current) clearTimeout(speedSendTimerRef.current)
+    const delay = controllerState === "streaming" ? 120 : 250
+    speedSendTimerRef.current = setTimeout(() => { void applySpeed(next) }, delay)
+  }, [applySpeed, controllerState])
+
+  // R12.24 + R12.39: Cleanup dos timers ao desmontar
   useEffect(() => {
     return () => {
       if (flowSendTimerRef.current) clearTimeout(flowSendTimerRef.current)
+      if (speedSendTimerRef.current) clearTimeout(speedSendTimerRef.current)
     }
   }, [])
 
@@ -2165,13 +2249,15 @@ export default function BioprintExecutePage() {
               <div className="text-[9px] uppercase tracking-wider text-gray-500 mb-1">XY</div>
               <div className="grid grid-cols-3 gap-1 max-w-[200px] mx-auto">
                 <div />
-                <JogBtn onClick={() => sendJog("Y", +step)} disabled={!connected || isStreaming}>Y+</JogBtn>
+                {/* R12.39: jog AGORA funciona em qualquer estado (idle/streaming/paused)
+                    via fila de injeção do controller. Removido `|| isStreaming`. */}
+                <JogBtn onClick={() => sendJog("Y", +step)} disabled={!connected}>Y+</JogBtn>
                 <div />
-                <JogBtn onClick={() => sendJog("X", -step)} disabled={!connected || isStreaming}>X−</JogBtn>
+                <JogBtn onClick={() => sendJog("X", -step)} disabled={!connected}>X−</JogBtn>
                 <JogBtn onClick={sendZero} disabled={!connected} variant="zero" title="G92 zero aqui — não move, só zera coordenadas">⌂</JogBtn>
-                <JogBtn onClick={() => sendJog("X", +step)} disabled={!connected || isStreaming}>X+</JogBtn>
+                <JogBtn onClick={() => sendJog("X", +step)} disabled={!connected}>X+</JogBtn>
                 <div />
-                <JogBtn onClick={() => sendJog("Y", -step)} disabled={!connected || isStreaming}>Y−</JogBtn>
+                <JogBtn onClick={() => sendJog("Y", -step)} disabled={!connected}>Y−</JogBtn>
                 <div />
               </div>
             </div>
@@ -2180,8 +2266,9 @@ export default function BioprintExecutePage() {
             <div className="mb-2">
               <div className="text-[9px] uppercase tracking-wider text-gray-500 mb-1">Z (cuidado · sem home)</div>
               <div className="grid grid-cols-2 gap-1">
-                <JogBtn onClick={() => sendJog("Z", +step)} disabled={!connected || isStreaming}>Z+</JogBtn>
-                <JogBtn onClick={() => sendJog("Z", -step)} disabled={!connected || isStreaming} variant="warn">Z−</JogBtn>
+                {/* R12.39: Z+/Z- em tempo real durante streaming via inject */}
+                <JogBtn onClick={() => sendJog("Z", +step)} disabled={!connected}>Z+</JogBtn>
+                <JogBtn onClick={() => sendJog("Z", -step)} disabled={!connected} variant="warn">Z−</JogBtn>
               </div>
             </div>
 
@@ -2198,8 +2285,11 @@ export default function BioprintExecutePage() {
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-1">
-                <JogBtn onClick={() => sendJog("E", +extrudeStep)} disabled={!connected || isStreaming}>E+</JogBtn>
-                <JogBtn onClick={() => sendJog("E", -extrudeStep)} disabled={!connected || isStreaming} variant="warn">E−</JogBtn>
+                {/* R12.39: E+/E- AGORA funciona em tempo real e parado.
+                    Bug antigo: estavam bloqueados durante streaming. Solução:
+                    via fila de injeção do controller, sem conflito de waiters. */}
+                <JogBtn onClick={() => sendJog("E", +extrudeStep)} disabled={!connected}>E+</JogBtn>
+                <JogBtn onClick={() => sendJog("E", -extrudeStep)} disabled={!connected} variant="warn">E−</JogBtn>
               </div>
             </div>
 
@@ -2405,6 +2495,190 @@ export default function BioprintExecutePage() {
                 {isStreaming
                   ? "Imprimindo — ajuste agora se notar sub-extrusão (linhas falhadas) ou super-extrusão (excesso na ponta)."
                   : "Para hidrogéis, comece em 50%. Ajustável em tempo real durante a impressão via Marlin M221."}
+              </div>
+            </div>
+          </Panel>
+
+          {/* ── R12.39: Velocidade de impressão (M220 em tempo real) ───── */}
+          <Panel
+            title="Velocidade de impressão"
+            icon={<Zap className="w-4 h-4" />}
+            badge={`${speedPercent}%`}
+            badgeColor={
+              speedPercent < 50 ? "amber" :
+              speedPercent <= 100 ? "emerald" :
+              speedPercent <= 150 ? "cyan" : "violet"
+            }
+          >
+            <div className="space-y-2">
+              {/* Display grande + status */}
+              <div className="flex items-end justify-between">
+                <div className="flex items-baseline gap-1">
+                  <span className={cn(
+                    "text-2xl font-bold tabular-nums",
+                    speedPercent < 50 ? "text-amber-300" :
+                    speedPercent <= 100 ? "text-emerald-200" :
+                    speedPercent <= 150 ? "text-cyan-200" : "text-violet-200"
+                  )}>
+                    {speedPercent}
+                  </span>
+                  <span className="text-sm text-gray-400">%</span>
+                </div>
+                <div className="text-right text-[9px] leading-tight">
+                  {!connected ? (
+                    <span className="text-gray-500">Conecte para aplicar</span>
+                  ) : speedAppliedRef.current === speedPercent ? (
+                    <span className="text-emerald-400 flex items-center gap-0.5 justify-end">
+                      <CheckCircle2 className="w-2.5 h-2.5" /> M220 ativo
+                    </span>
+                  ) : (
+                    <span className="text-amber-300 animate-pulse">
+                      ajustando…
+                    </span>
+                  )}
+                  <div className="text-gray-500 mt-0.5">multiplica F em runtime (XYZ+E)</div>
+                </div>
+              </div>
+
+              {/* Slider 25–200% */}
+              <div>
+                <input
+                  type="range"
+                  min={25}
+                  max={200}
+                  step={1}
+                  value={speedPercent}
+                  onChange={(e) => handleSpeedChange(parseInt(e.target.value, 10))}
+                  disabled={!connected}
+                  className="w-full accent-emerald-400 disabled:opacity-40"
+                  style={{
+                    background: `linear-gradient(to right,
+                      rgba(251,191,36,0.3) 0%,
+                      rgba(251,191,36,0.3) 14%,
+                      rgba(16,185,129,0.4) 14%,
+                      rgba(16,185,129,0.4) 43%,
+                      rgba(34,211,238,0.4) 43%,
+                      rgba(34,211,238,0.4) 72%,
+                      rgba(139,92,246,0.3) 72%,
+                      rgba(139,92,246,0.3) 100%)`
+                  }}
+                />
+                <div className="flex justify-between text-[8px] text-gray-500 mt-0.5 font-mono">
+                  <span>25%</span>
+                  <span className="text-amber-400/70">50</span>
+                  <span className="text-emerald-400/70">100</span>
+                  <span className="text-cyan-400/70">150</span>
+                  <span>200%</span>
+                </div>
+              </div>
+
+              {/* Presets */}
+              <div className="grid grid-cols-4 gap-1">
+                <button
+                  onClick={() => handleSpeedChange(50)}
+                  disabled={!connected}
+                  title="Modo lento — para hidrogéis viscosos, primeiras camadas críticas ou afinação fina de fluxo"
+                  className={cn(
+                    "px-1 py-1 rounded text-[9px] font-bold border transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+                    speedPercent === 50
+                      ? "bg-amber-500/30 border-amber-400/60 text-amber-100"
+                      : "bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-200"
+                  )}
+                >
+                  <div>50%</div>
+                  <div className="text-[7px] font-normal opacity-70 leading-tight">Lento</div>
+                </button>
+                <button
+                  onClick={() => handleSpeedChange(100)}
+                  disabled={!connected}
+                  title="Velocidade nominal — usa exatamente os feedrates calculados pelo slicer"
+                  className={cn(
+                    "px-1 py-1 rounded text-[9px] font-bold border transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+                    speedPercent === 100
+                      ? "bg-emerald-500/30 border-emerald-400/60 text-emerald-100"
+                      : "bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-200"
+                  )}
+                >
+                  <div>100%</div>
+                  <div className="text-[7px] font-normal opacity-70 leading-tight">Nominal</div>
+                </button>
+                <button
+                  onClick={() => handleSpeedChange(150)}
+                  disabled={!connected}
+                  title="Rápido — para movimentos de deslocamento (travel) ou geometrias simples"
+                  className={cn(
+                    "px-1 py-1 rounded text-[9px] font-bold border transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+                    speedPercent === 150
+                      ? "bg-cyan-500/30 border-cyan-400/60 text-cyan-100"
+                      : "bg-cyan-500/10 hover:bg-cyan-500/20 border-cyan-500/30 text-cyan-200"
+                  )}
+                >
+                  <div>150%</div>
+                  <div className="text-[7px] font-normal opacity-70 leading-tight">Rápido</div>
+                </button>
+                <button
+                  onClick={() => handleSpeedChange(200)}
+                  disabled={!connected}
+                  title="Máximo — apenas para teste de limites mecânicos / dry-run sem extrusão"
+                  className={cn(
+                    "px-1 py-1 rounded text-[9px] font-bold border transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+                    speedPercent === 200
+                      ? "bg-violet-500/30 border-violet-400/60 text-violet-100"
+                      : "bg-violet-500/10 hover:bg-violet-500/20 border-violet-500/30 text-violet-200"
+                  )}
+                >
+                  <div>200%</div>
+                  <div className="text-[7px] font-normal opacity-70 leading-tight">Máximo</div>
+                </button>
+              </div>
+
+              {/* Ajuste fino ±1% / ±5% */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleSpeedChange(Math.max(25, speedPercent - 5))}
+                  disabled={!connected || speedPercent <= 25}
+                  className="flex-1 px-1 py-1 rounded text-[10px] font-mono bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 disabled:opacity-30"
+                  title="−5%"
+                >
+                  −5
+                </button>
+                <button
+                  onClick={() => handleSpeedChange(Math.max(25, speedPercent - 1))}
+                  disabled={!connected || speedPercent <= 25}
+                  className="flex-1 px-1 py-1 rounded text-[10px] font-mono bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 disabled:opacity-30"
+                  title="−1%"
+                >
+                  −1
+                </button>
+                <button
+                  onClick={() => handleSpeedChange(Math.min(200, speedPercent + 1))}
+                  disabled={!connected || speedPercent >= 200}
+                  className="flex-1 px-1 py-1 rounded text-[10px] font-mono bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 disabled:opacity-30"
+                  title="+1%"
+                >
+                  +1
+                </button>
+                <button
+                  onClick={() => handleSpeedChange(Math.min(200, speedPercent + 5))}
+                  disabled={!connected || speedPercent >= 200}
+                  className="flex-1 px-1 py-1 rounded text-[10px] font-mono bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 disabled:opacity-30"
+                  title="+5%"
+                >
+                  +5
+                </button>
+              </div>
+
+              {/* Dica contextual */}
+              <div className={cn(
+                "rounded-md px-2 py-1.5 text-[9px] leading-tight border",
+                isStreaming
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-200"
+                  : "bg-emerald-500/5 border-emerald-500/20 text-emerald-200/80"
+              )}>
+                <Info className="w-2.5 h-2.5 inline mr-1 -mt-0.5" />
+                {isStreaming
+                  ? "Imprimindo — reduza se ver bordas mal extrudadas; aumente em deslocamentos longos. Afeta TODOS os feedrates (XYZ+E) e também o joystick."
+                  : "Override global de feedrate (M220). Afeta XYZ+E e todo joystick. Ajustável em tempo real durante a impressão."}
               </div>
             </div>
           </Panel>

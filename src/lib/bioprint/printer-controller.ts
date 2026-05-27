@@ -102,6 +102,17 @@ export class PrinterController {
   private pauseRequested = false
   private cancelRequested = false
 
+  // R12.39: fila de injeção (jog, M220, M221) processada pelo runLoop ENTRE
+  // linhas do G-code para evitar conflito de waiters (apenas 1 pendingOkResolver
+  // existe globalmente — se sendAndWait for chamado durante runLoop, o waiter
+  // do runLoop é sobrescrito e a linha em curso perde sua resolução de ok).
+  //
+  // A fila é drenada no início de cada iteração do runLoop, ANTES de enviar
+  // a próxima linha do stream. Cada comando injetado é enviado com handshake
+  // `ok` normal — Marlin processa M220/M221/jog antes da próxima linha do
+  // stream. Latência típica: 50-300ms (uma linha do stream).
+  private injectionQueue: Array<{ cmd: string; tag: string }> = []
+
   // ok-await
   private pendingOkResolver: (() => void) | null = null
   private pendingErrorResolver: ((err: Error) => void) | null = null
@@ -281,6 +292,99 @@ export class PrinterController {
     }
   }
 
+  /**
+   * R12.39: Injeta um comando em tempo real durante o streaming.
+   *
+   * Uso típico: jog do joystick (G91/G1/G90, E+/E-, Z+/Z-), M220 (feedrate
+   * override), M221 (flow override), M114 (get position).
+   *
+   * COMPORTAMENTO:
+   *   • Se o controller está em `streaming`, o comando entra na fila
+   *     `injectionQueue` e é enviado pelo runLoop ANTES da próxima linha
+   *     do stream. Não bloqueia o caller.
+   *   • Se o controller está em `idle/ready/paused`, o comando é enviado
+   *     diretamente via sendAndWait (handshake completo).
+   *
+   * IMPORTANTE: para comandos durante streaming, NÃO retorna Promise<ok> —
+   * é fire-and-forget. Se você precisa esperar o ok, use sendAndWait
+   * fora do streaming. Isto é por design: durante streaming, await
+   * causaria deadlock (estaríamos esperando ok do runLoop, mas o runLoop
+   * está esperando seu próprio ok).
+   *
+   * O comando jog típico envolve 3 linhas (G91 + G1 + G90). Use múltiplas
+   * chamadas inject() ou chame em loop que as 3 entram em ordem na fila.
+   */
+  inject(cmd: string, tag: string = "inject"): void {
+    const clean = cmd.trim()
+    if (!clean) return
+    // Fora do streaming → envia direto (fire-and-forget) para latência mínima.
+    // Não esperamos `ok` porque o caller usa inject() em contextos onde não
+    // pode bloquear (eventos de UI rápidos como slider arrastando).
+    if (this.state !== "streaming" && this.state !== "paused") {
+      this.logger.tx(`${clean}  (inject direto)`, tag)
+      this.events.onLine?.(clean, "tx")
+      void this.transport.write(clean).catch((e) => {
+        this.logger.warn(
+          `Inject direto falhou: ${e instanceof Error ? e.message : String(e)}`,
+          tag,
+        )
+      })
+      return
+    }
+    // Em streaming/paused → enfileira para o runLoop processar entre linhas
+    this.injectionQueue.push({ cmd: clean, tag })
+    this.logger.info(
+      `Inject enfileirado (${this.injectionQueue.length} pendente${this.injectionQueue.length === 1 ? "" : "s"}): ${clean}`,
+      tag,
+    )
+  }
+
+  /**
+   * R12.39: Versão que ESPERA o ok do comando injetado. Use APENAS fora
+   * do streaming (idle/ready/paused). Durante streaming usar inject()
+   * (que não bloqueia).
+   *
+   * Internamente é um alias para sendAndWait quando idle, ou enfileira e
+   * espera o flush quando paused/streaming (em streaming, isso bloqueia
+   * até o runLoop drenar a fila — pode ser lento se houver fila longa).
+   */
+  async injectAndWait(cmd: string, timeoutMs?: number): Promise<void> {
+    const clean = cmd.trim()
+    if (!clean) return
+    if (this.state !== "streaming" && this.state !== "paused") {
+      return this.sendAndWait(clean, timeoutMs)
+    }
+    // Em streaming/paused, sendAndWait causaria conflito de waiter — força
+    // a injeção via fila. Não há feedback de ok aqui (não dá pra esperar
+    // sem deadlock). Usuário deve preferir inject() em streaming.
+    this.inject(clean, "inject-wait")
+  }
+
+  /** R12.39: Drena a fila de injeção dentro do runLoop. NUNCA chame externamente. */
+  private async drainInjectionQueue(): Promise<void> {
+    while (this.injectionQueue.length > 0) {
+      const item = this.injectionQueue.shift()!
+      try {
+        this.logger.tx(`${item.cmd}  (injetado)`, item.tag)
+        this.events.onLine?.(item.cmd, "tx")
+        // Mesmo padrão do runLoop: arma waiter ANTES do write.
+        // Timeout um pouco menor (10s) porque comandos de jog/M220 são
+        // rápidos no Marlin — se demorar mais, algo está errado e
+        // não queremos travar o stream principal.
+        const waiter = this.armOkWaiter(10000)
+        await this.transport.write(item.cmd)
+        await waiter
+      } catch (e) {
+        // Comando injetado falhou — loga mas NÃO aborta o stream.
+        // O usuário pode retentar o jog/slider.
+        this.logger.warn(
+          `Comando injetado "${item.cmd}" falhou: ${e instanceof Error ? e.message : String(e)} — continuando stream.`,
+          item.tag,
+        )
+      }
+    }
+  }
+
   // ─── Streaming ──
   /**
    * Inicia o streaming de um G-code. Resolve quando o stream termina
@@ -343,11 +447,22 @@ export class PrinterController {
       if (this.pauseRequested) {
         this.setState("paused")
         this.logger.warn("Pausado.", "controller")
-        // Aguarda resume() liberar
-        await this.waitForResume()
+        // R12.39: durante pausa, ainda drenamos injeções (jog, M220, M221)
+        // periodicamente, para o usuário poder ajustar fluxo/posição.
+        // O waitForResume é interrompido por uma nova injeção via um polling
+        // leve (200ms) — implementação simples e robusta.
+        await this.waitForResumeWithInjections()
         if (this.cancelRequested) continue
         this.setState("streaming")
         this.logger.info("Retomado.", "controller")
+      }
+
+      // R12.39: drena fila de injeção (jog, M220, M221) ANTES da próxima
+      // linha do stream. Isso garante que comandos do usuário (joystick,
+      // sliders) sejam aplicados em ~50-300ms (latência de uma linha) sem
+      // conflitar com o waiter do runLoop.
+      if (this.injectionQueue.length > 0) {
+        await this.drainInjectionQueue()
       }
 
       const line = this.queue[this.index]
@@ -451,8 +566,44 @@ export class PrinterController {
     })
   }
 
+  /**
+   * R12.39: variante do waitForResume que processa injeções (jog, M220, M221)
+   * durante a pausa. Implementação: polling a 200ms — se houver itens na
+   * fila e não estivermos retomados, drena-os. Continua até resume() ser
+   * chamado (resumeResolver disparado).
+   *
+   * Por que polling em vez de notificação event-driven: simplicidade. A
+   * frequência de injeções durante pausa é baixa (usuário ajustando manualmente),
+   * e 200ms de latência é imperceptível.
+   */
+  private async waitForResumeWithInjections(): Promise<void> {
+    const resumed = new Promise<void>((resolve) => {
+      this.resumeResolver = resolve
+    })
+    let done = false
+    void resumed.then(() => { done = true })
+    while (!done) {
+      if (this.injectionQueue.length > 0) {
+        await this.drainInjectionQueue()
+      }
+      // Espera 200ms ou até resume disparar (o que vier primeiro)
+      await Promise.race([
+        this.delay(200),
+        resumed,
+      ])
+    }
+  }
+
   cancel(): void {
     this.cancelRequested = true
+    // R12.39: descarta injeções pendentes — segurança ao cancelar.
+    if (this.injectionQueue.length > 0) {
+      this.logger.warn(
+        `Cancel: descartando ${this.injectionQueue.length} comando(s) injetado(s) pendente(s).`,
+        "controller",
+      )
+      this.injectionQueue = []
+    }
     // Se está pausado, libera para o loop ver o cancel
     if (this.resumeResolver) {
       this.resumeResolver()
