@@ -148,6 +148,12 @@ const POST_HOME_Z_CLEARANCE_MM = 30    // sobe 30mm antes do XY → não bate na
 const POST_HOME_XY_FEEDRATE = 3000     // 50 mm/s (3000 mm/min) — seguro
 const POST_HOME_Z_FEEDRATE = 600       // 10 mm/s — Z lento para preservar células
 
+// R12.40: após centralizar (Z=30mm), descer 22mm para ficar a Z=8mm
+// próximo da mesa — pronto para iniciar a bioimpressão sem precisar
+// fazer jog manual. Ainda preserva clearance de 8mm para não colidir
+// com placas de cultura ao mover XY.
+const POST_HOME_Z_APPROACH_DROP_MM = 22 // desce 22mm após o clearance (30 → 8)
+
 // G-code de demo (hello world quadrado pequeno)
 // R12.18: G-code demo agora é um cubo 20×20 com 2 camadas de infill TPMS
 // gyroid (Triply Periodic Minimal Surface) — substitui o antigo "Hello Square"
@@ -157,7 +163,11 @@ const DEMO_GCODE = DEMO_GYROID_GCODE
 // Step sizes do joystick
 type StepSize = 0.05 | 0.1 | 0.5 | 1 | 5 | 10
 const JOYSTICK_STEPS: StepSize[] = [0.05, 0.1, 0.5, 1, 5, 10]
-const EXTRUDE_STEPS: number[] = [0.01, 0.05, 0.1, 0.5, 1.0]
+// R12.40: passos do extrusor expandidos para UX intuitiva de bioimpressão.
+// Valores grandes (2, 5, 10 mm) permitem PURGA da seringa antes da impressão
+// e remoção de bolha de ar — operações comuns. Default subido para 1 mm
+// (era 0.1 mm — alto demais para purga, baixo demais para "sentir" o motor).
+const EXTRUDE_STEPS: number[] = [0.05, 0.1, 0.5, 1, 2, 5, 10]
 
 // SessionStorage key — vindo de /quick-gcode, /gcode/medical, /gcode/advanced
 const HANDOFF_KEY = "bia.execute.gcode.handoff"
@@ -606,12 +616,36 @@ export default function BioprintExecutePage() {
     // (que pode levar 2-4 segundos a 50 mm/s atravessando 100mm).
     // O M400 bloqueia o firmware até o motion buffer estar VAZIO.
     await controllerRef.current.sendAndWait("M400 ; aguarda fim do movimento (sincroniza)")
-    // Atualiza estado de UI da posição (cabeçote agora está no centro)
+
+    // R12.40: 4) APROXIMAÇÃO DA MESA — desce 22mm para ficar a Z=8mm.
+    // Após o clearance, o cabeçote está em Z=30mm. Para iniciar a
+    // bioimpressão, precisamos aproximar a ponta da seringa da mesa —
+    // posição típica de "stand-by" entre 5-10mm acima do substrato
+    // (placa de Petri, lamínula, well-plate). Z=8mm é uma altura
+    // segura que permite ao usuário ver visualmente a ponta e fazer
+    // jog fino (Z-) para encostar com precisão.
+    //
+    // Feedrate baixo (POST_HOME_Z_FEEDRATE = 600 mm/min = 10 mm/s) para
+    // descida controlada — se houver obstáculo (placa de cultura mal
+    // posicionada), o usuário tem tempo de pressionar Emergency Stop.
+    const approachZ = +(POST_HOME_Z_CLEARANCE_MM - POST_HOME_Z_APPROACH_DROP_MM).toFixed(2)
+    loggerRef.current.info(
+      `Aproximação: descendo Z para ${approachZ}mm (clearance ${POST_HOME_Z_CLEARANCE_MM}mm − ${POST_HOME_Z_APPROACH_DROP_MM}mm)…`,
+      "controller",
+    )
+    await controllerRef.current.sendAndWait(
+      `G1 Z${approachZ} F${POST_HOME_Z_FEEDRATE} ; aproximação da mesa para iniciar bioimpressão (R12.40)`,
+    )
+    // SINCRONIZA aproximação para garantir que o usuário só interaja
+    // com o joystick quando o cabeçote estiver FISICAMENTE em Z=8mm.
+    await controllerRef.current.sendAndWait("M400 ; aguarda fim da aproximação (R12.40)")
+
+    // Atualiza estado de UI da posição (cabeçote agora no centro a Z=8mm)
     // NOTA: setPosition é declarado mais abaixo mas só é CHAMADO quando
     // a função executa (runtime, não na criação do callback) → seguro.
-    setPosition((p) => ({ ...p, x: cx, y: cy, z: +(p.z + POST_HOME_Z_CLEARANCE_MM).toFixed(2) }))
+    setPosition((p) => ({ ...p, x: cx, y: cy, z: approachZ }))
     loggerRef.current.ok(
-      `Cabeçote no centro (${cx}, ${cy}) com Z elevado em ${POST_HOME_Z_CLEARANCE_MM}mm. Joystick e G-code prontos.`,
+      `Cabeçote no centro (${cx}, ${cy}) a Z=${approachZ}mm da mesa — pronto para iniciar a bioimpressão.`,
       "controller",
     )
   }, [])
@@ -729,7 +763,18 @@ export default function BioprintExecutePage() {
       try {
         await controllerRef.current?.sendAndWait("G90 ; XYZ em modo absoluto")
         await controllerRef.current?.sendAndWait("M83 ; extrusora em modo relativo (R12.27)")
-        loggerRef.current.info("Modo de coordenadas pronto: XYZ absoluto (G90) + E relativo (M83).", "controller")
+        // R12.40: LIBERA EXTRUSÃO A FRIO. Marlin por padrão tem
+        // PREVENT_COLD_EXTRUSION ativo: se a temperatura do hotend estiver
+        // abaixo de EXTRUDE_MINTEMP (default 170°C), TODO comando `G1 E...`
+        // é silenciosamente IGNORADO — o firmware responde "ok" mas o motor
+        // do extrusor NÃO MOVE. Como bioimpressoras operam à temperatura
+        // ambiente (sem hotend, ou hotend desligado, hidrogéis se degradam
+        // acima de 37°C), precisamos desativar essa proteção. Esse era o
+        // motivo principal de E+/E- "não funcionar" pós Home All.
+        //   M302 S0   → minTemp = 0°C (qualquer temperatura permitida)
+        //   M302 P1   → permite cold extrusion explicitamente (Marlin 2.0+)
+        await controllerRef.current?.sendAndWait("M302 S0 P1 ; libera extrusão a frio (R12.40 — bioimpressora)")
+        loggerRef.current.info("Modo pronto: XYZ absoluto (G90) + E relativo (M83) + cold extrusion liberada (M302).", "controller")
       } catch (e) {
         loggerRef.current.warn(`Não foi possível ajustar modo de coordenadas: ${e instanceof Error ? e.message : String(e)}`)
       }
@@ -1005,7 +1050,10 @@ export default function BioprintExecutePage() {
 
   // ─── JOYSTICK ──
   const [step, setStep] = useState<StepSize>(1)
-  const [extrudeStep, setExtrudeStep] = useState(0.1)
+  // R12.40: default 1mm (era 0.1mm) — passo mais intuitivo para "sentir" o
+  // motor na primeira tentativa. Hidrogel típico precisa de 1-5mm de purga
+  // antes de começar a impressão.
+  const [extrudeStep, setExtrudeStep] = useState<number>(1)
   const [position, setPosition] = useState({ x: 0, y: 0, z: 0, e: 0 })
 
   const sendJog = useCallback(async (axis: "X" | "Y" | "Z" | "E", delta: number) => {
@@ -1129,11 +1177,16 @@ export default function BioprintExecutePage() {
       // extrusor para absoluto após G28).
       await controllerRef.current.sendAndWait("G90 ; XYZ absoluto")
       await controllerRef.current.sendAndWait("M83 ; E relativo (R12.27)")
+      // R12.40: re-aplica cold-extrusion liberada após Home All. Alguns
+      // firmwares Marlin resetam M302 para o default quando reset/G28. Sem
+      // isso, E+/E- volta a "não funcionar" depois do home. Ver bloco
+      // equivalente em handleConnect para explicação completa.
+      await controllerRef.current.sendAndWait("M302 S0 P1 ; libera extrusão a frio (R12.40)")
       setDidAutoHome(true)
       // Posição lógica pós-G28: cabeçote no canto (assumido 0,0,0)
       setPosition({ x: 0, y: 0, z: 0, e: 0 })
       loggerRef.current.ok(
-        "Home All concluído (G28) + modo XYZ absoluto / E relativo.",
+        "Home All concluído (G28) + XYZ absoluto + E relativo + cold extrusion liberada.",
         "controller",
       )
       // R12.33: centraliza com clearance Z se a opção estiver ativa
@@ -2102,14 +2155,15 @@ export default function BioprintExecutePage() {
                   />
                   <div className="flex-1 min-w-0">
                     <div className="text-[11px] font-semibold text-emerald-100 flex items-center gap-1">
-                      <Crosshair className="w-3 h-3" /> Centralizar após home
+                      <Crosshair className="w-3 h-3" /> Centralizar + aproximar mesa
                     </div>
                     <div className="text-[9px] text-emerald-200/70 leading-tight mt-0.5">
-                      Após o <span className="font-mono">G28</span>, sobe
-                      Z <span className="font-mono">+{POST_HOME_Z_CLEARANCE_MM}mm</span> e
-                      move para o centro (<span className="font-mono">{BIOENDER_BED_X_MM / 2},{BIOENDER_BED_Y_MM / 2}</span>)
-                      da mesa Bioender {BIOENDER_BED_X_MM}×{BIOENDER_BED_Y_MM}mm. Evita colidir
-                      com a placa de cultura e libera o joystick.
+                      Após o <span className="font-mono">G28</span>: sobe
+                      Z <span className="font-mono">+{POST_HOME_Z_CLEARANCE_MM}mm</span>,
+                      vai para o centro (<span className="font-mono">{BIOENDER_BED_X_MM / 2},{BIOENDER_BED_Y_MM / 2}</span>)
+                      e <span className="text-emerald-300 font-semibold">desce {POST_HOME_Z_APPROACH_DROP_MM}mm</span>
+                      {" "}até Z=<span className="font-mono">{POST_HOME_Z_CLEARANCE_MM - POST_HOME_Z_APPROACH_DROP_MM}mm</span> —
+                      pronto para iniciar a bioimpressão (R12.40).
                     </div>
                   </div>
                 </label>
@@ -2272,24 +2326,93 @@ export default function BioprintExecutePage() {
               </div>
             </div>
 
-            {/* Extrusora */}
+            {/* Extrusora — R12.40: UX intuitiva para bioimpressão */}
             <div className="mb-2">
               <div className="flex items-center justify-between text-[9px] uppercase tracking-wider text-gray-500 mb-1">
-                <span>Extrusora E</span>
-                <select
-                  value={extrudeStep}
-                  onChange={(e) => setExtrudeStep(parseFloat(e.target.value))}
-                  className="text-[9px] bg-black/40 border border-white/10 rounded px-1 py-0.5 text-gray-300"
-                >
-                  {EXTRUDE_STEPS.map((s) => <option key={s} value={s}>{s} mm</option>)}
-                </select>
+                <span className="text-emerald-400 font-bold flex items-center gap-1">
+                  <Droplet className="w-2.5 h-2.5" />
+                  Extrusora E
+                </span>
+                <span className="text-[8px] normal-case tracking-normal text-gray-500">
+                  passo: <span className="text-emerald-300 font-bold tabular-nums">{extrudeStep} mm</span>
+                </span>
               </div>
-              <div className="grid grid-cols-2 gap-1">
-                {/* R12.39: E+/E- AGORA funciona em tempo real e parado.
-                    Bug antigo: estavam bloqueados durante streaming. Solução:
-                    via fila de injeção do controller, sem conflito de waiters. */}
-                <JogBtn onClick={() => sendJog("E", +extrudeStep)} disabled={!connected}>E+</JogBtn>
-                <JogBtn onClick={() => sendJog("E", -extrudeStep)} disabled={!connected} variant="warn">E−</JogBtn>
+
+              {/* R12.40: presets visuais do passo — clique muda extrudeStep.
+                  Substituem o select antigo (menos cliques, mais visível). */}
+              <div className="grid grid-cols-7 gap-0.5 mb-1.5">
+                {EXTRUDE_STEPS.map((s) => {
+                  const active = extrudeStep === s
+                  return (
+                    <button
+                      key={s}
+                      onClick={() => {
+                        setExtrudeStep(s)
+                        loggerRef.current?.info(`Passo do extrusor: ${s} mm`, "controller")
+                      }}
+                      aria-pressed={active}
+                      className={cn(
+                        "px-0.5 py-1 rounded text-[9px] font-mono transition-all",
+                        active
+                          ? "bg-emerald-500 text-black font-bold border-2 border-emerald-300 ring-1 ring-emerald-400/60 shadow-[0_0_6px_rgba(16,185,129,0.5)] scale-105"
+                          : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/30"
+                      )}
+                      title={`${s} mm por clique`}
+                    >
+                      {s}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* E+/E- com ícones e tamanho maior para fácil clique */}
+              <div className="grid grid-cols-2 gap-1 mb-1.5">
+                {/* R12.40: E+/E- funciona ANTES, DURANTE e DEPOIS da
+                    bioimpressão (R12.39 inject + R12.40 M302 cold extrusion).
+                    Pré-requisitos garantidos no handshake e no Home All:
+                      • M83 — extrusora em modo relativo
+                      • M302 S0 P1 — libera extrusão a frio (sem hotend)
+                */}
+                <JogBtn
+                  onClick={() => sendJog("E", +extrudeStep)}
+                  disabled={!connected}
+                  title={`Extrude +${extrudeStep} mm (avança a seringa — empurra hidrogel para fora)`}
+                >
+                  <span className="flex items-center justify-center gap-1">
+                    <span className="text-emerald-200">▼</span>
+                    <span>E+ {extrudeStep}</span>
+                  </span>
+                </JogBtn>
+                <JogBtn
+                  onClick={() => sendJog("E", -extrudeStep)}
+                  disabled={!connected}
+                  variant="warn"
+                  title={`Retract −${extrudeStep} mm (recua a seringa — pode formar bolha se exagerar)`}
+                >
+                  <span className="flex items-center justify-center gap-1">
+                    <span className="text-amber-200">▲</span>
+                    <span>E− {extrudeStep}</span>
+                  </span>
+                </JogBtn>
+              </div>
+
+              {/* R12.40: PURGA RÁPIDA — botões de bolus comuns para
+                  preparar a seringa antes da bioimpressão (purgar ar,
+                  preencher cânula, fazer teste de fluxo). Usam inject()
+                  durante streaming via sendJog. */}
+              <div className="flex items-center gap-0.5">
+                <span className="text-[8px] uppercase tracking-wider text-gray-500 mr-1">Purga:</span>
+                {[1, 2, 5, 10].map((bolus) => (
+                  <button
+                    key={`purge-${bolus}`}
+                    onClick={() => sendJog("E", +bolus)}
+                    disabled={!connected}
+                    title={`Purga rápida +${bolus} mm (não muda o passo do joystick)`}
+                    className="flex-1 px-1 py-1 rounded text-[9px] font-mono bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    +{bolus}
+                  </button>
+                ))}
               </div>
             </div>
 
