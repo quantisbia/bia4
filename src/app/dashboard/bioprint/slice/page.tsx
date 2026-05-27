@@ -28,13 +28,13 @@ import {
   ArrowRight, AlertTriangle, CheckCircle2, Info, Download, Copy,
   Wind, Thermometer, Target, BarChart3, Clock, Droplets, Activity,
   Beaker, Zap, AlertCircle, ChevronDown, ChevronRight, Microscope,
-  Lightbulb, ShieldAlert,
+  Lightbulb, ShieldAlert, Square,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { useBioprintProcess, isBioinkReady } from "@/lib/bioprint/process-context"
 import { INFILL_PATTERNS, TEMPERATURE_PROFILES, CLASSIC_INFILL_PATTERNS } from "@/lib/bioprinter/biomedical-params"
 import { BIOPRINTERS, getBioprinterById, supportsWebSerial } from "@/lib/bioprinting/bioprinters"
-import { SUPPORTED_GEOMETRY_IDS } from "@/lib/gcode/slicer/geometry-bounds"
+import { SUPPORTED_GEOMETRY_IDS, isPerimeterOnlyGeometry } from "@/lib/gcode/slicer/geometry-bounds"
 import { TissueDesigner, type TissueDesignerValue } from "@/components/bioprinting/TissueDesigner"
 import { PrinterConnection } from "@/components/bioprinting/PrinterConnection"
 import { GcodeValidatorPanel } from "@/components/bioprinter/GcodeValidatorPanel"
@@ -191,6 +191,40 @@ export default function BioprintSlicePage() {
   const [infillFamily, setInfillFamily] = useState<"biomedical" | "classic">("biomedical")
 
   /**
+   * R12.36: Modo "Apenas Contorno" (perimeter-only).
+   * Quando true, força infillPercent=0 e desabilita seletor de padrão.
+   * Engine emite só os walls (perímetros) — não tenta gerar infill, evitando
+   * G-code inválido em geometrias de teste sem volume interno (linhas, grade,
+   * pontes, torres, escadas, leque de ângulos, fidelidade da biotinta).
+   * Auto-ativa para geometrias da lista PERIMETER_ONLY_GEOMETRY_IDS.
+   */
+  const [perimeterOnly, setPerimeterOnly] = useState<boolean>(() => {
+    if (state.slice.perimeterOnly !== null && state.slice.perimeterOnly !== undefined) {
+      return state.slice.perimeterOnly
+    }
+    return state.model.geometryId ? isPerimeterOnlyGeometry(state.model.geometryId) : false
+  })
+
+  /** R12.36: Geometria atual é forçadamente perimeter-only (não pode desligar)? */
+  const isGeometryForciblyPerimeterOnly = useMemo(
+    () => state.model.geometryId ? isPerimeterOnlyGeometry(state.model.geometryId) : false,
+    [state.model.geometryId],
+  )
+
+  /**
+   * R12.36: Auto-ativar perimeterOnly quando geometria for de teste de contorno.
+   * Quando o usuário troca de modelo (na Etapa 1) para um teste de printability,
+   * automaticamente ligamos o modo "Apenas Contorno" para que o G-code não
+   * tente gerar infill em uma geometria sem volume.
+   */
+  useEffect(() => {
+    if (isGeometryForciblyPerimeterOnly && !perimeterOnly) {
+      setPerimeterOnly(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGeometryForciblyPerimeterOnly])
+
+  /**
    * R12.22: O algorithm é DERIVADO automaticamente do padrão escolhido (família +
    * id) em vez de ser uma escolha independente. Isso elimina o conflito anterior
    * entre o seletor "Algoritmo de preenchimento" e o seletor "Biomédico/Clássico"
@@ -266,6 +300,7 @@ export default function BioprintSlicePage() {
       nozzleDiameterUm,
       infillPatternId,
       infillPercent,
+      perimeterOnly,
       cartridgeTempC,
       bedTempC,
       chamberTempC,
@@ -276,7 +311,8 @@ export default function BioprintSlicePage() {
   }, [
     isUnlocked,
     layerHeightMm, printSpeedMmS, pressureKPa, nozzleDiameterUm,
-    infillPatternId, infillPercent, cartridgeTempC, bedTempC, chamberTempC,
+    infillPatternId, infillPercent, perimeterOnly,
+    cartridgeTempC, bedTempC, chamberTempC,
     skirtLoops, retractionMm, result,
   ])
 
@@ -347,8 +383,12 @@ export default function BioprintSlicePage() {
     if (useMultiWell && selectedWells.length === 0) {
       out.push("⚠️ Multi-poço ativado mas nenhum poço selecionado. Vá na tab Multi-poço.")
     }
-    if (algorithm === "voronoi_3d" && infillPercent > 50) {
+    // R12.36: warnings de infill só fazem sentido quando NÃO está em modo contorno
+    if (!perimeterOnly && algorithm === "voronoi_3d" && infillPercent > 50) {
       out.push("⚠️ Voronoi 3D com infill > 50% gera trabéculas muito densas. Tente 25–40%.")
+    }
+    if (perimeterOnly) {
+      out.push("ℹ️ Modo 'Apenas Contorno' ativo: G-code emite só perímetros (walls), sem preenchimento.")
     }
     if (out.length === 1) {
       // nenhum aviso específico — sugestão padrão segura
@@ -362,7 +402,7 @@ export default function BioprintSlicePage() {
   }, [
     state.model.geometryId, state.bioink.cellType, layerHeightMm, pressureKPa,
     printSpeedMmS, nozzleDiameterUm, infillPercent, useMultiWell,
-    selectedWells.length, algorithm,
+    selectedWells.length, algorithm, perimeterOnly,
   ])
 
   // ── Geração de G-code ──
@@ -439,25 +479,42 @@ export default function BioprintSlicePage() {
           }
         : undefined
 
+      /**
+       * R12.36: Em modo "Apenas Contorno", FORÇA infillPercent=0 — o engine
+       * (src/lib/gcode/engine.ts linha 374: `if (job.infillPercent > 0)`)
+       * pula totalmente a geração de infill e emite só perímetros (walls),
+       * evitando G-code inválido em geometrias sem volume interno.
+       * Mantemos `algorithm` apenas para satisfazer o Zod schema (não será
+       * usado pelo engine quando infillPercent=0).
+       */
+      const effectiveInfillPercent = perimeterOnly ? 0 : infillPercent
+      // Garante walls >= 1 em modo contorno (não faz sentido perimeter-only com 0 walls)
+      const effectiveWalls = perimeterOnly ? Math.max(1, walls) : walls
+
       const body = {
         geometry: { id: state.model.geometryId, params: geomParams },
         infill: {
           algorithm,
-          infillPercent,
-          macroPorosity: {
-            density: 1 - infillPercent / 100,
-            poreSize_um: 450,
-          },
+          infillPercent: effectiveInfillPercent,
+          // Sem macroPorosity em modo contorno — não há volume interno para porosidade
+          ...(perimeterOnly ? {} : {
+            macroPorosity: {
+              density: 1 - infillPercent / 100,
+              poreSize_um: 450,
+            },
+          }),
         },
         bioink: bioinkPayload,
         bioprinterId,
         layerHeight_mm: layerHeightMm,
-        walls,
+        walls: effectiveWalls,
         skirtLoops,
         wellPlate: wellPlatePayload,
         tissue: state.model.category ?? "tecido",
         application: "scaffold",
-        jobName: `bia_${state.model.geometryId}_${algorithm}`,
+        jobName: perimeterOnly
+          ? `bia_${state.model.geometryId}_perimeter-only`
+          : `bia_${state.model.geometryId}_${algorithm}`,
       }
 
       const res = await fetch("/api/gcode/generate", {
@@ -574,7 +631,10 @@ export default function BioprintSlicePage() {
         ? `; Células: ${state.bioink.cellType} ${state.bioink.cellDensityMillionMl}×10^6/mL`
         : "; Sem células (scaffold acelular)",
       `; Bioprinter: ${currentPrinter?.fullName ?? bioprinterId}`,
-      `; Algoritmo: ${algorithm}  | Infill: ${infillPercent}%`,
+      // R12.36: header reflete modo "Apenas Contorno" quando ativo (infill=0)
+      perimeterOnly
+        ? `; Modo: APENAS CONTORNO (perímetros, sem preenchimento) | walls=${walls}`
+        : `; Algoritmo: ${algorithm}  | Infill: ${infillPercent}%`,
       `; Layer: ${layerHeightMm} mm | Speed: ${printSpeedMmS} mm/s | Pressão: ${pressureKPa} kPa`,
       `; Temp: cartucho ${cartridgeTempC}°C / bed ${bedTempC}°C / chamber ${chamberTempC}°C`,
       "; ═══════════════════════════════════════════════════════════",
@@ -590,7 +650,7 @@ export default function BioprintSlicePage() {
     a.download = `${result.jobName ?? "bia"}.gcode`
     a.click()
     URL.revokeObjectURL(url)
-  }, [result, state.model, state.bioink, currentPrinter, bioprinterId, algorithm, infillPercent, layerHeightMm, printSpeedMmS, pressureKPa, cartridgeTempC, bedTempC, chamberTempC])
+  }, [result, state.model, state.bioink, currentPrinter, bioprinterId, algorithm, infillPercent, layerHeightMm, printSpeedMmS, pressureKPa, cartridgeTempC, bedTempC, chamberTempC, perimeterOnly, walls])
 
   return (
     <div className="bia-slice-page flex flex-col min-h-full bg-[#0a0a0f]">
@@ -783,6 +843,8 @@ export default function BioprintSlicePage() {
             infillPercent={infillPercent} onInfillChange={setInfillPercent}
             infillPatternId={infillPatternId} onInfillPatternChange={setInfillPatternId}
             infillFamily={infillFamily} onInfillFamilyChange={setInfillFamily}
+            perimeterOnly={perimeterOnly} onPerimeterOnlyChange={setPerimeterOnly}
+            perimeterOnlyForced={isGeometryForciblyPerimeterOnly}
             walls={walls} onWallsChange={setWalls}
             skirtLoops={skirtLoops} onSkirtLoopsChange={setSkirtLoops}
             retractionMm={retractionMm} onRetractionChange={setRetractionMm}
@@ -927,6 +989,10 @@ interface ParamsProps {
   infillPercent: number; onInfillChange: (n: number) => void
   infillPatternId: string; onInfillPatternChange: (id: string) => void
   infillFamily: "biomedical" | "classic"; onInfillFamilyChange: (f: "biomedical" | "classic") => void
+  /** R12.36: modo "Apenas Contorno" — força infillPercent=0, desabilita seletor de padrão */
+  perimeterOnly: boolean; onPerimeterOnlyChange: (b: boolean) => void
+  /** R12.36: geometria atual EXIGE modo contorno (não pode ser desligado) */
+  perimeterOnlyForced: boolean
   walls: number; onWallsChange: (n: number) => void
   skirtLoops: number; onSkirtLoopsChange: (n: number) => void
   retractionMm: number; onRetractionChange: (n: number) => void
@@ -1006,41 +1072,71 @@ function ParamsPanel(p: ParamsProps) {
         Um pequeno indicador mostra qual algoritmo está ativo, com dica de
         otimização da BIA quando o padrão escolhido difere do recomendado.
       */}
-      <section className="rounded-2xl border border-violet-500/20 bg-gradient-to-r from-violet-500/[0.07] to-fuchsia-500/[0.05] p-4">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2 min-w-0">
-            <Sparkles className="w-4 h-4 text-violet-400 shrink-0" />
-            <div className="min-w-0">
-              <div className="text-[10px] uppercase tracking-wider text-violet-300/80 font-semibold">
-                Algoritmo do engine (auto-derivado do padrão)
-              </div>
-              <div className="text-sm font-bold text-violet-100 truncate">
-                {algoInfo?.icon} {algoInfo?.name ?? p.algorithm}
-                <span className="ml-2 text-[10px] font-normal text-violet-300/70">
-                  · {algoInfo?.category}
-                </span>
+      {/* R12.36: quando perimeterOnly ativo, mostramos um card específico
+          ao invés do display de algoritmo (pois não há infill rodando). */}
+      {p.perimeterOnly ? (
+        <section className="rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/[0.08] to-orange-500/[0.05] p-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 min-w-0">
+              <Square className="w-4 h-4 text-amber-300 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase tracking-wider text-amber-300/80 font-semibold">
+                  Modo do engine
+                </div>
+                <div className="text-sm font-bold text-amber-100 truncate">
+                  🔲 Apenas Contorno (perímetros, sem preenchimento)
+                  <span className="ml-2 text-[10px] font-normal text-amber-300/70">
+                    · perimeter-only
+                  </span>
+                </div>
               </div>
             </div>
+            <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-200 shrink-0">
+              ✓ Indicado para testes de impressibilidade
+            </span>
           </div>
-          {recommendedAlgo === p.algorithm ? (
-            <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 shrink-0">
-              ✓ BIA recomenda este algoritmo
-            </span>
-          ) : (
-            <span
-              className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-200 shrink-0"
-              title={`Para sua biotinta + modelo, a BIA recomendaria: ${ENGINE_ALGORITHMS.find(a => a.id === recommendedAlgo)?.name}`}
-            >
-              ⚠ BIA sugere: {ENGINE_ALGORITHMS.find(a => a.id === recommendedAlgo)?.name}
-            </span>
+          <div className="mt-2 text-[11px] text-amber-100/80">
+            <strong className="text-amber-300">Melhor para:</strong>{" "}
+            geometrias de teste sem volume interno · grade de fusão · ponte de colapso · torre de empilhamento · fidelidade da biotinta
+          </div>
+        </section>
+      ) : (
+        <section className="rounded-2xl border border-violet-500/20 bg-gradient-to-r from-violet-500/[0.07] to-fuchsia-500/[0.05] p-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 min-w-0">
+              <Sparkles className="w-4 h-4 text-violet-400 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase tracking-wider text-violet-300/80 font-semibold">
+                  Algoritmo do engine (auto-derivado do padrão)
+                </div>
+                <div className="text-sm font-bold text-violet-100 truncate">
+                  {algoInfo?.icon} {algoInfo?.name ?? p.algorithm}
+                  <span className="ml-2 text-[10px] font-normal text-violet-300/70">
+                    · {algoInfo?.category}
+                  </span>
+                </div>
+              </div>
+            </div>
+            {recommendedAlgo === p.algorithm ? (
+              <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 shrink-0">
+                ✓ BIA recomenda este algoritmo
+              </span>
+            ) : (
+              <span
+                className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-200 shrink-0"
+                title={`Para sua biotinta + modelo, a BIA recomendaria: ${ENGINE_ALGORITHMS.find(a => a.id === recommendedAlgo)?.name}`}
+              >
+                ⚠ BIA sugere: {ENGINE_ALGORITHMS.find(a => a.id === recommendedAlgo)?.name}
+              </span>
+            )}
+          </div>
+          {algoInfo && (
+            <div className="mt-2 text-[11px] text-violet-100/80">
+              <strong className="text-violet-300">Melhor para:</strong> {algoInfo.bestFor.join(" · ")}
+            </div>
           )}
-        </div>
-        {algoInfo && (
-          <div className="mt-2 text-[11px] text-violet-100/80">
-            <strong className="text-violet-300">Melhor para:</strong> {algoInfo.bestFor.join(" · ")}
-          </div>
-        )}
-      </section>
+        </section>
+      )}
 
       {/* ── Parâmetros físicos ── */}
       <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
@@ -1080,9 +1176,11 @@ function ParamsPanel(p: ParamsProps) {
           <SliderField
             label="Preenchimento (densidade)" icon={BarChart3}
             min={0} max={100} step={1}
-            value={p.infillPercent} onChange={p.onInfillChange}
-            display={`${p.infillPercent}%`}
-            hint="0% = oco · 20–40% scaffolds · 100% sólido"
+            value={p.perimeterOnly ? 0 : p.infillPercent}
+            onChange={p.onInfillChange}
+            display={p.perimeterOnly ? "0% (apenas contorno)" : `${p.infillPercent}%`}
+            hint={p.perimeterOnly ? "Modo contorno ativo — só perímetros (walls)" : "0% = oco · 20–40% scaffolds · 100% sólido"}
+            disabled={p.perimeterOnly}
           />
           <SliderField
             label="Paredes (walls)" icon={Layers}
@@ -1148,23 +1246,25 @@ function ParamsPanel(p: ParamsProps) {
           )}
         </div>
 
-        {/* Padrão de infill — Biomédico ou Clássico */}
+        {/* Padrão de infill — Biomédico, Clássico OU Apenas Contorno (R12.36) */}
         <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-4">
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <BarChart3 className="w-4 h-4 text-violet-400" />
               <span className="text-sm font-semibold text-white">Padrão de preenchimento</span>
             </div>
-            <div className="flex items-center gap-1 bg-black/40 rounded-lg p-1">
+            <div className="flex flex-wrap items-center gap-1 bg-black/40 rounded-lg p-1">
               <button
                 type="button"
+                disabled={p.perimeterOnly}
                 onClick={() => {
                   p.onInfillFamilyChange("biomedical")
                   p.onInfillPatternChange(INFILL_PATTERNS[0].id)
                 }}
                 className={cn(
                   "px-3 py-1 rounded-md text-[11px] font-semibold transition-colors",
-                  p.infillFamily === "biomedical"
+                  p.perimeterOnly && "opacity-40 cursor-not-allowed",
+                  !p.perimeterOnly && p.infillFamily === "biomedical"
                     ? "bg-violet-500/30 text-violet-100 ring-1 ring-violet-400/40"
                     : "text-gray-400 hover:text-white"
                 )}
@@ -1173,26 +1273,76 @@ function ParamsPanel(p: ParamsProps) {
               </button>
               <button
                 type="button"
+                disabled={p.perimeterOnly}
                 onClick={() => {
                   p.onInfillFamilyChange("classic")
                   p.onInfillPatternChange(CLASSIC_INFILL_PATTERNS[0].id)
                 }}
                 className={cn(
                   "px-3 py-1 rounded-md text-[11px] font-semibold transition-colors",
-                  p.infillFamily === "classic"
+                  p.perimeterOnly && "opacity-40 cursor-not-allowed",
+                  !p.perimeterOnly && p.infillFamily === "classic"
                     ? "bg-violet-500/30 text-violet-100 ring-1 ring-violet-400/40"
                     : "text-gray-400 hover:text-white"
                 )}
               >
                 ⚙️ Clássico (slicer)
               </button>
+              {/* R12.36: toggle "Apenas Contorno" — alternativa às famílias biomédico/clássico */}
+              <button
+                type="button"
+                onClick={() => p.onPerimeterOnlyChange(!p.perimeterOnly)}
+                disabled={p.perimeterOnlyForced}
+                title={p.perimeterOnlyForced
+                  ? "Esta geometria é um teste de contorno — modo Apenas Contorno é obrigatório"
+                  : "Desliga o preenchimento — emite só os perímetros (walls)"}
+                className={cn(
+                  "px-3 py-1 rounded-md text-[11px] font-semibold transition-colors flex items-center gap-1",
+                  p.perimeterOnly
+                    ? "bg-amber-500/30 text-amber-100 ring-1 ring-amber-400/40"
+                    : "text-gray-400 hover:text-white",
+                  p.perimeterOnlyForced && "cursor-not-allowed"
+                )}
+              >
+                <Square className="w-3 h-3" />
+                Apenas Contorno
+              </button>
             </div>
           </div>
-          <p className="text-[11px] text-gray-400 mb-3">
+
+          {/* R12.36: card explicativo quando modo contorno está ativo */}
+          {p.perimeterOnly && (
+            <div className="mb-3 rounded-lg bg-amber-500/10 border border-amber-500/30 p-3 text-xs">
+              <div className="flex items-start gap-2">
+                <Info className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-amber-100 font-medium">
+                    Modo &ldquo;Apenas Contorno&rdquo; ativo {p.perimeterOnlyForced && "(obrigatório para esta geometria)"}
+                  </p>
+                  <p className="text-amber-200/80">
+                    O G-code será gerado <strong>somente com os perímetros (walls)</strong> — sem preenchimento interno.
+                    Recomendado para testes de impressibilidade: linha, grade de fusão, ponte de colapso, estrela de
+                    overhang, torre de empilhamento, escada Z, leque de ângulos e fidelidade da biotinta.
+                  </p>
+                  <p className="text-amber-300/60 text-[10px]">
+                    Racional: estas geometrias não possuem volume interno fechado — tentar gerar infill produziria
+                    G-code inválido (filamentos no vazio). O engine pula totalmente a etapa de infill quando
+                    densidade = 0%, emitindo só os contornos. Use o slider &ldquo;Paredes (walls)&rdquo; para escolher
+                    quantos perímetros traçar (1–5).
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <p className={cn("text-[11px] text-gray-400 mb-3", p.perimeterOnly && "opacity-40")}>
             {p.infillFamily === "biomedical"
               ? "Padrões avançados otimizados para biofabricação — porosidade, vascularização e zonação inspiradas em tecidos nativos."
               : "Padrões clássicos dos slicers tradicionais (Cura, PrusaSlicer, Simplify3D) — familiar, rápido e bem-validado para FDM/scaffolds."}
           </p>
+
+          {/* R12.36: wrapper que desabilita os botões de padrão quando perimeterOnly */}
+          <div className={cn(p.perimeterOnly && "opacity-40 pointer-events-none select-none")}>
           {p.infillFamily === "biomedical" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {INFILL_PATTERNS.map(x => (
@@ -1236,7 +1386,7 @@ function ParamsPanel(p: ParamsProps) {
             </div>
           )}
 
-          {activePatternInfo && (
+          {activePatternInfo && !p.perimeterOnly && (
             <div className="mt-3 rounded-lg bg-violet-500/5 border border-violet-500/20 p-3 text-xs">
               <div className="flex items-start gap-2">
                 <Info className="w-4 h-4 text-violet-400 shrink-0 mt-0.5" />
@@ -1262,6 +1412,7 @@ function ParamsPanel(p: ParamsProps) {
               </div>
             </div>
           )}
+          </div> {/* R12.36: fim do wrapper perimeterOnly-disable */}
         </div>
       </section>
 
@@ -1357,15 +1508,16 @@ function ParamsPanel(p: ParamsProps) {
 
 // ─── Slider field reutilizável ────────────────────────────────────────────
 function SliderField({
-  label, icon: Icon, min, max, step, value, onChange, display, hint,
+  label, icon: Icon, min, max, step, value, onChange, display, hint, disabled,
 }: {
   label: string; icon: typeof Layers
   min: number; max: number; step: number
   value: number; onChange: (n: number) => void
   display: string; hint?: string
+  disabled?: boolean
 }) {
   return (
-    <div>
+    <div className={cn(disabled && "opacity-50 pointer-events-none select-none")}>
       <label className="text-[11px] text-gray-400 mb-1 flex items-center gap-1">
         <Icon className="w-3 h-3" />
         {label}
@@ -1374,9 +1526,10 @@ function SliderField({
         <input
           type="range" min={min} max={max} step={step} value={value}
           onChange={e => onChange(parseFloat(e.target.value))}
+          disabled={disabled}
           className="flex-1 accent-violet-500"
         />
-        <span className="text-xs text-violet-300 font-mono w-20 text-right">{display}</span>
+        <span className="text-xs text-violet-300 font-mono w-24 text-right">{display}</span>
       </div>
       {hint && <p className="text-[10px] text-gray-600 mt-0.5">{hint}</p>}
     </div>
@@ -1893,7 +2046,13 @@ function GCodePanel({
               <div className="mt-4 pt-4 border-t border-emerald-500/15 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[10px] text-emerald-100/60">
                 <div><span className="text-gray-500">Bioimpressora:</span> {result.summary.bioprinter}</div>
                 <div><span className="text-gray-500">Biotinta:</span> {result.summary.bioink}</div>
-                <div><span className="text-gray-500">Algoritmo:</span> {result.summary.algorithm}</div>
+                {/* R12.36: rotula como "Apenas Contorno" quando o job rodou em modo perimeter-only */}
+                <div>
+                  <span className="text-gray-500">Algoritmo:</span>{" "}
+                  {perimeterOnly
+                    ? <span className="text-amber-300">apenas contorno (perimeter-only)</span>
+                    : result.summary.algorithm}
+                </div>
               </div>
             )}
             {result.creditsUsed > 0 && (

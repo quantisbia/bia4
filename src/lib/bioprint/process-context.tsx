@@ -149,6 +149,14 @@ export interface SliceStepState {
   /** Padrão BIO de infill (id de INFILL_PATTERNS) */
   infillPatternId: string | null
   infillPercent: number | null
+  /**
+   * R12.36: Modo "Apenas Contorno" — força infillPercent=0 e desabilita seletor
+   * de padrão. Recomendado para testes de impressibilidade (linhas, grade,
+   * ponte, torre, fidelidade da biotinta) — geometrias sem volume interno.
+   * Quando true, o engine pula totalmente a geração de infill e emite só
+   * os perímetros (walls), evitando G-code inválido em meshes sem volume.
+   */
+  perimeterOnly: boolean | null
   /** Temperaturas */
   cartridgeTempC: number | null
   bedTempC: number | null
@@ -231,6 +239,7 @@ const DEFAULT_STATE: BioprintProcessState = {
     nozzleDiameterUm: null,
     infillPatternId: null,
     infillPercent: null,
+    perimeterOnly: null,
     cartridgeTempC: null,
     bedTempC: null,
     chamberTempC: null,

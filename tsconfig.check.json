@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "exclude": [
+    "node_modules",
+    "prisma.config.ts",
+    "src/lib/stl/meshes/fidelity-mesh-data.ts",
+    "src/lib/stl/meshes/heart-mesh-data.ts",
+    "src/lib/stl/meshes/femur-mesh-data.ts",
+    "src/lib/stl/meshes/nose-mesh-data.ts",
+    "src/lib/stl/meshes/ear-mesh-data.ts"
+  ]
+}

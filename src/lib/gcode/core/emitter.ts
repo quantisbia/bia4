@@ -40,7 +40,16 @@ export function emitHeader(
     const j = opts.jobMetadata
     lines.push(`; Tissue: ${j.tissue}`)
     lines.push(`; Application: ${j.application}`)
-    lines.push(`; Infill: ${j.infillAlgorithm} @ ${j.infillPercent}%`)
+    if (j.infillPercent <= 0) {
+      // R12.36: modo "Apenas Contorno" — sem preenchimento, só perímetros (walls).
+      // Indicado para testes de impressibilidade (linha, grade, ponte, torre,
+      // estrela, escada Z, leque de ângulos, fidelidade da biotinta).
+      lines.push(`; Infill: PERIMETER-ONLY (no infill) — walls=${j.walls}`)
+      lines.push(`;   ↳ Modo recomendado para testes de impressibilidade sem volume interno`)
+      lines.push(`;   ↳ G-code emite apenas contornos (perímetros) — sem padrão de preenchimento`)
+    } else {
+      lines.push(`; Infill: ${j.infillAlgorithm} @ ${j.infillPercent}%  (walls=${j.walls})`)
+    }
     if (j.wellPlate) {
       lines.push(`; Well plate: ${j.wellPlate.format}-well  (${j.wellPlate.selectedWells.length} wells)`)
       lines.push(`; Selected: ${j.wellPlate.selectedWells.join(", ")}`)

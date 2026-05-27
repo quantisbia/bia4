@@ -306,7 +306,8 @@ export async function POST(req: NextRequest) {
     summary: {
       bioprinter: bp.name,
       bioink: `${bioink.material} ${bioink.concentration}%`,
-      algorithm: infill.algorithm,
+      // R12.36: quando infillPercent=0, o engine pulou dispatchInfill — rotulamos como "perimeter-only"
+      algorithm: infill.infillPercent <= 0 ? "perimeter-only" : infill.algorithm,
       wellsCount: result.wellsUsed.length || 1,
       layerCount: result.layerCount,
       estimatedTime: `${result.estimatedTime_min} min`,

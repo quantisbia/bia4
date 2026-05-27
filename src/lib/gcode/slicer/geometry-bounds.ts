@@ -499,6 +499,92 @@ export function getGeometryBounds(
       }
     }
 
+    // ─── R12.36 · Testes de impressibilidade (PERIMETER-ONLY by design) ──
+    // Estas geometrias são CONTORNOS (sem volume interno), portanto:
+    //   • bounding box é dado pela mesh native (XY plano da peça)
+    //   • getPerimetersAtZ retorna um retângulo do bbox da peça
+    //   • infill DEVE ser pulado (perimeterOnly mode → infillPercent=0)
+    // A fidelidade do contorno depende da mesh real — aqui só geramos um
+    // bbox para o engine não dar fallback genérico. O g-code emitido será
+    // apenas as paredes/perímetros (engine já trata infillPercent=0).
+    case "test_fidelity_biotinta": {
+      // Mesh exata 15.4 × 15.4 × 0.8 mm (R12.35)
+      const W = 15.4, H = 15.4, T = 0.8
+      return {
+        height_mm: T, zMin: 0, zMax: T,
+        getBoundsAtZ: () => ({ minX: cx - W/2, maxX: cx + W/2, minY: cy - H/2, maxY: cy + H/2 }),
+        getPerimetersAtZ: (_z, walls, spacing) => rectPerimeters(cx, cy, W, H, walls, spacing),
+      }
+    }
+    case "test_grid": {
+      // Grade de fusão (Pf test): default width=20, segments=5
+      const W = params.width ?? 20
+      // Altura tipica: 2-3 camadas (assumimos 2 layers de 0.4 mm)
+      const T = 0.8
+      return {
+        height_mm: T, zMin: 0, zMax: T,
+        getBoundsAtZ: () => ({ minX: cx - W/2, maxX: cx + W/2, minY: cy - W/2, maxY: cy + W/2 }),
+        getPerimetersAtZ: (_z, walls, spacing) => rectPerimeters(cx, cy, W, W, walls, spacing),
+      }
+    }
+    case "test_line": {
+      // Linhas paralelas: comprimento × ~10 mm de largura (5 linhas espaçadas 4 mm)
+      const L = params.length ?? 20
+      const W = 20  // 5 linhas × 4 mm spacing
+      const T = 0.4 // 1 camada
+      return {
+        height_mm: T, zMin: 0, zMax: T,
+        getBoundsAtZ: () => ({ minX: cx - L/2, maxX: cx + L/2, minY: cy - W/2, maxY: cy + W/2 }),
+        getPerimetersAtZ: (_z, walls, spacing) => rectPerimeters(cx, cy, L, W, walls, spacing),
+      }
+    }
+    case "test_collapse_bridge": {
+      // Pontes 3+5+7+10+15 mm + torres 4×4: total ~50×4×8 mm
+      const W = 60, D = 8, T = 8
+      return {
+        height_mm: T, zMin: 0, zMax: T,
+        getBoundsAtZ: () => ({ minX: cx - W/2, maxX: cx + W/2, minY: cy - D/2, maxY: cy + D/2 }),
+        getPerimetersAtZ: (_z, walls, spacing) => rectPerimeters(cx, cy, W, D, walls, spacing),
+      }
+    }
+    case "test_star": {
+      // Pino central + 6 braços de 8 mm × Ø0.4 mm
+      const R = 10 // raio total ~ 1.5 + 8
+      return {
+        height_mm: 4, zMin: 0, zMax: 4,
+        getBoundsAtZ: () => ({ minX: cx - R, maxX: cx + R, minY: cy - R, maxY: cy + R }),
+        getPerimetersAtZ: (_z, walls, spacing) => circlePerimeters(cx, cy, R, walls, spacing),
+      }
+    }
+    case "test_stacking_tower": {
+      const R = params.radius ?? 3
+      const layers = params.segments ?? 24
+      const T = layers * 0.4 // assume layer height 0.4 mm
+      return {
+        height_mm: T, zMin: 0, zMax: T,
+        getBoundsAtZ: () => ({ minX: cx - R, maxX: cx + R, minY: cy - R, maxY: cy + R }),
+        getPerimetersAtZ: (_z, walls, spacing) => circlePerimeters(cx, cy, R, walls, spacing),
+      }
+    }
+    case "test_z_staircase": {
+      // 5 degraus 4×12 mm com alturas crescentes
+      const W = 4 * 5, D = 12, T = 0.4 + 0.3 + 0.2 + 0.15 + 0.1
+      return {
+        height_mm: T, zMin: 0, zMax: T,
+        getBoundsAtZ: () => ({ minX: cx - W/2, maxX: cx + W/2, minY: cy - D/2, maxY: cy + D/2 }),
+        getPerimetersAtZ: (_z, walls, spacing) => rectPerimeters(cx, cy, W, D, walls, spacing),
+      }
+    }
+    case "test_angle_fan": {
+      const L = params.length ?? 15
+      const R = L  // raio do leque
+      return {
+        height_mm: 0.4, zMin: 0, zMax: 0.4,
+        getBoundsAtZ: () => ({ minX: cx, maxX: cx + R, minY: cy - R, maxY: cy + R }),
+        getPerimetersAtZ: (_z, walls, spacing) => rectPerimeters(cx + R/2, cy, R, R*2, walls, spacing),
+      }
+    }
+
     default: {
       // ⚠️ Geometria desconhecida: usa um disco generoso (Ø20mm, 5mm alto)
       // ao invés do antigo 10x3 — mais útil como fallback para teste de
@@ -516,7 +602,22 @@ export const SUPPORTED_GEOMETRY_IDS = [
   "femur", "nose", "meniscus", "cornea", "lens", "organoid_sphere",
   "ear", "heart", "kidney", "liver_anatomical", "hand",
   "tpms_gyroid", "tpms_schwarz", "tpms_diamond",
+  // R12.36 — testes de impressibilidade (perimeter-only by design)
+  "test_fidelity_biotinta", "test_grid", "test_line", "test_collapse_bridge",
+  "test_star", "test_stacking_tower", "test_z_staircase", "test_angle_fan",
 ] as const
+
+// R12.36 — geometrias que SÃO contornos (sem volume interno) e devem
+// SEMPRE rodar em modo "Apenas Contorno" (infillPercent=0). Usado pelo
+// frontend para sugerir/forçar perimeterOnly automaticamente.
+export const PERIMETER_ONLY_GEOMETRY_IDS = [
+  "test_fidelity_biotinta", "test_grid", "test_line", "test_collapse_bridge",
+  "test_star", "test_stacking_tower", "test_z_staircase", "test_angle_fan",
+] as const
+
+export function isPerimeterOnlyGeometry(id: string): boolean {
+  return PERIMETER_ONLY_GEOMETRY_IDS.includes(id as typeof PERIMETER_ONLY_GEOMETRY_IDS[number])
+}
 
 export function isSupportedGeometry(id: string): boolean {
   return SUPPORTED_GEOMETRY_IDS.includes(id as typeof SUPPORTED_GEOMETRY_IDS[number])
