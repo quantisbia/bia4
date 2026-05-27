@@ -107,6 +107,26 @@ export class PrinterController {
   private pendingErrorResolver: ((err: Error) => void) | null = null
   private offMessage: (() => void) | null = null
 
+  /**
+   * R12.33: Contador de "ok"s órfãos a ignorar antes de aceitar o próximo
+   * "ok" como resolução do waiter atual.
+   *
+   * Cenário do bug que isso resolve:
+   *   1) sendAndWait("G28") arma waiter A com timeout 30s.
+   *   2) G28 demora 31s no firmware real → timeout dispara, waiter A rejeita.
+   *   3) ~1s depois, o "ok" REAL do G28 chega pela serial.
+   *   4) Sem isso, esse "ok" vazaria → resolveria QUALQUER waiter novo
+   *      (jog, M114, qualquer coisa) prematuramente, criando um efeito
+   *      cascata onde cada waiter resolve com o ok do comando ANTERIOR.
+   *      Resultado: joystick parece travado (cada clique aparenta funcionar
+   *      mas o firmware está sempre um passo atrás).
+   *
+   * Solução: ao detectar timeout, incrementamos staleOksToIgnore. Cada
+   * "ok" recebido enquanto este contador > 0 é DESCARTADO silenciosamente
+   * (mas logado) sem tocar no waiter atual.
+   */
+  private staleOksToIgnore = 0
+
   // Tempo médio por linha (rolling avg para ETA)
   private avgLineTimeMs = 50
 
@@ -141,8 +161,19 @@ export class PrinterController {
     }
     this.events.onLine?.(msg.text, "rx")
 
-    // ok → libera o waiter
+    // ok → libera o waiter (a menos que seja "ok" órfão de comando que deu timeout)
     if (msg.kind === "ok") {
+      // R12.33: drena "ok"s atrasados de comandos que deram timeout antes
+      // do firmware responder. Sem isso eles vazariam e resolveriam o
+      // próximo waiter prematuramente, criando o efeito "joystick travado".
+      if (this.staleOksToIgnore > 0) {
+        this.staleOksToIgnore--
+        this.logger.info(
+          `(ok órfão descartado — ${this.staleOksToIgnore} restantes)`,
+          "controller",
+        )
+        return
+      }
       if (this.pendingOkResolver) {
         this.pendingOkResolver()
         this.pendingOkResolver = null
@@ -211,6 +242,11 @@ export class PrinterController {
         if (this.pendingOkResolver === wrappedResolve) {
           this.pendingOkResolver = null
           this.pendingErrorResolver = null
+          // R12.33: o firmware ainda deve um "ok" para este comando — quando
+          // ele finalmente chegar (depois do timeout), precisa ser descartado
+          // em vez de resolver erroneamente o próximo waiter. Ver doc em
+          // `staleOksToIgnore` para o cenário completo.
+          this.staleOksToIgnore++
         }
         timer = null
         reject(new Error(`Timeout esperando 'ok' após ${timeoutMs}ms`))
@@ -228,6 +264,21 @@ export class PrinterController {
       this.pendingOkResolver = wrappedResolve
       this.pendingErrorResolver = wrappedReject
     })
+  }
+
+  /**
+   * R12.33: Reseta o contador de oks órfãos. Usado pelo handleConnect /
+   * handleResetAll após reconectar — começa uma sessão limpa sem dívidas
+   * de "ok" de sessões anteriores.
+   */
+  resetOkDebt(): void {
+    if (this.staleOksToIgnore > 0) {
+      this.logger.info(
+        `Resetando contador de ok órfãos (${this.staleOksToIgnore} descartados)`,
+        "controller",
+      )
+      this.staleOksToIgnore = 0
+    }
   }
 
   // ─── Streaming ──

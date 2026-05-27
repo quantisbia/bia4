@@ -40,7 +40,7 @@ import {
   Upload, FileCode2, Eye, Terminal as TerminalIcon, Cpu, Zap, Radio,
   ChevronDown, ChevronRight, Download, Trash2, Gamepad2, Sparkles,
   ShieldAlert, Info, RotateCcw, Wand2, X, Clipboard, ArrowLeft,
-  Wrench, Undo2, Settings2, Droplet,
+  Wrench, Undo2, Settings2, Droplet, Crosshair,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
@@ -123,6 +123,30 @@ class SectionErrorBoundary extends Component<
 
 const BAUD_OPTIONS = [9600, 19200, 38400, 57600, 115200, 230400, 250000]
 const DEFAULT_BAUD = 115200
+
+/**
+ * R12.33: Volume útil padrão da Bioender 200 (200×200 mm de leito).
+ *
+ * Após o G28, o cabeçote fica num canto (tipicamente X=0 Y=0 Z=0 ou Z=Zmax).
+ * Antes de iniciar qualquer impressão / antes do usuário pegar o joystick, é
+ * desejável posicionar o cabeçote no CENTRO da mesa, COM UM CLEARANCE em Z
+ * para não bater na placa de cultura. Isso resolve dois problemas:
+ *
+ *   1) Coloca a impressora pronta para receber o G-code (start position
+ *      previsível) — o usuário vê o cabeçote chegar no centro e sabe que
+ *      a máquina está livre para imprimir.
+ *
+ *   2) Sai dos endstops (X=0 Y=0 Z=0) onde alguns firmwares Marlin com
+ *      soft endstops ativos (M211 S1) podem rejeitar JOG NEGATIVO em todos
+ *      os eixos, deixando o joystick "travado" para o usuário. Movendo para
+ *      o centro, todos os 4 sentidos (X±, Y±) ficam disponíveis sem
+ *      conflito com soft endstops.
+ */
+const BIOENDER_BED_X_MM = 200
+const BIOENDER_BED_Y_MM = 200
+const POST_HOME_Z_CLEARANCE_MM = 30    // sobe 30mm antes do XY → não bate na placa
+const POST_HOME_XY_FEEDRATE = 3000     // 50 mm/s (3000 mm/min) — seguro
+const POST_HOME_Z_FEEDRATE = 600       // 10 mm/s — Z lento para preservar células
 
 // G-code de demo (hello world quadrado pequeno)
 // R12.18: G-code demo agora é um cubo 20×20 com 2 camadas de infill TPMS
@@ -446,6 +470,21 @@ export default function BioprintExecutePage() {
   const [didAutoHome, setDidAutoHome] = useState<boolean>(false)
 
   /**
+   * R12.33: Pós-home — move cabeçote para o CENTRO da mesa com clearance Z.
+   *
+   * Sequência após o G28 (compatível com Marlin):
+   *   G91                ; coordenadas relativas
+   *   G1 Z+30 F600       ; sobe 30mm (clearance) — preserva placa de cultura
+   *   G90                ; volta a absoluto
+   *   G1 X100 Y100 F3000 ; centro da mesa Bioender 200×200
+   *   M400               ; aguarda fim de todo movimento (sincroniza)
+   *
+   * Default ON: deixa a impressora pronta para receber G-code OU para o
+   * usuário fazer jog manual sem encostar em soft endstops nos cantos.
+   */
+  const [autoCenterAfterHome, setAutoCenterAfterHome] = useState<boolean>(true)
+
+  /**
    * R12.24: Controle de fluxo (extrusão) em tempo real para hidrogéis.
    *
    * G-codes "filamento" tradicionais (FDM) calculam E com base em nozzle ×
@@ -553,7 +592,14 @@ export default function BioprintExecutePage() {
         loggerRef.current.warn(`Não foi possível definir fluxo inicial: ${e instanceof Error ? e.message : String(e)}`)
       }
 
-      // R12.23: Auto-home ao conectar envia APENAS G28 (home mecânico).
+      // R12.23 + R12.33: Auto-home ao conectar envia G28 (home mecânico) e,
+      // se autoCenterAfterHome=true, move o cabeçote para o CENTRO da mesa
+      // com clearance Z (30mm). Isso resolve dois problemas:
+      //   (a) deixa a impressora pronta para receber G-code (start position
+      //       previsível no centro);
+      //   (b) tira os eixos dos soft endstops do canto (0,0,0), onde alguns
+      //       firmwares Marlin bloqueiam jog negativo em todos os eixos.
+      //
       // O G92 (definir ponto inicial / origem lógica) foi desacoplado e agora é uma
       // ação manual do usuário, disponível no painel de Comandos rápidos como
       // "Ponto inicial". Isso permite ao usuário fazer o jog até a posição desejada
@@ -563,8 +609,10 @@ export default function BioprintExecutePage() {
           loggerRef.current.info("Auto-home: enviando G28 (home all eixos)…", "controller")
           // Marlin: G28 retorna ok só ao terminar o home; timeout padrão do controller (30s) basta
           await controllerRef.current?.sendAndWait("G28 ; auto-home all (R12.23)")
-          loggerRef.current.ok("Home concluído em todos os eixos (G28). Use \"Ponto inicial\" nos Comandos rápidos para definir a origem (0,0,0) quando estiver no ponto desejado.", "controller")
+          loggerRef.current.ok("Home concluído em todos os eixos (G28).", "controller")
           setDidAutoHome(true)
+          // Posição lógica pós-G28: cabeçote no canto (assumido 0,0,0)
+          setPosition({ x: 0, y: 0, z: 0, e: 0 })
         } catch (e) {
           loggerRef.current.warn(`Auto-home falhou: ${e instanceof Error ? e.message : String(e)}. Use o botão "Home All" do painel se a impressora estiver pronta.`)
           setDidAutoHome(false)
@@ -574,18 +622,39 @@ export default function BioprintExecutePage() {
         setDidAutoHome(false)
       }
 
-      // R12.27: Após o home, garante modo POSICIONAMENTO ABSOLUTO (G90) +
-      // EXTRUSORA RELATIVA (M83). Sem M83, jog do eixo E falha silenciosamente:
-      // o Marlin pode estar em modo extrusora absoluta após boot/G28; o
-      // primeiro G1 E0.1 move uma vez (vai p/ E=0.1mm absoluto), o segundo
-      // não move (já está em 0.1). Com M83, todo G1 E<n> passa a ser delta.
-      // G91/G90 controla apenas X/Y/Z; o modo do extrusor é independente.
+      // R12.27: ANTES de qualquer movimento pós-home, garante modo POSICIONAMENTO
+      // ABSOLUTO (G90) + EXTRUSORA RELATIVA (M83). Sem M83, jog do eixo E falha
+      // silenciosamente: o Marlin pode estar em modo extrusora absoluta após
+      // boot/G28; o primeiro G1 E0.1 move uma vez (vai p/ E=0.1mm absoluto), o
+      // segundo não move (já está em 0.1). Com M83, todo G1 E<n> passa a ser
+      // delta. G91/G90 controla apenas X/Y/Z; o modo do extrusor é independente.
+      //
+      // R12.33: este bloco foi MOVIDO para ANTES do moveToSafeCenter porque a
+      // centralização usa G90/G91 (XYZ) — precisa do estado de coordenadas
+      // previsível para o M400 sincronizar corretamente.
       try {
         await controllerRef.current?.sendAndWait("G90 ; XYZ em modo absoluto")
         await controllerRef.current?.sendAndWait("M83 ; extrusora em modo relativo (R12.27)")
         loggerRef.current.info("Modo de coordenadas pronto: XYZ absoluto (G90) + E relativo (M83).", "controller")
       } catch (e) {
         loggerRef.current.warn(`Não foi possível ajustar modo de coordenadas: ${e instanceof Error ? e.message : String(e)}`)
+      }
+
+      // R12.33: PÓS-HOME — move cabeçote para o centro com clearance Z.
+      // Sem isso, o cabeçote fica em (0,0,0) onde:
+      //   · soft endstops podem bloquear jog negativo
+      //   · não há previsibilidade de start position para o G-code
+      //   · risco de colisão com placa de cultura ao tentar mover XY com Z=0
+      // Só roda se o auto-home teve sucesso E o usuário não desabilitou a opção.
+      if (autoHomeOnConnect && autoCenterAfterHome) {
+        try {
+          await moveToSafeCenterAfterHome()
+        } catch (e) {
+          loggerRef.current.warn(
+            `Centralização pós-home falhou: ${e instanceof Error ? e.message : String(e)}. ` +
+            `Você pode mover manualmente com o joystick.`,
+          )
+        }
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -608,7 +677,7 @@ export default function BioprintExecutePage() {
         "controller",
       )
     }
-  }, [connected, mode, supported, baud, autoHomeOnConnect, flowPercent])
+  }, [connected, mode, supported, baud, autoHomeOnConnect, autoCenterAfterHome, flowPercent, moveToSafeCenterAfterHome])
 
   // ─── DISCONNECT ──
   const handleDisconnect = useCallback(async () => {
@@ -797,6 +866,69 @@ export default function BioprintExecutePage() {
     await controllerRef.current.emergency()
   }, [])
 
+  // ─── R12.33: Move cabeçote para CENTRO da mesa (com clearance Z) ──
+  //
+  // Helper compartilhado entre auto-home (no connect) e handleHomeAll
+  // (botão manual). Sequência idêntica em ambos os pontos:
+  //   1) G91 (relativo) → G1 Z+30 F600 → G90 (absoluto)   — clearance Z
+  //   2) G1 X<cx> Y<cy> F3000                             — centro da mesa
+  //   3) M400                                              — aguarda fim do movimento
+  //
+  // Após esta função:
+  //   · cabeçote está no centro com 30mm de altura → seguro p/ placa de cultura
+  //   · todos os eixos saíram dos soft endstops (X=0/Y=0/Z=0) — joystick livre
+  //   · próximo G-code enviado pode começar com posicionamento absoluto
+  //
+  // O M400 é CRÍTICO: ele faz o Marlin aguardar o BUFFER DE PLANEJAMENTO
+  // esvaziar antes de responder 'ok'. Sem isso, o sendAndWait resolveria
+  // assim que o G1 entrasse no planner, e os comandos seguintes do
+  // handshake (G90/M83) viriam ANTES do movimento terminar fisicamente.
+  // Resultado prático: o joystick travaria porque o Marlin ainda estaria
+  // processando o movimento de centralização quando o usuário clicasse.
+  const moveToSafeCenterAfterHome = useCallback(async (
+    bedX: number = BIOENDER_BED_X_MM,
+    bedY: number = BIOENDER_BED_Y_MM,
+  ): Promise<void> => {
+    if (!controllerRef.current) {
+      loggerRef.current.warn("moveToSafeCenterAfterHome: sem controller — ignorando.")
+      return
+    }
+    const cx = +(bedX / 2).toFixed(2)
+    const cy = +(bedY / 2).toFixed(2)
+    loggerRef.current.info(
+      `Pós-home: subindo Z+${POST_HOME_Z_CLEARANCE_MM}mm e indo para o centro (${cx}, ${cy}) …`,
+      "controller",
+    )
+    // 1) Clearance Z relativo
+    await controllerRef.current.sendAndWait("G91 ; modo relativo p/ clearance Z")
+    await controllerRef.current.sendAndWait(
+      `G1 Z${POST_HOME_Z_CLEARANCE_MM} F${POST_HOME_Z_FEEDRATE} ; clearance Z (não bater na placa de cultura)`,
+    )
+    await controllerRef.current.sendAndWait("G90 ; volta para absoluto")
+    // 2) Move XY para o centro
+    await controllerRef.current.sendAndWait(
+      `G1 X${cx} Y${cy} F${POST_HOME_XY_FEEDRATE} ; centro da mesa Bioender ${bedX}×${bedY}mm`,
+    )
+    // 3) SINCRONIZA — aguarda o buffer do planner esvaziar antes do próximo cmd
+    //
+    // Sem o M400 + sendAndWait, o Marlin libera o 'ok' assim que o G1 entra
+    // no planner — mas o cabeçote ainda está se movendo fisicamente. Como o
+    // handshake continua imediatamente (G90, M83, jog do usuário), o
+    // próximo comando pode tentar setar modo de coordenadas DURANTE o
+    // movimento, ou o joystick pode disparar G91/G1/G90 enquanto o
+    // movimento de centralização ainda está em curso → resultado:
+    // joystick aparenta estar TRAVADO até o cabeçote finalmente parar
+    // (que pode levar 2-4 segundos a 50 mm/s atravessando 100mm).
+    // O M400 bloqueia o firmware até o motion buffer estar VAZIO.
+    await controllerRef.current.sendAndWait("M400 ; aguarda fim do movimento (sincroniza)")
+    // Atualiza estado de UI da posição (cabeçote agora está no centro)
+    setPosition((p) => ({ ...p, x: cx, y: cy, z: +(p.z + POST_HOME_Z_CLEARANCE_MM).toFixed(2) }))
+    loggerRef.current.ok(
+      `Cabeçote no centro (${cx}, ${cy}) com Z elevado em ${POST_HOME_Z_CLEARANCE_MM}mm. Joystick e G-code prontos.`,
+      "controller",
+    )
+  }, [])
+
   // ─── JOYSTICK ──
   const [step, setStep] = useState<StepSize>(1)
   const [extrudeStep, setExtrudeStep] = useState(0.1)
@@ -878,7 +1010,11 @@ export default function BioprintExecutePage() {
     }
   }, [])
 
-  // R12.22: Home All manual (espelha o auto-home, mas sob demanda)
+  // R12.22 + R12.33: Home All manual (espelha o auto-home, mas sob demanda).
+  // Após o G28, opcionalmente move o cabeçote para o centro da mesa com
+  // clearance Z (igual ao auto-home no connect). Use isso quando você
+  // perdeu o registro de posição ou quando o joystick estiver travado nos
+  // soft endstops dos cantos.
   const handleHomeAll = useCallback(async () => {
     if (!controllerRef.current || !connected) {
       loggerRef.current.warn("Conecte antes de fazer home.")
@@ -897,11 +1033,32 @@ export default function BioprintExecutePage() {
       await controllerRef.current.sendAndWait("G90 ; XYZ absoluto")
       await controllerRef.current.sendAndWait("M83 ; E relativo (R12.27)")
       setDidAutoHome(true)
-      loggerRef.current.ok("Home All concluído (G28) + modo XYZ absoluto / E relativo. Para definir a origem (0,0,0), use \"Ponto inicial\" nos Comandos rápidos.", "controller")
+      // Posição lógica pós-G28: cabeçote no canto (assumido 0,0,0)
+      setPosition({ x: 0, y: 0, z: 0, e: 0 })
+      loggerRef.current.ok(
+        "Home All concluído (G28) + modo XYZ absoluto / E relativo.",
+        "controller",
+      )
+      // R12.33: centraliza com clearance Z se a opção estiver ativa
+      if (autoCenterAfterHome) {
+        try {
+          await moveToSafeCenterAfterHome()
+        } catch (e) {
+          loggerRef.current.warn(
+            `Centralização pós-home falhou: ${e instanceof Error ? e.message : String(e)}. ` +
+            `Você pode mover manualmente com o joystick.`,
+          )
+        }
+      } else {
+        loggerRef.current.info(
+          "Para definir a origem (0,0,0), use \"Ponto inicial\" nos Comandos rápidos.",
+          "controller",
+        )
+      }
     } catch (e) {
       loggerRef.current.error(`Home All falhou: ${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [connected, controllerState])
+  }, [connected, controllerState, autoCenterAfterHome, moveToSafeCenterAfterHome])
 
   // ─── Manual command ──
   const [manualCmd, setManualCmd] = useState("")
@@ -1825,10 +1982,37 @@ export default function BioprintExecutePage() {
                       <Sparkles className="w-3 h-3" /> Auto-home ao conectar
                     </div>
                     <div className="text-[9px] text-cyan-200/70 leading-tight mt-0.5">
-                      Faz apenas <span className="font-mono">G28</span> (home mecânico)
+                      Faz <span className="font-mono">G28</span> (home mecânico)
                       ao conectar. Para definir o ponto atual como origem (0,0,0),
                       clique em <span className="font-mono">Ponto inicial</span> nos
                       Comandos rápidos quando quiser.
+                    </div>
+                  </div>
+                </label>
+                {/* R12.33: Toggle centralização pós-home — vai para (100,100) com Z+30mm */}
+                <label className={cn(
+                  "flex items-start gap-2 mb-2 p-2 rounded-lg cursor-pointer transition-colors",
+                  autoHomeOnConnect
+                    ? "bg-emerald-500/5 border border-emerald-500/20 hover:bg-emerald-500/10"
+                    : "bg-gray-500/5 border border-gray-500/20 opacity-50 cursor-not-allowed"
+                )}>
+                  <input
+                    type="checkbox"
+                    checked={autoCenterAfterHome}
+                    disabled={!autoHomeOnConnect}
+                    onChange={(e) => setAutoCenterAfterHome(e.target.checked)}
+                    className="mt-0.5 accent-emerald-400"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[11px] font-semibold text-emerald-100 flex items-center gap-1">
+                      <Crosshair className="w-3 h-3" /> Centralizar após home
+                    </div>
+                    <div className="text-[9px] text-emerald-200/70 leading-tight mt-0.5">
+                      Após o <span className="font-mono">G28</span>, sobe
+                      Z <span className="font-mono">+{POST_HOME_Z_CLEARANCE_MM}mm</span> e
+                      move para o centro (<span className="font-mono">{BIOENDER_BED_X_MM / 2},{BIOENDER_BED_Y_MM / 2}</span>)
+                      da mesa Bioender {BIOENDER_BED_X_MM}×{BIOENDER_BED_Y_MM}mm. Evita colidir
+                      com a placa de cultura e libera o joystick.
                     </div>
                   </div>
                 </label>
