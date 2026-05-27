@@ -21,7 +21,7 @@ import Link from "next/link"
 import {
   Upload, Sparkles, FlaskConical, Heart, Bone, Activity, Hexagon,
   ShieldCheck, Brain, CheckCircle2, AlertTriangle, ArrowRight, Box,
-  Download, Loader2, FileCode2, Info, XCircle
+  Download, Loader2, FileCode2, Info, XCircle, Lock
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import {
@@ -94,6 +94,7 @@ const CATEGORY_DEFS: CategoryDef[] = [
     geometryIds: [
       "test_line", "test_grid", "test_collapse_bridge", "test_star",
       "test_stacking_tower", "test_z_staircase", "test_angle_fan",
+      "test_fidelity_biotinta",  // R12.35: STL exato do usuário, dimensões travadas (15.4×15.4×0.8 mm)
     ],
   },
   {
@@ -667,23 +668,38 @@ function GeneratePanel({
             {/* Parâmetros */}
             <div className="mb-4">
               <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Parâmetros</div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {Object.entries(selectedGeo.paramLabels).map(([key, label]) => (
-                  <div key={key}>
-                    <label className="text-[11px] text-gray-400 block mb-1">{label}</label>
-                    <input
-                      type="number"
-                      value={(params as Record<string, number>)[key] ?? selectedGeo.defaultParams[key as keyof GeometryParams] ?? 0}
-                      onChange={e => handleParamChange(key, parseFloat(e.target.value) || 0)}
-                      step={key.includes("Percent") || key.includes("infill") ? 5 : 0.5}
-                      min={key.includes("Percent") ? 10 : 0.1}
-                      max={key.includes("Percent") ? 100 : key.includes("segments") ? 128 : 500}
-                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white
-                        focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20"
-                    />
+              {Object.keys(selectedGeo.paramLabels).length === 0 ? (
+                /* R12.35: geometrias com paramLabels vazio têm dimensões TRAVADAS (STL exato) */
+                <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2.5 text-[12px] text-amber-200/90 flex items-start gap-2">
+                  <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-400/80" />
+                  <div>
+                    <span className="font-semibold text-amber-200">Dimensões fixas — STL exato.</span>
+                    {selectedGeo.id === "test_fidelity_biotinta" ? (
+                      <> Geometria fornecida em mesh real (15,4 × 15,4 × 0,8 mm, 67.220 triângulos). Sem ajustes possíveis: preservação 1:1 garantida para validação de fidelidade.</>
+                    ) : (
+                      <> Este modelo usa coordenadas nativas pré-definidas — não há parâmetros editáveis.</>
+                    )}
                   </div>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {Object.entries(selectedGeo.paramLabels).map(([key, label]) => (
+                    <div key={key}>
+                      <label className="text-[11px] text-gray-400 block mb-1">{label}</label>
+                      <input
+                        type="number"
+                        value={(params as Record<string, number>)[key] ?? selectedGeo.defaultParams[key as keyof GeometryParams] ?? 0}
+                        onChange={e => handleParamChange(key, parseFloat(e.target.value) || 0)}
+                        step={key.includes("Percent") || key.includes("infill") ? 5 : 0.5}
+                        min={key.includes("Percent") ? 10 : 0.1}
+                        max={key.includes("Percent") ? 100 : key.includes("segments") ? 128 : 500}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white
+                          focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Botão gerar */}

@@ -537,6 +537,35 @@ export function genZStaircase(stepWidth: number, stepLength: number, heights: nu
  * Cada filamento parte do mesmo ponto base e se eleva em ângulo. Mede ângulo
  * crítico de overhang sem colapso.
  */
+/**
+ * Teste de FIDELIDADE da BIOTINTA (R12.35):
+ *   - Mesh EXATA fornecida pelo usuário (Rhinoceros Binary STL, 67.220 triângulos)
+ *   - Dimensões NATIVAS BLOQUEADAS: 15.4 × 15.4 × 0.8 mm (escala 1:1 preservada)
+ *   - Padrão hexagonal/grade fino com paredes ~0.1 mm
+ *   - Sem parâmetros: chamada SEM argumentos retorna a mesh exata 1:1
+ *   - Lazy require: ~3.45 MB carregado apenas quando esta peça é selecionada
+ */
+export function genFidelityBiotinta(): Triangle[] {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const meshMod = require("./meshes/fidelity-mesh-data") as typeof import("./meshes/fidelity-mesh-data")
+  const { FIDELITY_MESH_VERTICES } = meshMod
+
+  // SEM escala — coordenadas nativas preservadas 1:1 (15.4 × 15.4 × 0.8 mm)
+  // Dimensões TRAVADAS por design (R12.35 — solicitação explícita do usuário).
+  const verts = FIDELITY_MESH_VERTICES
+  const n = verts.length / 9
+  const tris: Triangle[] = new Array(n)
+
+  for (let i = 0; i < n; i++) {
+    const k = i * 9
+    const v1: Vec3 = [verts[k],   verts[k+1], verts[k+2]]
+    const v2: Vec3 = [verts[k+3], verts[k+4], verts[k+5]]
+    const v3: Vec3 = [verts[k+6], verts[k+7], verts[k+8]]
+    tris[i] = tri(v1, v2, v3)  // re-computa normal a partir dos vértices originais
+  }
+  return tris
+}
+
 export function genAngleFan(length: number, anglesDeg: number[], filamentRadius: number, spacing: number): Triangle[] {
   const tris: Triangle[] = []
   const baseH = 0.4
@@ -782,6 +811,21 @@ export const BIOMIMETIC_GEOMETRIES: BiomimeticGeometry[] = [
     rationale: "Therriault 2018: cada bioink tem ângulo crítico (geralmente 30–60°). Acima → necessita suporte sacrificial (FRESH, Pluronic).",
     analysisProtocol: "Foto lateral. Determinar maior ângulo sem colapso visual > 1 mm. Reportar como 'overhang_critical = X°'.",
   },
+  // ── R12.35: Teste de Fidelidade da Biotinta (mesh exata fornecida pelo usuário) ──
+  {
+    id: "test_fidelity_biotinta",
+    label: "Fidelidade da Biotinta (mesh exata)",
+    description: "Padrão hexagonal/grade fino de 15.4 × 15.4 × 0.8 mm com paredes finas (~0.1 mm). Geometria fornecida em STL exato — dimensões TRAVADAS (1:1), sem ajustes possíveis.",
+    tissue: "Calibração",
+    application: "Validação de fidelidade dimensional/geométrica de bioinks finos (extrusão de paredes <0.2 mm)",
+    icon: "⬡",
+    defaultParams: {} as GeometryParams,
+    paramLabels: {},   // ← BLOQUEADO: nenhum input renderizado (dimensões nativas preservadas)
+    creditCost: 6,
+    category: "printability_test",
+    rationale: "STL real (67.220 triângulos, Rhinoceros Binary). Paredes muito finas e padrão hexagonal denso desafiam o bioink em fidelity, line-merge e shrinkage. Útil para certificar formulações antes de constructos biomiméticos.",
+    analysisProtocol: "Foto top-down com escala (régua 10 mm). µ-CT ou microscopia confocal: comparar mesh impressa vs. mesh CAD (Iterative Closest Point). Reportar desvio médio (Δxy, Δz) e fidelity index F = 1 − |área_impressa − área_CAD| / área_CAD (alvo F > 0.85).",
+  },
 ]
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -820,6 +864,9 @@ export function generateBiomimeticGeometry(id: string, p: GeometryParams): Trian
       return genZStaircase(4, 12, [0.4, 0.3, 0.2, 0.15, 0.1])
     case "test_angle_fan":
       return genAngleFan(p.length ?? 15, [0, 15, 30, 45, 60, 75, 90], 0.4, 5)
+    case "test_fidelity_biotinta":
+      // R12.35: ignora p — dimensões nativas TRAVADAS (15.4 × 15.4 × 0.8 mm)
+      return genFidelityBiotinta()
     default:
       return null
   }
