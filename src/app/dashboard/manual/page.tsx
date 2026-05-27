@@ -18,8 +18,27 @@ import {
   Target, Beaker, Settings, CheckCircle2, AlertTriangle, ChevronRight,
   ChevronDown, Lightbulb, Rocket, Save, ShieldCheck, ArrowRight,
   Microscope, GitBranch, Map, Wrench, FileText, Coffee, Download,
+  Compass, Layers, Notebook as NotebookIcon, BarChart3, CreditCard,
+  PlayCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
+
+// ─── Capítulos modulares (R12.41 — manual de usuário final) ──────────
+import { GettingStarted } from "./chapters/getting-started"
+import { Roadmap as ChapterRoadmap } from "./chapters/roadmap"
+import { Pipeline as ChapterPipeline } from "./chapters/pipeline"
+import { BioprintModel } from "./chapters/bioprint-model"
+import { BioprintBioink } from "./chapters/bioprint-bioink"
+import { BioprintSlice } from "./chapters/bioprint-slice"
+import { BioprintExecute } from "./chapters/bioprint-execute"
+import { OrganoidBuilder } from "./chapters/organoid-builder"
+import { Protocols as ChapterProtocols } from "./chapters/protocols"
+import { Knowledge as ChapterKnowledge } from "./chapters/knowledge"
+import { Notebook as ChapterNotebook } from "./chapters/notebook"
+import { ChatIA as ChapterChatIA } from "./chapters/chat-ia"
+import { Analyses as ChapterAnalyses } from "./chapters/analyses"
+import { Tools as ChapterTools } from "./chapters/tools"
+import { CreditsSettings as ChapterCreditsSettings } from "./chapters/credits-settings"
 
 // ─────────────────────────────────────────────────────────────────────────
 // TIPOS
@@ -45,6 +64,143 @@ interface Section {
 // ─────────────────────────────────────────────────────────────────────────
 
 const CHAPTERS: Chapter[] = [
+  // ─── R12.41 — Manual de usuário final (ordem por fluxo de uso) ───
+  {
+    id: "getting-started",
+    title: "Primeiros Passos",
+    subtitle: "Login, dashboard, navegação, créditos e fluxo típico de uso",
+    icon: Compass,
+    color: "from-cyan-500 to-blue-600",
+    badge: "NOVO",
+    estReadMin: 7,
+  },
+  {
+    id: "roadmap-pro",
+    title: "Roteiro Profissional",
+    subtitle: "As 10 fases para levar uma ideia de conceito até produto clínico",
+    icon: Map,
+    color: "from-emerald-500 to-cyan-600",
+    badge: "NOVO",
+    estReadMin: 6,
+  },
+  {
+    id: "pipeline",
+    title: "Pipeline — Projetos",
+    subtitle: "Como organizar seus projetos, abas, filtros e integrações",
+    icon: GitBranch,
+    color: "from-blue-500 to-indigo-600",
+    badge: "NOVO",
+    estReadMin: 6,
+  },
+  {
+    id: "bioprint-model",
+    title: "Bioimpressão — Etapa 1: Modelo 3D",
+    subtitle: "Modelo paramétrico, upload STL ou biblioteca anatômica",
+    icon: Box,
+    color: "from-blue-500 to-purple-600",
+    badge: "NOVO",
+    estReadMin: 8,
+  },
+  {
+    id: "bioprint-bioink",
+    title: "Bioimpressão — Etapa 2: Biotinta",
+    subtitle: "807 biomateriais, reologia em tempo real, células e score",
+    icon: FlaskConical,
+    color: "from-emerald-500 to-teal-600",
+    badge: "NOVO",
+    estReadMin: 8,
+  },
+  {
+    id: "bioprint-slice",
+    title: "Bioimpressão — Etapa 3: Fatiamento (G-code)",
+    subtitle: "11 algoritmos, parâmetros-chave e modo Apenas Contorno",
+    icon: Layers,
+    color: "from-amber-500 to-orange-600",
+    badge: "NOVO",
+    estReadMin: 9,
+  },
+  {
+    id: "bioprint-execute",
+    title: "Bioimpressão — Etapa 4: Executar",
+    subtitle: "USB, joystick, extrusão, Speed/Flow, pausa, retomada (R12.40)",
+    icon: PlayCircle,
+    color: "from-rose-500 to-red-600",
+    badge: "ATUALIZADO",
+    estReadMin: 12,
+  },
+  {
+    id: "organoid-builder",
+    title: "Organoid Builder",
+    subtitle: "Projete mini-órgãos (organoides) a partir de células-tronco",
+    icon: Beaker,
+    color: "from-purple-500 to-pink-600",
+    badge: "NOVO",
+    estReadMin: 8,
+  },
+  {
+    id: "protocols",
+    title: "Protocolos GLP / GMP",
+    subtitle: "Documentos oficiais de pesquisa e clínica + Protocolo Total",
+    icon: ShieldCheck,
+    color: "from-emerald-500 to-cyan-600",
+    badge: "NOVO",
+    estReadMin: 9,
+  },
+  {
+    id: "knowledge",
+    title: "Motor de Conhecimento",
+    subtitle: "PubMed, arXiv, patentes e dossiês temáticos prontos",
+    icon: BookOpen,
+    color: "from-amber-500 to-yellow-600",
+    badge: "NOVO",
+    estReadMin: 6,
+  },
+  {
+    id: "notebook",
+    title: "Notebook (ELN)",
+    subtitle: "Caderno eletrônico de laboratório com timestamp imutável",
+    icon: NotebookIcon,
+    color: "from-rose-500 to-orange-600",
+    badge: "NOVO",
+    estReadMin: 6,
+  },
+  {
+    id: "chat-ia",
+    title: "Chat IA — Copiloto",
+    subtitle: "Conversa com a assistente especializada em bioimpressão",
+    icon: MessageSquare,
+    color: "from-blue-500 to-cyan-600",
+    badge: "NOVO",
+    estReadMin: 5,
+  },
+  {
+    id: "analyses",
+    title: "Análises & Dossiês",
+    subtitle: "Microscopia, fotos da impressão, reologia, mecânica e estatística",
+    icon: BarChart3,
+    color: "from-cyan-500 to-blue-600",
+    badge: "NOVO",
+    estReadMin: 7,
+  },
+  {
+    id: "tools",
+    title: "Ferramentas",
+    subtitle: "Calculadoras de diluição, molaridade, plaqueamento, conversões",
+    icon: Wrench,
+    color: "from-amber-500 to-orange-600",
+    badge: "NOVO",
+    estReadMin: 5,
+  },
+  {
+    id: "credits-settings",
+    title: "Créditos & Configurações",
+    subtitle: "Planos, recargas, billing, segurança, 2FA e preferências",
+    icon: CreditCard,
+    color: "from-emerald-500 to-teal-600",
+    badge: "NOVO",
+    estReadMin: 6,
+  },
+  // ─── Capítulos técnicos legados (módulos avançados) ───
   {
     id: "formulator-pro",
     title: "Formulador Pro",
@@ -115,7 +271,7 @@ const CHAPTERS: Chapter[] = [
 // ─────────────────────────────────────────────────────────────────────────
 
 export default function ManualPage() {
-  const [activeId, setActiveId] = useState<string>("formulator-pro")
+  const [activeId, setActiveId] = useState<string>("getting-started")
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -232,11 +388,29 @@ export default function ManualPage() {
               </select>
             </div>
 
-            {activeId === "formulator-pro"  && <ChapterFormulatorPro />}
-            {activeId === "formulator-bio"  && <ChapterFormulatorBio />}
-            {activeId === "stl-generator"   && <ChapterSTLGenerator />}
-            {activeId === "bioprinting"     && <ChapterBioprinting />}
-            {activeId === "roadmap-future"  && <ChapterRoadmapFuture />}
+            {/* ─── R12.41 — Capítulos modulares de usuário final ─── */}
+            {activeId === "getting-started"  && <GettingStarted />}
+            {activeId === "roadmap-pro"      && <ChapterRoadmap />}
+            {activeId === "pipeline"         && <ChapterPipeline />}
+            {activeId === "bioprint-model"   && <BioprintModel />}
+            {activeId === "bioprint-bioink"  && <BioprintBioink />}
+            {activeId === "bioprint-slice"   && <BioprintSlice />}
+            {activeId === "bioprint-execute" && <BioprintExecute />}
+            {activeId === "organoid-builder" && <OrganoidBuilder />}
+            {activeId === "protocols"        && <ChapterProtocols />}
+            {activeId === "knowledge"        && <ChapterKnowledge />}
+            {activeId === "notebook"         && <ChapterNotebook />}
+            {activeId === "chat-ia"          && <ChapterChatIA />}
+            {activeId === "analyses"         && <ChapterAnalyses />}
+            {activeId === "tools"            && <ChapterTools />}
+            {activeId === "credits-settings" && <ChapterCreditsSettings />}
+
+            {/* ─── Capítulos técnicos legados ─── */}
+            {activeId === "formulator-pro"   && <ChapterFormulatorPro />}
+            {activeId === "formulator-bio"   && <ChapterFormulatorBio />}
+            {activeId === "stl-generator"    && <ChapterSTLGenerator />}
+            {activeId === "bioprinting"      && <ChapterBioprinting />}
+            {activeId === "roadmap-future"   && <ChapterRoadmapFuture />}
             {activeId === "vision-formulator" && <ChapterVisionFormulator />}
             {activeId === "print-analysis"    && <ChapterPrintAnalysis />}
 
