@@ -446,7 +446,7 @@ export default function FormulatorProPage() {
 
   // ─── Render ─────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="bia-formulator-pro-page flex flex-col h-full overflow-hidden">
 
       {/* Header */}
       <div className="px-4 sm:px-6 py-4 border-b border-white/5 shrink-0 bg-gradient-to-r from-blue-500/[0.04] to-purple-500/[0.04]">

@@ -2092,3 +2092,199 @@ html.light .bia-landing-page section#pricing .grid > div ul li span {
 /* ═══════════════════════════════════════════════════════════════════════════
    FIM R12.32
    ═══════════════════════════════════════════════════════════════════════════ */
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   R12.34 — LIGHT MODE FIXES: credit-pills da landing + Formulador Pro
+   
+   PROBLEMAS REPORTADOS:
+   
+   1) Landing /#pricing — pílulas "1.500 créditos", "5.000 créditos",
+      "Curso completo + 20.000 créditos" estavam IMPOSSÍVEIS de ler em
+      light mode. Sintoma: pílula com fundo branco translúcido (bg-blue-500/10
+      sobre o gradient violet dos cards de planos) e texto claro
+      (text-blue-400 / text-purple-400 / text-indigo-400 — convertidos para
+      tons claros pelas regras de "texto dentro de bg-black mantém claro").
+   
+   2) Formulador Pro — cards "Propriedades preditas" e "Parâmetros de
+      bioimpressão" usam bg-black/20 + text-gray-500 (labels) + text-white
+      ou text-cyan-200 (valores). Em light mode o bg-black/20 vira cinza
+      muito claro translúcido, e as regras genéricas mantêm o texto claro,
+      resultando em texto APAGADO/quase invisível.
+   
+   SOLUÇÃO:
+   
+   1) Pílulas: fundo sólido escuro (cor brand mantida) + texto branco em
+      bold, para serem legíveis sobre o gradient violet do card.
+   
+   2) Formulador Pro: novo page-scope class `bia-formulator-pro-page`. Os
+      cards bg-black/20 internos passam a ter fundo BRANCO sólido com
+      bordas escuras + texto ESCURO (labels uppercase em violet, valores
+      em preto/violet profundo). Mantém legibilidade total.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── 1) PÍLULAS DE CRÉDITOS na landing (#pricing) ──────────────────────────
+   Os cards de planos pagos têm fundo branco no light mode (já corrigido na
+   R12.32 dentro do gradient violet). Mas as pílulas tipo .credit-pill
+   ficam invisíveis. Forçar fundo sólido brand + texto branco. */
+
+html.light .bia-landing-page section#pricing .credit-pill {
+  background-color: hsl(217 82% 32%) !important; /* azul Quantis profundo, default */
+  border-color: hsl(217 82% 25%) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+html.light .bia-landing-page section#pricing .credit-pill svg {
+  color: #fde68a !important; /* ícone Zap amarelo claro para destaque */
+}
+
+/* Variante azul (Biofabricação 3D — bg-blue-500/10) */
+html.light .bia-landing-page section#pricing .credit-pill[class*="bg-blue-500"] {
+  background-color: hsl(217 82% 32%) !important;
+  border-color: hsl(217 82% 25%) !important;
+  color: #ffffff !important;
+}
+
+/* Variante purple (Biofab 3D Avançada — bg-purple-500/10) */
+html.light .bia-landing-page section#pricing .credit-pill[class*="bg-purple-500"] {
+  background-color: hsl(268 75% 32%) !important;
+  border-color: hsl(268 75% 22%) !important;
+  color: #ffffff !important;
+}
+
+/* Variante indigo (Academy — bg-indigo-500/10) */
+html.light .bia-landing-page section#pricing .credit-pill[class*="bg-indigo-500"] {
+  background-color: hsl(245 75% 35%) !important;
+  border-color: hsl(245 75% 25%) !important;
+  color: #ffffff !important;
+}
+
+/* ─── 2) FORMULADOR PRO — Propriedades preditas / Parâmetros impressão ──────
+   Cards internos usam bg-black/20 + border-white/8 + texto claro. Em light
+   mode isso fica todo apagado. Override completo: fundo BRANCO sólido com
+   borda violet sutil + texto ESCURO bem contrastado. */
+
+/* Container raiz do formulador (page scope) — herda fundo claro padrão */
+html.light .bia-formulator-pro-page {
+  color: hsl(257 65% 8%); /* --light-ink */
+}
+
+/* Cards "Propriedades preditas" e "Parâmetros de bioimpressão" — wrappers
+   externos com bg-white/[0.02] em dark. Forçar fundo claríssimo + borda
+   violet sutil para destacar */
+html.light .bia-formulator-pro-page .rounded-2xl[class*="bg-white"] {
+  background-color: hsl(270 30% 99%) !important;
+  border-color: hsl(257 25% 88%) !important;
+  box-shadow: 0 1px 3px hsl(257 30% 80% / 0.4) !important;
+}
+
+/* Títulos dos painéis (h3) — eram text-white, agora preto */
+html.light .bia-formulator-pro-page h3 {
+  color: hsl(257 65% 8%) !important; /* --light-ink */
+}
+
+/* MINI-CARDS internos (bg-black/20) — cada propriedade predita / parâmetro
+   de impressão é uma div com bg-black/20 border-white/8. Em light precisa
+   virar branco com borda violet para ficar legível. */
+html.light .bia-formulator-pro-page .rounded-lg[class*="bg-black/2"] {
+  background-color: #ffffff !important;
+  border-color: hsl(257 30% 85%) !important;
+  box-shadow: 0 1px 2px hsl(257 30% 75% / 0.25) !important;
+}
+
+/* Labels uppercase dentro dos mini-cards (text-gray-500) — eram acinzentadas
+   demais, forçar violet brand escuro para destaque */
+html.light .bia-formulator-pro-page .rounded-lg[class*="bg-black/2"] p.text-\[10px\],
+html.light .bia-formulator-pro-page .rounded-lg[class*="bg-black/2"] p[class*="text-gray-500"] {
+  color: hsl(268 80% 32%) !important; /* --light-brand */
+  font-weight: 700 !important;
+  opacity: 1 !important;
+}
+
+/* Valores dentro dos mini-cards — eram text-white (propriedades) ou
+   text-cyan-200 (parâmetros impressão). Forçar PRETO bem visível */
+html.light .bia-formulator-pro-page .rounded-lg[class*="bg-black/2"] p.text-xs,
+html.light .bia-formulator-pro-page .rounded-lg[class*="bg-black/2"] p.font-mono {
+  color: hsl(257 70% 5%) !important; /* --light-ink-strong */
+  font-weight: 600 !important;
+}
+
+/* Especificamente o text-cyan-200 nos Parâmetros de bioimpressão — manter
+   tom cyan profundo legível em vez do preto puro, p/ diferenciar do bloco
+   anterior visualmente */
+html.light .bia-formulator-pro-page .rounded-lg[class*="bg-black/2"] p.text-cyan-200,
+html.light .bia-formulator-pro-page .rounded-lg[class*="bg-black/2"] p[class*="text-cyan-2"] {
+  color: hsl(195 88% 26%) !important; /* --light-accent (cyan profundo) */
+  font-weight: 700 !important;
+}
+
+/* Protocolo expandido — passos com bg-black/10 e bg-rose-500/5 */
+html.light .bia-formulator-pro-page .rounded-lg[class*="bg-black/1"] {
+  background-color: hsl(270 30% 99%) !important;
+  border-color: hsl(257 25% 88%) !important;
+}
+
+/* Título e descrição dos passos do protocolo */
+html.light .bia-formulator-pro-page .rounded-lg[class*="bg-black/1"] p.text-xs.font-semibold {
+  color: hsl(257 65% 8%) !important;
+}
+html.light .bia-formulator-pro-page .rounded-lg[class*="bg-black/1"] p[class*="text-gray-400"],
+html.light .bia-formulator-pro-page .rounded-lg[class*="bg-black/1"] p[class*="text-gray-500"] {
+  color: hsl(257 35% 22%) !important; /* --light-text */
+  opacity: 1 !important;
+}
+
+/* Badges/chips coloridos dentro do formulador — manter tom brand mas com
+   contraste suficiente sobre fundo claro */
+html.light .bia-formulator-pro-page span[class*="bg-emerald-500/1"],
+html.light .bia-formulator-pro-page span[class*="bg-purple-500/1"],
+html.light .bia-formulator-pro-page span[class*="bg-blue-500/1"],
+html.light .bia-formulator-pro-page span[class*="bg-rose-500/1"],
+html.light .bia-formulator-pro-page span[class*="bg-cyan-500/1"] {
+  background-color: hsl(268 60% 95%) !important;
+  border-color: hsl(268 50% 75%) !important;
+}
+html.light .bia-formulator-pro-page span[class*="text-emerald-200"],
+html.light .bia-formulator-pro-page span[class*="text-emerald-300"] {
+  color: hsl(160 78% 18%) !important;
+}
+html.light .bia-formulator-pro-page span[class*="text-purple-200"],
+html.light .bia-formulator-pro-page span[class*="text-purple-300"] {
+  color: hsl(268 80% 25%) !important;
+}
+html.light .bia-formulator-pro-page span[class*="text-blue-200"],
+html.light .bia-formulator-pro-page span[class*="text-blue-300"] {
+  color: hsl(217 82% 28%) !important;
+}
+html.light .bia-formulator-pro-page span[class*="text-rose-200"],
+html.light .bia-formulator-pro-page span[class*="text-rose-300"] {
+  color: hsl(348 76% 30%) !important;
+}
+
+/* Texto geral do formulador (parágrafos, paragráfos descritivos) */
+html.light .bia-formulator-pro-page p[class*="text-gray-400"] {
+  color: hsl(257 35% 22%) !important; /* --light-text */
+  opacity: 1 !important;
+}
+html.light .bia-formulator-pro-page p[class*="text-gray-500"] {
+  color: hsl(257 20% 35%) !important; /* mais escuro que --light-muted */
+  opacity: 1 !important;
+}
+
+/* Ícones gradiente (lucide-react) — preservar tom brand */
+html.light .bia-formulator-pro-page svg[class*="text-emerald-3"] {
+  color: hsl(160 78% 25%) !important;
+}
+html.light .bia-formulator-pro-page svg[class*="text-cyan-3"] {
+  color: hsl(195 88% 28%) !important;
+}
+html.light .bia-formulator-pro-page svg[class*="text-blue-3"] {
+  color: hsl(217 82% 32%) !important;
+}
+html.light .bia-formulator-pro-page svg[class*="text-purple-3"] {
+  color: hsl(268 80% 32%) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FIM R12.34
+   ═══════════════════════════════════════════════════════════════════════════ */
