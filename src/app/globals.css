@@ -1927,3 +1927,168 @@ html.light textarea[class*="bg-black/"]::placeholder {
 /* ═══════════════════════════════════════════════════════════════════════════
    FIM R12.19
    ═══════════════════════════════════════════════════════════════════════════ */
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   R12.32 — LIGHT MODE FIXES PARA LANDING PAGE (src/app/page.tsx)
+   
+   PROBLEMA: A landing usa estética dark (fundo #0a0514, texto branco/cinza claro,
+   seções com bg-black/20 translúcido). Em light mode os overrides globais
+   convertem text-white/text-gray-400 para tons ESCUROS (--light-ink, --light-text),
+   MAS o fundo bg-black/20 sobre o body branco fica como cinza muito claro
+   translúcido → texto escuro sobre cinza claro ainda funcionaria, EXCETO que
+   as regras de "texto dentro de bg-black/X mantém claro" (linhas 1740+)
+   revertem para texto claro → texto claro sobre cinza claro = ILEGÍVEL.
+   
+   SOLUÇÃO: Em light mode, forçar essas seções da landing a terem fundo
+   ESCURO (gradient violet/blue/indigo) com texto BRANCO — mantém estética
+   da landing legível em ambos os temas. O card Discovery (bg-white/2)
+   recebe fundo violet escuro com texto branco conforme pedido pelo usuário.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── 1) Botão "Começar agora" (bia-button-primary) — reforça gradient + texto branco ─── */
+html.light .bia-landing-page .bia-button-primary {
+  background-image: linear-gradient(to right, hsl(268 85% 38%), hsl(280 70% 55%)) !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+html.light .bia-landing-page .bia-button-primary:hover {
+  background-image: linear-gradient(to right, hsl(268 85% 32%), hsl(280 70% 48%)) !important;
+  color: #ffffff !important;
+}
+html.light .bia-landing-page .bia-button-primary span,
+html.light .bia-landing-page .bia-button-primary svg {
+  color: #ffffff !important;
+}
+
+/* ─── 2) Seções com bg-black/20 (#features e #pricing) — fundo violet escuro ─── */
+html.light .bia-landing-page section#features,
+html.light .bia-landing-page section#pricing {
+  background: linear-gradient(180deg, hsl(257 55% 12%) 0%, hsl(268 60% 16%) 100%) !important;
+  color: #f5f3ff !important;
+}
+
+/* Garante que TODOS os textos dentro dessas seções voltem a ser claros
+   (sobrepondo os overrides genéricos que escurecem text-white/text-gray-400) */
+html.light .bia-landing-page section#features,
+html.light .bia-landing-page section#features *,
+html.light .bia-landing-page section#pricing,
+html.light .bia-landing-page section#pricing * {
+  /* Reverter cor: deixa cada tipografia herdar do bloco abaixo */
+}
+
+html.light .bia-landing-page section#features h2,
+html.light .bia-landing-page section#features h3,
+html.light .bia-landing-page section#pricing h2,
+html.light .bia-landing-page section#pricing h3 {
+  color: #ffffff !important;
+}
+
+/* Texto descritivo (era text-gray-400 → vinha como --light-text escuro) */
+html.light .bia-landing-page section#features .text-gray-400,
+html.light .bia-landing-page section#features .text-gray-500,
+html.light .bia-landing-page section#pricing .text-gray-400,
+html.light .bia-landing-page section#pricing .text-gray-500 {
+  color: #d4c5f9 !important;
+  opacity: 1 !important;
+}
+
+html.light .bia-landing-page section#features .text-gray-300,
+html.light .bia-landing-page section#pricing .text-gray-300 {
+  color: #e9e2fb !important;
+}
+
+/* text-white dentro dessas seções (era invertido para escuro) */
+html.light .bia-landing-page section#features .text-white,
+html.light .bia-landing-page section#features [class*="text-white/"],
+html.light .bia-landing-page section#pricing .text-white,
+html.light .bia-landing-page section#pricing [class*="text-white/"] {
+  color: #ffffff !important;
+}
+
+/* Cards internos (bia-card / .bg-white/2) dentro dessas seções —
+   reforça fundo translúcido sobre o violet escuro */
+html.light .bia-landing-page section#features .bia-card,
+html.light .bia-landing-page section#features [class*="bg-white/"],
+html.light .bia-landing-page section#pricing [class*="bg-white/"] {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #f5f3ff !important;
+}
+
+/* ─── 3) Card "Plano Discovery — acesso imediato" — fundo violet/indigo escuro ─── */
+html.light .bia-landing-page section#pricing .max-w-sm > div.rounded-xl {
+  background: linear-gradient(135deg, hsl(258 70% 22%) 0%, hsl(245 75% 28%) 100%) !important;
+  border-color: hsl(268 60% 45%) !important;
+  box-shadow: 0 8px 24px -8px hsl(258 70% 15% / 0.6) !important;
+}
+
+html.light .bia-landing-page section#pricing .max-w-sm > div.rounded-xl h3,
+html.light .bia-landing-page section#pricing .max-w-sm > div.rounded-xl .text-2xl {
+  color: #ffffff !important;
+}
+
+html.light .bia-landing-page section#pricing .max-w-sm > div.rounded-xl p {
+  color: #e0d4ff !important;
+  opacity: 1 !important;
+}
+
+/* Ícone Zap dentro do círculo do card Discovery */
+html.light .bia-landing-page section#pricing .max-w-sm > div.rounded-xl [class*="bg-gray-500/"] {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+html.light .bia-landing-page section#pricing .max-w-sm > div.rounded-xl [class*="text-gray-400"] {
+  color: #fde68a !important; /* amarelo claro para destaque do ícone */
+}
+
+/* Link "Criar conta grátis" no card Discovery */
+html.light .bia-landing-page section#pricing .max-w-sm > div.rounded-xl a {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  color: #ffffff !important;
+}
+html.light .bia-landing-page section#pricing .max-w-sm > div.rounded-xl a:hover {
+  background-color: rgba(255, 255, 255, 0.22) !important;
+  color: #ffffff !important;
+}
+
+/* ─── 4) Cards de features (#features grid) — manter texto claro sobre o fundo violet ─── */
+html.light .bia-landing-page section#features .grid > div {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+html.light .bia-landing-page section#features .grid > div h3 {
+  color: #ffffff !important;
+}
+html.light .bia-landing-page section#features .grid > div p {
+  color: #cdc1f0 !important;
+}
+
+/* ─── 5) Badges/chips coloridos dentro de #pricing (30 créditos, 20% OFF) — texto claro ─── */
+html.light .bia-landing-page section#pricing .text-blue-200,
+html.light .bia-landing-page section#pricing .text-blue-300 {
+  color: #bfdbfe !important;
+}
+html.light .bia-landing-page section#pricing .text-emerald-200,
+html.light .bia-landing-page section#pricing .text-emerald-300 {
+  color: #a7f3d0 !important;
+}
+html.light .bia-landing-page section#pricing .text-violet-400 {
+  color: #c4b5fd !important;
+}
+
+/* ─── 6) Cards de planos pagos (Biofab/Academy) dentro de #pricing — texto claro ─── */
+html.light .bia-landing-page section#pricing .grid > div h3,
+html.light .bia-landing-page section#pricing .grid > div .text-2xl,
+html.light .bia-landing-page section#pricing .grid > div .text-3xl {
+  color: #ffffff !important;
+}
+html.light .bia-landing-page section#pricing .grid > div ul li,
+html.light .bia-landing-page section#pricing .grid > div ul li span {
+  color: #e0d4ff !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FIM R12.32
+   ═══════════════════════════════════════════════════════════════════════════ */

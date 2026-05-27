@@ -44,7 +44,7 @@ function BiaLogoBox({ sizeClass = "w-10 h-10", size = 32, rounded = "rounded-xl"
 /* ══════════════════════════════════════════════════════════════════════ */
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-[#0a0514] text-white overflow-x-hidden">
+    <div className="bia-landing-page min-h-screen bg-[#0a0514] text-white overflow-x-hidden">
 
       {/* ── Controles flutuantes (tema + idioma) ─────────────────────────── */}
       <FloatingThemeLocale position="top-right" className="mt-16" />
