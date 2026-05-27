@@ -19,18 +19,20 @@ import { ArrowLeft } from "lucide-react"
 export default function BioprintLayout({ children }: { children: React.ReactNode }) {
   return (
     <BioprintProcessProvider>
-      <div className="min-h-screen bg-[#0a0a0f] text-white">
+      {/* R12.37: classe marcadora `bia-bioprint-process` permite overrides
+          de light-mode no header global + stepper (ver globals.css). */}
+      <div className="bia-bioprint-process min-h-screen bg-[#0a0a0f] text-white">
         {/* Header global do processo */}
-        <header className="border-b border-white/5 bg-black/40 backdrop-blur sticky top-0 z-20">
+        <header className="bia-bioprint-header border-b border-white/5 bg-black/40 backdrop-blur sticky top-0 z-20">
           <div className="px-4 sm:px-6 py-3 flex items-center gap-3 max-w-7xl mx-auto">
             <Link
               href="/dashboard"
-              className="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5 text-xs"
+              className="bia-bioprint-crumb text-gray-400 hover:text-white transition-colors flex items-center gap-1.5 text-xs"
             >
               <ArrowLeft className="w-4 h-4" /> Dashboard
             </Link>
-            <span className="text-white/20">/</span>
-            <h1 className="text-base sm:text-lg font-bold bg-gradient-to-r from-emerald-300 via-cyan-300 to-violet-300 bg-clip-text text-transparent">
+            <span className="bia-bioprint-crumb-sep text-white/20">/</span>
+            <h1 className="bia-bioprint-title text-base sm:text-lg font-bold bg-gradient-to-r from-emerald-300 via-cyan-300 to-violet-300 bg-clip-text text-transparent">
               Processo de Bioimpressão
             </h1>
           </div>

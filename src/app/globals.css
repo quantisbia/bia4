@@ -2288,3 +2288,164 @@ html.light .bia-formulator-pro-page svg[class*="text-purple-3"] {
 /* ═══════════════════════════════════════════════════════════════════════════
    FIM R12.34
    ═══════════════════════════════════════════════════════════════════════════ */
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   R12.37 — LIGHT MODE FIXES: HEADER GLOBAL DO PROCESSO DE BIOIMPRESSÃO
+   (src/app/dashboard/bioprint/layout.tsx + BioprintStepper.tsx)
+
+   PROBLEMA: O header global "Dashboard / Processo de Bioimpressão" e o
+   stepper das 4 etapas (1-Modelo, 2-Biotinta, 3-Fatiar, 4-Executar) usam
+   estética dark hardcoded:
+     • <header> com bg-black/40 (fica cinza-claro translúcido em light)
+     • <h1> com bg-gradient-to-r ... bg-clip-text text-transparent (gradiente
+       cyan/violet CLARO continua claro sobre fundo claro → invisível)
+     • crumb "Dashboard" usa text-gray-400 e o separador "/" usa text-white/20
+     • Cards do stepper usam bg-white/[0.02] + text-gray-300/400 (todos
+       muito claros sobre fundo branco)
+
+   SOLUÇÃO: Classe marcadora `.bia-bioprint-process` no <div> root do
+   layout. Em light mode:
+     1) header com fundo branco fosco e borda sutil
+     2) "Processo de Bioimpressão" vira gradient ESCURO (tons saturados
+        emerald/cyan/violet) preservando identidade visual
+     3) crumb "Dashboard" e separador "/" com cinza escuro legível
+     4) Stepper: cards inativos com borda escura + texto escuro
+        (etapas ativas/ready/draft mantêm cores semânticas)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── 1) Container raiz — fundo claro herdado (já feito por bg-[#0a0a0f]
+       global mas reforçamos para garantir prioridade). ─── */
+html.light .bia-bioprint-process {
+  background-color: hsl(var(--background)) !important;
+  color: hsl(257 50% 14%) !important;
+}
+
+/* ─── 2) Header sticky: fundo branco translúcido com leve blur ─── */
+html.light .bia-bioprint-process .bia-bioprint-header {
+  background-color: hsl(270 30% 98% / 0.92) !important;
+  border-bottom-color: hsl(270 20% 88%) !important;
+}
+
+/* ─── 3) Título "Processo de Bioimpressão" — gradient escuro saturado
+       (mantém o efeito visual emerald → cyan → violet do dark mode). ─── */
+html.light .bia-bioprint-process .bia-bioprint-title {
+  background-image: linear-gradient(
+    to right,
+    hsl(160 75% 28%) 0%,
+    hsl(195 82% 30%) 50%,
+    hsl(268 78% 38%) 100%
+  ) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+/* ─── 4) Breadcrumb "Dashboard" + separador "/" ─── */
+html.light .bia-bioprint-process .bia-bioprint-crumb {
+  color: hsl(257 35% 25%) !important;
+}
+html.light .bia-bioprint-process .bia-bioprint-crumb:hover {
+  color: hsl(268 78% 38%) !important;
+}
+html.light .bia-bioprint-process .bia-bioprint-crumb-sep {
+  color: hsl(257 18% 55%) !important;
+}
+
+/* ─── 5) Stepper — cards das 4 etapas: bordas e textos escuros ─── */
+
+/* Botões "inativos/unlocked" (bg-white/[0.02] border-white/10) */
+html.light .bia-bioprint-process nav ol li button[class*="bg-white/"] {
+  background-color: hsl(270 25% 96%) !important;
+  border-color: hsl(270 20% 85%) !important;
+}
+html.light .bia-bioprint-process nav ol li button[class*="bg-white/"]:hover:not(:disabled) {
+  background-color: hsl(270 25% 92%) !important;
+  border-color: hsl(270 20% 78%) !important;
+}
+
+/* Texto principal das etapas (label + shortLabel) — usa text-gray-300/500 */
+html.light .bia-bioprint-process nav ol li button .text-gray-300 {
+  color: hsl(257 45% 18%) !important;
+}
+html.light .bia-bioprint-process nav ol li button .text-gray-400 {
+  color: hsl(257 30% 32%) !important;
+}
+html.light .bia-bioprint-process nav ol li button .text-gray-500 {
+  color: hsl(257 20% 45%) !important;
+}
+
+/* Etapa ATIVA (violet) — gradiente um pouco mais escuro para contraste */
+html.light .bia-bioprint-process nav ol li button[class*="bg-violet-500/"] {
+  background-color: hsl(268 70% 95%) !important;
+  border-color: hsl(268 70% 55%) !important;
+}
+html.light .bia-bioprint-process nav ol li button .text-violet-100 {
+  color: hsl(268 78% 28%) !important;
+}
+
+/* Etapa READY (emerald) */
+html.light .bia-bioprint-process nav ol li button[class*="bg-emerald-500/"] {
+  background-color: hsl(160 60% 93%) !important;
+  border-color: hsl(160 65% 38%) !important;
+}
+html.light .bia-bioprint-process nav ol li button .text-emerald-200 {
+  color: hsl(160 75% 22%) !important;
+}
+
+/* Etapa DRAFT (amber) */
+html.light .bia-bioprint-process nav ol li button[class*="bg-amber-500/"] {
+  background-color: hsl(38 80% 94%) !important;
+  border-color: hsl(32 80% 45%) !important;
+}
+html.light .bia-bioprint-process nav ol li button .text-amber-200 {
+  color: hsl(32 85% 26%) !important;
+}
+
+/* Círculo numerado da etapa (StepCircle) — bg-white/5 + text-gray-400/600 */
+html.light .bia-bioprint-process nav ol li button div[class*="rounded-full"][class*="bg-white/"] {
+  background-color: hsl(270 25% 93%) !important;
+  border-color: hsl(270 20% 80%) !important;
+  color: hsl(257 35% 30%) !important;
+}
+html.light .bia-bioprint-process nav ol li button div[class*="rounded-full"] .text-gray-400,
+html.light .bia-bioprint-process nav ol li button div[class*="rounded-full"] .text-gray-600 {
+  color: hsl(257 35% 30%) !important;
+}
+
+/* Círculo ATIVO (violet-500/20) */
+html.light .bia-bioprint-process nav ol li button div[class*="rounded-full"][class*="bg-violet-500/"] {
+  background-color: hsl(268 70% 88%) !important;
+  border-color: hsl(268 70% 50%) !important;
+  color: hsl(268 78% 22%) !important;
+}
+html.light .bia-bioprint-process nav ol li button div[class*="rounded-full"] .text-violet-100 {
+  color: hsl(268 78% 22%) !important;
+}
+
+/* Círculo READY (emerald-500/20) */
+html.light .bia-bioprint-process nav ol li button div[class*="rounded-full"][class*="bg-emerald-500/"] {
+  background-color: hsl(160 60% 85%) !important;
+  border-color: hsl(160 65% 35%) !important;
+  color: hsl(160 75% 18%) !important;
+}
+html.light .bia-bioprint-process nav ol li button div[class*="rounded-full"] .text-emerald-100 {
+  color: hsl(160 75% 18%) !important;
+}
+
+/* Círculo DRAFT (amber-500/15) */
+html.light .bia-bioprint-process nav ol li button div[class*="rounded-full"][class*="bg-amber-500/"] {
+  background-color: hsl(38 80% 86%) !important;
+  border-color: hsl(32 80% 42%) !important;
+  color: hsl(32 85% 22%) !important;
+}
+
+/* Conector entre etapas (linha bg-white/5) — em light vira cinza visível */
+html.light .bia-bioprint-process nav ol li > div[class*="bg-white/"] {
+  background-color: hsl(270 18% 80%) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FIM R12.37
+   ═══════════════════════════════════════════════════════════════════════════ */
