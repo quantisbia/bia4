@@ -40,7 +40,7 @@ import {
   Upload, FileCode2, Eye, Terminal as TerminalIcon, Cpu, Zap, Radio,
   ChevronDown, ChevronRight, Download, Trash2, Gamepad2, Sparkles,
   ShieldAlert, Info, RotateCcw, Wand2, X, Clipboard, ArrowLeft,
-  Wrench, Undo2, Settings2, Droplet, Crosshair,
+  Wrench, Undo2, Settings2, Droplet, Crosshair, Loader2,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
@@ -464,6 +464,11 @@ export default function BioprintExecutePage() {
   const [baud, setBaud] = useState(DEFAULT_BAUD)
   const [connected, setConnected] = useState(false)
   const [firmware, setFirmware] = useState<FirmwareInfo | null>(null)
+  // R12.45 — Estado de "preparando impressora": true entre o `setConnected(true)` e o
+  // fim do post-home (incluindo G28, G90/M83/M302, ir-pro-centro, descida Z, G92).
+  // Bloqueia jog do usuário neste período — porque o waiter do G28/M400 é único,
+  // se um jog do usuário entra ele rouba o ok do home e tudo trava (log da Bia).
+  const [isHandshaking, setIsHandshaking] = useState(false)
   const [supported, setSupported] = useState(false)
   /**
    * R12.23: Auto-home ao conectar. Default ON. Sequência ao conectar:
@@ -640,12 +645,37 @@ export default function BioprintExecutePage() {
     // com o joystick quando o cabeçote estiver FISICAMENTE em Z=8mm.
     await controllerRef.current.sendAndWait("M400 ; aguarda fim da aproximação (R12.40)")
 
-    // Atualiza estado de UI da posição (cabeçote agora no centro a Z=8mm)
-    // NOTA: setPosition é declarado mais abaixo mas só é CHAMADO quando
-    // a função executa (runtime, não na criação do callback) → seguro.
-    setPosition((p) => ({ ...p, x: cx, y: cy, z: approachZ }))
+    // R12.45 — CRÍTICO: redefine origem lógica para o CENTRO da mesa.
+    //
+    // PROBLEMA: G-codes de teste (incluindo /printability) usam coordenadas
+    // X0/Y0/Z0 como ponto de partida (porque eles assumem que "0,0" é o
+    // canto inferior-esquerdo da peça). Após o G28 + ir-para-centro, a
+    // impressora sabe que está fisicamente em X=100 Y=100 — mas se o
+    // G-code começa com "G0 X0 Y0", ela vai PRA TRÁS, até o canto da mesa.
+    //
+    // Foi exatamente o que aconteceu no log da Bia (R12.44 / 09:46:54):
+    // após o pós-home colocar o cabeçote em (100,100), o G-code começou com
+    // "G0 X0 Y0 Z0.250" e a impressora foi para o canto, imprimindo lá.
+    //
+    // SOLUÇÃO: G92 X0 Y0 Z<approachZ> redefine a origem lógica para o
+    // ponto físico atual (centro, Z=8mm). Agora "X0 Y0" no G-code = centro
+    // da mesa. O Z fica em 8mm para que a primeira camada (Z=0.25 por ex)
+    // seja na altura correta — o G-code pode usar Z baixo sem bater na mesa.
+    //
+    // NOTA: alguns G-codes têm seu próprio G92 X0 Y0 Z0 no header. Quando
+    // isso acontece, o nosso G92 vira no-op (o do G-code prevalece) — mas
+    // garantimos o estado certo se o usuário enviar um G-code que NÃO tem
+    // G92 (caso típico do /printability quick-gcode).
+    await controllerRef.current.sendAndWait(
+      `G92 X0 Y0 Z${approachZ} ; redefine origem lógica: centro da mesa = (0,0) (R12.45)`,
+    )
+
+    // Atualiza estado de UI da posição (cabeçote agora em X=0 Y=0 lógico,
+    // mas FISICAMENTE no centro a Z=approachZ). A UI mostra coordenadas
+    // lógicas, que é o que faz sentido para o usuário olhando o G-code.
+    setPosition((p) => ({ ...p, x: 0, y: 0, z: approachZ }))
     loggerRef.current.ok(
-      `Cabeçote no centro (${cx}, ${cy}) a Z=${approachZ}mm da mesa — pronto para iniciar a bioimpressão.`,
+      `Cabeçote no centro físico (${cx}, ${cy}) — origem lógica redefinida: agora (0,0,${approachZ}) = centro da mesa. Pronto para bioimprimir.`,
       "controller",
     )
   }, [])
@@ -681,7 +711,14 @@ export default function BioprintExecutePage() {
       controllerRef.current = ctrl
 
       setConnected(true)
+      // R12.45: BLOQUEIA jog/comandos manuais durante TODO o handshake +
+      // post-home. Liberado no `finally` lá embaixo (ou se algo der erro).
+      setIsHandshaking(true)
       loggerRef.current.ok(`Conectado em modo ${mode.toUpperCase()}.`)
+      loggerRef.current.info(
+        "🔒 Preparando impressora — joystick BLOQUEADO até o cabeçote estar no centro da mesa. Aguarde o '✓ Pronto para bioimprimir'.",
+        "controller",
+      )
 
       // Handshake M115
       try {
@@ -795,6 +832,13 @@ export default function BioprintExecutePage() {
           )
         }
       }
+
+      // R12.45: handshake + post-home COMPLETOS → libera joystick + comandos manuais
+      setIsHandshaking(false)
+      loggerRef.current.ok(
+        "🔓 Impressora pronta. Joystick LIBERADO — você pode mover os eixos e iniciar a impressão.",
+        "controller",
+      )
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       loggerRef.current.error(`Falha ao conectar: ${msg}`)
@@ -809,6 +853,7 @@ export default function BioprintExecutePage() {
       transportRef.current = null
       controllerRef.current = null
       setConnected(false)
+      setIsHandshaking(false)   // R12.45: libera mesmo em erro
       setFirmware(null)
       setControllerState("idle")
       loggerRef.current.info(
@@ -1061,6 +1106,25 @@ export default function BioprintExecutePage() {
       loggerRef.current.warn("Conecte para usar o joystick.")
       return
     }
+    // R12.45: BLOQUEIA jog durante o handshake/auto-home/post-home.
+    //
+    // ANTES: o joystick funcionava IMEDIATAMENTE após o setConnected(true) —
+    // mas como o auto-home (G28) ainda estava rodando em paralelo no thread
+    // do handshake, cliques do usuário entravam no controller, ROUBAVAM o
+    // waiter do G28 (sendAndWait usa um único pendingOkResolver), e quando
+    // o 'ok' do home finalmente chegava ele resolvia o waiter ERRADO. O
+    // G28 dava timeout (30s) e tudo travava (caso real do log da Bia em
+    // 09:42:29 — clicou Z+ durante o G28 → impressora parou de responder).
+    //
+    // AGORA: rejeitamos o clique com aviso amigável. O usuário entende que
+    // precisa esperar o '✓ Joystick LIBERADO' antes de mexer nos eixos.
+    if (isHandshaking) {
+      loggerRef.current.warn(
+        `⏳ Aguarde — impressora ainda preparando (home + centro da mesa). Jog ${axis}${delta} ignorado.`,
+        "joystick",
+      )
+      return
+    }
     const feedrate = axis === "Z" ? 300 : axis === "E" ? 200 : 1500
 
     // R12.39: jog AGORA funciona durante streaming (tempo real) via fila
@@ -1110,7 +1174,7 @@ export default function BioprintExecutePage() {
     } catch (e) {
       loggerRef.current.error(`Jog ${axis}${delta} falhou: ${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [connected, controllerState])
+  }, [connected, controllerState, isHandshaking])
 
   const sendZero = useCallback(async () => {
     if (!controllerRef.current || !connected) return
@@ -2261,9 +2325,26 @@ export default function BioprintExecutePage() {
           <Panel
             title="Joystick (jog manual)"
             icon={<Gamepad2 className="w-4 h-4" />}
-            badge={`${step} mm`}
-            badgeColor="cyan"
+            badge={isHandshaking ? "🔒 preparando…" : `${step} mm`}
+            badgeColor={isHandshaking ? "amber" : "cyan"}
           >
+            {/* R12.45: aviso visual quando bloqueado pelo handshake */}
+            {isHandshaking && (
+              <div className="mb-3 rounded-xl border border-amber-500/40 bg-amber-500/[0.08] p-2.5 flex items-start gap-2">
+                <div className="w-7 h-7 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0 animate-pulse">
+                  <Loader2 className="w-3.5 h-3.5 text-amber-300 animate-spin" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10.5px] font-semibold text-amber-200 leading-snug">
+                    Preparando a impressora — joystick BLOQUEADO
+                  </div>
+                  <div className="text-[9.5px] text-amber-100/80 leading-snug mt-0.5">
+                    Aguarde o G28 (home) + ir-para-centro terminarem. Em ~10–15 s o
+                    sistema desbloqueia automaticamente.
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Step size — R12.20: contraste reforçado p/ light mode + log no console técnico */}
             <div className="mb-2">
               <div className="flex items-center justify-between mb-1">

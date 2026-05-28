@@ -712,8 +712,33 @@ function emitGcodeText(
     lines.push(parts.join(" "))
   }
 
-  // R12.20: M84 removido — motor permanece ligado até desligamento manual do usuário.
-  lines.push("", "; ─── FIM ───", "")
+  // R12.45 — FOOTER de finalização: encerra extrusão + libera peça
+  //
+  // ANTES: o G-code terminava abruptamente no último G1 com extrusão ativa.
+  // O bioink continuava escorrendo pela ponta da seringa após o fim e o
+  // cabeçote ficava sobre a peça, impedindo retirá-la sem encostar.
+  //
+  // AGORA:
+  //   1) M83 (defensivo — força modo relativo da extrusora)
+  //   2) G1 E-10 F300 → retract grande de 10 mm para parar a saída de hidrogel
+  //   3) G91 → modo relativo p/ subir Z sem brigar com a origem do desenho
+  //   4) G1 Z+20 F600 → sobe 20 mm para liberar espaço de retirada da peça
+  //   5) G90 → volta para absoluto (deixa a impressora num estado conhecido)
+  //   6) M400 → garante que tudo acabou antes do firmware retornar 'ok'
+  lines.push(
+    "",
+    "; ═══════════════════════════════════════════════════════════════",
+    "; ─── FOOTER: encerra extrusão + libera peça (R12.45) ─────────",
+    "; ═══════════════════════════════════════════════════════════════",
+    "M83             ; garante extrusora relativa",
+    "G1 E-10 F300    ; retract de 10mm para parar escoamento do hidrogel",
+    "G91             ; modo relativo para subir Z sem mover XY",
+    "G1 Z20 F600     ; sobe 20mm para dar espaço de retirar a peça",
+    "G90             ; volta para absoluto",
+    "M400            ; aguarda fim do movimento",
+    "; ─── FIM ───",
+    "",
+  )
   return lines.filter((l) => l !== "").join("\n") + "\n"
 }
 
