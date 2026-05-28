@@ -1146,11 +1146,23 @@ export default function BioprintExecutePage() {
     const ctrl = controllerRef.current
     try {
       if (axis === "E") {
-        // E já está em relativo permanente (M83) — basta o G1
+        // R12.46: FORÇA M83 ANTES de cada jog do E.
+        //
+        // Bug real reportado pela Bia: depois de imprimir o demo gyroid
+        // (que termina com `M82 ; extrusão absoluta` e E≈8.4mm), a posição
+        // do E no firmware ficava EM ABSOLUTO. Aí "Purga +1" mandava `G1 E1`
+        // que em modo absoluto significa "vá PARA E=1" → retract de ~7.4mm
+        // ao invés de extrudar +1mm. Cabo do hidrogel sugava ar.
+        //
+        // Solução: sempre mandar M83 antes do G1 do E. Custa 1 linha extra
+        // mas garante que +bolus sempre EXTRUDA e -bolus sempre RETRAIA,
+        // independente do que o G-code anterior fez.
         const cmd = `G1 E${delta} F${feedrate}`
         if (isStreamingOrPaused) {
+          ctrl.inject("M83", "joystick")
           ctrl.inject(cmd, "joystick")
         } else {
+          await ctrl.sendAndWait("M83 ; força extrusora relativa antes do jog (R12.46)")
           await ctrl.sendAndWait(cmd)
         }
       } else {
@@ -2404,6 +2416,44 @@ export default function BioprintExecutePage() {
                 {/* R12.39: Z+/Z- em tempo real durante streaming via inject */}
                 <JogBtn onClick={() => sendJog("Z", +step)} disabled={!connected}>Z+</JogBtn>
                 <JogBtn onClick={() => sendJog("Z", -step)} disabled={!connected} variant="warn">Z−</JogBtn>
+              </div>
+            </div>
+
+            {/* R12.46: MICRO-AJUSTE Z em tempo real durante a impressão.
+                Botões dedicados de Z± 0.05/0.10/0.20 mm que NÃO alteram o
+                passo do joystick (extrudeStep e step continuam intactos).
+                Útil para descer um pouquinho o bico durante a impressão
+                quando a primeira camada está alta demais (gap) ou subir
+                quando está esmagando o filamento. Usa inject() durante
+                streaming → latência ~50-300ms. */}
+            <div className="mb-2 rounded-lg border border-cyan-500/30 bg-cyan-500/[0.05] p-1.5">
+              <div className="text-[9px] uppercase tracking-wider text-cyan-300 mb-1 flex items-center justify-between">
+                <span>Micro-ajuste Z (tempo real)</span>
+                <span className="text-[8px] normal-case tracking-normal text-gray-500">durante impressão</span>
+              </div>
+              <div className="grid grid-cols-6 gap-0.5">
+                {[0.05, 0.1, 0.2].map((d) => (
+                  <button
+                    key={`zfine-down-${d}`}
+                    onClick={() => sendJog("Z", -d)}
+                    disabled={!connected}
+                    title={`Desce ${d} mm (mais perto da mesa) — bom se está saindo gap entre filamentos`}
+                    className="px-1 py-1 rounded text-[9px] font-mono bg-amber-500/10 hover:bg-amber-500/25 border border-amber-500/30 text-amber-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Z−{d}
+                  </button>
+                ))}
+                {[0.05, 0.1, 0.2].map((d) => (
+                  <button
+                    key={`zfine-up-${d}`}
+                    onClick={() => sendJog("Z", +d)}
+                    disabled={!connected}
+                    title={`Sobe ${d} mm (mais longe da mesa) — bom se está esmagando o filamento`}
+                    className="px-1 py-1 rounded text-[9px] font-mono bg-cyan-500/10 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Z+{d}
+                  </button>
+                ))}
               </div>
             </div>
 

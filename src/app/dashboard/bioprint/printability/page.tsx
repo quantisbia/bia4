@@ -64,6 +64,7 @@ interface QuickMapping {
 
 const TEST_QUICK_MAPPING: Record<string, QuickMapping> = {
   // 1. Linha — 5 filamentos paralelos. Quick não tem isso, mas grid passa perto.
+  // R12.46: pattern=rectilinear para gerar as linhas internas (a grade é o teste).
   test_line: {
     buildGeometry: (p) => ({
       id: "grid",
@@ -74,11 +75,12 @@ const TEST_QUICK_MAPPING: Record<string, QuickMapping> = {
     }),
     defaultLayerHeight_mm: 0.25,
     defaultWalls: 1,
-    defaultInfillPattern: "none",
-    defaultInfillDensity_pct: 0,
-    note: "5 linhas paralelas (grade fina sem infill). Mede CV de largura.",
+    defaultInfillPattern: "rectilinear",
+    defaultInfillDensity_pct: 50,
+    note: "5 linhas paralelas (grade fina). Mede CV de largura.",
   },
   // 2. Grade Pf — Ouyang 2016
+  // R12.46: precisa das linhas cruzadas — esse é o teste do Pf.
   test_grid: {
     buildGeometry: (p) => ({
       id: "grid",
@@ -89,11 +91,12 @@ const TEST_QUICK_MAPPING: Record<string, QuickMapping> = {
     }),
     defaultLayerHeight_mm: 0.2,
     defaultWalls: 1,
-    defaultInfillPattern: "none",
-    defaultInfillDensity_pct: 0,
-    note: "Grade para cálculo de Pf = P²/(16·A). Padrão-ouro Ouyang 2016.",
+    defaultInfillPattern: "rectilinear",
+    defaultInfillDensity_pct: 50,
+    note: "Grade cruzada para cálculo de Pf = P²/(16·A). Padrão-ouro Ouyang 2016.",
   },
   // 3. Ponte de Colapso — torres+pontes. Aproxima como grade larga.
+  // R12.46: pattern=rectilinear pra ter os vãos da grade (= as pontes do teste).
   test_collapse_bridge: {
     buildGeometry: () => ({
       id: "grid",
@@ -101,8 +104,8 @@ const TEST_QUICK_MAPPING: Record<string, QuickMapping> = {
     }),
     defaultLayerHeight_mm: 0.25,
     defaultWalls: 1,
-    defaultInfillPattern: "none",
-    defaultInfillDensity_pct: 0,
+    defaultInfillPattern: "rectilinear",
+    defaultInfillDensity_pct: 50,
     note: "Série de torres com vãos crescentes. Mede vão máximo sem colapso.",
   },
   // 4. Torre de Empilhamento — disco fino N camadas
@@ -158,6 +161,7 @@ const TEST_QUICK_MAPPING: Record<string, QuickMapping> = {
     note: "Estrela aproximada por disco. Para forma exata baixe o STL.",
   },
   // 8. Fidelidade — grade densa
+  // R12.46: pattern=rectilinear pra preencher a malha densa (esse é o teste).
   test_fidelity_biotinta: {
     buildGeometry: () => ({
       id: "grid",
@@ -165,9 +169,9 @@ const TEST_QUICK_MAPPING: Record<string, QuickMapping> = {
     }),
     defaultLayerHeight_mm: 0.1,
     defaultWalls: 1,
-    defaultInfillPattern: "none",
-    defaultInfillDensity_pct: 0,
-    note: "Padrão hexagonal denso 15.4×15.4×0.8 mm. Mede fidelity index F.",
+    defaultInfillPattern: "rectilinear",
+    defaultInfillDensity_pct: 60,
+    note: "Grade densa 15.4×15.4×0.8 mm. Mede fidelity index F.",
   },
 }
 

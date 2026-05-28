@@ -999,5 +999,19 @@ M104 S0 ; bico off
 M140 S0 ; cama off
 ; R12.20: M84 removido — motor permanece ligado até desligamento manual.
 
-Lines: 981
+; ─── R12.46: restaura estado padrão da bioplataforma ──────────────
+; O demo usou M82 (extrusão absoluta) internamente, e ao final E=44.5+.
+; Se sair daqui em M82, o usuário clicar "Purga +1" mandaria G1 E1 que
+; em absoluto seria interpretado como "vá para E=1" = retract gigante.
+; Por isso restauramos M83 (relativo) + G92 E0 (zera contador) no fim.
+M83             ; extrusora relativa (padrão BIA pós-execução)
+G92 E0          ; zera contador do E para que a purga manual funcione
+
+; ─── Footer de segurança: retract + subir Z (R12.45/R12.46) ───────
+G1 E-10 F300    ; retract de 10mm para parar escoamento do hidrogel
+G91             ; modo relativo para subir Z sem mover XY
+G1 Z20 F600     ; sobe 20mm para dar espaço de retirar a peça
+G90             ; volta para absoluto
+M400            ; aguarda fim do movimento
+; ─── FIM ───
 `
