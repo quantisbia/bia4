@@ -418,9 +418,22 @@ export function generateGCodeForJob(input: EngineInput): GCodeResult {
   }
 
   // 8) Emitir G-code final
+  //
+  // R12.42 — CRITICAL FIX: extrusão RELATIVA (M83) por padrão.
+  //
+  // ANTES: relativeExtrusion=false → header emitia M82 (absoluta), mas o
+  // engine calcula `e` como INCREMENTO por segmento (linha 178: `d * extrusionPerMm`).
+  // Em modo absoluto cada E=0.04 → E=0.05 fazia o firmware interpretar como
+  // "vá para posição 0.04, agora 0.05" — efetivamente NÃO EXTRUDA nada após
+  // o primeiro segmento (motor recua ou ignora).
+  //
+  // AGORA: M83 (relativa) — cada `E n` significa "extrude +n mm". Isso bate
+  // com como o engine, retract() e primeExtruder() emitem deltas, e também
+  // está alinhado com o que a página /execute envia para a impressora real
+  // após o handshake (linha 765: "M83 ; extrusora em modo relativo").
   const gcode = emitGCode(moves, job.bioprinter, job.bioink, {
     verbose: true,
-    relativeExtrusion: false,
+    relativeExtrusion: true,    // ← M83
     includeHeader: true,
     includeFooter: true,
     jobMetadata: job,
@@ -452,6 +465,14 @@ export function generateGCodeForJob(input: EngineInput): GCodeResult {
   if (stats.totalTime_sec > 7200 && job.bioink.hasCells) {
     warnings.push(
       `⚠️ Impressão > 2h fora da incubadora pode comprometer viabilidade. Considere reduzir número de poços.`,
+    )
+  }
+  // R12.42: validação defensiva — se não há nada para extrudar, é configuração
+  // sem sentido. Sinaliza com warning bem visível ao invés de retornar G-code
+  // mudo (apenas header/footer) que faria a impressora não fazer nada.
+  if (stats.extrudeDistance_mm < 0.1) {
+    warnings.push(
+      `🚨 G-code sem nenhuma extrusão! Verifique se: (a) infillPercent > 0 OU walls > 0; (b) geometria tem dimensões válidas; (c) bbox não está em zero. Esta impressão não vai depositar bioink.`,
     )
   }
 

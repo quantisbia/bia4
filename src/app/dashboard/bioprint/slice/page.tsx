@@ -881,6 +881,7 @@ export default function BioprintSlicePage() {
               onGenerate={generateGCode}
               onDownload={downloadGCode}
               isUnlocked={isUnlocked}
+              perimeterOnly={perimeterOnly}
             />
           </div>
         )}
@@ -1874,12 +1875,14 @@ function WellsPanel({
 // PAINEL C — G-CODE
 // ═══════════════════════════════════════════════════════════════════════════
 function GCodePanel({
-  loading, error, result, onGenerate, onDownload, isUnlocked,
+  loading, error, result, onGenerate, onDownload, isUnlocked, perimeterOnly,
 }: {
   loading: boolean
   error: { message: string; details?: string; suggestions?: string[] } | null
   result: GCodeResponse | null
   onGenerate: () => void; onDownload: () => void; isUnlocked: boolean
+  /** R12.42 fix: ReferenceError causado por uso de `perimeterOnly` sem prop */
+  perimeterOnly: boolean
 }) {
   const [copied, setCopied] = useState(false)
   const [elapsed, setElapsed] = useState(0)

@@ -60,7 +60,7 @@ const CATEGORY_DEFS: CategoryDef[] = [
     icon: Heart,
     accent: "rose",
     geometryIds: [
-      "membrane", "disk", "cube_tissue", "vessel", "hexagonal_liver",
+      "membrane", "disk", "skin_cylinder", "cube_tissue", "vessel", "hexagonal_liver",
       "nose", "meniscus", "cornea", "lens", "ear", "heart", "kidney",
       "liver_anatomical",
       "skin_3layer", "cardiac_patch", "cornea_curved", "cartilage_zonal",

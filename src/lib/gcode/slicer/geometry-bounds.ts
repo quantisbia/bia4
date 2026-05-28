@@ -91,6 +91,17 @@ export function getGeometryBounds(
       }
     }
 
+    case "skin_cylinder": {
+      // R12.42 — cilindro baixo para Pele (mesh STL real, bounds = círculo)
+      const r = params.radius ?? 20
+      const t = params.thickness ?? 10
+      return {
+        height_mm: t, zMin: 0, zMax: t,
+        getBoundsAtZ: () => ({ minX: cx - r, maxX: cx + r, minY: cy - r, maxY: cy + r }),
+        getPerimetersAtZ: (_z, walls, spacing) => circlePerimeters(cx, cy, r, walls, spacing),
+      }
+    }
+
     case "bone_block":
     case "cube_tissue": {
       const w = params.width ?? 20
@@ -598,7 +609,7 @@ export function getGeometryBounds(
 // ─── Helper público: lista todas as geometrias com bounds dedicado ─────────
 // Útil para o frontend validar antes de chamar /api/gcode/generate.
 export const SUPPORTED_GEOMETRY_IDS = [
-  "membrane", "disk", "bone_block", "cube_tissue", "vessel", "hexagonal_liver",
+  "membrane", "disk", "skin_cylinder", "bone_block", "cube_tissue", "vessel", "hexagonal_liver",
   "femur", "nose", "meniscus", "cornea", "lens", "organoid_sphere",
   "ear", "heart", "kidney", "liver_anatomical", "hand",
   "tpms_gyroid", "tpms_schwarz", "tpms_diamond",

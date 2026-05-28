@@ -92,12 +92,23 @@ export const GEOMETRIES: STLGeometry[] = [
   {
     id: "disk",
     label: "Cilindro / Bolacha",
-    description: "Disco circular para implantes dérmicos, pele 3D e discos cartilaginosos",
+    description: "Disco circular real (mesh STL CAD · R12.42) para implantes dérmicos, pele 3D e discos cartilaginosos",
     tissue: "Pele / Cartilagem",
     application: "Implante dérmico, enxerto circular, disco de cartilagem",
     icon: "🥏",
     defaultParams: { radius: 10, thickness: 3, segments: 48 },
-    paramLabels: { radius: "Raio (mm)", thickness: "Espessura (mm)", segments: "Segmentos (resolução)" },
+    paramLabels: { radius: "Raio (mm)", thickness: "Espessura (mm)", segments: "Segmentos (apenas visual)" },
+    creditCost: 6,
+  },
+  {
+    id: "skin_cylinder",
+    label: "Cilindro Baixo (Pele)",
+    description: "Disco fino real (mesh STL CAD · R12.42) — cilindro de baixa altura para implantes/patches dérmicos e curativos espessos",
+    tissue: "Pele",
+    application: "Implante dérmico de área extensa, patch dermal espesso, scaffold de regeneração cutânea",
+    icon: "🟤",
+    defaultParams: { radius: 20, thickness: 10, segments: 48 },
+    paramLabels: { radius: "Raio (mm)", thickness: "Espessura/altura (mm)", segments: "Segmentos (apenas visual)" },
     creditCost: 6,
   },
   {
@@ -136,13 +147,13 @@ export const GEOMETRIES: STLGeometry[] = [
   {
     id: "hexagonal_liver",
     label: "Hexagonal (Hepático)",
-    description: "Prisma hexagonal inspirado no lóbulo hepático para tissue engineering de fígado",
+    description: "Ácino hepático real (mesh STL CAD · R12.42 · 51.024 triângulos) — cilindro hexagonal de 6 segmentos inspirado no lóbulo hepático para tissue engineering de fígado",
     tissue: "Fígado",
     application: "Modelo hepático, lóbulo artificial, chip-órgão",
     icon: "⬡",
     defaultParams: { radius: 8, thickness: 4, segments: 6 },
-    paramLabels: { radius: "Raio (circunferência, mm)", thickness: "Altura (mm)", segments: "Lados (6=hexágono)" },
-    creditCost: 6,
+    paramLabels: { radius: "Raio (circunferência, mm)", thickness: "Altura (mm)", segments: "Lados (6=hexágono, apenas visual)" },
+    creditCost: 10,
   },
   {
     id: "femur",
@@ -202,7 +213,7 @@ export const GEOMETRIES: STLGeometry[] = [
   {
     id: "lens",
     label: "Cristalino (Oval)",
-    description: "Cilindro oval biconvexo para engenharia de cristalino e modelos oftálmicos",
+    description: "Esfera oval biconvexa real (mesh STL CAD · R12.42 · 3.720 triângulos) para engenharia de cristalino e modelos oftálmicos",
     tissue: "Cristalino / Humor",
     application: "Lente intraocular bioimprimida, modelo de cristalino",
     icon: "🔵",
@@ -567,6 +578,104 @@ function genFemurAnatomical(width: number, height: number, depth: number): Trian
 // em R12.15. O fêmur agora é uma mesh anatômica real (ver genFemurAnatomical).
 // Para histórico: ver commit anterior a 59356ab no git log.
 
+// ═══════════════════════════════════════════
+// R12.42 — MESHES STL REAIS (substituem geração procedural)
+// ═══════════════════════════════════════════
+
+/**
+ * Disco / Cilindro / Bolacha (R12.42):
+ *   - Mesh real CAD do usuário (cilindro.stl · 176 triângulos)
+ *   - Substitui o cilindro paramétrico antigo
+ *   - Aceita escala: radius (X=Y, isotrópico no plano) · thickness (Z)
+ *   - Mesh centralizada em (0,0) no plano XY após pipeline · base em Z=0
+ *   - Lazy require: a mesh (~10 KB) só carrega quando "disk" é selecionado
+ */
+function genDiskFromMesh(radius: number, thickness: number): Triangle[] {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const meshMod = require("./meshes/disk-mesh-data") as typeof import("./meshes/disk-mesh-data")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const utils = require("./meshes/mesh-utils") as typeof import("./meshes/mesh-utils")
+  const { DISK_MESH_VERTICES, DISK_MESH_NATIVE } = meshMod
+  // Cilindro: width e depth representam o DIÂMETRO do círculo (= 2 × radius)
+  return utils.loadCenteredScaledMesh(
+    DISK_MESH_VERTICES,
+    DISK_MESH_NATIVE,
+    radius * 2,    // target width (diâmetro X)
+    radius * 2,    // target depth (diâmetro Y)
+    thickness,     // target height (altura Z)
+  )
+}
+
+/**
+ * Cilindro Baixo / Pele (R12.42 — NOVA peça na categoria Pele):
+ *   - Mesh real CAD do usuário (cilindro-baixo.stl · 396 triângulos)
+ *   - Disco fino com mais resolução circular do que o `disk` padrão
+ *   - Aceita escala: radius (X=Y, isotrópico) · thickness (Z)
+ *   - Mesh nativa já está centralizada em XY · base em Z=0
+ *   - Lazy require: a mesh (~20 KB) só carrega quando "skin_cylinder" é selecionado
+ */
+function genSkinCylinderFromMesh(radius: number, thickness: number): Triangle[] {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const meshMod = require("./meshes/skin-cylinder-mesh-data") as typeof import("./meshes/skin-cylinder-mesh-data")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const utils = require("./meshes/mesh-utils") as typeof import("./meshes/mesh-utils")
+  const { SKIN_CYLINDER_MESH_VERTICES, SKIN_CYLINDER_MESH_NATIVE } = meshMod
+  return utils.loadCenteredScaledMesh(
+    SKIN_CYLINDER_MESH_VERTICES,
+    SKIN_CYLINDER_MESH_NATIVE,
+    radius * 2,    // diâmetro X
+    radius * 2,    // diâmetro Y
+    thickness,     // altura Z
+  )
+}
+
+/**
+ * Cristalino Oval (R12.42):
+ *   - Mesh real CAD do usuário (esfera oval.stl · 3.720 triângulos)
+ *   - Substitui o cilindro oval procedural antigo
+ *   - Aceita escala anisotrópica: radiusA (X) · radiusB (Y) · thickness (Z)
+ *   - Mesh centralizada após pipeline · base em Z=0
+ *   - Lazy require: a mesh (~210 KB) só carrega quando "lens" é selecionado
+ */
+function genLensFromMesh(radiusA: number, radiusB: number, thickness: number): Triangle[] {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const meshMod = require("./meshes/lens-mesh-data") as typeof import("./meshes/lens-mesh-data")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const utils = require("./meshes/mesh-utils") as typeof import("./meshes/mesh-utils")
+  const { LENS_MESH_VERTICES, LENS_MESH_NATIVE } = meshMod
+  return utils.loadCenteredScaledMesh(
+    LENS_MESH_VERTICES,
+    LENS_MESH_NATIVE,
+    radiusA * 2,   // diâmetro X (semi-eixo maior × 2)
+    radiusB * 2,   // diâmetro Y (semi-eixo menor × 2)
+    thickness,     // altura Z
+  )
+}
+
+/**
+ * Hexagonal Hepático / Ácino (R12.42):
+ *   - Mesh real CAD do usuário (acino hepático.stl · 51.024 triângulos)
+ *   - Cilindro hexagonal de 6 segmentos com geometria detalhada do ácino hepático real
+ *   - Substitui o prisma hexagonal procedural (genCylinder com 6 segmentos)
+ *   - Aceita escala: radius (X=Y, isotrópico) · thickness (Z)
+ *   - Mesh centralizada após pipeline · base em Z=0
+ *   - Lazy require: a mesh (~3 MB) só carrega quando "hexagonal_liver" é selecionado
+ */
+function genHexagonalLiverFromMesh(radius: number, thickness: number): Triangle[] {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const meshMod = require("./meshes/hepatic-acinus-mesh-data") as typeof import("./meshes/hepatic-acinus-mesh-data")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const utils = require("./meshes/mesh-utils") as typeof import("./meshes/mesh-utils")
+  const { HEPATIC_ACINUS_MESH_VERTICES, HEPATIC_ACINUS_MESH_NATIVE } = meshMod
+  return utils.loadCenteredScaledMesh(
+    HEPATIC_ACINUS_MESH_VERTICES,
+    HEPATIC_ACINUS_MESH_NATIVE,
+    radius * 2,    // X (diâmetro do hexágono)
+    radius * 2,    // Y (diâmetro do hexágono)
+    thickness,     // altura Z
+  )
+}
+
 /**
  * Nariz ANATÔMICO real (R12.13):
  *   - Mesh fiel de nariz humano com 11.974 triângulos (cartilagem nasal)
@@ -903,7 +1012,10 @@ export function generateGeometry(id: string, params: GeometryParams): Triangle[]
     case "membrane":
       return genMembrane(p)
     case "disk":
-      return genCylinder(p.radius ?? 10, p.thickness ?? 3, p.segments ?? 48)
+      return genDiskFromMesh(p.radius ?? 10, p.thickness ?? 3)
+    case "skin_cylinder":
+      // R12.42: novo cilindro baixo (mesh STL real) para implantes/patches dérmicos
+      return genSkinCylinderFromMesh(p.radius ?? 20, p.thickness ?? 10)
     case "bone_block":
       return genBoneBlock(p.width ?? 20, p.height ?? 20, p.depth ?? 10, p.wallThickness ?? 1.2, p.infillPercent ?? 70, p.segments ?? 20)
     case "cube_tissue":
@@ -911,7 +1023,8 @@ export function generateGeometry(id: string, params: GeometryParams): Triangle[]
     case "vessel":
       return genTube(p.outerRadius ?? 8, p.innerRadius ?? 6.5, p.tubeLength ?? 30, p.segments ?? 48)
     case "hexagonal_liver":
-      return genCylinder(p.radius ?? 8, p.thickness ?? 4, 6) // hexagon = 6 segments
+      // R12.42: ácino hepático real (mesh STL ~51k triângulos), substitui prisma hexagonal procedural
+      return genHexagonalLiverFromMesh(p.radius ?? 8, p.thickness ?? 4)
     case "femur":
       // R12.15: mesh anatômica real (substituiu cilindro oco + 2 esferas)
       return genFemurAnatomical(p.width ?? 85, p.height ?? 450, p.depth ?? 30)
@@ -923,7 +1036,8 @@ export function generateGeometry(id: string, params: GeometryParams): Triangle[]
     case "cornea":
       return genMeniscus(p.outerR ?? 6, p.innerR ?? 3, p.thickness ?? 1.2, p.arcAngle ?? 200, p.segments ?? 64)
     case "lens":
-      return genOvalCylinder(p.radiusA ?? 5, p.radiusB ?? 3, p.thickness ?? 4, p.segments ?? 48)
+      // R12.42: cristalino oval real (mesh STL ~3.7k triângulos), substitui geração procedural
+      return genLensFromMesh(p.radiusA ?? 5, p.radiusB ?? 3, p.thickness ?? 4)
     case "organoid_sphere":
       return genSphere(p.radius ?? 5, p.segments ?? 32)
     case "ear":

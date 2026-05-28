@@ -7,6 +7,11 @@
     "src/lib/stl/meshes/heart-mesh-data.ts",
     "src/lib/stl/meshes/femur-mesh-data.ts",
     "src/lib/stl/meshes/nose-mesh-data.ts",
-    "src/lib/stl/meshes/ear-mesh-data.ts"
+    "src/lib/stl/meshes/ear-mesh-data.ts",
+    "src/lib/stl/meshes/disk-mesh-data.ts",
+    "src/lib/stl/meshes/skin-cylinder-mesh-data.ts",
+    "src/lib/stl/meshes/lens-mesh-data.ts",
+    "src/lib/stl/meshes/star-mesh-data.ts",
+    "src/lib/stl/meshes/hepatic-acinus-mesh-data.ts"
   ]
 }

@@ -479,30 +479,33 @@ export function genCollapseBridge(spans: number[], towerSize: number, towerHeigh
 }
 
 /**
- * STAR / ASTERISK TEST — overhang em ângulos diferentes.
- * Pino central + N braços radiais sem suporte. Mede colapso por ângulo.
+ * STAR / ASTERISK TEST — overhang em ângulos diferentes (R12.42 — atualizado).
+ *
+ * AGORA: usa mesh STL real CAD fornecida pelo usuário (estrela.stl · 10.228 triângulos)
+ * substituindo a geração procedural antiga (pino + filamentos discretizados).
+ *
+ * A assinatura é preservada por compatibilidade com o dispatcher, mas os
+ * parâmetros pinR/pinH/armCount/armLength/armRadius agora derivam:
+ *   - largura/profundidade alvo = 2 × (pinR + armLength)   (extensão do braço de ponta-a-ponta)
+ *   - altura alvo = pinH
+ * Isso preserva a UX dos parâmetros antigos para quem chamava com argumentos customizados.
  */
-export function genStarOverhang(pinR: number, pinH: number, armCount: number, armLength: number, armRadius: number): Triangle[] {
-  const tris: Triangle[] = []
-  // Pino central
-  tris.push(...cylinder(0, 0, pinR, 0, pinH, 24))
-  // Braços horizontais a partir do topo do pino
-  const z = pinH - armRadius
-  for (let i = 0; i < armCount; i++) {
-    const a = (i / armCount) * Math.PI * 2
-    // Aproximamos braço como série de filamentos curtos formando linha
-    const steps = 8
-    for (let s = 0; s < steps; s++) {
-      const t0 = s / steps, t1 = (s + 1) / steps
-      const x0 = Math.cos(a) * (pinR + t0 * armLength)
-      const y0 = Math.sin(a) * (pinR + t0 * armLength)
-      const x1 = Math.cos(a) * (pinR + t1 * armLength)
-      const y1 = Math.sin(a) * (pinR + t1 * armLength)
-      tris.push(...filamentX(Math.min(x0, x1), (y0 + y1) / 2, z, Math.abs(x1 - x0) + 0.1, armRadius, 8))
-      tris.push(...filamentY((x0 + x1) / 2, Math.min(y0, y1), z, Math.abs(y1 - y0) + 0.1, armRadius, 8))
-    }
-  }
-  return tris
+export function genStarOverhang(pinR: number, pinH: number, _armCount: number, armLength: number, _armRadius: number): Triangle[] {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const meshMod = require("./meshes/star-mesh-data") as typeof import("./meshes/star-mesh-data")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const utils = require("./meshes/mesh-utils") as typeof import("./meshes/mesh-utils")
+  const { STAR_MESH_VERTICES, STAR_MESH_NATIVE } = meshMod
+
+  // Extensão total da estrela = 2 × distância centro-ponta = 2 × (pinR + armLength)
+  const span = 2 * (pinR + armLength)
+  return utils.loadCenteredScaledMesh(
+    STAR_MESH_VERTICES,
+    STAR_MESH_NATIVE,
+    span,          // largura X
+    span,          // profundidade Y
+    pinH,          // altura Z
+  )
 }
 
 /**

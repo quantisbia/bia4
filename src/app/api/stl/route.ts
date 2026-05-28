@@ -47,7 +47,7 @@ export async function GET() {
     method: "POST",
     description: "Gerador de geometrias 3D para bioimpressão",
     geometries: [
-      "membrane", "disk", "bone_block", "cube_tissue", "vessel",
+      "membrane", "disk", "skin_cylinder", "bone_block", "cube_tissue", "vessel",
       "hexagonal_liver", "femur", "nose", "meniscus", "cornea", "lens", "organoid_sphere",
       "ear", "heart", "kidney", "liver_anatomical", "hand",
       "tpms_gyroid", "tpms_schwarz", "tpms_diamond",
