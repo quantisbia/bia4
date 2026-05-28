@@ -595,6 +595,27 @@ function GeneratePanel({
           )
         })}
 
+        {/* R12.43 — Aviso de página dedicada para testes de imprimibilidade */}
+        {category === "printability-test" && (
+          <Link
+            href="/dashboard/bioprint/printability"
+            className="block mt-2 rounded-xl border border-amber-500/40 bg-amber-500/[0.08] hover:bg-amber-500/[0.12] p-3 transition-colors group"
+          >
+            <div className="flex items-center gap-2 text-xs font-semibold text-amber-200">
+              <Sparkles className="w-4 h-4" />
+              Página dedicada disponivel
+            </div>
+            <div className="text-[11px] text-amber-100/80 mt-1 leading-snug">
+              Para testar a biotinta sem passar pelo fluxo das 5 etapas, use a
+              pre-etapa standalone /printability — STL + G-code + protocolo de
+              analise em uma so pagina.
+            </div>
+            <div className="text-[10px] text-amber-300/80 mt-1.5 flex items-center gap-1 group-hover:gap-2 transition-all">
+              Abrir testes de imprimibilidade <ArrowRight className="w-3 h-3" />
+            </div>
+          </Link>
+        )}
+
         {/* Estratégia avançada — dual-porosity (consolidada nesta página, categoria organoid-vascular) */}
         {category === "organoid-vascular" && (
           <div className="block mt-2 rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-3">
