@@ -931,12 +931,27 @@ export default function BioprintSlicePage() {
             </button>
           )}
           {state.slice.status === "ready" && (
-            <Link
-              href="/dashboard/bioprint/control"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500 hover:bg-violet-400 text-violet-950 text-sm font-semibold rounded-lg transition-colors"
-            >
-              Etapa 4 · Execução <ArrowRight className="w-4 h-4" />
-            </Link>
+            <>
+              {/* R12.52: rota principal — vai direto pra /execute que tem o
+                  controller serial real. /control é um simulador (só log
+                  virtual, não envia comandos pra impressora) e era pra onde
+                  o link apontava antes, o que travava a impressão real. */}
+              <Link
+                href="/dashboard/bioprint/execute"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-sm font-semibold rounded-lg transition-colors"
+              >
+                Imprimir agora <ArrowRight className="w-4 h-4" />
+              </Link>
+              {/* Mantém acesso ao simulador para quem quer revisar parâmetros
+                  antes de subir pra máquina real. */}
+              <Link
+                href="/dashboard/bioprint/control"
+                className="inline-flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium rounded-lg transition-colors"
+                title="Abrir simulador de controle (não envia para a bioimpressora)"
+              >
+                Simular <ArrowRight className="w-3 h-3" />
+              </Link>
+            </>
           )}
         </div>
       </footer>

@@ -32,6 +32,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { useBioprintProcess } from "@/lib/bioprint/process-context"
+import { sendToExecute } from "@/lib/bioprint/execute-handoff"
 import { type JoystickPosition } from "@/components/bioprinter/Joystick3D"
 import { ExtrusionPanel, type ExtrusionState } from "@/components/bioprinter/ExtrusionPanel"
 import { TissueViabilityPanel, type TissueState } from "@/components/bioprinter/TissueViabilityPanel"
@@ -656,12 +657,30 @@ export default function BioprintControlPage() {
               </div>
               <div className="flex gap-2">
                 {state.slice.gcode && (
-                  <button
-                    onClick={handleStartPrint}
-                    className="text-[10px] px-2.5 py-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-200 transition-colors flex items-center gap-1"
-                  >
-                    <PlayCircle className="w-3 h-3" /> Simular print
-                  </button>
+                  <>
+                    {/* R12.52: imprimir de verdade — manda pra /execute que
+                        tem o controller serial real. /control só simula. */}
+                    <button
+                      onClick={() => {
+                        sendToExecute({
+                          gcode: state.slice.gcode!,
+                          name: `bia_${state.model.geometryId ?? "job"}.gcode`,
+                          from: "Etapa 4 · Controle (fluxo principal)",
+                        })
+                      }}
+                      className="text-[10px] px-2.5 py-1 rounded-lg border border-emerald-400/40 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 hover:from-emerald-500/30 hover:to-cyan-500/30 text-emerald-100 font-semibold transition-colors flex items-center gap-1"
+                      title="Envia o G-code para a página de impressão REAL (controller serial)"
+                    >
+                      <ZapIcon className="w-3 h-3" /> Imprimir de verdade →
+                    </button>
+                    <button
+                      onClick={handleStartPrint}
+                      className="text-[10px] px-2.5 py-1 rounded-lg border border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/20 text-violet-200 transition-colors flex items-center gap-1"
+                      title="Simula no log virtual — NÃO envia para a impressora"
+                    >
+                      <PlayCircle className="w-3 h-3" /> Simular
+                    </button>
+                  </>
                 )}
                 <button
                   onClick={clearLog}

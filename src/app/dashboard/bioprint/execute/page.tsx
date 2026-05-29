@@ -202,44 +202,75 @@ export default function BioprintExecutePage() {
   // R12.29: também valida + auto-corrige automaticamente (igual aos demais
   // canais de carga). Não pode usar loadGcodeWithAutoFix aqui porque o
   // useCallback é declarado depois — então a lógica é inline (curta).
+  //
+  // R12.52: agora há DOIS canais de carga:
+  //   1) sessionStorage HANDOFF_KEY — usado por /quick-gcode, /gcode/medical,
+  //      /gcode/advanced, /printability (chamam sendToExecute)
+  //   2) bioprintState.slice.gcode — usado pelo FLUXO PRINCIPAL (etapas
+  //      model → bioink → slice). A /slice grava em state.slice.gcode via
+  //      updateSlice e nunca chamava sendToExecute, então o /execute ficava
+  //      sem G-code. Bug reportado pela Janaina: "faço membrana+linhas e
+  //      não consigo imprimir".
+  //
+  // Prioridade: HANDOFF tem preferência (é mais recente, vem de um botão
+  // explícito). Se vazio, usa o state.slice.gcode do context global.
   useEffect(() => {
+    // Helper interno — carrega + valida + auto-fix
+    const loadAndValidate = (gcode: string, name: string, from: string) => {
+      setGcodeText(gcode)
+      setGcodeName(name)
+      loggerRef.current.info(`G-code importado de ${from} — ${gcode.split("\n").length} linhas`)
+      try {
+        const result = validateGcode(gcode, DEFAULT_BIO_LIMITS, "marlin")
+        const summary = summarizeAutoFix(result)
+        if (summary.totalFixable > 0) {
+          const fix = autoFixGcode(gcode, result, DEFAULT_AUTOFIX_OPTS)
+          if (fix.applied.length > 0) {
+            setGcodeText(fix.fixedGcode)
+            const reval = validateGcode(fix.fixedGcode, DEFAULT_BIO_LIMITS, "marlin")
+            setValidation(reval)
+            loggerRef.current.ok(
+              `Auto-fix aplicou ${fix.applied.length} correção(ões) no G-code importado.`,
+              "validator",
+            )
+          } else {
+            setValidation(result)
+          }
+        } else {
+          setValidation(result)
+        }
+      } catch (e) {
+        loggerRef.current.warn(`Validação automática falhou: ${e instanceof Error ? e.message : String(e)}`)
+      }
+    }
+
     try {
+      // ── Canal 1: sessionStorage HANDOFF ──
       const raw = sessionStorage.getItem(HANDOFF_KEY)
       if (raw) {
         const obj = JSON.parse(raw) as { gcode: string; name?: string; from?: string }
         if (obj.gcode) {
-          setGcodeText(obj.gcode)
-          setGcodeName(obj.name ?? "G-code importado")
-          loggerRef.current.info(`G-code importado de ${obj.from ?? "outra página"} — ${obj.gcode.split("\n").length} linhas`)
           sessionStorage.removeItem(HANDOFF_KEY)
-
-          // R12.29: valida + auto-fix em background
-          try {
-            const result = validateGcode(obj.gcode, DEFAULT_BIO_LIMITS, "marlin")
-            const summary = summarizeAutoFix(result)
-            if (summary.totalFixable > 0) {
-              const fix = autoFixGcode(obj.gcode, result, DEFAULT_AUTOFIX_OPTS)
-              if (fix.applied.length > 0) {
-                setGcodeText(fix.fixedGcode)
-                const reval = validateGcode(fix.fixedGcode, DEFAULT_BIO_LIMITS, "marlin")
-                setValidation(reval)
-                loggerRef.current.ok(
-                  `Auto-fix aplicou ${fix.applied.length} correção(ões) no G-code importado.`,
-                  "validator",
-                )
-              } else {
-                setValidation(result)
-              }
-            } else {
-              setValidation(result)
-            }
-          } catch (e) {
-            loggerRef.current.warn(`Validação automática do handoff falhou: ${e instanceof Error ? e.message : String(e)}`)
-          }
+          loadAndValidate(obj.gcode, obj.name ?? "G-code importado", obj.from ?? "outra página")
+          return
         }
       }
+
+      // ── Canal 2 (R12.52): bioprintState.slice.gcode ──
+      // Se o usuário veio do fluxo principal (model → bioink → slice), o
+      // G-code está no context. Sem isso, /execute fica vazio e o botão
+      // IMPRIMIR mostra "Sem G-code carregado".
+      if (bioprintState.slice.gcode && bioprintState.slice.gcode.trim().length > 0) {
+        const modelName = bioprintState.model.name ?? bioprintState.model.geometryId ?? "fluxo principal"
+        loadAndValidate(
+          bioprintState.slice.gcode,
+          `${modelName}.gcode`,
+          "fluxo Bioprint (Etapa 3 · Fatiamento)",
+        )
+      }
     } catch {}
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // intencionalmente só no mount — handoff e state inicial
 
   // ─── Validação ──
   const [validation, setValidation] = useState<ValidationResult | null>(null)
