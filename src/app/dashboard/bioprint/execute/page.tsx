@@ -41,6 +41,7 @@ import {
   ChevronDown, ChevronRight, Download, Trash2, Gamepad2, Sparkles,
   ShieldAlert, Info, RotateCcw, Wand2, X, Clipboard, ArrowLeft,
   Wrench, Undo2, Settings2, Droplet, Crosshair, Loader2,
+  Printer, ListChecks,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
@@ -64,6 +65,9 @@ import {
   type FirmwareInfo,
 } from "@/lib/bioprint/printer-connection"
 import { PrinterController, type ControllerState, type StreamProgress } from "@/lib/bioprint/printer-controller"
+// R12.47: estado global do processo + checagem de coerência modelo↔gcode
+import { useBioprintProcess } from "@/lib/bioprint/process-context"
+import { checkCoherence, coherenceBadge, type CoherenceReport } from "@/lib/bioprint/coherence-check"
 
 // Reutiliza preview 3D existente
 import { type ColorMode } from "@/components/bioprinter/GcodeViewer3D"
@@ -175,6 +179,12 @@ const HANDOFF_KEY = "bia.execute.gcode.handoff"
 // ─── Componente principal ────────────────────────────────────────────────
 
 export default function BioprintExecutePage() {
+  // R12.47: estado global do processo de bioimpressão (fonte da verdade).
+  // O /execute agora consome o BioprintProcessState para verificar coerência
+  // entre o que a usuária escolheu (modelo, biotinta, fatiamento) e o G-code
+  // realmente carregado — antes de liberar o IMPRIMIR.
+  const { state: bioprintState } = useBioprintProcess()
+
   // ─── Logger global (singleton por mount) ──
   const loggerRef = useRef<PrintLogger>(new PrintLogger())
   const [logEntries, setLogEntries] = useState<LogEntry[]>([])
@@ -234,6 +244,23 @@ export default function BioprintExecutePage() {
   // ─── Validação ──
   const [validation, setValidation] = useState<ValidationResult | null>(null)
   const [showAllIssues, setShowAllIssues] = useState(false)
+
+  // R12.47: Coerência modelo↔gcode. Sempre que o gcodeText mudar, recalcula
+  // o report comparando contra o BioprintProcessState. Se `isBlocking`, o
+  // botão IMPRIMIR fica desabilitado e o modal de pré-flight mostra o motivo.
+  const coherenceReport: CoherenceReport | null = useMemo(() => {
+    if (!gcodeText.trim()) return null
+    try {
+      return checkCoherence(gcodeText, bioprintState)
+    } catch {
+      return null
+    }
+  }, [gcodeText, bioprintState])
+
+  // R12.47: estado do modal "Pré-flight" — mostra checklist completo antes
+  // de mandar o stream. Abre quando o usuário clica em IMPRIMIR (qualquer
+  // dos dois botões: o do painel principal ou o do joystick).
+  const [showPreflight, setShowPreflight] = useState(false)
 
   const handleValidate = useCallback(() => {
     if (!gcodeText.trim()) {
@@ -1048,6 +1075,11 @@ export default function BioprintExecutePage() {
   }, [connected])
 
   // ─── SEND G-CODE ──
+  /**
+   * R12.47: handleSend agora é o "confirm" final do pré-flight.
+   * Use handleRequestPrint para abrir o modal de pré-flight; só depois
+   * que a usuária confirmar é que handleSend é chamado.
+   */
   const handleSend = useCallback(async () => {
     if (!connected || !controllerRef.current) {
       loggerRef.current.warn("Conecte primeiro.")
@@ -1066,6 +1098,13 @@ export default function BioprintExecutePage() {
       loggerRef.current.error(`Bloqueado: ${validation.errorCount} erros precisam ser corrigidos.`)
       return
     }
+    // R12.47: bloqueia se coerência tem issues "blocking"
+    if (coherenceReport?.isBlocking) {
+      loggerRef.current.error(
+        `Bloqueado por incoerência modelo↔G-code: ${coherenceReport.issues.filter(i => i.level === "blocking").map(i => i.code).join(", ")}. Confira o painel de Pré-flight.`,
+      )
+      return
+    }
     try {
       // R12.24: garante que o fluxo configurado (default 50% para hidrogéis)
       // está aplicado ANTES do streaming começar. Sem isso, Marlin usaria o
@@ -1077,7 +1116,29 @@ export default function BioprintExecutePage() {
     } catch (e) {
       loggerRef.current.error(`Stream falhou: ${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [connected, gcodeText, validation, handleValidate, applyFlow, flowPercent, applySpeed, speedPercent])
+  }, [connected, gcodeText, validation, handleValidate, applyFlow, flowPercent, applySpeed, speedPercent, coherenceReport])
+
+  /**
+   * R12.47: Abre o modal de Pré-flight. Tanto o botão IMPRIMIR do joystick
+   * quanto o do painel principal chamam isso. O modal mostra um checklist
+   * completo (conectado? home? G-code? validação? coerência?) e só permite
+   * confirmar se TUDO estiver verde.
+   */
+  const handleRequestPrint = useCallback(() => {
+    if (!gcodeText.trim()) {
+      loggerRef.current.warn("Sem G-code carregado. Volte para a Etapa 3 (Fatiamento) ou carregue um G-code antes de imprimir.")
+      return
+    }
+    if (!connected) {
+      loggerRef.current.warn("Conecte a bioimpressora (painel Conexão) antes de imprimir.")
+      return
+    }
+    // Valida se ainda não validou
+    if (!validation) {
+      handleValidate()
+    }
+    setShowPreflight(true)
+  }, [gcodeText, connected, validation, handleValidate])
 
   // ─── PAUSE / RESUME / CANCEL / EMERGENCY ──
   const handlePause = useCallback(() => controllerRef.current?.pause(), [])
@@ -2123,12 +2184,18 @@ export default function BioprintExecutePage() {
             <div className="flex flex-wrap gap-2">
               {!isStreaming && !isPaused && (
                 <button
-                  onClick={handleSend}
-                  disabled={!canSend || validation?.verdict === "blocked"}
+                  onClick={handleRequestPrint}
+                  disabled={!canSend || validation?.verdict === "blocked" || coherenceReport?.isBlocking}
                   className="px-4 py-2 rounded-lg text-sm font-bold bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+                  title="Abre o pré-flight antes do envio (checklist completo)"
                 >
                   <Send className="w-4 h-4" />
                   Enviar para Bioimpressora
+                  {coherenceReport && coherenceReport.issues.length > 0 && (
+                    <span className="text-[9px] font-normal bg-amber-500/30 border border-amber-300/40 px-1.5 py-0.5 rounded-full">
+                      {coherenceReport.issues.length}
+                    </span>
+                  )}
                 </button>
               )}
               {isStreaming && (
@@ -2565,6 +2632,62 @@ export default function BioprintExecutePage() {
                 <div className="text-[9px] text-gray-500 uppercase">E</div>
                 <div className="text-emerald-300">{position.e.toFixed(2)}</div>
               </div>
+            </div>
+
+            {/* ── R12.47: BOTÃO IMPRIMIR dentro do joystick ─────────────
+                A Bia pediu explicitamente: precisa poder iniciar a impressão
+                SEM sair do painel do joystick. Antes, o botão "Enviar"
+                ficava só no painel principal, longe dos comandos manuais.
+                Agora o IMPRIMIR fica aqui, com pré-flight check completo
+                (conectado? home? G-code? validação? coerência?).
+            */}
+            <div className="mt-3 pt-3 border-t border-emerald-500/30">
+              {(() => {
+                // Razões para bloquear o botão (cada uma resulta em uma frase explicativa)
+                const blockReasons: string[] = []
+                if (!connected) blockReasons.push("conecte a impressora")
+                if (!gcodeText.trim()) blockReasons.push("carregue um G-code")
+                if (validation?.verdict === "blocked") blockReasons.push(`corrija ${validation.errorCount} erro(s) do G-code`)
+                if (coherenceReport?.isBlocking) blockReasons.push("resolva incoerências modelo↔G-code")
+                if (controllerState === "streaming") blockReasons.push("impressão já em andamento")
+                if (isHandshaking) blockReasons.push("aguarde o handshake terminar")
+                const blocked = blockReasons.length > 0
+
+                return (
+                  <>
+                    <button
+                      onClick={handleRequestPrint}
+                      disabled={blocked}
+                      className={cn(
+                        "w-full px-3 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-lg",
+                        blocked
+                          ? "bg-gray-700/40 border border-gray-600/40 text-gray-400 cursor-not-allowed"
+                          : "bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-white border border-emerald-300/40 shadow-emerald-900/40 hover:shadow-emerald-900/60"
+                      )}
+                      title={blocked ? `Bloqueado: ${blockReasons.join("; ")}` : "Abre o pré-flight e inicia a impressão"}
+                    >
+                      <Printer className="w-4 h-4" />
+                      IMPRIMIR
+                      {!blocked && coherenceReport && coherenceReport.issues.length > 0 && (
+                        <span className="text-[9px] font-normal bg-amber-500/30 border border-amber-300/40 px-1.5 py-0.5 rounded-full">
+                          {coherenceReport.issues.length} alerta{coherenceReport.issues.length > 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </button>
+                    {blocked ? (
+                      <div className="mt-1.5 text-[9.5px] text-amber-200/80 leading-snug px-0.5">
+                        <span className="font-semibold text-amber-300">Bloqueado:</span>{" "}
+                        {blockReasons.join("; ")}.
+                      </div>
+                    ) : (
+                      <div className="mt-1.5 text-[9.5px] text-emerald-200/70 leading-snug px-0.5 flex items-center gap-1">
+                        <ListChecks className="w-2.5 h-2.5" />
+                        Abre checklist de pré-flight antes do envio.
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
             </div>
           </Panel>
 
@@ -3039,6 +3162,268 @@ export default function BioprintExecutePage() {
           </span>
         </div>
       </footer>
+
+      {/* ═══════════════════════════════════════════════════════════════
+          R12.47: MODAL DE PRÉ-FLIGHT
+          ───────────────────────────────────────────────────────────────
+          Aparece quando a usuária clica em IMPRIMIR (no joystick ou no
+          painel principal). Mostra checklist completo:
+            - impressora conectada?
+            - home feito?
+            - G-code carregado e válido?
+            - coerência modelo↔G-code?
+            - parâmetros principais coerentes (printer, material, infill)
+          Só permite "Confirmar" se TUDO estiver verde (ou apenas com
+          alertas que a usuária aceita conscientemente).
+          ═══════════════════════════════════════════════════════════════ */}
+      {showPreflight && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={() => setShowPreflight(false)}
+        >
+          <div
+            className="bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900 border border-emerald-500/30 rounded-2xl shadow-2xl shadow-emerald-900/50 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between sticky top-0 bg-slate-900/95 backdrop-blur z-10">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center">
+                  <Printer className="w-4 h-4 text-emerald-300" />
+                </div>
+                <div>
+                  <div className="text-base font-bold text-white">Pré-flight — Impressão</div>
+                  <div className="text-[10px] text-gray-400">Checklist de segurança antes do envio</div>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPreflight(false)}
+                className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-3">
+              {/* Checklist técnico */}
+              <div className="rounded-xl border border-white/10 bg-black/30 p-3.5 space-y-2">
+                <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-1">Status técnico</div>
+                <PreflightItem
+                  ok={connected}
+                  label="Bioimpressora conectada"
+                  detail={connected ? `Firmware: ${firmware?.family ?? "detectado"}` : "Use o painel Conexão para conectar"}
+                />
+                <PreflightItem
+                  ok={didAutoHome}
+                  label="Home (G28) realizado"
+                  detail={didAutoHome ? "Eixos referenciados" : "Clique em Home All antes de imprimir"}
+                  warnOnly
+                />
+                <PreflightItem
+                  ok={gcodeText.trim().length > 0}
+                  label="G-code carregado"
+                  detail={gcodeText.trim() ? `${gcodeText.split("\n").length} linhas (${gcodeName})` : "Nenhum G-code carregado"}
+                />
+                <PreflightItem
+                  ok={validation != null && validation.verdict !== "blocked"}
+                  label="Validação do G-code"
+                  detail={
+                    !validation ? "Validação não executada" :
+                    validation.verdict === "blocked" ? `${validation.errorCount} erro(s) bloqueante(s)` :
+                    `${verdictLabel(validation.verdict)} — ${validation.warningCount} aviso(s)`
+                  }
+                />
+              </div>
+
+              {/* Coerência modelo↔gcode */}
+              {coherenceReport && (
+                <div className={cn(
+                  "rounded-xl border p-3.5",
+                  coherenceReport.isBlocking
+                    ? "border-red-500/40 bg-red-500/[0.06]"
+                    : coherenceReport.issues.length > 0
+                      ? "border-amber-500/40 bg-amber-500/[0.06]"
+                      : "border-emerald-500/40 bg-emerald-500/[0.06]"
+                )}>
+                  <div className="flex items-center gap-2 mb-2.5">
+                    <ListChecks className={cn(
+                      "w-4 h-4",
+                      coherenceReport.isBlocking ? "text-red-400" :
+                      coherenceReport.issues.length > 0 ? "text-amber-400" : "text-emerald-400"
+                    )} />
+                    <span className="text-[11px] font-bold uppercase tracking-wide">
+                      <span className={cn(
+                        coherenceReport.isBlocking ? "text-red-300" :
+                        coherenceReport.issues.length > 0 ? "text-amber-300" : "text-emerald-300"
+                      )}>
+                        Coerência modelo ↔ G-code
+                      </span>
+                    </span>
+                  </div>
+
+                  {/* Resumo do que foi escolhido vs encontrado */}
+                  <div className="grid grid-cols-2 gap-3 mb-3 text-[10px]">
+                    <div>
+                      <div className="text-gray-500 uppercase tracking-wide mb-1">Você escolheu</div>
+                      <ul className="space-y-0.5 text-gray-300">
+                        <li>Modelo: <span className="text-cyan-300 font-mono">{coherenceReport.expected.modelGeometryId ?? "—"}</span></li>
+                        <li>Material: <span className="text-cyan-300 font-mono">{coherenceReport.expected.materialName ?? "—"}</span></li>
+                        <li>Padrão: <span className="text-cyan-300 font-mono">{coherenceReport.expected.pattern ?? "—"}</span></li>
+                        <li>Altura: <span className="text-cyan-300 font-mono">{coherenceReport.expected.layerHeight ?? "—"} mm</span></li>
+                      </ul>
+                    </div>
+                    <div>
+                      <div className="text-gray-500 uppercase tracking-wide mb-1">G-code detectado</div>
+                      <ul className="space-y-0.5 text-gray-300">
+                        <li>Job: <span className="text-violet-300 font-mono">{coherenceReport.detected.jobName ?? "—"}</span></li>
+                        <li>Geom: <span className="text-violet-300 font-mono">{coherenceReport.detected.geometryHints.join(", ") || "—"}</span></li>
+                        <li>Mat: <span className="text-violet-300 font-mono">{coherenceReport.detected.materialHints.join(", ") || "—"}</span></li>
+                        <li>Infill: <span className="text-violet-300 font-mono">{coherenceReport.detected.infillHints.join(", ") || "—"}</span></li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Issues */}
+                  {coherenceReport.issues.length === 0 ? (
+                    <div className="text-[11px] text-emerald-200 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Modelo, biotinta e padrão batem com o G-code.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {coherenceReport.issues.map((issue, idx) => (
+                        <div
+                          key={idx}
+                          className={cn(
+                            "rounded-lg border p-2.5",
+                            issue.level === "blocking" ? "border-red-500/40 bg-red-500/[0.08]" :
+                            issue.level === "warning" ? "border-amber-500/40 bg-amber-500/[0.08]" :
+                            "border-cyan-500/30 bg-cyan-500/[0.05]"
+                          )}
+                        >
+                          <div className="flex items-start gap-2 mb-1">
+                            {issue.level === "blocking" ? <ShieldAlert className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" /> :
+                             issue.level === "warning" ? <AlertTriangle className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" /> :
+                             <Info className="w-3.5 h-3.5 text-cyan-400 mt-0.5 shrink-0" />}
+                            <div className="flex-1 min-w-0">
+                              <div className={cn(
+                                "text-[10px] font-bold uppercase tracking-wider mb-0.5",
+                                issue.level === "blocking" ? "text-red-300" :
+                                issue.level === "warning" ? "text-amber-300" : "text-cyan-300"
+                              )}>
+                                {issue.level === "blocking" ? "BLOQUEIA" : issue.level === "warning" ? "ALERTA" : "INFO"} — {issue.code}
+                              </div>
+                              <div className="text-[11px] text-gray-200 leading-snug">{issue.message}</div>
+                            </div>
+                          </div>
+                          <div className="ml-5.5 mt-1.5 text-[10px] text-gray-400 leading-snug border-t border-white/5 pt-1.5">
+                            <span className="font-semibold text-emerald-300">Como corrigir:</span> {issue.fixHint}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Parâmetros em tempo de run */}
+              <div className="rounded-xl border border-white/10 bg-black/30 p-3.5">
+                <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-2">Parâmetros que serão aplicados ANTES do stream</div>
+                <div className="grid grid-cols-2 gap-2 text-[10.5px]">
+                  <div className="flex items-center gap-1.5">
+                    <Droplet className="w-3 h-3 text-cyan-400" />
+                    <span className="text-gray-400">Fluxo (M221):</span>
+                    <span className="text-cyan-200 font-mono">{flowPercent}%</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Zap className="w-3 h-3 text-violet-400" />
+                    <span className="text-gray-400">Velocidade (M220):</span>
+                    <span className="text-violet-200 font-mono">{speedPercent}%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer com ações */}
+            <div className="px-5 py-3.5 border-t border-white/10 flex items-center justify-between gap-3 bg-slate-900/80 sticky bottom-0">
+              <button
+                onClick={() => setShowPreflight(false)}
+                className="px-4 py-2 rounded-lg text-xs font-semibold text-gray-300 hover:bg-white/10 transition-colors"
+              >
+                Cancelar
+              </button>
+              {(() => {
+                const isBlocked =
+                  !connected ||
+                  !gcodeText.trim() ||
+                  validation?.verdict === "blocked" ||
+                  coherenceReport?.isBlocking ||
+                  controllerState === "streaming"
+
+                const handleConfirm = async () => {
+                  setShowPreflight(false)
+                  await handleSend()
+                }
+                return (
+                  <button
+                    onClick={handleConfirm}
+                    disabled={isBlocked}
+                    className={cn(
+                      "px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2",
+                      isBlocked
+                        ? "bg-gray-700/40 text-gray-500 cursor-not-allowed"
+                        : "bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-white shadow-lg shadow-emerald-900/40"
+                    )}
+                  >
+                    <Send className="w-4 h-4" />
+                    Confirmar e Imprimir
+                  </button>
+                )
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Item do checklist do pré-flight (R12.47).
+ * - ok=true → bullet verde
+ * - ok=false + warnOnly=true → bullet amarelo (aviso, não bloqueia)
+ * - ok=false + warnOnly=false → bullet vermelho (bloqueia)
+ */
+function PreflightItem({
+  ok, label, detail, warnOnly = false,
+}: {
+  ok: boolean
+  label: string
+  detail?: string
+  warnOnly?: boolean
+}) {
+  const color = ok ? "emerald" : (warnOnly ? "amber" : "red")
+  const Icon = ok ? CheckCircle2 : (warnOnly ? AlertTriangle : ShieldAlert)
+  return (
+    <div className="flex items-start gap-2 text-[11.5px]">
+      <Icon className={cn(
+        "w-3.5 h-3.5 mt-0.5 shrink-0",
+        color === "emerald" ? "text-emerald-400" :
+        color === "amber" ? "text-amber-400" : "text-red-400"
+      )} />
+      <div className="flex-1 min-w-0">
+        <div className={cn(
+          "font-semibold",
+          color === "emerald" ? "text-emerald-200" :
+          color === "amber" ? "text-amber-200" : "text-red-200"
+        )}>
+          {label}
+        </div>
+        {detail && (
+          <div className="text-[10px] text-gray-400 leading-snug mt-0.5">{detail}</div>
+        )}
+      </div>
     </div>
   )
 }

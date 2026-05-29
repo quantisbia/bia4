@@ -171,8 +171,12 @@ export default function BioprintSlicePage() {
   })
 
   // ── Parâmetros do slicer ──
-  // Inicializa do state.slice (se houver) ou de defaults conservadores
-  const [bioprinterId, setBioprinterId] = useState<string>("cellink_biox")
+  // R12.47: default mudou de cellink_biox → bioender_bioedtech porque é a
+  // impressora real que os usuários BIA têm em mãos (BioEnder = Marlin/Klipper
+  // 200×200×200 mm, baud 115200, USB Web Serial direto). O CELLINK BIO X
+  // continua disponível no seletor para quem usar essa máquina, mas o default
+  // agora corresponde ao hardware que a Bia e demais bioedutech têm.
+  const [bioprinterId, setBioprinterId] = useState<string>("bioender_bioedtech")
 
   // Recomendar perfil térmico baseado na biotinta
   const recommendedProfile = useMemo(() => pickTempProfile(state.bioink.material), [state.bioink.material])
