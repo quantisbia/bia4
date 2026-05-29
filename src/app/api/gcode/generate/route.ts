@@ -41,6 +41,12 @@ import { z } from "zod"
 import { generateGCodeForJob } from "@/lib/gcode/engine"
 import { getBioprinter, listBioprinters } from "@/lib/gcode/profiles/bioprinters"
 import { WELL_PLATES, plateMetadata, allWellIds } from "@/lib/gcode/wellplates/catalog"
+import {
+  hasStlForGeometry,
+  getStlFileForGeometry,
+  hasMesh,
+  loadMeshFromPublic,
+} from "@/lib/stl/mesh-bounds"
 import type {
   PrintJob, Bioink, WellPlateConfig, WellPlateFormat, InfillAlgorithm,
   PorosityConfig, ReplicationMode,
@@ -233,6 +239,24 @@ export async function POST(req: NextRequest) {
     wellPlate: wpConfig,
     tissue,
     application,
+  }
+
+  // R12.49: Pré-carregar STL real para geometrias anatômicas que têm
+  // arquivo associado (ear, etc.). Se o fetch falhar, o engine cai
+  // graciosamente no fallback paramétrico — geração continua, só
+  // sem usar a malha real. Cache de processo evita re-fetch.
+  if (hasStlForGeometry(geometry.id) && !hasMesh(getStlFileForGeometry(geometry.id)!)) {
+    const stlFile = getStlFileForGeometry(geometry.id)!
+    try {
+      // Origin do request → base URL para servir STL estático do /public
+      const origin = new URL(req.url).origin
+      await loadMeshFromPublic(stlFile, origin)
+      console.log(`[STL] Carregada malha real: ${stlFile}`)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.warn(`[STL] Falha ao carregar ${stlFile} — usando fallback paramétrico: ${msg}`)
+      // Não bloqueia — segue com fallback
+    }
   }
 
   // Gerar G-code

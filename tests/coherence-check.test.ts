@@ -61,15 +61,30 @@ describe("checkCoherence — cenário 1: Orelha + GelMA + Linhas COERENTE", () =
     expect(blocking.length).toBe(0)
   })
 
-  it("deve emitir 'info' avisando que orelha é geometria paramétrica (honestidade)", () => {
+  it("R12.49: orelha NÃO emite mais aviso paramétrico (mesh real disponível)", () => {
     const state = makeEarGelmaLinesState()
     const report = checkCoherence(GCODE_EAR_GELMA_LINES, state)
 
-    // R12.47 mantém honestidade: avisa que ear é elipse afunilada, não mesh real
+    // R12.49 implementou voxelização para 'ear' via STL real.
+    // O aviso "geometria-parametrica" foi removido para esta anatomia.
+    const parametricInfo = report.issues.find(i => i.code === "geometria-parametrica")
+    expect(parametricInfo).toBeUndefined()
+  })
+
+  it("R12.49: outras anatomias (coração, rim) AINDA emitem aviso paramétrico", () => {
+    // Heart ainda não tem STL real → continua emitindo aviso info-level.
+    // Este teste documenta o estado: à medida que você fornecer mais STLs,
+    // estas geometrias migram de "paramétrica" para "real".
+    const state = makeEarGelmaLinesState({ geometryId: "heart" })
+    const gcodeHeart =
+      "; BIA v4.2 — heart anatomical\n" +
+      "; geometry=heart\n" +
+      "; material=GelMA\n" +
+      "G1 X10 Y10 Z0.2 F500\nG1 X20 Y20 E1\n"
+    const report = checkCoherence(gcodeHeart, state)
     const parametricInfo = report.issues.find(i => i.code === "geometria-parametrica")
     expect(parametricInfo).toBeDefined()
     expect(parametricInfo?.level).toBe("info")
-    expect(parametricInfo?.fixHint).toMatch(/voxelizado|stl|slicer/i)
   })
 })
 

@@ -280,12 +280,12 @@ export function checkCoherence(
     }
   }
 
-  // ─── 2) Caso especial honesto: orelha → mesh real ainda não slice ──
-  // O motor BIA hoje gera para "ear" uma elipse paramétrica afunilada,
-  // não a mesh anatômica real (ear-mesh-data.ts, 261 KB). Avisar isso
-  // explicitamente para a usuária não pensar que vai sair uma orelha
-  // perfeita.
-  const PARAMETRIC_ANATOMICAL = ["ear", "heart", "nose", "femur", "kidney", "liver_anatomical", "hand"]
+  // ─── 2) Aviso de geometria paramétrica vs. mesh real ────────────────
+  // R12.49: A "ear" agora usa STL real fatiado (binary-stl-parser +
+  // mesh-slicer). As demais anatomias (heart, kidney, liver, nose, hand,
+  // femur) ainda usam aproximação paramétrica até receberem STLs reais.
+  // Mantemos o aviso para essas geometrias.
+  const PARAMETRIC_ANATOMICAL = ["heart", "nose", "femur", "kidney", "liver_anatomical", "hand"]
   if (
     expected.modelGeometryId &&
     PARAMETRIC_ANATOMICAL.includes(expected.modelGeometryId.toLowerCase()) &&
@@ -294,9 +294,9 @@ export function checkCoherence(
     issues.push({
       level: "info",
       code: "geometria-parametrica",
-      message: `O G-code do modelo "${expected.modelGeometryId}" é uma aproximação PARAMÉTRICA (elipse afunilada / sólido de revolução), NÃO a mesh anatômica real do arquivo STL associado.`,
+      message: `O G-code do modelo "${expected.modelGeometryId}" é uma aproximação PARAMÉTRICA, NÃO a mesh anatômica real.`,
       fixHint:
-        "Para fatiar a mesh anatômica real, o slicer voxelizado da BIA ainda está em desenvolvimento (3-5 dias estimados). Hoje, use o G-code paramétrico para validar parâmetros (altura, velocidade, pressão) e protocolos. Para impressão fiel à anatomia real, faça upload do STL e use o slicer externo enquanto o motor BIA não estiver completo.",
+        "A R12.49 implementou voxelização para 'ear' usando STL real. Para fatiar mesh real desta anatomia, forneça o arquivo STL binário em /public/stl/ e adicione a entrada em STL_FILE_MAP (src/lib/stl/mesh-bounds.ts). Enquanto isso, o G-code paramétrico valida parâmetros (altura, velocidade, pressão) corretamente.",
       expected: `geometria anatômica real (mesh ${expected.modelGeometryId})`,
       found: "aproximação paramétrica (elipse/cilindro afunilado)",
     })

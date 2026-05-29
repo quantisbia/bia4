@@ -10,6 +10,11 @@
  */
 
 import type { Polygon2D, BBox2D } from "../core/types"
+import {
+  hasMesh,
+  geometryBoundsFromMesh,
+  STL_FILE_MAP,
+} from "../../stl/mesh-bounds"
 
 export interface GeometryBounds {
   height_mm: number           // altura total Z
@@ -318,22 +323,33 @@ export function getGeometryBounds(
       }
     }
 
-    // ─── Orelha ANATÔMICA (R12.14) ────────────────────────────────────────
+    // ─── Orelha ANATÔMICA (R12.14/R12.49) ─────────────────────────────────
     case "ear": {
-      // Mesh anatômico real do pavilhão auricular. Aproximação de bounds:
-      //   - width  → largura lateral (X)
-      //   - height → altura superior→lobo (Z, eixo de impressão)
-      //   - depth  → profundidade hélice→tragus (Y)
-      //
-      // A orelha tem perfil de elipse alongada que afunila levemente conforme
-      // sobe (lobo mais cheio na base, hélice estreita no topo). Modelagem:
-      // taper de 1.0 (base) → 0.85 (topo) em ambos X e Y.
+      // R12.49: Se o STL real foi pré-carregado em cache pelo route handler,
+      // usamos a MALHA REAL fatiada plano-a-plano (4432 triângulos).
+      // Caso contrário (sandbox, teste, fetch falhou), caímos no fallback
+      // paramétrico de elipse com taper — mesma lógica anterior à R12.49.
+      const stlFile = STL_FILE_MAP["ear"]
+      if (stlFile && hasMesh(stlFile)) {
+        const W = params.width
+        const H = params.height
+        const D = params.depth
+        return geometryBoundsFromMesh(
+          stlFile,
+          { x: cx, y: cy },
+          { width: W, height: H, depth: D },
+        )
+      }
+
+      // ── Fallback paramétrico (pré-R12.49) ──
+      // Elipse alongada com taper 1.0 (base) → 0.85 (topo).
+      // Avisa o coherence-check via "geometria-parametrica" info-level.
       const W = params.width ?? 35
       const H = params.height ?? 60
       const D = params.depth ?? 18
       const taperAtZ = (z: number) => {
         const t = Math.max(0, Math.min(1, 1 - z / H))
-        return 0.85 + 0.15 * t   // 1.0 na base, 0.85 no topo
+        return 0.85 + 0.15 * t
       }
       return {
         height_mm: H, zMin: 0, zMax: H,
