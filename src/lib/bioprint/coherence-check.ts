@@ -281,11 +281,11 @@ export function checkCoherence(
   }
 
   // ─── 2) Aviso de geometria paramétrica vs. mesh real ────────────────
-  // R12.49: A "ear" agora usa STL real fatiado (binary-stl-parser +
-  // mesh-slicer). As demais anatomias (heart, kidney, liver, nose, hand,
-  // femur) ainda usam aproximação paramétrica até receberem STLs reais.
-  // Mantemos o aviso para essas geometrias.
-  const PARAMETRIC_ANATOMICAL = ["heart", "nose", "femur", "kidney", "liver_anatomical", "hand"]
+  // R12.49: "ear" passou a usar STL real fatiado.
+  // R12.50: "nose" e "femur" também ganharam STL real.
+  // As demais anatomias (heart, kidney, liver, hand) ainda usam aproximação
+  // paramétrica até receberem STLs reais. Aviso mantido para essas.
+  const PARAMETRIC_ANATOMICAL = ["heart", "kidney", "liver_anatomical", "hand"]
   if (
     expected.modelGeometryId &&
     PARAMETRIC_ANATOMICAL.includes(expected.modelGeometryId.toLowerCase()) &&

@@ -235,6 +235,19 @@ export function getGeometryBounds(
     }
 
     case "femur": {
+      // R12.50: Se o STL real foi pré-carregado, usa a malha (118860 tri).
+      // STL original em unidades pequenas (bbox 2×1×9) → escala 50× aplicada
+      // no STL_PREPROCESS_MAP (bbox final ~105×62×453 mm).
+      const stlFileFemur = STL_FILE_MAP["femur"]
+      if (stlFileFemur && hasMesh(stlFileFemur)) {
+        return geometryBoundsFromMesh(
+          stlFileFemur,
+          { x: cx, y: cy },
+          { width: params.width, height: params.height, depth: params.depth },
+        )
+      }
+
+      // ── Fallback paramétrico (pré-R12.50) ──
       // R12.15: Fêmur ANATÔMICO real — aproximação de bounds para slicing.
       //   - width  → largura medial→lateral (X, epicôndilos máximos)
       //   - height → comprimento total côndilos→cabeça (Z, eixo longo)
@@ -291,6 +304,19 @@ export function getGeometryBounds(
     }
 
     case "nose": {
+      // R12.50: Se o STL real foi pré-carregado, usa a malha (11974 tri).
+      // STL original com eixo longo em Y → rotacionado 90° X no
+      // STL_PREPROCESS_MAP (Y→Z), virando bbox ~16×10×25 mm com Z = eixo longo.
+      const stlFileNose = STL_FILE_MAP["nose"]
+      if (stlFileNose && hasMesh(stlFileNose)) {
+        return geometryBoundsFromMesh(
+          stlFileNose,
+          { x: cx, y: cy },
+          { width: params.width, height: params.height, depth: params.depth },
+        )
+      }
+
+      // ── Fallback paramétrico (pré-R12.50) ──
       // R12.13: Nariz ANATÔMICO real — aproximação de bounds para slicing.
       //   - width  → largura asa-a-asa (X)
       //   - height → altura do dorso (Z)

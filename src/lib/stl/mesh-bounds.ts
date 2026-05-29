@@ -18,6 +18,8 @@
 import {
   parseBinaryStl,
   normalizeMesh,
+  rotateMesh,
+  scaleMesh,
   type ParsedMesh,
 } from "./binary-stl-parser"
 import {
@@ -35,7 +37,42 @@ const meshCache = new Map<string, ParsedMesh>()
 const slicedCache = new Map<string, Map<number, ReturnType<typeof sliceMeshAtZ>>>()
 
 /**
- * Lê e parseia uma mesh do diretório /public/stl, normalizando origem.
+ * Pré-processamento por arquivo: rotação + escala antes de normalizar.
+ *
+ * Aplica-se a STLs cujos eixos/unidades não estão no referencial esperado
+ * pelo engine BIA (Z = eixo de impressão, milímetros).
+ *
+ *   - rotate: { axis, degrees }  — opcional
+ *   - scale:  fator escalar      — opcional
+ *
+ * A ordem é: rotate → scale → normalize (centra XY, base em Z=0).
+ */
+export interface MeshPreprocess {
+  rotate?: { axis: "x" | "y" | "z"; degrees: number }
+  scale?: number
+}
+
+export const STL_PREPROCESS_MAP: Record<string, MeshPreprocess> = {
+  // Orelha: já vem em mm, Z é eixo longo, base em Z=0 → sem transformação
+  "ear-real.stl": {},
+
+  // Nariz: vem com eixo longo em Y (25.51 mm) e altura Z=10mm
+  // Para impressão Z = base→ponta, rotacionamos 90° em X (Y → Z)
+  "nose-real.stl": {
+    rotate: { axis: "x", degrees: 90 },
+  },
+
+  // Fêmur: vem em unidades muito pequenas (bbox 2.1 × 1.25 × 9.06)
+  // Fêmur adulto real ~450 mm de comprimento → escala ~50× para virar
+  // 105×62×453 mm aproximadamente.
+  "femur-real.stl": {
+    scale: 50,
+  },
+}
+
+/**
+ * Lê e parseia uma mesh do diretório /public/stl, aplica pré-processamento
+ * registrado em STL_PREPROCESS_MAP, e normaliza origem (centro XY + base Z=0).
  *
  * @param fileName ex: "ear-real.stl"
  * @param baseUrl URL absoluta (Cloudflare Pages serve estáticos no mesmo domínio)
@@ -54,20 +91,37 @@ export async function loadMeshFromPublic(
     throw new Error(`Falha ao baixar ${url}: HTTP ${res.status}`)
   }
   const buf = await res.arrayBuffer()
-  const raw = parseBinaryStl(buf)
-  const normalized = normalizeMesh(raw)
+  let mesh = parseBinaryStl(buf)
 
+  // Pré-processamento (rotação, escala) específico do arquivo
+  const preprocess = STL_PREPROCESS_MAP[fileName]
+  if (preprocess?.rotate) {
+    mesh = rotateMesh(mesh, preprocess.rotate.axis, preprocess.rotate.degrees)
+  }
+  if (preprocess?.scale && preprocess.scale !== 1) {
+    mesh = scaleMesh(mesh, preprocess.scale)
+  }
+
+  const normalized = normalizeMesh(mesh)
   meshCache.set(cacheKey, normalized)
   return normalized
 }
 
 /**
  * Versão sync para uso em contexto onde a mesh já foi pré-carregada
- * (ex: bundle estático via require/import). Mantém compatibilidade
- * com src/lib/stl/meshes/ear-mesh-data.ts existente, caso queira.
+ * (ex: bundle estático via require/import, ou tests com fs.readFileSync).
+ * Aplica o mesmo pré-processamento de loadMeshFromPublic.
  */
 export function registerMesh(name: string, mesh: ParsedMesh): void {
-  meshCache.set(name, normalizeMesh(mesh))
+  let processed = mesh
+  const preprocess = STL_PREPROCESS_MAP[name]
+  if (preprocess?.rotate) {
+    processed = rotateMesh(processed, preprocess.rotate.axis, preprocess.rotate.degrees)
+  }
+  if (preprocess?.scale && preprocess.scale !== 1) {
+    processed = scaleMesh(processed, preprocess.scale)
+  }
+  meshCache.set(name, normalizeMesh(processed))
 }
 
 export function hasMesh(name: string): boolean {
@@ -213,12 +267,13 @@ export function clearMeshCache(): void {
 // Define quais geometrias do catálogo BIA têm um STL real associado.
 // Pode crescer conforme você for fornecendo STLs.
 export const STL_FILE_MAP: Record<string, string> = {
-  ear: "ear-real.stl",
-  // R12.49 placeholders — adicione quando você enviar os arquivos:
+  ear: "ear-real.stl",       // R12.49 — 4432 tri, 28×47×15 mm
+  nose: "nose-real.stl",     // R12.50 — 11974 tri, 16×10×25 mm (rotacionado 90° X)
+  femur: "femur-real.stl",   // R12.50 — 118860 tri, 2×1×9 → 105×62×453 mm (escala 50×)
+  // Placeholders — adicione quando você enviar os arquivos:
   // heart: "heart-real.stl",
   // kidney: "kidney-real.stl",
   // liver_anatomical: "liver-real.stl",
-  // nose: "nose-real.stl",
   // hand: "hand-real.stl",
 }
 

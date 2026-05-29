@@ -241,10 +241,12 @@ export async function POST(req: NextRequest) {
     application,
   }
 
-  // R12.49: Pré-carregar STL real para geometrias anatômicas que têm
-  // arquivo associado (ear, etc.). Se o fetch falhar, o engine cai
-  // graciosamente no fallback paramétrico — geração continua, só
-  // sem usar a malha real. Cache de processo evita re-fetch.
+  // R12.49/R12.50: Pré-carregar STL real para geometrias anatômicas que
+  // têm arquivo associado (ear, nose, femur, …). Se o fetch falhar, o
+  // engine cai graciosamente no fallback paramétrico — geração continua,
+  // só sem usar a malha real. Cache de processo evita re-fetch.
+  // Transformações específicas por arquivo (rotação, escala) são
+  // aplicadas dentro de loadMeshFromPublic via STL_PREPROCESS_MAP.
   if (hasStlForGeometry(geometry.id) && !hasMesh(getStlFileForGeometry(geometry.id)!)) {
     const stlFile = getStlFileForGeometry(geometry.id)!
     try {

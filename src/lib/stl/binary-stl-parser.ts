@@ -184,3 +184,71 @@ export function normalizeMesh(mesh: ParsedMesh): ParsedMesh {
   const zBase = mesh.bbox.minZ
   return transformMesh(mesh, { translate: { x: -cx, y: -cy, z: -zBase } })
 }
+
+/**
+ * Rotaciona a mesh em torno de um eixo (X, Y ou Z) por ângulo em graus.
+ * Útil para reorientar STLs cujo eixo longo NÃO é Z (eixo de impressão).
+ *
+ * Ex: nariz com eixo longo em Y → rotateMesh(mesh, "x", 90) faz Y → Z.
+ *
+ * Convenção: ângulos positivos seguem regra da mão direita.
+ */
+export function rotateMesh(
+  mesh: ParsedMesh,
+  axis: "x" | "y" | "z",
+  degrees: number,
+): ParsedMesh {
+  if (degrees === 0) return mesh
+  const rad = (degrees * Math.PI) / 180
+  const c = Math.cos(rad)
+  const s = Math.sin(rad)
+
+  const v = new Float32Array(mesh.vertices.length)
+  let minX = Infinity, minY = Infinity, minZ = Infinity
+  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity
+
+  for (let i = 0; i < mesh.vertices.length; i += 3) {
+    const x = mesh.vertices[i + 0]
+    const y = mesh.vertices[i + 1]
+    const z = mesh.vertices[i + 2]
+    let nx = x, ny = y, nz = z
+    if (axis === "x") {
+      // X fixo, Y/Z rotacionam
+      ny = c * y - s * z
+      nz = s * y + c * z
+    } else if (axis === "y") {
+      // Y fixo, Z/X rotacionam
+      nz = c * z - s * x
+      nx = s * z + c * x
+    } else {
+      // Z fixo, X/Y rotacionam
+      nx = c * x - s * y
+      ny = s * x + c * y
+    }
+    v[i + 0] = nx
+    v[i + 1] = ny
+    v[i + 2] = nz
+    if (nx < minX) minX = nx
+    if (nx > maxX) maxX = nx
+    if (ny < minY) minY = ny
+    if (ny > maxY) maxY = ny
+    if (nz < minZ) minZ = nz
+    if (nz > maxZ) maxZ = nz
+  }
+
+  return {
+    vertices: v,
+    triangleCount: mesh.triangleCount,
+    bbox: { minX, maxX, minY, maxY, minZ, maxZ },
+    isAscii: false,
+  }
+}
+
+/**
+ * Escala uniforme da mesh por um fator. Aplica em todos os vértices.
+ * Útil para STLs que vieram em unidades não-mm (metros, cm, etc.).
+ */
+export function scaleMesh(mesh: ParsedMesh, factor: number): ParsedMesh {
+  if (factor === 1) return mesh
+  return transformMesh(mesh, { scale: factor })
+}
