@@ -220,13 +220,15 @@ describe("integração: STL_FILE_MAP cobre todas as 3 anatomias", () => {
     expect(hasStlForGeometry("ear")).toBe(true)
     expect(hasStlForGeometry("nose")).toBe(true)
     expect(hasStlForGeometry("femur")).toBe(true)
+    // R12.51: heart e kidney também passaram a ter STL real.
+    expect(hasStlForGeometry("heart")).toBe(true)
+    expect(hasStlForGeometry("kidney")).toBe(true)
   })
 
   it("anatomias sem STL ainda retornam false em hasStlForGeometry", async () => {
     const { hasStlForGeometry } = await import("@/lib/stl/mesh-bounds")
-    expect(hasStlForGeometry("heart")).toBe(false)
-    expect(hasStlForGeometry("kidney")).toBe(false)
-    expect(hasStlForGeometry("liver_anatomical")).toBe(false)
+    // R12.51: liver_anatomical foi REMOVIDO do catálogo (não tem STL nem é mais paramétrico).
+    // Apenas "hand" continua paramétrico-sem-STL.
     expect(hasStlForGeometry("hand")).toBe(false)
   })
 })

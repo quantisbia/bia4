@@ -51,3 +51,4 @@ prisma/*.db-journal
 logs/
 *.log
 core
+ecosystem.config.cjs.bak

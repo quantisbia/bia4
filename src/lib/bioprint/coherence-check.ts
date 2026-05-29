@@ -119,6 +119,8 @@ function extractGcodeHints(gcode: string): CoherenceReport["detected"] {
     heart:        ["coração", "heart", "cardio"],
     nose:         ["nariz", "nose", "septo"],
     femur:        ["femur", "fêmur", "osso longo"],
+    kidney:       ["rim", "kidney", "renal", "néfron", "nefron"],
+    hand:         ["mão", "mao", "hand", "palma"],
     cube:         ["cubo", "cube"],
     disk:         ["disco", "disk"],
     grid:         ["grade", "grid", "scaffold aberto"],
@@ -283,9 +285,10 @@ export function checkCoherence(
   // ─── 2) Aviso de geometria paramétrica vs. mesh real ────────────────
   // R12.49: "ear" passou a usar STL real fatiado.
   // R12.50: "nose" e "femur" também ganharam STL real.
-  // As demais anatomias (heart, kidney, liver, hand) ainda usam aproximação
-  // paramétrica até receberem STLs reais. Aviso mantido para essas.
-  const PARAMETRIC_ANATOMICAL = ["heart", "kidney", "liver_anatomical", "hand"]
+  // R12.51: "heart" e "kidney" também ganharam STL real;
+  //         "liver_anatomical" foi REMOVIDO do catálogo.
+  // Apenas "hand" continua paramétrica até receber STL real.
+  const PARAMETRIC_ANATOMICAL = ["hand"]
   if (
     expected.modelGeometryId &&
     PARAMETRIC_ANATOMICAL.includes(expected.modelGeometryId.toLowerCase()) &&

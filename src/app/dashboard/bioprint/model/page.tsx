@@ -56,13 +56,13 @@ const CATEGORY_DEFS: CategoryDef[] = [
   {
     id: "soft-tissue",
     label: "Tecidos moles",
-    description: "Pele, vaso, miocárdio, hepático, córnea, cartilagem, rim, fígado anatômico",
+    description: "Pele, vaso, miocárdio, hepático, córnea, cartilagem, rim",
     icon: Heart,
     accent: "rose",
+    // R12.51: liver_anatomical removido do catálogo a pedido da Janaina.
     geometryIds: [
       "membrane", "disk", "skin_cylinder", "cube_tissue", "vessel", "hexagonal_liver",
       "nose", "meniscus", "cornea", "lens", "ear", "heart", "kidney",
-      "liver_anatomical",
       "skin_3layer", "cardiac_patch", "cornea_curved", "cartilage_zonal",
     ],
   },

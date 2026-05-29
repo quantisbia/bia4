@@ -274,17 +274,9 @@ export const GEOMETRIES: STLGeometry[] = [
     paramLabels: { length: "Comprimento (mm)", width: "Largura (mm)", thickness: "Espessura (mm)", segments: "Resolução" },
     creditCost: 6,
   },
-  {
-    id: "liver_anatomical",
-    label: "Fígado (Anatômico)",
-    description: "Fígado com lobos direito/esquerdo para modelos hepáticos 3D e bioreatores",
-    tissue: "Hepático",
-    application: "Modelo hepático 3D, lóbulo artificial, órgão-em-chip",
-    icon: "🫀",
-    defaultParams: { length: 60, width: 40, thickness: 18, segments: 32 },
-    paramLabels: { length: "Comprimento (mm)", width: "Largura (mm)", thickness: "Espessura (mm)", segments: "Resolução" },
-    creditCost: 6,
-  },
+  // R12.51: liver_anatomical REMOVIDO do catálogo a pedido da Janaina.
+  // STL anatômico de fígado não está disponível e o paramétrico (elipse achatada)
+  // não representava bem o órgão.
   {
     id: "hand",
     label: "Mão (Esqueleto Simplificado)",
@@ -885,8 +877,14 @@ function genKidney(length: number, width: number, thickness: number, segs: numbe
   return tris
 }
 
-/** Fígado anatômico: forma irregular com dois lobos (direito maior, esquerdo menor) */
-function genLiverAnatomical(length: number, width: number, thickness: number, segs: number): Triangle[] {
+/**
+ * Fígado anatômico: forma irregular com dois lobos (direito maior, esquerdo menor).
+ * R12.51: liver_anatomical foi REMOVIDO do catálogo a pedido da Janaina (STL real
+ * indisponível e o paramétrico não representava bem). Função mantida como referência
+ * histórica caso volte ao catálogo no futuro.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _genLiverAnatomical(length: number, width: number, thickness: number, segs: number): Triangle[] {
   const tris: Triangle[] = []
   const n = Math.max(16, segs)
   const vertices: Vec3[][] = []
@@ -1047,8 +1045,7 @@ export function generateGeometry(id: string, params: GeometryParams): Triangle[]
       return genHeartAnatomical(p.width ?? 80, p.height ?? 100, p.depth ?? 95)
     case "kidney":
       return genKidney(p.length ?? 45, p.width ?? 25, p.thickness ?? 15, p.segments ?? 32)
-    case "liver_anatomical":
-      return genLiverAnatomical(p.length ?? 60, p.width ?? 40, p.thickness ?? 18, p.segments ?? 32)
+    // R12.51: case "liver_anatomical" REMOVIDO (geometria descontinuada).
     case "hand":
       return genHand(p.palmWidth ?? 80, p.palmLength ?? 100, p.fingerLength ?? 70, p.thickness ?? 15)
     case "tpms_gyroid":

@@ -49,7 +49,7 @@ export async function GET() {
     geometries: [
       "membrane", "disk", "skin_cylinder", "bone_block", "cube_tissue", "vessel",
       "hexagonal_liver", "femur", "nose", "meniscus", "cornea", "lens", "organoid_sphere",
-      "ear", "heart", "kidney", "liver_anatomical", "hand",
+      "ear", "heart", "kidney", "hand",
       "tpms_gyroid", "tpms_schwarz", "tpms_diamond",
     ],
     formats: ["stl_binary", "stl_ascii", "obj"],

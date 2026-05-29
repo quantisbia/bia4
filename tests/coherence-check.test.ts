@@ -71,20 +71,36 @@ describe("checkCoherence — cenário 1: Orelha + GelMA + Linhas COERENTE", () =
     expect(parametricInfo).toBeUndefined()
   })
 
-  it("R12.49: outras anatomias (coração, rim) AINDA emitem aviso paramétrico", () => {
-    // Heart ainda não tem STL real → continua emitindo aviso info-level.
+  it("R12.51: anatomia ainda paramétrica (mão) emite aviso info-level", () => {
+    // R12.51: heart + kidney ganharam STL real; liver_anatomical foi removido.
+    // Apenas "hand" continua paramétrica → continua emitindo aviso info-level.
     // Este teste documenta o estado: à medida que você fornecer mais STLs,
     // estas geometrias migram de "paramétrica" para "real".
-    const state = makeEarGelmaLinesState({ geometryId: "heart" })
-    const gcodeHeart =
-      "; BIA v4.2 — heart anatomical\n" +
-      "; geometry=heart\n" +
+    const state = makeEarGelmaLinesState({ geometryId: "hand" })
+    const gcodeHand =
+      "; BIA v4.2 — hand anatomical\n" +
+      "; geometry=hand\n" +
       "; material=GelMA\n" +
       "G1 X10 Y10 Z0.2 F500\nG1 X20 Y20 E1\n"
-    const report = checkCoherence(gcodeHeart, state)
+    const report = checkCoherence(gcodeHand, state)
     const parametricInfo = report.issues.find(i => i.code === "geometria-parametrica")
     expect(parametricInfo).toBeDefined()
     expect(parametricInfo?.level).toBe("info")
+  })
+
+  it("R12.51: heart e kidney NÃO emitem mais aviso paramétrico (STL real disponível)", () => {
+    // R12.51: ambos passaram a usar STL real fatiado.
+    for (const geom of ["heart", "kidney"]) {
+      const state = makeEarGelmaLinesState({ geometryId: geom })
+      const gcode =
+        `; BIA v4.2 — ${geom} anatomical\n` +
+        `; geometry=${geom}\n` +
+        "; material=GelMA\n" +
+        "G1 X10 Y10 Z0.2 F500\nG1 X20 Y20 E1\n"
+      const report = checkCoherence(gcode, state)
+      const parametricInfo = report.issues.find(i => i.code === "geometria-parametrica")
+      expect(parametricInfo, `geometria ${geom} não deveria emitir aviso paramétrico`).toBeUndefined()
+    }
   })
 })
 

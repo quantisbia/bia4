@@ -68,6 +68,23 @@ export const STL_PREPROCESS_MAP: Record<string, MeshPreprocess> = {
   "femur-real.stl": {
     scale: 50,
   },
+
+  // Rim (R12.51): bbox cru 38.6 × 19.7 × 12.7 mm com eixo longo em X.
+  // Rim humano adulto: ~120 × 60 × 30 mm com eixo longo VERTICAL (Z).
+  // Transformação: rotação 90° em Y (X → Z) + escala 3× para virar
+  // ~116 × 38 × 59 mm (próximo do anatômico).
+  "kidney-real.stl": {
+    rotate: { axis: "y", degrees: 90 },
+    scale: 3,
+  },
+
+  // Coração (R12.51): convertido de coracao.3mf (PrusaSlicer) → STL binário.
+  // 447378 triângulos, bbox cru 28.83 × 34.11 × 35.97 mm. Z já é o eixo longo.
+  // Coração adulto: ~120 × 100 × 100 mm → escala ~3× para virar ~86×102×108 mm.
+  // (modelo era "Coracao maior 3.1" — escala próxima do tamanho biopsável real)
+  "heart-real.stl": {
+    scale: 3,
+  },
 }
 
 /**
@@ -267,14 +284,14 @@ export function clearMeshCache(): void {
 // Define quais geometrias do catálogo BIA têm um STL real associado.
 // Pode crescer conforme você for fornecendo STLs.
 export const STL_FILE_MAP: Record<string, string> = {
-  ear: "ear-real.stl",       // R12.49 — 4432 tri, 28×47×15 mm
-  nose: "nose-real.stl",     // R12.50 — 11974 tri, 16×10×25 mm (rotacionado 90° X)
-  femur: "femur-real.stl",   // R12.50 — 118860 tri, 2×1×9 → 105×62×453 mm (escala 50×)
+  ear: "ear-real.stl",          // R12.49 — 4432 tri, 28×47×15 mm
+  nose: "nose-real.stl",        // R12.50 — 11974 tri, 16×10×25 mm (rotacionado 90° X)
+  femur: "femur-real.stl",      // R12.50 — 118860 tri, 2×1×9 → 105×62×453 mm (escala 50×)
+  kidney: "kidney-real.stl",    // R12.51 — 7960 tri, 39×20×13 → ~116×38×59 mm (rot 90° Y + escala 3×)
+  heart: "heart-real.stl",      // R12.51 — 447378 tri (de 3MF), 29×34×36 → ~86×102×108 mm (escala 3×)
   // Placeholders — adicione quando você enviar os arquivos:
-  // heart: "heart-real.stl",
-  // kidney: "kidney-real.stl",
-  // liver_anatomical: "liver-real.stl",
   // hand: "hand-real.stl",
+  // R12.51: liver_anatomical REMOVIDA do catálogo a pedido da Janaina.
 }
 
 export function hasStlForGeometry(geomId: string): boolean {

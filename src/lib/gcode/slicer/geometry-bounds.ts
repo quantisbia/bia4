@@ -406,8 +406,21 @@ export function getGeometryBounds(
       }
     }
 
-    // ─── Coração ANATÔMICO real (R12.16) ─────────────────────────────────
+    // ─── Coração ANATÔMICO real (R12.16/R12.51) ──────────────────────────
     case "heart": {
+      // R12.51: Se o STL real foi pré-carregado (447378 tri convertidos de
+      // coracao.3mf, escala 3× → ~86×102×108 mm), usa a malha. Caso contrário,
+      // fallback paramétrico abaixo.
+      const stlFileHeart = STL_FILE_MAP["heart"]
+      if (stlFileHeart && hasMesh(stlFileHeart)) {
+        return geometryBoundsFromMesh(
+          stlFileHeart,
+          { x: cx, y: cy },
+          { width: params.width, height: params.height, depth: params.depth },
+        )
+      }
+
+      // ── Fallback paramétrico (pré-R12.51) ──
       // Aproximação de bounds para a mesh anatômica real:
       //   - width  → largura átrios E↔D (X)
       //   - height → altura ápice→base (Z, eixo longo)
@@ -463,8 +476,21 @@ export function getGeometryBounds(
       }
     }
 
-    // ─── Rim (forma de feijão) ───────────────────────────────────────────
+    // ─── Rim ANATÔMICO real (R12.51) ─────────────────────────────────────
     case "kidney": {
+      // R12.51: Se o STL real foi pré-carregado (7960 tri de rim.stl,
+      // rotacionado 90° em Y e escala 3× → ~116×38×59 mm anatômico),
+      // usa a malha. Caso contrário, fallback paramétrico abaixo.
+      const stlFileKidney = STL_FILE_MAP["kidney"]
+      if (stlFileKidney && hasMesh(stlFileKidney)) {
+        return geometryBoundsFromMesh(
+          stlFileKidney,
+          { x: cx, y: cy },
+          { width: params.width, height: params.height, depth: params.depth },
+        )
+      }
+
+      // ── Fallback paramétrico (pré-R12.51) ──
       // Aproximação: cilindro com seção elíptica, eixo vertical.
       // params: length=45 (Y), width=25 (X), thickness=15 (Z), segments=32
       const W = params.width ?? 25
@@ -494,34 +520,10 @@ export function getGeometryBounds(
       }
     }
 
-    // ─── Fígado (anatômico com lobos) ────────────────────────────────────
-    case "liver_anatomical": {
-      // Aproximação: bloco elíptico achatado (lobos direito/esquerdo).
-      // params: length=60 (X), width=40 (Y), thickness=18 (Z), segments=32
-      const L = params.length ?? 60
-      const W = params.width ?? 40
-      const T = params.thickness ?? 18
-      const a = L / 2, b = W / 2
-      return {
-        height_mm: T, zMin: 0, zMax: T,
-        getBoundsAtZ: () => ({ minX: cx - a, maxX: cx + a, minY: cy - b, maxY: cy + b }),
-        getPerimetersAtZ: (_z, walls, spacing) => {
-          const polys: Polygon2D[] = []
-          for (let w = 0; w < walls; w++) {
-            const aw = a - w * spacing
-            const bw = b - w * spacing
-            if (aw <= 0.1 || bw <= 0.1) break
-            const poly: Polygon2D = []
-            for (let i = 0; i < 80; i++) {
-              const ang = (2 * Math.PI * i) / 80
-              poly.push({ x: cx + aw * Math.cos(ang), y: cy + bw * Math.sin(ang) })
-            }
-            polys.push(poly)
-          }
-          return polys
-        },
-      }
-    }
+    // R12.51: case "liver_anatomical" REMOVIDO do catálogo a pedido da Janaina.
+    // Justificativa: STL anatômico de fígado não está disponível e o paramétrico
+    // (elipse achatada) não representava bem o órgão. Removida do enum
+    // SUPPORTED_GEOMETRY_IDS, da lista PARAMETRIC_ANATOMICAL e do frontend.
 
     // ─── Mão (palma simplificada) ────────────────────────────────────────
     case "hand": {
@@ -653,7 +655,7 @@ export function getGeometryBounds(
 export const SUPPORTED_GEOMETRY_IDS = [
   "membrane", "disk", "skin_cylinder", "bone_block", "cube_tissue", "vessel", "hexagonal_liver",
   "femur", "nose", "meniscus", "cornea", "lens", "organoid_sphere",
-  "ear", "heart", "kidney", "liver_anatomical", "hand",
+  "ear", "heart", "kidney", "hand",
   "tpms_gyroid", "tpms_schwarz", "tpms_diamond",
   // R12.36 — testes de impressibilidade (perimeter-only by design)
   "test_fidelity_biotinta", "test_grid", "test_line", "test_collapse_bridge",
