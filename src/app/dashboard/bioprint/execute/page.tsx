@@ -68,6 +68,9 @@ import { PrinterController, type ControllerState, type StreamProgress } from "@/
 // R12.47: estado global do processo + checagem de coerência modelo↔gcode
 import { useBioprintProcess } from "@/lib/bioprint/process-context"
 import { checkCoherence, coherenceBadge, type CoherenceReport } from "@/lib/bioprint/coherence-check"
+// R12.53: catálogo de bioimpressoras — usado para extrair USB Vendor IDs
+// e filtrar o diálogo navigator.serial.requestPort para a impressora certa.
+import { getBioprinterById, BIOPRINTERS, type BioprinterSpec } from "@/lib/bioprinting/bioprinters"
 
 // Reutiliza preview 3D existente
 import { type ColorMode } from "@/components/bioprinter/GcodeViewer3D"
@@ -518,7 +521,16 @@ export default function BioprintExecutePage() {
   }, [parsed, validation])
 
   // ─── Transport + Controller ──
-  const [mode, setMode] = useState<"mock" | "real">("mock")
+  // R12.53: default mode passou de "mock" → "real". Motivo: a Janaina
+  // reportou "não está conectando na BioEnder" — e o motivo era que o
+  // toggle estava em MOCK por default. Usuários de hardware real (caso
+  // de uso principal) clicavam em "Conectar" sem perceber que estavam
+  // no simulador. Agora a página assume conexão real; o usuário que
+  // quer simular precisa explicitamente mudar para MOCK. O useEffect
+  // de detecção (logo abaixo) faz fallback para "mock" se Web Serial
+  // não estiver disponível, para que o botão "Conectar" sempre seja
+  // clicável (evita estado morto em Firefox/Safari).
+  const [mode, setMode] = useState<"mock" | "real">("real")
   const [baud, setBaud] = useState(DEFAULT_BAUD)
   const [connected, setConnected] = useState(false)
   const [firmware, setFirmware] = useState<FirmwareInfo | null>(null)
@@ -528,6 +540,21 @@ export default function BioprintExecutePage() {
   // se um jog do usuário entra ele rouba o ok do home e tudo trava (log da Bia).
   const [isHandshaking, setIsHandshaking] = useState(false)
   const [supported, setSupported] = useState(false)
+  /**
+   * R12.53: aplicar filtros de USB Vendor ID no diálogo `requestPort`.
+   * Default ON — só mostra dispositivos compatíveis com a bioimpressora
+   * selecionada (CH340/CP210x/FTDI para BioEnder). Se a impressora tem
+   * um chip USB-Serial não-padrão, o usuário pode desligar para ver
+   * todos os dispositivos seriais do sistema.
+   */
+  const [useUsbFilters, setUseUsbFilters] = useState<boolean>(true)
+  /**
+   * R12.53: portas previamente autorizadas pelo navegador (chamado uma
+   * vez no mount + a cada conexão). Útil pra diagnóstico — se o usuário
+   * já autorizou a BioEnder antes mas o conectar está falhando, a porta
+   * aparece aqui.
+   */
+  const [authorizedPorts, setAuthorizedPorts] = useState<number>(0)
   /**
    * R12.23: Auto-home ao conectar. Default ON. Sequência ao conectar:
    *   1) Handshake M115
@@ -604,9 +631,54 @@ export default function BioprintExecutePage() {
   const [controllerState, setControllerState] = useState<ControllerState>("idle")
   const [progress, setProgress] = useState<StreamProgress | null>(null)
 
-  // Detecta suporte Web Serial no mount
+  /**
+   * R12.53: Bioimpressora selecionada no /slice. Default → BioEnder (a mais
+   * usada no Brasil, é o caso de teste oficial da Janaina). Lê do context
+   * global se o usuário veio do fluxo /slice → /execute; senão usa BioEnder
+   * como fallback razoável.
+   *
+   * O `usbVendorIds` daqui é o que vai pro filtro do diálogo navigator.serial:
+   *   • BioEnder → [0x1A86, 0x10C4, 0x0403]  (CH340, CP210x, FTDI)
+   *   • CELLINK / Allevi → vazio (lista todos, esses usam chip proprietário)
+   */
+  const selectedBioprinter = useMemo<BioprinterSpec | undefined>(() => {
+    const id = bioprintState.slice.bioprinterId ?? "bioender_bioedtech"
+    return getBioprinterById(id) ?? getBioprinterById("bioender_bioedtech")
+  }, [bioprintState.slice.bioprinterId])
+
+  // Quando muda a bioimpressora ou aparece supported, ajusta o baud default
+  // pra o que essa impressora declara em seu spec. (115200 pra BioEnder,
+  // 250000 pra Octopus 3DBS, etc.) Só roda se não está conectado.
   useEffect(() => {
-    setSupported(typeof navigator !== "undefined" && "serial" in navigator)
+    if (connected) return
+    if (selectedBioprinter?.baud && BAUD_OPTIONS.includes(selectedBioprinter.baud)) {
+      setBaud(selectedBioprinter.baud)
+    }
+  }, [selectedBioprinter, connected])
+
+  // Detecta suporte Web Serial no mount.
+  // R12.53: se o navegador NÃO suporta (Firefox/Safari), automaticamente
+  // volta para mock — assim o botão "Conectar" continua clicável e o
+  // usuário não fica num estado morto. Também tenta listar portas
+  // previamente autorizadas (cache do Chromium) para o painel de
+  // diagnóstico.
+  useEffect(() => {
+    const hasSerial = typeof navigator !== "undefined" && "serial" in navigator
+    setSupported(hasSerial)
+    if (!hasSerial) {
+      // Sem Web Serial não tem como "real" funcionar — força mock
+      setMode("mock")
+      return
+    }
+    // Conta portas previamente autorizadas (não pede permissão)
+    void (async () => {
+      try {
+        const ports = await (navigator as { serial: { getPorts: () => Promise<unknown[]> } }).serial.getPorts()
+        setAuthorizedPorts(ports.length)
+      } catch {
+        setAuthorizedPorts(0)
+      }
+    })()
   }, [])
 
   // Cleanup ao desmontar
@@ -748,9 +820,63 @@ export default function BioprintExecutePage() {
         transport = new PrinterMock({ latencyMs: 25, busyRate: 0.02 })
         await transport.connect()
       } else {
-        if (!supported) throw new Error("Web Serial API não suportada neste navegador.")
-        const real = new RealPrinterConnection({ baudRate: baud })
-        await real.requestAndOpen()
+        if (!supported) {
+          throw new Error(
+            "Web Serial API não suportada neste navegador. " +
+            "Use Chrome 89+, Edge 89+, Brave ou Opera 75+ no desktop. " +
+            "Firefox e Safari ainda NÃO suportam Web Serial (W3C draft)."
+          )
+        }
+        // R12.53: aplica filtros de USB Vendor ID se a bioimpressora
+        // selecionada declara `usbVendorIds`. Sem isso, o diálogo nativo
+        // do navegador lista TODAS as portas seriais do sistema
+        // (impressora térmica, GPS, modem 4G, Arduino do colega…) e
+        // o usuário pode escolher a errada — que abre, mas não
+        // responde ao M115, e a conexão trava no handshake.
+        //
+        // Quando `useUsbFilters=false` (toggle off na UI), passa array
+        // VAZIO para forçar listar tudo — útil pra setups exóticos com
+        // chip USB-Serial não-padrão (ex.: clone com Arduino Mega
+        // 16U2 customizado, ESP32 com firmware Marlin, etc).
+        const vendorIds = selectedBioprinter?.usbVendorIds ?? []
+        const filters = useUsbFilters && vendorIds.length > 0
+          ? vendorIds.map((id) => ({ usbVendorId: id }))
+          : undefined
+        if (filters) {
+          loggerRef.current.info(
+            `Aplicando filtro USB para ${selectedBioprinter?.brand ?? "?"} ${selectedBioprinter?.model ?? "?"}: ` +
+            `vendorId=[${vendorIds.map((v) => "0x" + v.toString(16).toUpperCase()).join(", ")}] (CH340/CP210x/FTDI)`,
+            "controller",
+          )
+        } else {
+          loggerRef.current.info(
+            "Sem filtro USB — todos os dispositivos seriais aparecerão no diálogo do navegador.",
+            "controller",
+          )
+        }
+        const real = new RealPrinterConnection({ baudRate: baud, filters })
+        try {
+          await real.requestAndOpen()
+        } catch (e) {
+          // Reescreve mensagens crípticas pra algo acionável pro usuário
+          const raw = e instanceof Error ? e.message : String(e)
+          let hint = ""
+          if (raw.includes("No port selected") || raw.includes("Nenhuma porta")) {
+            hint = useUsbFilters && vendorIds.length > 0
+              ? ` — o diálogo abriu mas nenhuma porta foi selecionada. ` +
+                `Possíveis causas: (1) bioimpressora não conectada via USB, ` +
+                `(2) cabo USB sem fio de dados (só carrega), ` +
+                `(3) driver CH340 não instalado (Windows/Mac precisam baixar do site da WCH), ` +
+                `(4) sua impressora usa um chip USB-Serial diferente — tente desligar "Filtrar USB" abaixo.`
+              : ` — o diálogo abriu mas nenhuma porta foi selecionada.`
+          } else if (raw.includes("Access denied") || raw.includes("Failed to open")) {
+            hint = ` — a porta está em uso por outro programa. Feche Cura, Pronterface, OctoPrint, ` +
+                   `Repetier-Host ou qualquer terminal serial e tente novamente.`
+          } else if (raw.includes("not supported") || raw.includes("não suportada")) {
+            hint = ` — verifique se o navegador é Chrome 89+/Edge 89+/Brave e se a página é servida via HTTPS ou localhost.`
+          }
+          throw new Error(raw + hint)
+        }
         transport = real
       }
 
@@ -919,7 +1045,7 @@ export default function BioprintExecutePage() {
         "controller",
       )
     }
-  }, [connected, mode, supported, baud, autoHomeOnConnect, autoCenterAfterHome, flowPercent, moveToSafeCenterAfterHome])
+  }, [connected, mode, supported, baud, autoHomeOnConnect, autoCenterAfterHome, flowPercent, moveToSafeCenterAfterHome, selectedBioprinter, useUsbFilters])
 
   // ─── DISCONNECT ──
   const handleDisconnect = useCallback(async () => {
@@ -1576,20 +1702,11 @@ export default function BioprintExecutePage() {
 
           <div className="flex-1" />
 
-          {/* Mode toggle */}
+          {/* Mode toggle.
+              R12.53: a ordem visual agora é "Real USB" PRIMEIRO (default) e
+              "Mock" depois — antes era o oposto, e usuários reportaram que
+              clicavam em "Conectar" sem perceber que o toggle estava em mock. */}
           <div className="flex items-center gap-1 rounded-lg bg-black/40 border border-white/10 p-1">
-            <button
-              disabled={connected}
-              onClick={() => setMode("mock")}
-              className={cn(
-                "px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors flex items-center gap-1",
-                mode === "mock" ? "bg-violet-500/30 border border-violet-500/50 text-violet-100" : "text-gray-400 hover:text-white",
-                connected && "opacity-50 cursor-not-allowed",
-              )}
-              title="Simulador (sem hardware) — útil para sandbox/demo"
-            >
-              <Cpu className="w-3 h-3" /> Mock
-            </button>
             <button
               disabled={connected || !supported}
               onClick={() => setMode("real")}
@@ -1598,9 +1715,21 @@ export default function BioprintExecutePage() {
                 mode === "real" ? "bg-emerald-500/30 border border-emerald-500/50 text-emerald-100" : "text-gray-400 hover:text-white",
                 (connected || !supported) && "opacity-50 cursor-not-allowed",
               )}
-              title={supported ? "Bioimpressora real via Web Serial USB" : "Web Serial API não suportada neste navegador"}
+              title={supported ? "Bioimpressora real via Web Serial USB (default)" : "Web Serial API não suportada neste navegador"}
             >
               <Usb className="w-3 h-3" /> Real USB
+            </button>
+            <button
+              disabled={connected}
+              onClick={() => setMode("mock")}
+              className={cn(
+                "px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors flex items-center gap-1",
+                mode === "mock" ? "bg-violet-500/30 border border-violet-500/50 text-violet-100" : "text-gray-400 hover:text-white",
+                connected && "opacity-50 cursor-not-allowed",
+              )}
+              title="Simulador (sem hardware) — útil para sandbox/demo. NÃO envia nada para a bioimpressora física."
+            >
+              <Cpu className="w-3 h-3" /> Simulador
             </button>
           </div>
 
@@ -2278,7 +2407,46 @@ export default function BioprintExecutePage() {
               <>
                 {mode === "real" && !supported && (
                   <div className="mb-2 px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[10px]">
-                    Web Serial não suportada. Use Chrome 89+ ou Edge 89+. Modo MOCK funciona em qualquer navegador.
+                    Web Serial não suportada. Use <b>Chrome 89+</b>, <b>Edge 89+</b>, <b>Brave</b> ou <b>Opera 75+</b> no desktop.
+                    Firefox/Safari ainda NÃO suportam. Modo MOCK funciona em qualquer navegador.
+                  </div>
+                )}
+                {/* R12.53: Painel de Diagnóstico — só pra modo real, antes da conexão.
+                    Mostra de uma só vez: navegador detectado, suporte Web Serial,
+                    portas previamente autorizadas, bioimpressora selecionada e seu vendorId.
+                    Ajuda a triagear: (a) navegador errado, (b) cabo/driver ausente,
+                    (c) bioimpressora certa selecionada. */}
+                {mode === "real" && supported && (
+                  <div className="mb-2 px-2.5 py-2 rounded-lg bg-cyan-500/5 border border-cyan-500/20 text-[10px] space-y-1">
+                    <div className="text-cyan-200 font-semibold flex items-center gap-1 mb-1">
+                      <Info className="w-3 h-3" /> Diagnóstico de conexão
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-cyan-200/70">Web Serial</span>
+                      <span className="text-emerald-300 font-mono">✓ disponível</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-cyan-200/70">Portas autorizadas</span>
+                      <span className={cn("font-mono", authorizedPorts > 0 ? "text-emerald-300" : "text-gray-400")}>
+                        {authorizedPorts > 0 ? `${authorizedPorts}` : "nenhuma"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-cyan-200/70 shrink-0">Bioimpressora</span>
+                      <span className="text-cyan-100 font-mono text-right truncate">
+                        {selectedBioprinter
+                          ? `${selectedBioprinter.icon} ${selectedBioprinter.brand} ${selectedBioprinter.model}`
+                          : "—"}
+                      </span>
+                    </div>
+                    {selectedBioprinter?.usbVendorIds && selectedBioprinter.usbVendorIds.length > 0 && (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-cyan-200/70 shrink-0">USB Vendor IDs</span>
+                        <span className="text-cyan-100/80 font-mono text-[9px] text-right">
+                          {selectedBioprinter.usbVendorIds.map((v) => "0x" + v.toString(16).toUpperCase()).join(" · ")}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
                 {mode === "real" && (
@@ -2292,6 +2460,31 @@ export default function BioprintExecutePage() {
                       {BAUD_OPTIONS.map((b) => <option key={b} value={b}>{b}</option>)}
                     </select>
                   </div>
+                )}
+                {/* R12.53: Toggle filtro USB. Quando ON (default) só mostra portas
+                    com vendorId compatível com a bioimpressora selecionada.
+                    Quando OFF, lista todos os dispositivos seriais (fallback pra
+                    clones com chip incomum). */}
+                {mode === "real" && supported && selectedBioprinter?.usbVendorIds && selectedBioprinter.usbVendorIds.length > 0 && (
+                  <label className="flex items-start gap-2 mb-2 p-2 rounded-lg bg-violet-500/5 border border-violet-500/20 cursor-pointer hover:bg-violet-500/10 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={useUsbFilters}
+                      onChange={(e) => setUseUsbFilters(e.target.checked)}
+                      className="mt-0.5 accent-violet-400"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[11px] font-semibold text-violet-100 flex items-center gap-1">
+                        <Usb className="w-3 h-3" /> Filtrar dispositivos USB
+                      </div>
+                      <div className="text-[9px] text-violet-200/70 leading-tight mt-0.5">
+                        Quando ligado, o diálogo do navegador só mostra dispositivos
+                        com chip USB-Serial reconhecido (CH340/CP210x/FTDI).
+                        Se sua bioimpressora não aparecer no diálogo,
+                        <span className="text-violet-200 font-semibold"> desligue</span> para ver todos.
+                      </div>
+                    </div>
+                  </label>
                 )}
                 {/* R12.22: Toggle auto-home — explícito antes de conectar */}
                 <label className="flex items-start gap-2 mb-2 p-2 rounded-lg bg-cyan-500/5 border border-cyan-500/20 cursor-pointer hover:bg-cyan-500/10 transition-colors">
@@ -2351,9 +2544,14 @@ export default function BioprintExecutePage() {
                       : "bg-emerald-500 hover:bg-emerald-400 text-white",
                     "disabled:opacity-40 disabled:cursor-not-allowed"
                   )}
+                  title={mode === "real"
+                    ? `Conecta na bioimpressora ${selectedBioprinter?.brand ?? ""} ${selectedBioprinter?.model ?? ""} via USB`
+                    : "Inicia simulador interno — NÃO envia nada para hardware físico"}
                 >
-                  <Usb className="w-3.5 h-3.5" />
-                  {mode === "mock" ? "Iniciar Simulador" : "Conectar USB"}
+                  {mode === "mock" ? <Cpu className="w-3.5 h-3.5" /> : <Usb className="w-3.5 h-3.5" />}
+                  {mode === "mock"
+                    ? "Iniciar Simulador (sem hardware)"
+                    : `Conectar ${selectedBioprinter?.model ?? "BioEnder"} via USB`}
                 </button>
               </>
             ) : (

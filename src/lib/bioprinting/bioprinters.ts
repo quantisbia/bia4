@@ -30,6 +30,21 @@ export interface BioprinterSpec {
   connectionTypes: Array<"USB" | "Wi-Fi" | "Ethernet" | "SD" | "Proprietary">
   firmwareCompatibility: Array<"Marlin" | "Klipper" | "RepRap" | "Proprietary" | "GCODE-standard">
   baud: number                                                    // taxa serial USB (para conexão)
+  /**
+   * R12.53: USB Vendor IDs do(s) chip(s) USB-Serial usado(s) por essa
+   * bioimpressora. Usado para filtrar o diálogo `navigator.serial.requestPort`
+   * — sem isso, o usuário vê TODAS as portas seriais do sistema (impressora
+   * térmica, GPS, modem 4G, etc) e pode escolher a errada. Opcional: quando
+   * ausente, o diálogo lista tudo (comportamento "Mostrar todos").
+   *
+   * Valores típicos:
+   *   0x1A86 — WCH CH340/CH341 (Ender 3 e clones, BioEnder)
+   *   0x10C4 — Silicon Labs CP210x (alguns Creality, Ultimaker original)
+   *   0x0403 — FTDI FT232 (Prusa MK2/MK3 antigos, Rep2)
+   *   0x2341 — Arduino (placas Arduino oficiais)
+   *   0x2C99 — Prusa Research (MK3+/MK4)
+   */
+  usbVendorIds?: number[]
   nozzleDiameters_um: number[]                                    // bicos suportados
   priceTier: "academic" | "research" | "professional" | "industrial"
   description: string
@@ -59,6 +74,12 @@ export const BIOPRINTERS: BioprinterSpec[] = [
     connectionTypes: ["USB", "SD"],
     firmwareCompatibility: ["Marlin", "Klipper", "RepRap"],
     baud: 115200,
+    // R12.53: BioEnder é Ender 3 adaptada — usa o chip CH340 (WCH 0x1A86) na
+    // grande maioria das placas. Modelos mais novos (silenciosas v4.2.7) às
+    // vezes vêm com CP210x (Silicon Labs 0x10C4). Algumas Ender 3 antigas com
+    // placa Sanguino bringadas trazem FT232 (FTDI 0x0403). Listamos os 3 para
+    // cobrir todas as variações sem precisar de "Mostrar todos".
+    usbVendorIds: [0x1A86, 0x10C4, 0x0403],
     nozzleDiameters_um: [200, 250, 330, 410, 510, 840, 1200],
     priceTier: "academic",
     description:

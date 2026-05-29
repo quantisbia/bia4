@@ -583,8 +583,11 @@ export default function BioprintSlicePage() {
 
       setResult(data as GCodeResponse)
       // Persistir gcode + estimate
+      // R12.53: também persiste bioprinterId pra que /execute saiba qual
+      // filtro USB usar no requestPort (CH340 vs CP210x vs FTDI etc).
       updateSlice({
         status: "ready",
+        bioprinterId,
         gcode: data.gcode ?? null,
         estimate: {
           totalLayers: data.layerCount ?? 0,

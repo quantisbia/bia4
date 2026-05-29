@@ -164,6 +164,15 @@ export interface SliceStepState {
   /** Outros */
   skirtLoops: number | null
   retractionMm: number | null
+  /**
+   * R12.53: ID da bioimpressora selecionada no /slice (default
+   * "bioender_bioedtech"). Persistido aqui para que o /execute saiba
+   * quais filtros USB aplicar no `navigator.serial.requestPort()` —
+   * sem isso, o usuário vê TODAS as portas seriais do sistema e
+   * pode acabar selecionando a errada (impressora térmica, GPS,
+   * modem 4G, etc), levando ao bug "não está conectando na BioEnder".
+   */
+  bioprinterId: string | null
   /** G-code gerado */
   gcode: string | null
   /** Estimativas */
@@ -245,6 +254,7 @@ const DEFAULT_STATE: BioprintProcessState = {
     chamberTempC: null,
     skirtLoops: null,
     retractionMm: null,
+    bioprinterId: null,
     gcode: null,
     estimate: null,
   },
