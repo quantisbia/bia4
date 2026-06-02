@@ -71,6 +71,9 @@ import { checkCoherence, coherenceBadge, type CoherenceReport } from "@/lib/biop
 // R12.53: catálogo de bioimpressoras — usado para extrair USB Vendor IDs
 // e filtrar o diálogo navigator.serial.requestPort para a impressora certa.
 import { getBioprinterById, BIOPRINTERS, type BioprinterSpec } from "@/lib/bioprinting/bioprinters"
+// R12.54: modal de feedback pós-impressão (alimenta o learning-store)
+import { PrintFeedbackModal } from "@/components/bioprint/PrintFeedbackModal"
+import { inferTissueFromGeometry, type PresetParams } from "@/lib/bioprint/tissue-presets"
 
 // Reutiliza preview 3D existente
 import { type ColorMode } from "@/components/bioprinter/GcodeViewer3D"
@@ -630,6 +633,69 @@ export default function BioprintExecutePage() {
 
   const [controllerState, setControllerState] = useState<ControllerState>("idle")
   const [progress, setProgress] = useState<StreamProgress | null>(null)
+
+  // ─── R12.54: Modal de feedback pós-impressão ─────────────────────────
+  // Abre automaticamente quando `controllerState` vira "completed".
+  // Salva o resultado no learning-store (localStorage hoje, D1 no R12.55).
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false)
+  const lastCompletedAtRef = useRef<number>(0)
+
+  useEffect(() => {
+    // Só abre quando entra em "completed" — evita reabrir se o usuário fechar.
+    // Usamos uma janela de 60s pra debouce de re-renders. Se outro print rodar
+    // depois, o ref é "resetado" via setControllerState("idle"|"streaming")
+    // em outro lugar do código.
+    if (controllerState === "completed") {
+      const now = Date.now()
+      if (now - lastCompletedAtRef.current > 60_000) {
+        lastCompletedAtRef.current = now
+        // pequeno delay pra deixar o usuário ver o estado completed antes
+        const timer = setTimeout(() => setShowFeedbackModal(true), 800)
+        return () => clearTimeout(timer)
+      }
+    }
+    // Reset quando começa novo print
+    if (controllerState === "streaming") {
+      lastCompletedAtRef.current = 0
+    }
+  }, [controllerState])
+
+  // Snapshot dos parâmetros do /slice (lido do context global) — passa
+  // como `params` pro modal e gravado no learning-store.
+  const sliceParamsSnapshot = useMemo<PresetParams>(() => {
+    const s = bioprintState.slice
+    // Inferir flowPercent a partir do contexto (legado não tem campo
+    // dedicado — assumimos 100% se não informado)
+    return {
+      layerHeightMm: s.layerHeightMm ?? 0.25,
+      printSpeedMmS: s.printSpeedMmS ?? 8,
+      pressureKPa: s.pressureKPa ?? 80,
+      flowPercent: 100,  // R12.54: ainda não persistimos extrusionMultiplier
+      infillPercent: s.infillPercent ?? 30,
+      infillPatternId: s.infillPatternId ?? "classic-lines",
+      walls: 2,  // R12.54: walls ainda não persistidos no context
+      skirtLoops: s.skirtLoops ?? 2,
+      retractionMm: s.retractionMm ?? 0,
+      cartridgeTempC: s.cartridgeTempC ?? 25,
+      bedTempC: s.bedTempC ?? 20,
+      chamberTempC: s.chamberTempC ?? null,
+      perimeterOnly: s.perimeterOnly ?? false,
+    }
+  }, [bioprintState.slice])
+
+  // Tissue + bioink inferidos do contexto pro modal
+  const feedbackTissueId = useMemo(
+    () => inferTissueFromGeometry(bioprintState.model.geometryId) ?? "membrana",
+    [bioprintState.model.geometryId],
+  )
+  const feedbackBioinkId = useMemo(() => {
+    const first = bioprintState.bioink.formulations?.[0]
+    if (first?.materialId) return first.materialId
+    const mat = (bioprintState.bioink.material ?? "").toLowerCase()
+    if (mat.includes("gelma")) return "gelma"
+    if (mat.includes("algin")) return "alginate"
+    return "alginate"
+  }, [bioprintState.bioink])
 
   /**
    * R12.53: Bioimpressora selecionada no /slice. Default → BioEnder (a mais
@@ -3614,6 +3680,25 @@ export default function BioprintExecutePage() {
           </div>
         </div>
       )}
+
+      {/* R12.54: Modal de feedback pós-impressão — abre automaticamente
+          ~800ms após `controllerState` virar "completed". Permite ao
+          usuário registrar qualidade + issues + notas, alimentando o
+          learning-store que treina o TissueRecommendationCard. */}
+      <PrintFeedbackModal
+        open={showFeedbackModal}
+        onClose={() => setShowFeedbackModal(false)}
+        tissueId={feedbackTissueId}
+        bioinkId={feedbackBioinkId}
+        geometryId={bioprintState.model.geometryId}
+        params={sliceParamsSnapshot}
+        onSaved={(id) => {
+          loggerRef.current?.ok(
+            `Feedback do print registrado (id ${id.slice(0, 12)}…). A BIA vai usar isso pra melhorar as próximas recomendações.`,
+            "feedback",
+          )
+        }}
+      />
     </div>
   )
 }

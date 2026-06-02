@@ -38,6 +38,10 @@ import { SUPPORTED_GEOMETRY_IDS, isPerimeterOnlyGeometry } from "@/lib/gcode/sli
 import { TissueDesigner, type TissueDesignerValue } from "@/components/bioprinting/TissueDesigner"
 import { PrinterConnection } from "@/components/bioprinting/PrinterConnection"
 import { GcodeValidatorPanel } from "@/components/bioprinter/GcodeValidatorPanel"
+// R12.54: card de recomendação inteligente por tecido (Onda 1: membrana/vaso/músculo/nervo)
+import { TissueRecommendationCard } from "@/components/bioprint/TissueRecommendationCard"
+import { inferTissueFromGeometry } from "@/lib/bioprint/tissue-presets"
+import type { PresetParams } from "@/lib/bioprint/tissue-presets"
 
 // Timeout máximo de geração — evita rodar para sempre se o engine travar
 const GCODE_TIMEOUT_MS = 45_000
@@ -254,6 +258,91 @@ export default function BioprintSlicePage() {
   const [chamberTempC, setChamberTempC] = useState<number>(
     state.slice.chamberTempC ?? recommendedProfile.chamberTempC.ideal
   )
+
+  // ─── R12.54: Tecido alvo (Onda 1) ───────────────────────────────────────
+  // tissueId começa inferido pela geometria (membrane→membrana, vessel→vaso,
+  // heart→musculo...) mas o usuário pode mudar via dropdown no card.
+  // Quando vazio, o card vira modo "sem preset" mas ainda permite override.
+  const inferredTissueId = useMemo(
+    () => inferTissueFromGeometry(state.model.geometryId),
+    [state.model.geometryId],
+  )
+  const [tissueId, setTissueId] = useState<string>(inferredTissueId ?? "membrana")
+
+  // Quando a geometria muda na Etapa 1, atualizar tissueId se ele tinha sido
+  // inferido (não sobrescreve escolha manual feita pelo usuário antes)
+  useEffect(() => {
+    if (inferredTissueId && inferredTissueId !== tissueId) {
+      setTissueId(inferredTissueId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inferredTissueId])
+
+  // Bioink ID: vem do formulations[0].materialId (R12.10) com fallback
+  // pra material legacy do bioink step
+  const currentBioinkId = useMemo<string>(() => {
+    const first = state.bioink.formulations?.[0]
+    if (first?.materialId) return first.materialId
+    // Fallback: tenta mapear material legacy → id padronizado
+    const mat = (state.bioink.material ?? "").toLowerCase()
+    if (mat.includes("gelma")) return "gelma"
+    if (mat.includes("algin")) return "alginate"
+    if (mat.includes("colág") || mat.includes("collagen")) return "collagen_I"
+    if (mat.includes("fibrin")) return "fibrinogen"
+    return "alginate"  // fallback seguro
+  }, [state.bioink.formulations, state.bioink.material])
+
+  // currentParams: snapshot de todos os parâmetros atuais — entrada
+  // controlada do TissueRecommendationCard. Sempre que QUALQUER um dos
+  // setters acima for chamado, esse objeto é recalculado.
+  const currentParams = useMemo<PresetParams>(() => ({
+    layerHeightMm,
+    printSpeedMmS,
+    pressureKPa,
+    flowPercent: Math.round(extrusionMultiplier * 100),
+    infillPercent,
+    infillPatternId,
+    walls,
+    skirtLoops,
+    retractionMm,
+    cartridgeTempC,
+    bedTempC,
+    chamberTempC: temperatureEnabled ? chamberTempC : null,
+    perimeterOnly,
+  }), [
+    layerHeightMm, printSpeedMmS, pressureKPa, extrusionMultiplier,
+    infillPercent, infillPatternId, walls, skirtLoops, retractionMm,
+    cartridgeTempC, bedTempC, chamberTempC, temperatureEnabled, perimeterOnly,
+  ])
+
+  // handleApplyParams: callback do card. Aplica TODOS os parâmetros nos
+  // setters individuais existentes. Não dispara fetch de G-code — o usuário
+  // ainda precisa clicar no botão "Gerar G-code" depois (ou em alguns casos
+  // o próprio card chama isso depois de aplicar).
+  const handleApplyParams = useCallback((params: PresetParams) => {
+    setLayerHeightMm(params.layerHeightMm)
+    setPrintSpeedMmS(params.printSpeedMmS)
+    setPressureKPa(params.pressureKPa)
+    setExtrusionMultiplier(params.flowPercent / 100)
+    setInfillPercent(params.infillPercent)
+    setInfillPatternId(params.infillPatternId)
+    // Família do padrão é derivada do id
+    if (params.infillPatternId.startsWith("classic-")) {
+      setInfillFamily("classic")
+    } else {
+      setInfillFamily("biomedical")
+    }
+    setWalls(params.walls)
+    setSkirtLoops(params.skirtLoops)
+    setRetractionMm(params.retractionMm)
+    setCartridgeTempC(params.cartridgeTempC)
+    setBedTempC(params.bedTempC)
+    if (params.chamberTempC !== null) {
+      setChamberTempC(params.chamberTempC)
+      setTemperatureEnabled(true)
+    }
+    setPerimeterOnly(params.perimeterOnly)
+  }, [])
 
   // ── Multi-poço (opcional) ──
   const [useMultiWell, setUseMultiWell] = useState<boolean>(false)
@@ -837,7 +926,23 @@ export default function BioprintSlicePage() {
           </div>
         )}
         {tab === "params" && (
-          <ParamsPanel
+          <>
+            {/* R12.54: Card "Recomendado pela BIA" + Painel "Ajustar e Regenerar"
+                Aparece ANTES dos sliders manuais quando há um tecido inferido.
+                Onda 1: membrana / vaso / músculo / nervo. */}
+            {isUnlocked && (
+              <div className="max-w-5xl mx-auto mb-5">
+                <TissueRecommendationCard
+                  tissueId={tissueId}
+                  bioinkId={currentBioinkId}
+                  geometryId={state.model.geometryId}
+                  currentParams={currentParams}
+                  onApplyParams={handleApplyParams}
+                  onTissueChange={setTissueId}
+                />
+              </div>
+            )}
+            <ParamsPanel
             bioprinterId={bioprinterId} onBioprinterChange={setBioprinterId}
             currentPrinter={currentPrinter}
             algorithm={algorithm} /* R12.22: derivado do padrão (sem setter) */
@@ -863,6 +968,7 @@ export default function BioprintSlicePage() {
             modelCategory={state.model.category}
             hasCells={!!state.bioink.cellType}
           />
+          </>
         )}
         {tab === "wells" && (
           <WellsPanel
