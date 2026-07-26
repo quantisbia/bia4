@@ -677,3 +677,103 @@ export function isPerimeterOnlyGeometry(id: string): boolean {
 export function isSupportedGeometry(id: string): boolean {
   return SUPPORTED_GEOMETRY_IDS.includes(id as typeof SUPPORTED_GEOMETRY_IDS[number])
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// R12.55 — Segmentação Básico vs Avançado (Modo B como default)
+// ───────────────────────────────────────────────────────────────────────────
+// Estratégia: o /slice mostra APENAS a lista BÁSICA por default (Motor B —
+// quick-gcode.ts síncrono, validado em teste). O usuário precisa acionar
+// explicitamente o toggle "🧪 Modo Avançado (experimental)" para acessar as
+// geometrias anatômicas (heart/kidney/femur/…) + TPMS via Motor A (engine.ts,
+// 45s timeout, sem cobertura de testes garantida).
+//
+// BASIC_GEOMETRY_IDS: cobertas pelo Motor B (quick-gcode) + testes de
+// impressibilidade validados (Nelson 2021 ready).
+//
+// ADVANCED_GEOMETRY_IDS: anatômicas + TPMS via engine.ts — bandeira
+// "experimental" obrigatória no UI.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Geometrias BÁSICAS (Modo B / quick-gcode.ts) — Motor síncrono, testado, <100ms.
+ *
+ * Inclui as 5 formas paramétricas simples + 8 testes de impressibilidade
+ * (perimeter-only). No total, 13 IDs seguros para uso em produção.
+ *
+ * As geometrias "cube", "cylinder", "disk", "patch", "tube" são geradas pelo
+ * quick-gcode.ts diretamente no browser (sync). Os testes de impressibilidade
+ * são gerados pelo engine.ts em modo perimeter-only (rápido e determinístico).
+ *
+ * Mapeamento quick-gcode → engine.ts IDs:
+ *   quick "cube"     ↔ engine "cube_tissue"
+ *   quick "cylinder" ↔ engine "skin_cylinder"  (cilindro sólido)
+ *   quick "disk"     ↔ engine "disk"
+ *   quick "patch"    ↔ engine "membrane"
+ *   quick "tube"     ↔ engine "vessel"         (tubulação/anel)
+ *   quick "grid"     ↔ (não há equivalente engine — só quick-gcode)
+ */
+export const BASIC_GEOMETRY_IDS = [
+  // Formas paramétricas (Motor B / quick-gcode.ts)
+  "cube_tissue", "skin_cylinder", "disk", "membrane", "vessel",
+  // Testes de impressibilidade (rápidos, perimeter-only, validados)
+  "test_fidelity_biotinta", "test_grid", "test_line", "test_collapse_bridge",
+  "test_star", "test_stacking_tower", "test_z_staircase", "test_angle_fan",
+] as const
+
+/**
+ * Geometrias AVANÇADAS (Motor A / engine.ts) — experimental, sem garantia de tempo.
+ *
+ * - Anatômicas: heart, kidney, femur, nose, ear, hand, hexagonal_liver,
+ *   meniscus, cornea, lens, organoid_sphere → carregam STL grande + Voronoi
+ *   e podem exceder 45s no build.
+ * - TPMS: gyroid/schwarz/diamond → gerações matematicamente pesadas.
+ * - bone_block: bloco denso trabecular → também via engine.ts.
+ */
+export const ADVANCED_GEOMETRY_IDS = [
+  "bone_block",
+  "femur", "nose", "meniscus", "cornea", "lens", "organoid_sphere",
+  "ear", "heart", "kidney", "hand", "hexagonal_liver",
+  "tpms_gyroid", "tpms_schwarz", "tpms_diamond",
+] as const
+
+export function isBasicGeometry(id: string): boolean {
+  return BASIC_GEOMETRY_IDS.includes(id as typeof BASIC_GEOMETRY_IDS[number])
+}
+
+export function isAdvancedGeometry(id: string): boolean {
+  return ADVANCED_GEOMETRY_IDS.includes(id as typeof ADVANCED_GEOMETRY_IDS[number])
+}
+
+/**
+ * Retorna "basic" | "advanced" | "unknown" para qualquer geometry ID.
+ * Usado pela UI para decidir badge: "⚡ Verificado" vs "🧪 Experimental".
+ */
+export function classifyGeometry(id: string): "basic" | "advanced" | "unknown" {
+  if (isBasicGeometry(id)) return "basic"
+  if (isAdvancedGeometry(id)) return "advanced"
+  return "unknown"
+}
+
+/**
+ * Mapeamento quick-gcode → engine ID (usado quando /slice precisa
+ * traduzir a escolha do modo Básico para o naming legacy do engine.ts).
+ */
+export const QUICK_TO_ENGINE_ID: Record<string, string> = {
+  cube: "cube_tissue",
+  cylinder: "skin_cylinder",
+  disk: "disk",
+  patch: "membrane",
+  tube: "vessel",
+  // grid: sem mapping — só quick-gcode
+}
+
+/**
+ * Mapeamento engine → quick-gcode ID (inverso).
+ */
+export const ENGINE_TO_QUICK_ID: Record<string, string> = {
+  cube_tissue: "cube",
+  skin_cylinder: "cylinder",
+  disk: "disk",
+  membrane: "patch",
+  vessel: "tube",
+}

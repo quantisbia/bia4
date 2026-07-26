@@ -172,9 +172,42 @@ GOOGLE_AI_API_KEY=...
 
 ---
 
+## 🗓 Changelog Recente
+
+### R12.55 — Modo Básico (default) + Avançado (gated) + multi-biotinta + CSV real (2026-07-26)
+Refactor da Etapa 3 (`/dashboard/bioprint/slice`) para separar pipeline **verificado** vs **experimental**:
+
+- **Modo Básico (default, ⚡ pipeline verificado):** motor `quick-gcode` síncrono (&lt;100ms).
+  5 geometrias 3D simples: **cubo, cilindro, disco, patch retangular, tubo** (vascular).
+  Esfera oca removida (não é comum em bioimpressão prática).
+  Validador estático de G-code + score Nelson 2021 (shear stress Hagen-Poiseuille Power-Law).
+- **Modo Avançado (gated, 🧪 experimental):** motor `engine.ts` (Motor A, timeout 45s).
+  Anatômicos (femur, coração, rim, ouvido, mão, meniscus, cornea, lens, nariz, organoide, fígado hexagonal) + TPMS (gyroid, schwarz, diamond).
+  Banner amber deixa claro que a geração pode falhar.
+- **Multi-biotinta (novo):** seleção de até 4 formulações misturadas com fração %.
+  Merge por média ponderada (viscosidade, travel), mínimo (print speed), concat (label, crosslinker).
+  Simula blend pré-misturado em nozzle único (padrão real de laboratório).
+- **Base de dados de materiais (novo):** CSV real com 803/807 linhas (99.5%) do banco CECT parseado
+  para `material-database.ts` — **128 materiais canônicos** (Alginate 152×, PCL 134×, GelMA 86×,
+  Gelatin 71×, Pluronic F127 25×, PLGA 21×). DOIs 2020-2025.
+  Parser Python robusto lida com vírgula-decimal do PT-BR via *needle anchor* + *decimal-fusion*.
+- **G-code funcional:** parâmetros recomendados vêm direto do CSV (pressão kPa, temp °C, velocidade
+  mm/s, diâmetro de agulha µm) por material selecionado. Auto-aplicados na formulação.
+- **Testes:** 211/211 passando (201 anteriores + 10 novos smoke R12.55).
+- **Arquivos:** `material-database.ts` (244KB), `quick-gcode.ts` (+cylinder/+tube/+multi-bioink),
+  `geometry-bounds.ts` (BASIC_GEOMETRY_IDS/ADVANCED_GEOMETRY_IDS/classifyGeometry),
+  `MultiBioinkSelector.tsx` (7 presets), `BasicModePanel.tsx` (UI self-contained),
+  `/slice/page.tsx` (toggle Básico ↔ Avançado).
+
+### R12.54 — G-code adaptativo por tecido (Onda 1: membrana / vaso / músculo / nervo)
+`TissueRecommendationCard` integrado ao `/slice` sugere parâmetros por tecido inferido da geometria.
+Learning store persiste ajustes do usuário e re-alimenta as próximas sugestões.
+
+---
+
 ## 📜 Licença
 
 Proprietário — Quantis Biotechnology © 2026
 Janaina Dernowsek (CEO/Founder)
 
-**Last Updated:** 2026-05-06 — v4.3 (Formulador Pro + STL TPMS + Mesh Validator + Manual completo)
+**Last Updated:** 2026-07-26 — R12.55 (Basic/Advanced mode + multi-bioink + CSV real)

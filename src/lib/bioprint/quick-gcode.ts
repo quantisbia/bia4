@@ -5,17 +5,27 @@
  *  Filosofia: usuário define biotinta + modelo simples → G-code SAI EM <1s.
  *  Sem LLM, sem Voronoi pré-computado, sem well-plates, sem timeout 45s.
  *
- *  Geometrias suportadas (parametrizáveis):
- *    - cubo (l × w × h)
- *    - cilindro/disco (Ø × h)
- *    - grid/scaffold simples (l × w × h, pitch)
- *    - esfera oca (R externo, espessura)
- *    - patch retangular (l × w × h fino)
+ *  Geometrias suportadas (parametrizáveis) — R12.55:
+ *    ─── Modo BÁSICO (default) ────
+ *    - cube:     cubo/bloco (l × w × h)
+ *    - cylinder: cilindro sólido (Ø × h)
+ *    - disk:     disco fino circular (Ø × h fina)
+ *    - patch:    patch retangular fino (l × w × h fina)
+ *    - tube:     tubulação / anel (Ø externo, parede, h)
+ *    - grid:     grid/scaffold aberto poroso (l × w × h, pitch)
+ *
+ *    ─── LEGACY (deprecated, não expor no UI, mantido p/ compat de tipos) ──
+ *    - hollow-sphere: esfera oca (removida da UI em R12.55)
  *
  *  Infill suportado:
  *    - linhas paralelas (rectilinear) — alterna 0°/90° por camada
  *    - concêntrico — espirais offset (para discos)
  *    - sem infill (oco)
+ *
+ *  Multi-bioink (R12.55): suporta blend de N formulações (frac somando 1.0)
+ *  usando `generateQuickGcodeMulti(geom, bioinks, opts)`. A biotinta principal
+ *  (maior fração) governa velocidade/pressão; as demais são registradas no
+ *  header + metadata para rastreabilidade.
  *
  *  Saída: G-code Marlin-compatível com header BIA, SEM G28 (preserva bandeja).
  *
@@ -27,22 +37,40 @@ import { assessPrintability, type PrintabilityAssessment } from "./printability-
 
 // ─── Tipos ──────────────────────────────────────────────────────────────
 
-export type QuickGeometryId = "cube" | "disk" | "grid" | "patch" | "hollow-sphere"
+/**
+ * IDs de geometria suportados.
+ * ATENÇÃO R12.55: `hollow-sphere` é mantido no tipo por compatibilidade
+ * (código legado importa este tipo), mas NÃO deve aparecer na UI:
+ * ele foi removido de `GEOMETRY_PRESETS` e não é oferecido ao usuário.
+ */
+export type QuickGeometryId =
+  | "cube"        // ← BÁSICO
+  | "cylinder"    // ← BÁSICO (novo em R12.55)
+  | "disk"        // ← BÁSICO
+  | "grid"        // ← BÁSICO (scaffold aberto)
+  | "patch"       // ← BÁSICO
+  | "tube"        // ← BÁSICO (novo em R12.55: tubulação/anel)
+  | "hollow-sphere" // ← LEGACY (removido da UI em R12.55)
 
 export type QuickInfillPattern = "rectilinear" | "concentric" | "none"
 
 export interface QuickGeometry {
   id: QuickGeometryId
-  /** Largura X (mm) */
+  /** Largura X (mm) — para cylinder/disk/tube, este é o Ø externo */
   width: number
-  /** Profundidade Y (mm) */
+  /** Profundidade Y (mm) — para cylinder/disk/tube, geralmente = width */
   depth: number
   /** Altura Z (mm) */
   height: number
-  /** Para grid: passo do grid (mm); para disk: ignorado */
+  /** Para grid: passo do grid (mm); para disk/cylinder: ignorado */
   pitch?: number
-  /** Para hollow-sphere: espessura da parede (mm) */
+  /** Para hollow-sphere / tube: espessura da parede (mm) */
   wallThickness?: number
+  /**
+   * Para `tube`: diâmetro interno (mm). Se omitido, calculado como
+   * width − 2 × wallThickness. Se ambos omitidos, wall = 1.5 mm por padrão.
+   */
+  innerDiameter?: number
 }
 
 export interface QuickBioinkParams {
@@ -67,6 +95,25 @@ export interface QuickBioinkParams {
   /** Crosslinker (opcional, p/ comentário) */
   crosslinker?: string | null
 }
+
+/**
+ * R12.55 — Blend multi-biotinta.
+ *
+ * Uso comum em bioimpressão: misturar componentes (ex: Fibrinogênio 10% +
+ * Gelatina 5% + Ácido Hialurônico 3%). Cada componente contribui com uma
+ * fração em massa/volume; a biotinta com maior fração é considerada a
+ * "principal" (governa velocidade base e viscosidade efetiva no cálculo
+ * de Nelson 2021).
+ *
+ * Fração 0-1 (não %); a soma deve ser aproximadamente 1.0 (validado; se
+ * a soma divergir mais que 5% o parâmetro é normalizado com um warning).
+ */
+export interface QuickBioinkFormulation extends QuickBioinkParams {
+  /** Fração volumétrica no blend (0-1). Todas as frações somam ~1. */
+  fraction: number
+}
+
+export type QuickMultiBioink = QuickBioinkFormulation[]
 
 export interface QuickGcodeOptions {
   /** Altura de cada camada em mm (típico 0.2-0.4) */
@@ -158,6 +205,55 @@ function generateDiskWalls(geom: QuickGeometry, layerHeight: number, z: number):
     ring.push({ x: r * Math.cos(a), y: r * Math.sin(a) })
   }
   return [ring]
+}
+
+/**
+ * R12.55 — Cylinder: cilindro sólido (mesma parede circular a cada camada).
+ * Igual ao disk, mas semanticamente = coluna volumétrica alta.
+ */
+function generateCylinderWalls(geom: QuickGeometry, layerHeight: number, z: number): Point[][] {
+  const r = Math.min(geom.width, geom.depth) / 2
+  const N = Math.max(32, Math.ceil(r * 4))
+  const ring: Point[] = []
+  for (let i = 0; i <= N; i++) {
+    const a = (2 * Math.PI * i) / N
+    ring.push({ x: r * Math.cos(a), y: r * Math.sin(a) })
+  }
+  return [ring]
+}
+
+/**
+ * R12.55 — Tube: tubulação / anel = 2 anéis concêntricos (externo + interno).
+ *
+ * Modo comum em bioimpressão vascular: parede única formando um duto oco.
+ * Se `innerDiameter` for fornecido usa direto; caso contrário calcula
+ * `Ø_out − 2 × wallThickness` (wall padrão 1.5 mm).
+ */
+function generateTubeWalls(geom: QuickGeometry, layerHeight: number, z: number): Point[][] {
+  const r_out = Math.min(geom.width, geom.depth) / 2
+  const wall = geom.wallThickness ?? 1.5
+  const r_in_from_wall = r_out - wall
+  const r_in = geom.innerDiameter !== undefined
+    ? Math.max(0.5, geom.innerDiameter / 2)
+    : Math.max(0.5, r_in_from_wall)
+
+  // Validação: r_in deve ser menor que r_out
+  if (r_in >= r_out - 0.1) {
+    // Parede inválida — colapsa em um cilindro sólido
+    return generateCylinderWalls(geom, layerHeight, z)
+  }
+
+  const rings: Point[][] = []
+  for (const r of [r_out, r_in]) {
+    const N = Math.max(24, Math.ceil(r * 4))
+    const ring: Point[] = []
+    for (let i = 0; i <= N; i++) {
+      const a = (2 * Math.PI * i) / N
+      ring.push({ x: r * Math.cos(a), y: r * Math.sin(a) })
+    }
+    rings.push(ring)
+  }
+  return rings
 }
 
 function generateHollowSphereWalls(geom: QuickGeometry, layerHeight: number, z: number): Point[][] {
@@ -504,9 +600,11 @@ export function generateQuickGcode(
     let walls: Point[][]
     switch (geom.id) {
       case "cube":          walls = generateCubeWalls(geom, opts.layerHeight_mm, z); break
+      case "cylinder":      walls = generateCylinderWalls(geom, opts.layerHeight_mm, z); break
       case "disk":          walls = generateDiskWalls(geom, opts.layerHeight_mm, z); break
       case "grid":          walls = generateGridWalls(geom, opts.layerHeight_mm, z); break
       case "patch":         walls = generatePatchWalls(geom, opts.layerHeight_mm, z); break
+      case "tube":          walls = generateTubeWalls(geom, opts.layerHeight_mm, z); break
       case "hollow-sphere": walls = generateHollowSphereWalls(geom, opts.layerHeight_mm, z); break
       default:              walls = []
     }
@@ -524,17 +622,28 @@ export function generateQuickGcode(
     }
 
     // 2. INFILL (apenas em geometrias com área "fechada")
-    if (opts.infillPattern !== "none" && (geom.id === "cube" || geom.id === "patch" || geom.id === "disk" || geom.id === "grid")) {
+    // R12.55: `cylinder` agora recebe infill (mesma lógica do disk — clip circular)
+    // `tube` NÃO recebe infill (é oco por definição)
+    const needsInfill = (
+      geom.id === "cube" ||
+      geom.id === "patch" ||
+      geom.id === "disk" ||
+      geom.id === "cylinder" ||
+      geom.id === "grid"
+    )
+    if (opts.infillPattern !== "none" && needsInfill) {
       let segs: Array<[Point, Point]> = []
       if (geom.id === "grid") {
         // R12.18: grid agora respeita pattern (rectilinear/concentric)
         const pitch = geom.pitch ?? Math.max(1.0, nozzle * 5)
         segs = generateGridInfill(geom, li, pitch, opts.infillPattern)
-      } else if (opts.infillPattern === "concentric" && geom.id === "disk") {
+      } else if (opts.infillPattern === "concentric" && (geom.id === "disk" || geom.id === "cylinder")) {
         segs = generateConcentricInfill(geom, opts.infillDensity_pct, nozzle)
       } else {
-        // Rectilinear (clipa círculo se geom.id === "disk")
-        segs = generateRectilinearInfill(geom, li, opts.infillDensity_pct, nozzle)
+        // Rectilinear (clipa círculo se geom.id === "disk" ou "cylinder")
+        // Para cylinder tratamos como disk no clipping
+        const geomForInfill = geom.id === "cylinder" ? { ...geom, id: "disk" as QuickGeometryId } : geom
+        segs = generateRectilinearInfill(geomForInfill, li, opts.infillDensity_pct, nozzle)
       }
       emitSegments(acc, segs, bioink.printSpeed_mms, bioink.travelSpeed_mms, `infill L${li + 1}`)
     }
@@ -742,15 +851,159 @@ function emitGcodeText(
   return lines.filter((l) => l !== "").join("\n") + "\n"
 }
 
+// ─── R12.55 — Multi-bioink blend ───────────────────────────────────────
+
+/**
+ * Colapsa um blend multi-biotinta em um único `QuickBioinkParams` "efetivo"
+ * usando média ponderada pela fração de cada componente.
+ *
+ * Regras:
+ *  - Nozzle diameter → média ponderada arredondada a 0.05 mm (bicos comerciais)
+ *  - Viscosidade → média ponderada (aproximação para blend homogêneo)
+ *  - Print speed → mínima entre todas (componente mais lento manda)
+ *  - Travel speed → média ponderada
+ *  - Pressure → média ponderada (se disponível em todas)
+ *  - Cells → true se qualquer formulação tiver células
+ *  - Material label → "60% X + 40% Y" (concatenação legível)
+ *  - Crosslinker → concatenação de todos os crosslinkers únicos
+ */
+export function collapseMultiBioink(blend: QuickMultiBioink): QuickBioinkParams {
+  if (blend.length === 0) {
+    throw new Error("Blend multi-biotinta está vazio")
+  }
+  if (blend.length === 1) {
+    // Fast-path: sem blend real, remove fraction e retorna
+    const { fraction: _f, ...single } = blend[0]
+    return single
+  }
+
+  // Normaliza frações (soma = 1)
+  const rawSum = blend.reduce((s, b) => s + (b.fraction || 0), 0)
+  if (rawSum <= 0) {
+    throw new Error("Soma das frações do blend deve ser > 0")
+  }
+  const normalized = blend.map(b => ({ ...b, fraction: b.fraction / rawSum }))
+
+  const wSum = (fn: (b: QuickBioinkFormulation) => number) =>
+    normalized.reduce((s, b) => s + fn(b) * b.fraction, 0)
+
+  const nozzleAvg = wSum(b => b.nozzleDiameter_mm)
+  // Arredondar a 0.05 (bicos comerciais)
+  const nozzle = Math.round(nozzleAvg * 20) / 20
+
+  const viscosityAvg = wSum(b => b.viscosity_PaS)
+  const printSpeedMin = Math.min(...normalized.map(b => b.printSpeed_mms))
+  const travelSpeedAvg = wSum(b => b.travelSpeed_mms)
+  const pressuresDefined = normalized.filter(b => b.pressure_kpa !== undefined)
+  const pressureAvg = pressuresDefined.length === normalized.length
+    ? wSum(b => b.pressure_kpa!)
+    : undefined
+
+  const hasCells = normalized.some(b => b.hasCells)
+  // Se múltiplas células, junta com "+"
+  const cellTypes = normalized.filter(b => b.hasCells && b.cellType).map(b => b.cellType).filter((x): x is string => !!x)
+  const cellType = cellTypes.length > 0 ? Array.from(new Set(cellTypes)).join(" + ") : null
+
+  const cellDensityTotal = normalized
+    .filter(b => b.cellDensity_M_per_mL !== undefined && b.cellDensity_M_per_mL !== null)
+    .reduce((s, b) => s + (b.cellDensity_M_per_mL! * b.fraction), 0)
+  const cellDensity_M_per_mL = cellDensityTotal > 0 ? cellDensityTotal : null
+
+  const crosslinkers = Array.from(new Set(normalized.map(b => b.crosslinker).filter((x): x is string => !!x)))
+  const crosslinker = crosslinkers.length > 0 ? crosslinkers.join(" + ") : null
+
+  // Label: "60% GelMA 10% + 40% Alginato 3%"
+  const label = normalized
+    .map(b => `${(b.fraction * 100).toFixed(0)}% ${b.materialLabel}`)
+    .join(" + ")
+
+  return {
+    materialLabel: label,
+    nozzleDiameter_mm: nozzle,
+    viscosity_PaS: viscosityAvg,
+    printSpeed_mms: printSpeedMin,
+    travelSpeed_mms: travelSpeedAvg,
+    pressure_kpa: pressureAvg,
+    hasCells,
+    cellType,
+    cellDensity_M_per_mL,
+    crosslinker,
+  }
+}
+
+/**
+ * R12.55 — Gera G-code a partir de um BLEND multi-biotinta.
+ *
+ * Uso comum em bioimpressão prática: misturar 2+ componentes numa mesma
+ * ponta (ex: Fibrinogênio 10% + Gelatina 5%). Este helper colapsa o blend
+ * em params efetivos e delega para `generateQuickGcode`.
+ *
+ * NOTA: para impressoras MULTI-CARTUCHO (ferramentas T0/T1/T2/T3 distintas),
+ * uma futura versão emitirá blocos T{n} separados. Por ora, tratamos como
+ * blend pré-misturado (que é o caso mais comum em bioimpressão pesquisa).
+ *
+ * O header do G-code sempre lista TODAS as formulações originais para
+ * rastreabilidade.
+ */
+export function generateQuickGcodeMulti(
+  geom: QuickGeometry,
+  blend: QuickMultiBioink,
+  opts: QuickGcodeOptions,
+): QuickGcodeResult {
+  const effective = collapseMultiBioink(blend)
+  const result = generateQuickGcode(geom, effective, opts)
+
+  // Enriquece o rationale + G-code com detalhes do blend
+  if (blend.length > 1) {
+    const blendLines = blend.map((b, i) =>
+      `   [${i + 1}] ${(b.fraction * 100).toFixed(1)}% — ${b.materialLabel} (η=${b.viscosity_PaS} Pa·s, v=${b.printSpeed_mms} mm/s)`
+    )
+    // Insere logo após a primeira linha rationale
+    result.rationale.splice(1, 0,
+      `🧪 Blend com ${blend.length} formulações:`,
+      ...blendLines,
+    )
+
+    // Warn se soma diverge de 1.0 mais que 5%
+    const rawSum = blend.reduce((s, b) => s + (b.fraction || 0), 0)
+    if (Math.abs(rawSum - 1) > 0.05) {
+      result.warnings.push(
+        `Soma das frações do blend = ${rawSum.toFixed(3)} (esperado 1.0). Frações foram normalizadas.`,
+      )
+    }
+
+    // Anota no G-code (comentário adicional no header)
+    const blendHeader = [
+      "; ─────────────────────────────────────────────────────────────",
+      "; BLEND MULTI-BIOTINTA (R12.55):",
+      ...blend.map((b, i) => `;   [${i + 1}] ${(b.fraction * 100).toFixed(1)}% — ${b.materialLabel}`),
+      "; ─────────────────────────────────────────────────────────────",
+    ]
+    // Substitui a primeira ocorrência do bloco de biotinta no G-code
+    // pela versão com blend explícito
+    const marker = "; BIOTINTA:"
+    const insertPos = result.gcode.indexOf(marker)
+    if (insertPos >= 0) {
+      const before = result.gcode.slice(0, insertPos)
+      const after = result.gcode.slice(insertPos)
+      result.gcode = before + blendHeader.join("\n") + "\n" + after
+    }
+  }
+
+  return result
+}
+
 // ─── Labels human-readable ──────────────────────────────────────────────
 
 export function geometryLabel(id: QuickGeometryId): string {
   return {
     cube:            "Cubo",
+    cylinder:        "Cilindro",
     disk:            "Disco",
     grid:            "Grid / Scaffold aberto",
     patch:           "Patch retangular",
-    "hollow-sphere": "Esfera oca",
+    tube:            "Tubulação / Anel",
+    "hollow-sphere": "Esfera oca (legacy)",
   }[id]
 }
 
@@ -762,13 +1015,20 @@ export function infillLabel(p: QuickInfillPattern): string {
   }[p]
 }
 
-// ─── Presets de geometria comuns ────────────────────────────────────────
+// ─── Presets de geometria comuns (R12.55 — Modo Básico) ────────────────
+//
+// IMPORTANTE: `hollow-sphere` foi REMOVIDO desta lista em R12.55 por
+// solicitação do usuário (não é comum em bioimpressão prática).
+// O tipo é mantido para compat, mas não deve ser exposto na UI.
+//
+// Ordem de apresentação recomendada: cube → cylinder → disk → patch
+// → tube → grid (do mais fácil ao mais elaborado).
 
 export const GEOMETRY_PRESETS: Array<{
   id: QuickGeometryId
   label: string
   description: string
-  defaultParams: { width: number; depth: number; height: number; pitch?: number; wallThickness?: number }
+  defaultParams: { width: number; depth: number; height: number; pitch?: number; wallThickness?: number; innerDiameter?: number }
   goodFor: string[]
 }> = [
   {
@@ -779,11 +1039,32 @@ export const GEOMETRY_PRESETS: Array<{
     goodFor: ["validação", "testes de aderência", "scaffolds simples"],
   },
   {
+    id: "cylinder",
+    label: "Cilindro",
+    description: "Cilindro sólido — músculo, nervo, discos empilháveis. Ø × altura.",
+    defaultParams: { width: 10, depth: 10, height: 5 },
+    goodFor: ["músculo", "nervo", "tecido cilíndrico", "discos empilhados"],
+  },
+  {
     id: "disk",
-    label: "Disco / Cilindro",
-    description: "Disco circular — patch fino, cartilagem, córnea, pele.",
+    label: "Disco (fino)",
+    description: "Disco circular fino — cartilagem, córnea, pele, patch cardíaco.",
     defaultParams: { width: 12, depth: 12, height: 2 },
     goodFor: ["cartilagem", "patch cardíaco", "pele", "córnea"],
+  },
+  {
+    id: "patch",
+    label: "Patch retangular",
+    description: "Retângulo fino (~1 mm) — pele, peritôneo, cobertura de feridas, membrana.",
+    defaultParams: { width: 20, depth: 20, height: 1 },
+    goodFor: ["pele", "curativos", "membranas", "peritôneo"],
+  },
+  {
+    id: "tube",
+    label: "Tubulação / Anel",
+    description: "Cilindro oco — vasos, tubulações, canais vasculares macro.",
+    defaultParams: { width: 8, depth: 8, height: 10, wallThickness: 1.5 },
+    goodFor: ["vaso sanguíneo", "tubulação", "canal vascular", "anel"],
   },
   {
     id: "grid",
@@ -791,20 +1072,6 @@ export const GEOMETRY_PRESETS: Array<{
     description: "Malha aberta cross-hatch — alta porosidade, fácil perfusão.",
     defaultParams: { width: 15, depth: 15, height: 3, pitch: 1.5 },
     goodFor: ["osso", "scaffolds vascularizados", "engenharia de tecido"],
-  },
-  {
-    id: "patch",
-    label: "Patch (fino)",
-    description: "Retângulo fino (~1 mm) — pele, peritôneo, cobertura de feridas.",
-    defaultParams: { width: 20, depth: 20, height: 1 },
-    goodFor: ["pele", "curativos", "membranas"],
-  },
-  {
-    id: "hollow-sphere",
-    label: "Esfera oca",
-    description: "Esfera com parede fina — organoides, modelos vasculares simples.",
-    defaultParams: { width: 10, depth: 10, height: 10, wallThickness: 1.5 },
-    goodFor: ["organoides", "spheroids macros", "modelos vasculares"],
   },
 ]
 

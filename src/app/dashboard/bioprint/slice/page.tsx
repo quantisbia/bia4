@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils/helpers"
 import { useBioprintProcess, isBioinkReady } from "@/lib/bioprint/process-context"
 import { INFILL_PATTERNS, TEMPERATURE_PROFILES, CLASSIC_INFILL_PATTERNS } from "@/lib/bioprinter/biomedical-params"
 import { BIOPRINTERS, getBioprinterById, supportsWebSerial } from "@/lib/bioprinting/bioprinters"
-import { SUPPORTED_GEOMETRY_IDS, isPerimeterOnlyGeometry } from "@/lib/gcode/slicer/geometry-bounds"
+import { SUPPORTED_GEOMETRY_IDS, isPerimeterOnlyGeometry, classifyGeometry, ENGINE_TO_QUICK_ID } from "@/lib/gcode/slicer/geometry-bounds"
 import { TissueDesigner, type TissueDesignerValue } from "@/components/bioprinting/TissueDesigner"
 import { PrinterConnection } from "@/components/bioprinting/PrinterConnection"
 import { GcodeValidatorPanel } from "@/components/bioprinter/GcodeValidatorPanel"
@@ -42,6 +42,9 @@ import { GcodeValidatorPanel } from "@/components/bioprinter/GcodeValidatorPanel
 import { TissueRecommendationCard } from "@/components/bioprint/TissueRecommendationCard"
 import { inferTissueFromGeometry } from "@/lib/bioprint/tissue-presets"
 import type { PresetParams } from "@/lib/bioprint/tissue-presets"
+// R12.55: modo Básico (default) vs Avançado (gated) — pipeline verificado vs experimental
+import { BasicModePanel } from "@/components/bioprinter/BasicModePanel"
+import type { QuickGeometryId } from "@/lib/bioprint/quick-gcode"
 
 // Timeout máximo de geração — evita rodar para sempre se o engine travar
 const GCODE_TIMEOUT_MS = 45_000
@@ -167,6 +170,16 @@ export default function BioprintSlicePage() {
 
   // ── Tab atual (params é o padrão; tissue é OPCIONAL/avançado) ──
   const [tab, setTab] = useState<"tissue" | "params" | "wells" | "gcode">("params")
+
+  // ── R12.55: modo Básico (default) vs Avançado (gated) ─────────────────
+  // Básico = quick-gcode síncrono (<100ms) + geometrias 3D simples + validador estático
+  // Avançado = engine.ts (Motor A) — geometrias anatômicas + TPMS (experimental, 45s timeout)
+  const [sliceMode, setSliceMode] = useState<"basic" | "advanced">(() => {
+    const cls = state.model.geometryId ? classifyGeometry(state.model.geometryId) : "unknown"
+    // Se a geometria escolhida em /model é anatômica/TPMS, entra direto em Avançado.
+    // Caso contrário, mantém o padrão Básico (recomendado).
+    return cls === "advanced" ? "advanced" : "basic"
+  })
 
   // ── TissueDesigner (R10) ─ perfil biomimético inteligente ──
   const [tissueDesign, setTissueDesign] = useState<TissueDesignerValue>({
@@ -854,8 +867,122 @@ export default function BioprintSlicePage() {
         </div>
       )}
 
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* R12.55: Seletor de modo Básico ↔ Avançado                       */}
+      {/* Básico = pipeline verificado (default). Avançado = experimental. */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {isUnlocked && (
+        <div className="mx-4 sm:mx-6 mt-4">
+          {sliceMode === "basic" ? (
+            <div className="rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent p-4">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center shrink-0">
+                    <Zap className="w-5 h-5 text-emerald-300" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm font-bold text-white">⚡ Modo Básico · Pipeline Verificado</h3>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-200 font-semibold border border-emerald-500/30 uppercase tracking-wider">recomendado</span>
+                    </div>
+                    <p className="text-xs text-emerald-100/80 mt-1">
+                      Geometrias 3D simples (cubo, cilindro, disco, patch, tubo) + mistura de biotintas.
+                      G-code síncrono &lt;100ms, validador estático + Nelson 2021 (shear stress).
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSliceMode("advanced")}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 whitespace-nowrap transition-colors"
+                  title="Trocar para o motor experimental (Motor A / engine.ts) com anatômicos e TPMS"
+                >
+                  Ir para Modo Avançado 🧪
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-transparent p-4">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center shrink-0">
+                    <ShieldAlert className="w-5 h-5 text-amber-300" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm font-bold text-white">🧪 Modo Avançado · Experimental</h3>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-200 font-semibold border border-amber-500/30 uppercase tracking-wider">motor A</span>
+                    </div>
+                    <p className="text-xs text-amber-100/80 mt-1">
+                      Anatômicos (femur, coração, rim, ouvido…) + TPMS (gyroid, schwarz, diamond) via engine.ts.
+                      Geração pode levar até 45s e falhar em geometrias complexas.
+                      Use apenas quando o Básico não atende.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSliceMode("basic")}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-100 whitespace-nowrap transition-colors"
+                  title="Voltar ao pipeline verificado (recomendado)"
+                >
+                  Voltar ao Modo Básico ⚡
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Conteúdo da tab */}
       <main className="flex-1 px-4 sm:px-6 py-6 pb-24">
+
+        {/* ─── R12.55: Modo Básico renderiza painel dedicado ─────────── */}
+        {isUnlocked && sliceMode === "basic" && (
+          <div className="max-w-5xl mx-auto">
+            <BasicModePanel
+              initialGeometryId={
+                (ENGINE_TO_QUICK_ID[state.model.geometryId ?? ""] ?? "cube") as QuickGeometryId
+              }
+              jobName={`bia_${state.model.name?.replace(/\W+/g, "_").toLowerCase() ?? "basic"}_${state.model.geometryId ?? "cube"}`}
+              onGcodeGenerated={(gcode, quickResult) => {
+                updateSlice({
+                  status: "ready",
+                  bioprinterId,
+                  gcode,
+                  estimate: {
+                    totalLayers: quickResult.layerCount,
+                    estimatedTimeMin: quickResult.estimatedTime_min,
+                    estimatedVolumeMl: quickResult.bioinkVolume_uL / 1000,
+                  },
+                })
+              }}
+            />
+
+            {/* CTA para próxima etapa quando G-code está pronto */}
+            {state.slice.status === "ready" && state.slice.gcode && (
+              <div className="mt-6 rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 to-transparent p-5 flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <div className="text-sm font-bold text-white flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    G-code pronto para execução
+                  </div>
+                  <div className="text-xs text-violet-200/80 mt-1">
+                    Já pode conectar a bioimpressora e enviar o job.
+                  </div>
+                </div>
+                <Link
+                  href="/dashboard/bioprint/control"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500/20 hover:bg-violet-500/30 border border-violet-500/50 text-violet-100 text-sm font-semibold rounded-xl transition-colors"
+                >
+                  Continuar para Execução <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── R12.55: Modo Avançado (ou bloqueado) renderiza tabs originais ─ */}
+        {(!isUnlocked || sliceMode === "advanced") && (
+          <>
         {tab === "tissue" && (
           <div className="max-w-5xl mx-auto space-y-5">
             {/* Banner OPCIONAL — deixa claro que esta etapa não é obrigatória */}
@@ -997,6 +1124,8 @@ export default function BioprintSlicePage() {
               perimeterOnly={perimeterOnly}
             />
           </div>
+        )}
+          </>
         )}
       </main>
 
