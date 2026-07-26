@@ -24,13 +24,17 @@ import {
 import { cn } from "@/lib/utils/helpers"
 
 // ─── Capítulos modulares (R12.41 — manual de usuário final) ──────────
-import { GettingStarted } from "./chapters/getting-started"
-import { Roadmap as ChapterRoadmap } from "./chapters/roadmap"
-import { Pipeline as ChapterPipeline } from "./chapters/pipeline"
-import { BioprintModel } from "./chapters/bioprint-model"
-import { BioprintBioink } from "./chapters/bioprint-bioink"
-import { BioprintSlice } from "./chapters/bioprint-slice"
-import { BioprintExecute } from "./chapters/bioprint-execute"
+// R12.55.2 FIX: alinhar imports com os nomes reais exportados nos arquivos.
+// Antes os imports GettingStarted/BioprintModel/BioprintBioink/BioprintSlice/BioprintExecute
+// vinham como undefined (não existiam com esses nomes) e disparavam React error #130
+// ("Element type is invalid: undefined") ao clicar nesses capítulos.
+import { ChapterGettingStarted as GettingStarted } from "./chapters/getting-started"
+import { ChapterRoadmap } from "./chapters/roadmap"
+import { ChapterPipeline } from "./chapters/pipeline"
+import { ChapterBioprintModel as BioprintModel } from "./chapters/bioprint-model"
+import { ChapterBioprintBioink as BioprintBioink } from "./chapters/bioprint-bioink"
+import { ChapterBioprintSlice as BioprintSlice } from "./chapters/bioprint-slice"
+import { ChapterBioprintExecute as BioprintExecute } from "./chapters/bioprint-execute"
 import { OrganoidBuilder } from "./chapters/organoid-builder"
 import { Protocols as ChapterProtocols } from "./chapters/protocols"
 import { Knowledge as ChapterKnowledge } from "./chapters/knowledge"
