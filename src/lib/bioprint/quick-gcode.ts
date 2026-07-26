@@ -126,6 +126,20 @@ export interface QuickGcodeOptions {
   walls: number
   /** Nome do job para o header */
   jobName?: string
+  /**
+   * R12.55.1 — Centro do bed em mm (para transladar a geometria).
+   *
+   * As geometrias internamente são geradas centradas em (0,0), o que é o padrão
+   * na literatura de bioimpressão. Mas as bioimpressoras reais têm coordenadas
+   * de 0 até `xMax`/`yMax` (ex: 0-220 no BioEnder), então precisamos transladar
+   * cada ponto por `(bedCenter.x, bedCenter.y)` antes de emitir no G-code para
+   * a peça ficar centrada no bed e todas as coordenadas ficarem positivas.
+   *
+   * Se omitido, default = (110, 110) — centro do bed padrão 220×220 do BioEnder.
+   * Para desligar a translação (gerar coordenadas centradas em zero para
+   * simulação/debug), passe `{ x: 0, y: 0 }`.
+   */
+  bedCenter?: { x: number; y: number }
 }
 
 export interface QuickGcodeResult {
@@ -670,12 +684,15 @@ export function generateQuickGcode(
   )
 
   // ─── R12.13: Análise de imprimibilidade (Nelson et al. 2021) ───
+  // R12.55.1: passa crosslinker para o modelo classificar hidrogéis fotocuráveis
+  // (GelMA/PEGDA), termorreversíveis (Pluronic) e enzimáticos (Fibrin) corretamente.
   const printability = assessPrintability({
     viscosity_PaS: bioink.viscosity_PaS,
     printSpeed_mms: bioink.printSpeed_mms,
     nozzleDiameter_mm: bioink.nozzleDiameter_mm,
     hasCells: bioink.hasCells,
     materialLabel: bioink.materialLabel,
+    crosslinker: bioink.crosslinker,
   })
 
   // Mescla rationale Nelson no final (com cabeçalho científico)
@@ -748,6 +765,10 @@ function emitGcodeText(
   const now = new Date().toISOString()
   const lines: string[] = []
 
+  // R12.55.1: coordenadas do centro do bed (usadas para transladar a peça).
+  const bedCx = opts.bedCenter?.x ?? 110
+  const bedCy = opts.bedCenter?.y ?? 110
+
   // ─── HEADER BIA ───
   lines.push(
     "; ═══════════════════════════════════════════════════════════════",
@@ -769,6 +790,7 @@ function emitGcodeText(
     "; GEOMETRIA:",
     `;   Tipo:            ${geometryLabel(geom.id)}`,
     `;   Dimensões:       ${geom.width} × ${geom.depth} × ${geom.height} mm`,
+    `;   Centrado em:     X=${bedCx} mm, Y=${bedCy} mm (centro do bed)`,
     `;   Camadas:         ${stats.layerCount} × ${opts.layerHeight_mm} mm`,
     `;   Paredes:         ${opts.walls}`,
     `;   Infill:          ${infillLabel(opts.infillPattern)}${opts.infillPattern !== "none" ? ` @ ${opts.infillDensity_pct}%` : ""}`,
@@ -786,6 +808,7 @@ function emitGcodeText(
       `;   Ref próxima:     ${stats.printability.closestReference.id} (Pr=${stats.printability.closestReference.Pr.toFixed(2)})`,
     ] : []),
     "; ═══════════════════════════════════════════════════════════════",
+    `; ⚠️ Peça centrada no bed (X=${bedCx}, Y=${bedCy}). Ajuste bedCenter se seu bed for diferente.`,
     "; ⚠️ POSICIONE o bico MANUALMENTE sobre o bed antes de iniciar.",
     "; ⚠️ NENHUM aquecimento de cartucho/bed/chamber é enviado.",
     "; ⚠️ NENHUM G28 (home) — preserva bandeja/cartucho.",
@@ -799,6 +822,9 @@ function emitGcodeText(
   )
 
   // ─── MOVES ───
+  // R12.55.1: transladar coordenadas para o centro do bed (evita X/Y negativos
+  // que o validador rejeita). Geometrias são centradas em (0,0) internamente.
+  // bedCx/bedCy já foram declarados no topo (usados no header).
   let lastZ = -1
   let lastE = 0
   for (const m of moves) {
@@ -808,8 +834,8 @@ function emitGcodeText(
       lastZ = m.z
     }
     const parts: string[] = [m.type]
-    parts.push(`X${m.x.toFixed(3)}`)
-    parts.push(`Y${m.y.toFixed(3)}`)
+    parts.push(`X${(m.x + bedCx).toFixed(3)}`)
+    parts.push(`Y${(m.y + bedCy).toFixed(3)}`)
     parts.push(`Z${m.z.toFixed(3)}`)
     if (m.e !== undefined && m.e > lastE) {
       const dE = m.e - lastE

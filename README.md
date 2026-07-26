@@ -174,6 +174,27 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R12.55.1 — Correções críticas do Modo Básico (2026-07-26)
+
+Dois bugs reportados pela usuária no Modo Básico R12.55, ambos corrigidos:
+
+- **Bug 1 — `Validação: blocked` com 420 erros `OUT_OF_VOLUME`**:
+  as geometrias eram geradas centradas em (0,0) mas o validador espera coordenadas
+  dentro do volume da bioimpressora (0-220mm). **Fix**: nova opção `bedCenter` em
+  `QuickGcodeOptions` (default `{x:110, y:110}` — centro do bed BioEnder 220×220).
+  Toda peça sai automaticamente centralizada no bed. Header do G-code documenta
+  o centro usado. Custom bed suportado via `bedCenter: {x, y}`.
+- **Bug 2 — `Nelson 2021: 42/100 poor` para GelMA fotocurável**:
+  o modelo Nelson 2021 é calibrado para hidrogéis **pré-crosslinked** (Alginate+CMC+Ca²⁺),
+  que exigem viscosidade alta (200-800 Pa·s). Mas GelMA/PEGDA/HAMA são **fotocuráveis**:
+  a viscosidade baixa (1-20 Pa·s) é intencional pré-UV. **Fix**: nova função
+  `classifyCrosslinker()` detecta 5 classes (photocurable / thermoreversible /
+  enzymatic / ionic / pre-crosslinked) e aplica janela alternativa (1-50 Pa·s ideal 15)
+  para os 3 primeiros. Score GelMA 10% pré-UV agora: **98/100 excellent** (era 44/100 poor).
+  Rationale explica: *"Bioink fotocurável (UV/luz visível) — modelo Nelson 2021 é para
+  hidrogéis PRÉ-crosslinked. Aplicando janela alternativa."*
+- **Testes**: 216/216 passando (5 novos de regressão explicitamente para os 2 bugs).
+
 ### R12.55 — Modo Básico (default) + Avançado (gated) + multi-biotinta + CSV real (2026-07-26)
 Refactor da Etapa 3 (`/dashboard/bioprint/slice`) para separar pipeline **verificado** vs **experimental**:
 
@@ -210,4 +231,4 @@ Learning store persiste ajustes do usuário e re-alimenta as próximas sugestõe
 Proprietário — Quantis Biotechnology © 2026
 Janaina Dernowsek (CEO/Founder)
 
-**Last Updated:** 2026-07-26 — R12.55 (Basic/Advanced mode + multi-bioink + CSV real)
+**Last Updated:** 2026-07-26 — R12.55.1 (Fix: bed centering + Nelson score justo p/ fotocuráveis)

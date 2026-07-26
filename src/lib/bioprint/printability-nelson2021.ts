@@ -277,14 +277,75 @@ export interface PrintabilityAssessment {
  *
  * Usa as janelas Nelson 2021 e devolve score+rationale+warnings.
  */
+/**
+ * R12.55.1 — Classificação de método de crosslink.
+ *
+ * Nelson 2021 é calibrado para hidrogéis PRÉ-crosslinked (Alginate/CMC + Ca²⁺),
+ * onde a viscosidade PRÉ-impressão precisa ser alta (200-800 Pa·s) porque não
+ * há cura pós-deposição. Mas muitos bioinks modernos são de outra classe:
+ *
+ *  - FOTOCURÁVEIS (GelMA, PEGDA, PEGDMA, HAMA): baixa viscosidade a frio (1-20 Pa·s)
+ *    porque a rede polimérica só se forma quando incide UV/luz visível. Fluidez
+ *    baixa é FEATURE, não bug — permite bico fino sem shear alto.
+ *  - TERMORREVERSÍVEIS (Pluronic F127, Gelatina pura): baixa viscosidade quente,
+ *    alta a frio (ou vice-versa). Precisa aquecer/resfriar para gelar. A viscosidade
+ *    "no cartucho" pode variar 100× dependendo da temperatura.
+ *  - ENZIMÁTICOS (Fibrinogênio + trombina): coagulam pós-deposição por reação enzimática.
+ *
+ * Quando o crosslink é pós-deposição, aplicamos janela alternativa (1-50 Pa·s ideal 5-20)
+ * e explicamos que a fluidez é intencional. Verdict passa a considerar apenas shear
+ * (que ainda é físico e importa).
+ */
+export type CrosslinkClass = "pre-crosslinked" | "photocurable" | "thermoreversible" | "enzymatic" | "ionic" | "unknown"
+
+export function classifyCrosslinker(crosslinker?: string | null, materialLabel?: string): CrosslinkClass {
+  if (!crosslinker && !materialLabel) return "unknown"
+  const s = `${crosslinker ?? ""} ${materialLabel ?? ""}`.toLowerCase()
+
+  // Fotocurável: UV, luz visível, LAP, Irgacure, riboflavin, ruthenium
+  if (/\buv\b|photo|light|lap\b|irgacure|riboflavin|ruthenium|405\s*nm|365\s*nm|visible[\s-]*light/i.test(s)) {
+    return "photocurable"
+  }
+  // Materiais tipicamente fotocuráveis por nome (mesmo sem crosslinker informado)
+  if (/gelma|pegda|pegdma|hama|methacryl/i.test(s)) {
+    return "photocurable"
+  }
+  // Termorreversível
+  if (/pluronic|f-?127|thermo|gelation|cold[\s-]*set/i.test(s)) {
+    return "thermoreversible"
+  }
+  // Enzimático
+  if (/thrombin|transglutaminase|tgase|enzym|fibrin/i.test(s)) {
+    return "enzymatic"
+  }
+  // Iônico (Ca²⁺, Ba²⁺) — alginate típico
+  if (/cacl2|ca[²2]?\+|calcium|bacl|ba[²2]?\+|barium|ionic/i.test(s)) {
+    return "ionic"
+  }
+  // Pré-crosslinked (Nelson-style)
+  if (/pre.?cross|caso4|preformed/i.test(s)) {
+    return "pre-crosslinked"
+  }
+  return "unknown"
+}
+
+/** Janela alternativa para crosslink pós-deposição (fotocurável/termorreversível/enzimático). */
+const POST_DEPOSITION_VISCOSITY_WINDOW = { min: 1, ideal: 15, max: 50 } as const
+
 export function assessPrintability(input: {
   viscosity_PaS: number
   printSpeed_mms: number
   nozzleDiameter_mm: number
   hasCells?: boolean
   materialLabel?: string
+  /** R12.55.1: crosslinker (livre) — usado para inferir classe de crosslink */
+  crosslinker?: string | null
 }): PrintabilityAssessment {
-  const { viscosity_PaS, printSpeed_mms, nozzleDiameter_mm, hasCells, materialLabel } = input
+  const { viscosity_PaS, printSpeed_mms, nozzleDiameter_mm, hasCells, materialLabel, crosslinker } = input
+
+  // R12.55.1: classificar crosslink
+  const crosslinkClass = classifyCrosslinker(crosslinker, materialLabel)
+  const isPostDeposition = crosslinkClass === "photocurable" || crosslinkClass === "thermoreversible" || crosslinkClass === "enzymatic"
 
   // 1. Estimar Power-Law params
   const { K_PaSn, n } = estimatePowerLawFromViscosity(viscosity_PaS)
@@ -302,17 +363,19 @@ export function assessPrintability(input: {
   const refDistance = Math.min(1, minDist / 2)  // normalizado
 
   // 4. Score por dimensão (0-100)
+  // R12.55.1: para post-deposition crosslink, usa janela alternativa +
+  // ignora referenceDistance (Nelson é para hidrogéis pré-crosslinked).
   const W = NELSON_OPTIMAL_WINDOWS
-  const visc_score = scoreInWindow(viscosity_PaS, W.initialViscosity_PaS.min, W.initialViscosity_PaS.ideal, W.initialViscosity_PaS.max)
+  const viscWindow = isPostDeposition ? POST_DEPOSITION_VISCOSITY_WINDOW : W.initialViscosity_PaS
+  const visc_score = scoreInWindow(viscosity_PaS, viscWindow.min, viscWindow.ideal, viscWindow.max)
   const shear_score = scoreShearStress(wallShear_Pa, hasCells ?? false)
-  const refSim_score = (1 - refDistance) * 100
+  const refSim_score = isPostDeposition ? 100 : (1 - refDistance) * 100  // não penaliza distância a Nelson quando é foto/termo/enzimático
 
   // Score consolidado (média ponderada)
-  const score = Math.round(
-    visc_score * 0.40 +
-    shear_score * 0.40 +
-    refSim_score * 0.20
-  )
+  // Para post-deposition, dá menos peso à viscosidade (é intencional baixa) e mais ao shear (que é físico).
+  const score = isPostDeposition
+    ? Math.round(visc_score * 0.30 + shear_score * 0.55 + refSim_score * 0.15)
+    : Math.round(visc_score * 0.40 + shear_score * 0.40 + refSim_score * 0.20)
 
   // 5. Verdict
   const verdict: PrintabilityVerdict =
@@ -331,6 +394,16 @@ export function assessPrintability(input: {
   const rationale: string[] = []
   const warnings: string[] = []
 
+  // R12.55.1: se é post-deposition, avisa PRIMEIRO que o modelo Nelson é para pré-crosslinked
+  if (isPostDeposition) {
+    const classLabel = crosslinkClass === "photocurable" ? "fotocurável (UV/luz visível)"
+      : crosslinkClass === "thermoreversible" ? "termorreversível (gelifica com temperatura)"
+      : "enzimático (crosslink pós-deposição)"
+    rationale.push(
+      `ℹ️ Bioink ${classLabel} — modelo Nelson 2021 é para hidrogéis PRÉ-crosslinked. Aplicando janela alternativa (${viscWindow.min}-${viscWindow.max} Pa·s ideal ${viscWindow.ideal}).`
+    )
+  }
+
   rationale.push(
     `Power-Law estimado (Nelson 2021): K ≈ ${(K_PaSn / 1000).toFixed(1)} Pa·sⁿ · n ≈ ${n.toFixed(2)} (shear thinning ${n < 0.5 ? "forte" : "moderado"}).`
   )
@@ -340,14 +413,22 @@ export function assessPrintability(input: {
   )
 
   // Viscosidade
-  if (viscosity_PaS < W.initialViscosity_PaS.min) {
-    rationale.push(`⚠ Viscosidade ${viscosity_PaS.toFixed(1)} Pa·s ABAIXO da janela ideal (${W.initialViscosity_PaS.min}-${W.initialViscosity_PaS.max} Pa·s). Filamentos vão espalhar e perder fidelidade.`)
-    warnings.push("Viscosidade insuficiente — adicione CMC, aumente concentração ou pre-crosslink.")
-  } else if (viscosity_PaS > W.initialViscosity_PaS.max) {
+  if (viscosity_PaS < viscWindow.min) {
+    rationale.push(`⚠ Viscosidade ${viscosity_PaS.toFixed(1)} Pa·s ABAIXO da janela ideal (${viscWindow.min}-${viscWindow.max} Pa·s). Filamentos vão espalhar e perder fidelidade.`)
+    if (isPostDeposition) {
+      warnings.push("Viscosidade muito baixa mesmo para hidrogel pós-crosslink — aumente concentração do polímero.")
+    } else {
+      warnings.push("Viscosidade insuficiente — adicione CMC, aumente concentração ou pre-crosslink.")
+    }
+  } else if (viscosity_PaS > viscWindow.max) {
     rationale.push(`⚠ Viscosidade ${viscosity_PaS.toFixed(1)} Pa·s ACIMA da janela ideal. Vai exigir pressão alta e estressar as células.`)
     warnings.push("Viscosidade excessiva — reduza concentração ou aqueça o material.")
   } else {
-    rationale.push(`✓ Viscosidade ${viscosity_PaS.toFixed(1)} Pa·s dentro da janela ótima (Nelson: 200-800 Pa·s).`)
+    if (isPostDeposition) {
+      rationale.push(`✓ Viscosidade ${viscosity_PaS.toFixed(1)} Pa·s adequada para bioink com crosslink pós-deposição (janela ${viscWindow.min}-${viscWindow.max} Pa·s).`)
+    } else {
+      rationale.push(`✓ Viscosidade ${viscosity_PaS.toFixed(1)} Pa·s dentro da janela ótima (Nelson: 200-800 Pa·s).`)
+    }
   }
 
   // Shear cells
