@@ -176,7 +176,7 @@ export default function BioprintModelPage() {
       <main className="flex-1 px-4 sm:px-6 py-6">
         {source === "upload"   && <UploadPanel   onSelected={updateModel} currentName={state.model.name} />}
         {source === "generate" && <GeneratePanel onSelected={updateModel} currentGeometry={state.model.geometryId} currentParams={state.model.params} />}
-        {source === "ai"       && <AIPanel />}
+        {source === "ai"       && <AIPanel onSelected={updateModel} />}
       </main>
 
       {/* Rodapé fixo com status + CTA quando pronto */}
@@ -826,11 +826,163 @@ function GeneratePanel({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PAINEL C — IA (placeholder)
+// PAINEL C — IA (R12.56 · Sprint A · Claude Sonnet 4.5)
 // ═══════════════════════════════════════════════════════════════════════════
-function AIPanel() {
+
+/** Resposta enviada pelo endpoint /api/bioprint/model/ai-generate */
+interface AiGenerateApiResult {
+  geometryId: "cube_tissue" | "skin_cylinder" | "disk" | "membrane" | "vessel"
+  geometryLabel: string
+  dims: { x: number; y: number; z: number }
+  bioinkSuggestion: {
+    material: string
+    concentration_pct: number
+    crosslinker: string | null
+    crosslinkerConc: string | null
+    rationale: string
+  }
+  processParams: {
+    printSpeed_mms: number
+    layerHeight_mm: number
+    infillPercent: number
+    needleDiameter_um: number
+  }
+  rationale: string
+  dois: string[]
+  warnings: string[]
+  originalPrompt: string
+}
+
+interface AiGenerateApiMeta {
+  latencyMs: number
+  model: string
+  inputTokens: number
+  outputTokens: number
+  stopReason: string | null
+}
+
+const PROMPT_EXAMPLES = [
+  "Scaffold poroso para regeneração óssea cortical de 20×15×10 mm, com canais para vascularização",
+  "Córnea artificial 11 mm de diâmetro, 0.8 mm de espessura, com viabilidade celular alta",
+  "Vaso sanguíneo tubular 6 mm de diâmetro interno e 20 mm de altura",
+  "Patch de miocárdio 25×15×2 mm para regeneração pós-infarto com hidrogel biomimético",
+] as const
+
+/** Mapeia geometryId da IA (5 formas do Modo Básico) → params default do generator. */
+function buildParamsFromAi(result: AiGenerateApiResult): Record<string, number | string | boolean> {
+  const { geometryId, dims, processParams } = result
+  const common = {
+    width_mm: dims.x,
+    depth_mm: dims.y,
+    height_mm: dims.z,
+    infill_percent: processParams.infillPercent,
+    layer_height_mm: processParams.layerHeight_mm,
+  }
+  if (geometryId === "disk" || geometryId === "skin_cylinder") {
+    return { ...common, diameter_mm: dims.x, thickness_mm: dims.z }
+  }
+  if (geometryId === "vessel") {
+    return {
+      ...common,
+      outer_diameter_mm: dims.x,
+      inner_diameter_mm: Math.max(dims.x - 2, 3),
+      length_mm: dims.z,
+    }
+  }
+  if (geometryId === "membrane") {
+    return { ...common, thickness_mm: Math.min(dims.z, 3) }
+  }
+  return common
+}
+
+function AIPanel({
+  onSelected,
+}: {
+  onSelected: ReturnType<typeof useBioprintProcess>["updateModel"]
+}) {
+  const [prompt, setPrompt] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<AiGenerateApiResult | null>(null)
+  const [meta, setMeta] = useState<AiGenerateApiMeta | null>(null)
+  const [applied, setApplied] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    return () => abortRef.current?.abort()
+  }, [])
+
+  const handleGenerate = async () => {
+    const trimmed = prompt.trim()
+    if (trimmed.length < 5) {
+      setError("Descreva o tecido em pelo menos 5 caracteres.")
+      return
+    }
+    setLoading(true)
+    setError(null)
+    setResult(null)
+    setMeta(null)
+    setApplied(false)
+
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    try {
+      const res = await fetch("/api/bioprint/model/ai-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: trimmed }),
+        signal: controller.signal,
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(
+          data?.message
+            ?? (data?.error === "api_key_missing"
+              ? "Chave da IA não configurada no servidor. Defina ANTHROPIC_API_KEY em .env.local"
+              : data?.error === "resposta_invalida"
+                ? `Resposta inválida do modelo: ${data.details ?? "desconhecida"}`
+                : `Erro ${res.status}`),
+        )
+        return
+      }
+      setResult(data.result)
+      setMeta(data.meta)
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return
+      setError(`Falha na chamada: ${(err as Error).message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleApply = () => {
+    if (!result) return
+    onSelected({
+      status: "ready",
+      source: "ai-prompt",
+      name: `IA: ${result.geometryLabel} · ${result.bioinkSuggestion.material} ${result.bioinkSuggestion.concentration_pct}%`,
+      category: null,
+      geometryId: result.geometryId,
+      params: buildParamsFromAi(result),
+      stats: {
+        bboxMm: { x: result.dims.x, y: result.dims.y, z: result.dims.z },
+      },
+      validation: null,
+    })
+    setApplied(true)
+  }
+
+  const handleUseExample = (ex: string) => {
+    setPrompt(ex)
+    setError(null)
+  }
+
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-3xl mx-auto space-y-4">
+      {/* Painel principal — input */}
       <div className="rounded-2xl bg-gradient-to-br from-violet-500/8 to-fuchsia-500/8 border border-violet-500/20 p-6">
         <div className="flex items-start gap-3 mb-4">
           <div className="w-10 h-10 rounded-xl bg-violet-500/15 border border-violet-500/30 flex items-center justify-center">
@@ -843,39 +995,190 @@ function AIPanel() {
             </p>
           </div>
           <span className="text-[10px] font-semibold bg-violet-500/20 text-violet-200 px-2 py-1 rounded-full border border-violet-500/30">
-            EM BREVE
+            BETA · Claude Sonnet 4.5
           </span>
         </div>
 
         <textarea
-          disabled
+          value={prompt}
+          onChange={(e) => { setPrompt(e.target.value); setError(null) }}
+          disabled={loading}
           placeholder="Ex: Quero um scaffold poroso para regeneração óssea cortical de 20×15×10 mm, porosidade ≥70%, com canais para vascularização passiva…"
-          className="w-full h-32 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-gray-400
-            placeholder:text-gray-600 resize-none focus:outline-none disabled:cursor-not-allowed"
+          className="w-full h-32 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-gray-200
+            placeholder:text-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/40
+            disabled:opacity-50 disabled:cursor-not-allowed"
+          maxLength={2000}
         />
 
-        <div className="flex items-center justify-between mt-3">
+        <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
           <div className="text-[11px] text-gray-500">
-            Funcionalidade prevista para liberação após validação experimental do banco BIA.
+            {prompt.length}/2000 caracteres · Modo Básico (5 geometrias verificadas)
           </div>
           <button
-            disabled
-            className="px-4 py-2 bg-violet-500/30 text-violet-200/60 text-sm rounded-lg font-medium disabled:cursor-not-allowed"
+            onClick={handleGenerate}
+            disabled={loading || prompt.trim().length < 5}
+            className="px-4 py-2 bg-violet-500/40 hover:bg-violet-500/60 border border-violet-400/40
+              text-white text-sm rounded-lg font-medium disabled:opacity-40 disabled:cursor-not-allowed
+              transition-colors flex items-center gap-2"
           >
-            Gerar com IA
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Gerando…
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                Gerar com IA
+              </>
+            )}
           </button>
         </div>
+
+        {!result && !loading && (
+          <div className="mt-4 pt-4 border-t border-white/5">
+            <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">
+              Exemplos rápidos
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {PROMPT_EXAMPLES.map((ex, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleUseExample(ex)}
+                  className="text-[11px] px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10
+                    text-gray-300 rounded-full transition-colors"
+                >
+                  {ex.slice(0, 60)}{ex.length > 60 ? "…" : ""}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-3 rounded-lg bg-rose-500/10 border border-rose-500/30 p-3 flex items-start gap-2">
+            <XCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+            <div className="text-xs text-rose-200">{error}</div>
+          </div>
+        )}
       </div>
 
-      <div className="mt-4 rounded-xl bg-white/3 border border-white/8 p-4">
+      {/* Card de resultado */}
+      {result && (
+        <div className="rounded-2xl bg-gradient-to-br from-emerald-500/8 to-cyan-500/8 border border-emerald-500/25 p-6">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.2em] text-emerald-300/80 font-semibold mb-1">
+                Proposta da IA
+              </div>
+              <h3 className="text-base font-bold text-white">{result.geometryLabel}</h3>
+              <div className="text-xs text-gray-400 mt-0.5">
+                {result.dims.x} × {result.dims.y} × {result.dims.z} mm
+              </div>
+            </div>
+            {meta && (
+              <div className="text-right text-[10px] text-gray-500">
+                <div>{meta.latencyMs}ms · {meta.outputTokens} tokens</div>
+                <div className="opacity-60">{meta.model}</div>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 pb-4 border-b border-white/5">
+            <Stat label="Biotinta" value={`${result.bioinkSuggestion.material} ${result.bioinkSuggestion.concentration_pct}%`} />
+            <Stat label="Crosslinker" value={result.bioinkSuggestion.crosslinker ?? "—"} />
+            <Stat label="Velocidade" value={`${result.processParams.printSpeed_mms} mm/s`} />
+            <Stat label="Layer" value={`${result.processParams.layerHeight_mm} mm`} />
+            <Stat label="Infill" value={`${result.processParams.infillPercent}%`} />
+            <Stat label="Agulha" value={`${result.processParams.needleDiameter_um} µm`} />
+          </div>
+
+          <div className="mb-4">
+            <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">
+              Racional da biotinta
+            </div>
+            <p className="text-xs text-gray-300 leading-relaxed">
+              {result.bioinkSuggestion.rationale}
+            </p>
+          </div>
+
+          <div className="mb-4">
+            <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">
+              Racional científico
+            </div>
+            <p className="text-xs text-gray-300 leading-relaxed whitespace-pre-line">
+              {result.rationale}
+            </p>
+          </div>
+
+          {result.dois.length > 0 && (
+            <div className="mb-4">
+              <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">
+                Referências ({result.dois.length})
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {result.dois.map((doi, i) => (
+                  <a
+                    key={i}
+                    href={`https://doi.org/${doi.replace(/^doi:/i, "").replace(/^https?:\/\/(dx\.)?doi\.org\//i, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-mono px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10
+                      text-cyan-300 rounded-md transition-colors"
+                  >
+                    {doi}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {result.warnings.length > 0 && (
+            <div className="mb-4 rounded-lg bg-amber-500/10 border border-amber-500/25 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-amber-400 font-semibold mb-1.5 flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Ajustes automáticos ({result.warnings.length})
+              </div>
+              <ul className="text-[11px] text-amber-200/90 space-y-0.5">
+                {result.warnings.map((w, i) => (
+                  <li key={i}>• {w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-4 border-t border-white/5 gap-3">
+            <div className="text-[11px] text-gray-500">
+              A sugestão será registrada em <code className="font-mono text-emerald-300">state.model</code> com fonte <code className="font-mono text-emerald-300">ai-prompt</code>.
+            </div>
+            {applied ? (
+              <div className="flex items-center gap-2 text-sm text-emerald-300 font-medium">
+                <CheckCircle2 className="w-4 h-4" />
+                Aplicado
+              </div>
+            ) : (
+              <button
+                onClick={handleApply}
+                className="px-4 py-2 bg-emerald-500/25 hover:bg-emerald-500/40 border border-emerald-500/40
+                  text-emerald-100 text-sm rounded-lg font-medium transition-colors flex items-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Aplicar sugestão
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-xl bg-white/3 border border-white/8 p-4">
         <div className="text-xs font-semibold text-gray-300 mb-2 flex items-center gap-2">
           <Info className="w-4 h-4 text-blue-400" />
-          Por enquanto
+          Como funciona (R12.56 · Sprint A)
         </div>
         <p className="text-xs text-gray-400 leading-relaxed">
-          Use a aba <strong className="text-emerald-300">Gerar</strong> para escolher entre as 25 geometrias paramétricas
-          já validadas (5 categorias) — todas com base científica documentada. Quando a IA estiver liberada, ela vai
-          orquestrar exatamente esses mesmos motores.
+          A IA escolhe entre 5 geometrias verificadas (<strong className="text-emerald-300">cubo, cilindro, disco, membrana, tubo</strong>) e 10 materiais
+          canônicos do banco BIA. Toda saída passa por validação server-side (whitelist + clamp de dimensões).
+          Prompts em português ou inglês. O rationale sempre em pt-BR.
         </p>
       </div>
     </div>

@@ -8,7 +8,7 @@
 ## 🎯 Visão Geral
 
 - **Nome:** BIA v4 (Biomaterial Intelligent Assistant)
-- **Stack:** Next.js 14 + TypeScript + TailwindCSS + Prisma + Gemini 2.5 Flash
+- **Stack:** Next.js 14 + TypeScript + TailwindCSS + Prisma + Gemini 2.5 Flash + Claude Sonnet 4.5 (geração de modelo 3D via IA · R12.56)
 - **Foco:** Acelerar pesquisa em medicina regenerativa com IA + ferramentas científicas integradas
 - **Status:** ✅ Operacional em produção
 
@@ -173,6 +173,35 @@ GOOGLE_AI_API_KEY=...
 ---
 
 ## 🗓 Changelog Recente
+
+### R12.56 — Geração por IA da Etapa 1 (Claude Sonnet 4.5) · Sprint A (2026-07-27)
+
+Ativação da aba **"IA (beta)"** em `/dashboard/bioprint/model` — antes um placeholder marcado "EM BREVE", agora funcional:
+
+- **LLM**: Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) via SDK oficial Anthropic
+- **Endpoint novo**: `POST /api/bioprint/model/ai-generate` recebe `{ prompt }` (5-2000 chars) e retorna proposta estruturada
+- **Estratégia técnica**: uso do `tool_use` do Claude com schema JSON estrito — garante saída 100% estruturada sem parsing de string
+- **Guardrails server-side**:
+  - Geometria restrita a whitelist de 5 formas do Modo Básico (`cube_tissue`, `skin_cylinder`, `disk`, `membrane`, `vessel`)
+  - Material restrito a 10 canônicos (`GelMA`, `Alginate`, `Gelatin`, `Collagen`, `Fibrinogen`, `dECM`, `Hyaluronic Acid`, `PCL`, `Pluronic F127`, `PEGDA`)
+  - Clamp defensivo em todas as dimensões (5-100 mm) com warnings quando ajustes ocorrem
+  - Fallback de material inválido → GelMA (com warning explícito)
+- **UI refatorada**: `AIPanel()` em `model/page.tsx` totalmente reescrito
+  - Textarea funcional com 4 exemplos rápidos clicáveis
+  - Card de resultado com: geometria + dims + biotinta + rationale bioink + rationale científico (pt-BR) + DOIs clicáveis + warnings de validação
+  - Botão "Aplicar sugestão" persiste em `state.model` com `source: "ai-prompt"` — a Etapa 2 (Biotinta) já lê o material sugerido
+- **Rationale**: modelo produz 2-4 parágrafos em pt-BR citando literatura peer-review (Biomaterials, Acta Biomaterialia, Biofabrication, etc)
+- **Performance real**: ~20s por chamada, ~1400 in / ~940 out tokens
+- **Segurança**: `ANTHROPIC_API_KEY` só em `.env.local` (gitignored) — nunca exposta ao browser
+- **Sprint A limitações conscientes**: sem cobrança de créditos, sem streaming, sem retry automático — planejados para Sprint B
+- **Testes**: 241/241 passando (22 novos em `tests/r12_56_ai_generate.test.ts` cobrindo validação, whitelist, clamps, defaults, contract com UI)
+- **Live smoke test validado com 3 prompts reais**:
+  - "Scaffold poroso osso cortical 20×15×10" → `cube_tissue` + `GelMA 10%` + UV/LAP + infill 40% (4 DOIs)
+  - "Córnea 11 mm × 0.8 mm" → `disk` + `GelMA 7.5%` + infill 100% + agulha 200 µm (4 DOIs)
+  - "Vaso 6 mm interno × 20 mm altura" → `vessel` + `GelMA 7%` + LAP UV + infill 25% (4 DOIs)
+
+Sprint B (próximo) — cobrança de créditos + retry automático + streaming do rationale.
+Sprint C (depois) — expandir para geometrias avançadas + sugestão de alternativas (top-3).
 
 ### R12.55.1 — Correções críticas do Modo Básico (2026-07-26)
 
