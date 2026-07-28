@@ -174,6 +174,33 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R12.58 — Etapa 2 · Multi-biotinta (max 2, 1 célula por biotinta) (2026-07-28)
+
+Correção de UX crítica reportada pela usuária: **a Etapa 2 forçava biotinta única com 1 tipo celular**, mas na prática real de bioimpressão trabalha-se com múltiplos materiais e tipos celulares. Agora:
+
+- **Até 2 biotintas** — controle explícito de "biotinta 1" (T0) e "biotinta 2" (T1), mapeando para os slots Marlin da bioimpressora
+- **1 tipo celular por biotinta** — cada biotinta encapsula UMA linhagem celular (ex: bio 1 = GelMA estrutural acelular; bio 2 = Alginato com hMSC). O scaffold como um todo pode ter 2 tipos celulares diferentes, um por biotinta
+- **Botão "+ Adicionar biotinta 2"** e **"− Remover biotinta 2"** — usuário começa com 1 (single) e escala para 2 (dual) quando precisa
+- **Seletor de biotinta ativa**: cards Bio 1 / Bio 2 no topo mostram material + concentração + role + status celular; clicar num deles muda qual está sendo editada
+- **Papel funcional (role)**: seletor novo antes do material — 5 opções (`structural` / `cellular` / `sacrificial` / `vascular` / `support-bath`)
+- **Cores por tool**: T0 ciano (`#22d3ee`), T1 violeta (`#a78bfa`) — visualmente consistente com o preview 3D
+- **Rodapé sticky mostra AMBAS**: "Bio 1 [T0]: GelMA 8% · Bio 2 [T1]: Alginato 3% · hMSC 5×10⁶/mL"
+- **Reologia**: continua calculada para a biotinta ATIVA (a que o usuário está vendo) — é a que aparece no painel de reologia
+- **Backward compat**: `slice/page.tsx` e `control/page.tsx` continuam consumindo `state.bioink.material` / `.concentration` / `.cellType` etc. — a UI R12.58 espelha os campos legacy a partir de `formulations[0]` (biotinta principal). Nenhum código downstream precisa mudar
+- **Migração automática**: usuários vindos de R12.57 (com campos legacy preenchidos) veem sua biotinta antiga hidratada como bio 1 (T0) com `role: "structural"` (ou `"cellular"` se tinha células)
+- **Hidratação priorizada**: se `state.bioink.formulations[]` já tiver dados persistidos (sessionStorage), usa direto; senão migra do legacy; senão cria default GelMA 8% estrutural
+- **strategy** derivada: `"single"` (1 bio) / `"dual"` (2 bio)
+
+**Rationale científico**: na prática de laboratório real (relato da Janaina), scaffolds funcionais quase sempre combinam pelo menos duas biotintas — uma estrutural (dá rigidez e forma) e uma celular (carrega o tipo de célula do tecido alvo), frequentemente com sacrificial ou vascular como terceira. O limite de 2 do R12.58 cobre 80% dos casos práticos sem complicar demais a UI; o backend já suporta multi-material completo via `formulations[]`, então expandir para 3+ no futuro é só destravar a UI.
+
+**Arquivos**:
+- `src/app/dashboard/bioprint/bioink/page.tsx` (+272/-70 linhas) — refactor completo do estado + UI multi-biotinta
+- `tests/r12_58_multi_biotinta.test.ts` (novo, 16 testes) — cobre draftToFormulation, buildBioinkPatch, dual/single strategy, legacy mirror, role preservation
+
+**Testes**: 271/271 passing (255 anteriores + 16 novos R12.58).
+
+**Próximo (Sprints B/C do R12.56 estão desbloqueados)**: cobrança de créditos + streaming do rationale IA + expandir IA para geometrias avançadas.
+
 ### R12.57 — Etapa 1 · Filtro "geometrias verificadas vs experimentais" (2026-07-28)
 
 Correção de UX crítica reportada pela usuária: **geometrias anatômicas complexas apareciam por padrão e travavam** (heart, kidney, femur, TPMS, formas compostas experimentais). Agora:
@@ -279,4 +306,4 @@ Learning store persiste ajustes do usuário e re-alimenta as próximas sugestõe
 Proprietário — Quantis Biotechnology © 2026
 Janaina Dernowsek (CEO/Founder)
 
-**Last Updated:** 2026-07-28 — R12.57 (Etapa 1: filtro geometrias verificadas vs experimentais)
+**Last Updated:** 2026-07-28 — R12.58 (Etapa 2: multi-biotinta · max 2, 1 célula cada)

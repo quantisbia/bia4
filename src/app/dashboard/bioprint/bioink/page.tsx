@@ -24,9 +24,10 @@ import {
   Droplets, Database, BarChart3, Search, Loader2, FlaskConical,
   Microscope, Star, ArrowRight, AlertTriangle, CheckCircle2, ChevronDown,
   ChevronUp, Info, Beaker, Sparkles, Filter, X, ChevronRight, TrendingUp,
+  Plus, Trash2, Layers,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
-import { useBioprintProcess } from "@/lib/bioprint/process-context"
+import { useBioprintProcess, type BioinkRole, type BioinkFormulation } from "@/lib/bioprint/process-context"
 
 // ─── Constantes da biotinta (importadas da página antiga, agora aqui) ─────
 
@@ -251,6 +252,88 @@ function calculateRheology(input: RheologyInput): RheologyResult {
   }
 }
 
+// ─── R12.58: roles funcionais das biotintas ────────────────────────────
+const ROLE_DEFS: Array<{ id: BioinkRole; label: string; hint: string; color: string }> = [
+  { id: "structural",   label: "Estrutural",  hint: "Matriz principal · sustenta o scaffold",       color: "#34d399" },
+  { id: "cellular",     label: "Celular",     hint: "Carrega células · encapsula tipo celular",     color: "#a78bfa" },
+  { id: "sacrificial",  label: "Sacrificial", hint: "Removida depois · gera vazios / canais",       color: "#fbbf24" },
+  { id: "vascular",     label: "Vascular",    hint: "Canal perfundível (Pluronic, alginato temp.)", color: "#f472b6" },
+  { id: "support-bath", label: "Banho supp.", hint: "FRESH / suspensão · não é impressa como fio",  color: "#94a3b8" },
+]
+
+const TOOL_COLORS = ["#22d3ee", "#a78bfa"] as const  // T0 ciano, T1 violeta
+
+// ─── R12.58: draft (estado local de UMA biotinta durante edição) ──────
+interface FormulationDraft {
+  tool: 0 | 1
+  role: BioinkRole
+  materialId: string
+  concentration: number
+  crosslinker: string
+  crosslinkerConc: number
+  hasCells: boolean
+  cellType: string
+  cellDensity: number
+  additivesText: string
+}
+
+function draftFromContext(f: BioinkFormulation | undefined, toolIdx: 0 | 1): FormulationDraft {
+  if (!f) {
+    // Default para "nova biotinta 2" (T1) — assume papel celular
+    const preset = BIOINK_MATERIALS[0]
+    return {
+      tool: toolIdx,
+      role: toolIdx === 0 ? "structural" : "cellular",
+      materialId: preset.id,
+      concentration: preset.concDefault,
+      crosslinker: preset.defaultCrosslinker,
+      crosslinkerConc: preset.defaultCrosslinkerConc,
+      hasCells: toolIdx === 1,   // Bio 2 geralmente carrega células
+      cellType: "Fibroblast",
+      cellDensity: 2,
+      additivesText: "",
+    }
+  }
+  // Mapeia BioinkFormulation → draft. materialId vem direto se existir,
+  // senão tenta casar pelo label.
+  const preset =
+    BIOINK_MATERIALS.find(m => m.id === f.materialId) ??
+    BIOINK_MATERIALS.find(m => m.label.toLowerCase() === (f.material ?? "").toLowerCase()) ??
+    BIOINK_MATERIALS[0]
+  return {
+    tool: toolIdx,
+    role: f.role,
+    materialId: preset.id,
+    concentration: f.concentration ?? preset.concDefault,
+    crosslinker: f.crosslinker ?? preset.defaultCrosslinker,
+    crosslinkerConc: f.crosslinkerConc ?? preset.defaultCrosslinkerConc,
+    hasCells: f.cellType !== null,
+    cellType: f.cellType ?? "Fibroblast",
+    cellDensity: f.cellDensityMillionMl ?? 2,
+    additivesText: (f.additives ?? []).join(", "),
+  }
+}
+
+function draftToFormulation(d: FormulationDraft): BioinkFormulation {
+  const preset = BIOINK_MATERIALS.find(m => m.id === d.materialId) ?? BIOINK_MATERIALS[0]
+  const additives = d.additivesText
+    .split(",").map(s => s.trim()).filter(s => s.length > 0)
+  return {
+    tool: d.tool,
+    color: TOOL_COLORS[d.tool] ?? "#22d3ee",
+    role: d.role,
+    material: preset.label,
+    materialId: preset.id,
+    concentration: d.concentration,
+    crosslinker: d.crosslinker,
+    crosslinkerConc: d.crosslinkerConc,
+    cellType: d.hasCells ? d.cellType : null,
+    cellDensityMillionMl: d.hasCells ? d.cellDensity : null,
+    additives,
+    rheology: null,   // preenchido só na biotinta ativa (ver useEffect)
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════════════════════
@@ -258,71 +341,134 @@ export default function BioprintBioinkPage() {
   const { state, updateBioink } = useBioprintProcess()
   const [tab, setTab] = useState<"formulate" | "catalog" | "rheology">("formulate")
 
-  // ─── Estado da formulação (default vem do context, se houver) ──────────
-  const [materialId, setMaterialId] = useState<string>(
-    state.bioink.material ?? "gelma"
-  )
-  const matPreset = BIOINK_MATERIALS.find(m => m.id === materialId) ?? BIOINK_MATERIALS[0]
+  // ─── R12.58: estado é um array de 1 ou 2 drafts ────────────────────────
+  // Hidrata do context:
+  //   - Se já houver formulations[] persistidas → usa
+  //   - Senão, se houver campos legacy → migra para formulations[0]
+  //   - Senão, começa com 1 biotinta default (T0 estrutural GelMA)
+  const [drafts, setDrafts] = useState<FormulationDraft[]>(() => {
+    const fs = state.bioink.formulations ?? []
+    if (fs.length >= 2) {
+      return [draftFromContext(fs[0], 0), draftFromContext(fs[1], 1)]
+    }
+    if (fs.length === 1) {
+      return [draftFromContext(fs[0], 0)]
+    }
+    // Legacy fallback (usuário vindo de R12.55.x)
+    if (state.bioink.material) {
+      const preset =
+        BIOINK_MATERIALS.find(m => m.label.toLowerCase() === state.bioink.material!.toLowerCase()) ??
+        BIOINK_MATERIALS.find(m => m.id === state.bioink.material!.toLowerCase()) ??
+        BIOINK_MATERIALS[0]
+      return [{
+        tool: 0,
+        role: state.bioink.cellType ? "cellular" : "structural",
+        materialId: preset.id,
+        concentration: state.bioink.concentration ?? preset.concDefault,
+        crosslinker: state.bioink.crosslinker ?? preset.defaultCrosslinker,
+        crosslinkerConc: state.bioink.crosslinkerConc ?? preset.defaultCrosslinkerConc,
+        hasCells: state.bioink.cellType !== null,
+        cellType: state.bioink.cellType ?? "Fibroblast",
+        cellDensity: state.bioink.cellDensityMillionMl ?? 2,
+        additivesText: (state.bioink.additives ?? []).join(", "),
+      }]
+    }
+    return [draftFromContext(undefined, 0)]
+  })
 
-  const [concentration, setConcentration]       = useState<number>(state.bioink.concentration ?? matPreset.concDefault)
-  const [crosslinker, setCrosslinker]            = useState<string>(state.bioink.crosslinker ?? matPreset.defaultCrosslinker)
-  const [crosslinkerConc, setCrosslinkerConc]    = useState<number>(state.bioink.crosslinkerConc ?? matPreset.defaultCrosslinkerConc)
-  const [hasCells, setHasCells]                  = useState<boolean>(state.bioink.cellType !== null)
-  const [cellType, setCellType]                  = useState<string>(state.bioink.cellType ?? "Fibroblast")
-  const [cellDensity, setCellDensity]            = useState<number>(state.bioink.cellDensityMillionMl ?? 2)
-  const [additivesText, setAdditivesText]        = useState<string>(state.bioink.additives.join(", "))
+  const [activeIdx, setActiveIdx] = useState<0 | 1>(0)
+  // Se drafts encolheu para 1 (usuário removeu bio 2) e activeIdx=1 → volta pra 0
+  useEffect(() => {
+    if (activeIdx >= drafts.length) setActiveIdx(0)
+  }, [drafts.length, activeIdx])
+
+  const activeDraft = drafts[activeIdx] ?? drafts[0]
+  const matPreset = BIOINK_MATERIALS.find(m => m.id === activeDraft.materialId) ?? BIOINK_MATERIALS[0]
 
   // Para reologia + warnings: precisa de um nozzleUm e printSpeedMmS chutados
   // (a etapa de fatiamento vai sobrescrever — aqui usamos defaults razoáveis)
   const [nozzleUm, setNozzleUm]         = useState<number>(300)
   const [printSpeedMmS, setPrintSpeedMmS] = useState<number>(15)
 
-  // Reologia derivada
+  // Reologia derivada — calculada só para a biotinta ATIVA
   const rheology = useMemo<RheologyResult>(() => calculateRheology({
-    materialId, concentration, hasCells, cellDensityM: cellDensity, nozzleUm, printSpeedMmS,
-  }), [materialId, concentration, hasCells, cellDensity, nozzleUm, printSpeedMmS])
+    materialId: activeDraft.materialId,
+    concentration: activeDraft.concentration,
+    hasCells: activeDraft.hasCells,
+    cellDensityM: activeDraft.cellDensity,
+    nozzleUm, printSpeedMmS,
+  }), [activeDraft.materialId, activeDraft.concentration, activeDraft.hasCells, activeDraft.cellDensity, nozzleUm, printSpeedMmS])
 
   // Pre-requisito visual (etapa 1 não pronta?)
   const isUnlocked = state.model.status === "ready"
 
-  // ─── Quando trocar de material: aplicar preset ─────────────────────────
+  // ─── Helpers para editar biotinta ativa ─────────────────────────────────
+  const patchActive = useCallback((patch: Partial<FormulationDraft>) => {
+    setDrafts(prev => prev.map((d, i) => i === activeIdx ? { ...d, ...patch } : d))
+  }, [activeIdx])
+
   const handleMaterialChange = useCallback((id: string) => {
-    setMaterialId(id)
     const p = BIOINK_MATERIALS.find(m => m.id === id)
-    if (p) {
-      setConcentration(p.concDefault)
-      setCrosslinker(p.defaultCrosslinker)
-      setCrosslinkerConc(p.defaultCrosslinkerConc)
-    }
+    patchActive({
+      materialId: id,
+      ...(p ? {
+        concentration: p.concDefault,
+        crosslinker: p.defaultCrosslinker,
+        crosslinkerConc: p.defaultCrosslinkerConc,
+      } : {}),
+    })
+  }, [patchActive])
+
+  const handleAddSecond = useCallback(() => {
+    setDrafts(prev => {
+      if (prev.length >= 2) return prev
+      return [...prev, draftFromContext(undefined, 1)]
+    })
+    setActiveIdx(1)
+  }, [])
+
+  const handleRemoveSecond = useCallback(() => {
+    setDrafts(prev => prev.slice(0, 1))
+    setActiveIdx(0)
   }, [])
 
   // ─── Persistir no context (debounced via useEffect) ────────────────────
   useEffect(() => {
-    if (!matPreset) return
-    const additives = additivesText
-      .split(",")
-      .map(s => s.trim())
-      .filter(s => s.length > 0)
+    const formulations = drafts.map(draftToFormulation)
+    // Injeta rheology só na biotinta ativa (é a que temos calc atual)
+    if (formulations[activeIdx]) {
+      formulations[activeIdx] = {
+        ...formulations[activeIdx],
+        rheology: {
+          viscosityPaS: rheology.viscosityPaS,
+          yieldStressPa: rheology.yieldStressPa,
+        },
+      }
+    }
+    // Status: ready se biotinta principal tem material + conc > 0
+    const primary = formulations[0]
+    const status = (primary && primary.material && primary.concentration > 0) ? "ready" : "draft"
+    const strategy: "single" | "dual" | "multi" =
+      formulations.length === 1 ? "single" :
+      formulations.length === 2 ? "dual" : "multi"
 
-    // Status: ready se tem material + concentração > 0
-    const status = (materialId && concentration > 0) ? "ready" : "draft"
-
+    // Espelha campos legacy a partir de formulations[0] — mantém
+    // slice/page.tsx + control/page.tsx funcionando sem refactor.
     updateBioink({
       status,
-      material: matPreset.label,
-      concentration,
-      crosslinker,
-      crosslinkerConc,
-      cellType: hasCells ? cellType : null,
-      cellDensityMillionMl: hasCells ? cellDensity : null,
-      additives,
-      rheology: {
-        viscosityPaS: rheology.viscosityPaS,
-        yieldStressPa: rheology.yieldStressPa,
-      },
+      formulations,
+      strategy,
+      material: primary?.material ?? null,
+      concentration: primary?.concentration ?? null,
+      crosslinker: primary?.crosslinker ?? null,
+      crosslinkerConc: primary?.crosslinkerConc ?? null,
+      cellType: primary?.cellType ?? null,
+      cellDensityMillionMl: primary?.cellDensityMillionMl ?? null,
+      additives: primary?.additives ?? [],
+      rheology: primary?.rheology ?? null,
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [materialId, concentration, crosslinker, crosslinkerConc, hasCells, cellType, cellDensity, additivesText, rheology.viscosityPaS, rheology.yieldStressPa])
+  }, [drafts, activeIdx, rheology.viscosityPaS, rheology.yieldStressPa])
 
   return (
     <div className="bia-bioink-page flex flex-col min-h-full bg-[#0a0a0f]">
@@ -385,15 +531,22 @@ export default function BioprintBioinkPage() {
       <main className="flex-1 px-4 sm:px-6 py-6">
         {tab === "formulate" && (
           <FormulatePanel
-            materialId={materialId}        onMaterialChange={handleMaterialChange}
+            drafts={drafts}
+            activeIdx={activeIdx}
+            onSelectBiotinta={(i) => setActiveIdx(i as 0 | 1)}
+            onAddSecond={handleAddSecond}
+            onRemoveSecond={handleRemoveSecond}
+            activeDraft={activeDraft}
             matPreset={matPreset}
-            concentration={concentration}  onConcentrationChange={setConcentration}
-            crosslinker={crosslinker}      onCrosslinkerChange={setCrosslinker}
-            crosslinkerConc={crosslinkerConc} onCrosslinkerConcChange={setCrosslinkerConc}
-            hasCells={hasCells}            onHasCellsChange={setHasCells}
-            cellType={cellType}            onCellTypeChange={setCellType}
-            cellDensity={cellDensity}      onCellDensityChange={setCellDensity}
-            additivesText={additivesText}  onAdditivesChange={setAdditivesText}
+            onMaterialChange={handleMaterialChange}
+            onRoleChange={(role) => patchActive({ role })}
+            onConcentrationChange={(n) => patchActive({ concentration: n })}
+            onCrosslinkerChange={(s) => patchActive({ crosslinker: s })}
+            onCrosslinkerConcChange={(n) => patchActive({ crosslinkerConc: n })}
+            onHasCellsChange={(b) => patchActive({ hasCells: b })}
+            onCellTypeChange={(s) => patchActive({ cellType: s })}
+            onCellDensityChange={(n) => patchActive({ cellDensity: n })}
+            onAdditivesChange={(s) => patchActive({ additivesText: s })}
             rheology={rheology}
           />
         )}
@@ -422,21 +575,34 @@ export default function BioprintBioinkPage() {
             nozzleUm={nozzleUm}            onNozzleChange={setNozzleUm}
             printSpeedMmS={printSpeedMmS}  onPrintSpeedChange={setPrintSpeedMmS}
             materialLabel={matPreset.label}
-            concentration={concentration}
+            concentration={activeDraft.concentration}
           />
         )}
       </main>
 
-      {/* Rodapé sticky com CTA */}
+      {/* Rodapé sticky com CTA — mostra AMBAS as biotintas */}
       {state.bioink.status === "ready" && (
         <footer className="sticky bottom-0 z-10 bg-[#0a0a0f]/95 backdrop-blur border-t border-cyan-500/20 px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm min-w-0">
+          <div className="flex items-center gap-2 text-sm min-w-0 flex-wrap">
             <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
-            <span className="text-cyan-300 font-medium shrink-0">Biotinta:</span>
-            <span className="text-gray-300 truncate">
-              {matPreset.label} {concentration}%
-              {hasCells && ` · ${cellType} ${cellDensity}×10⁶/mL`}
-            </span>
+            {drafts.map((d, i) => {
+              const p = BIOINK_MATERIALS.find(m => m.id === d.materialId) ?? BIOINK_MATERIALS[0]
+              return (
+                <span key={i} className="inline-flex items-center gap-1.5 text-gray-300 truncate">
+                  {i > 0 && <span className="text-gray-600 mx-1">·</span>}
+                  <span
+                    className="inline-block w-2 h-2 rounded-full shrink-0"
+                    style={{ background: TOOL_COLORS[i] }}
+                    aria-hidden
+                  />
+                  <span className="text-cyan-300 font-medium">Bio {i + 1} [T{i}]:</span>
+                  <span className="truncate">
+                    {p.label} {d.concentration}%
+                    {d.hasCells && ` · ${d.cellType} ${d.cellDensity}×10⁶/mL`}
+                  </span>
+                </span>
+              )
+            })}
           </div>
           <Link
             href="/dashboard/bioprint/slice"
@@ -474,41 +640,182 @@ function SourceTab({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PAINEL A — FORMULAR
+// PAINEL A — FORMULAR (R12.58 · multi-biotinta)
 // ═══════════════════════════════════════════════════════════════════════════
 interface FormulateProps {
-  materialId: string;            onMaterialChange: (id: string) => void
+  drafts: FormulationDraft[]
+  activeIdx: 0 | 1
+  onSelectBiotinta: (i: number) => void
+  onAddSecond: () => void
+  onRemoveSecond: () => void
+  activeDraft: FormulationDraft
   matPreset: MatPreset
-  concentration: number;         onConcentrationChange: (n: number) => void
-  crosslinker: string;            onCrosslinkerChange: (s: string) => void
-  crosslinkerConc: number;        onCrosslinkerConcChange: (n: number) => void
-  hasCells: boolean;              onHasCellsChange: (b: boolean) => void
-  cellType: string;               onCellTypeChange: (s: string) => void
-  cellDensity: number;            onCellDensityChange: (n: number) => void
-  additivesText: string;          onAdditivesChange: (s: string) => void
+  onMaterialChange: (id: string) => void
+  onRoleChange: (r: BioinkRole) => void
+  onConcentrationChange: (n: number) => void
+  onCrosslinkerChange: (s: string) => void
+  onCrosslinkerConcChange: (n: number) => void
+  onHasCellsChange: (b: boolean) => void
+  onCellTypeChange: (s: string) => void
+  onCellDensityChange: (n: number) => void
+  onAdditivesChange: (s: string) => void
   rheology: RheologyResult
 }
 
 function FormulatePanel(p: FormulateProps) {
   const {
-    materialId, onMaterialChange, matPreset,
-    concentration, onConcentrationChange,
-    crosslinker, onCrosslinkerChange,
-    crosslinkerConc, onCrosslinkerConcChange,
-    hasCells, onHasCellsChange,
-    cellType, onCellTypeChange,
-    cellDensity, onCellDensityChange,
-    additivesText, onAdditivesChange,
+    drafts, activeIdx, onSelectBiotinta, onAddSecond, onRemoveSecond,
+    activeDraft, matPreset,
+    onMaterialChange, onRoleChange,
+    onConcentrationChange,
+    onCrosslinkerChange,
+    onCrosslinkerConcChange,
+    onHasCellsChange,
+    onCellTypeChange,
+    onCellDensityChange,
+    onAdditivesChange,
     rheology,
   } = p
 
+  const {
+    materialId, role, concentration, crosslinker, crosslinkerConc,
+    hasCells, cellType, cellDensity, additivesText,
+  } = activeDraft
+
   return (
     <div className="max-w-5xl mx-auto space-y-5">
+      {/* ── R12.58: seletor de biotintas ── */}
+      <section className="rounded-2xl border border-cyan-500/20 bg-cyan-500/[0.03] p-4">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+            <Layers className="w-4 h-4 text-cyan-400" />
+            Biotintas do scaffold
+            <span className="text-[10px] uppercase tracking-wider font-normal text-gray-500">
+              {drafts.length === 1 ? "single-material" : "dual-material"}
+            </span>
+          </h3>
+          {drafts.length < 2 ? (
+            <button
+              type="button"
+              onClick={onAddSecond}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg
+                bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/40 text-violet-200 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Adicionar biotinta 2
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onRemoveSecond}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg
+                bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-200 transition-colors"
+              title="Remover biotinta 2 (mantém apenas a biotinta 1)"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Remover biotinta 2
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {drafts.map((d, i) => {
+            const preset = BIOINK_MATERIALS.find(m => m.id === d.materialId) ?? BIOINK_MATERIALS[0]
+            const roleInfo = ROLE_DEFS.find(r => r.id === d.role)
+            const isActive = i === activeIdx
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => onSelectBiotinta(i)}
+                className={cn(
+                  "text-left rounded-xl border p-3 transition-all",
+                  isActive
+                    ? "bg-cyan-500/10 border-cyan-500/50 ring-1 ring-cyan-500/30"
+                    : "bg-white/3 border-white/8 hover:bg-white/5 hover:border-white/15"
+                )}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span
+                    className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ background: TOOL_COLORS[i] }}
+                    aria-hidden
+                  />
+                  <span className={cn("text-xs font-semibold", isActive ? "text-cyan-200" : "text-gray-200")}>
+                    Biotinta {i + 1}
+                  </span>
+                  <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-gray-400">
+                    T{i}
+                  </span>
+                  {roleInfo && (
+                    <span className="text-[9px] uppercase tracking-wider text-gray-500 ml-auto">
+                      {roleInfo.label}
+                    </span>
+                  )}
+                </div>
+                <div className={cn("text-[13px] font-semibold", isActive ? "text-white" : "text-gray-300")}>
+                  {preset.label} <span className="font-mono text-cyan-300/80">{d.concentration}%</span>
+                </div>
+                <div className="text-[11px] text-gray-500 mt-0.5 truncate">
+                  {d.hasCells ? `+ ${d.cellType} ${d.cellDensity}×10⁶/mL` : "acelular"}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+
+        {drafts.length === 1 && (
+          <p className="text-[11px] text-gray-500 mt-3 leading-relaxed">
+            💡 Bioimpressão real de tecidos raramente usa 1 só material.
+            Ex: <span className="text-gray-300">GelMA estrutural (T0) + Alginato com células (T1)</span>,
+            ou <span className="text-gray-300">PCL rígido (T0) + Colágeno celular (T1)</span>.
+          </p>
+        )}
+      </section>
+
+      {/* ── Papel funcional (role) — R12.58 ── */}
+      <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
+        <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+          <span
+            className="inline-block w-3 h-3 rounded-full"
+            style={{ background: TOOL_COLORS[activeIdx] }}
+            aria-hidden
+          />
+          Papel da Biotinta {activeIdx + 1} no scaffold
+        </h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+          {ROLE_DEFS.map(r => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => onRoleChange(r.id)}
+              className={cn(
+                "p-2.5 rounded-lg border text-left transition-all",
+                role === r.id
+                  ? "border-cyan-500/50 bg-cyan-500/10 ring-1 ring-cyan-500/30"
+                  : "border-white/8 bg-white/3 hover:border-white/15 hover:bg-white/5"
+              )}
+              title={r.hint}
+            >
+              <div className={cn(
+                "text-xs font-semibold",
+                role === r.id ? "text-cyan-200" : "text-white"
+              )}>
+                {r.label}
+              </div>
+              <div className="text-[10px] text-gray-500 mt-0.5 leading-tight line-clamp-2">
+                {r.hint}
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
+
       {/* ── Material ── */}
       <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
         <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
           <FlaskConical className="w-4 h-4 text-cyan-400" />
-          Material da biotinta
+          Material da Biotinta {activeIdx + 1}
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-4">
           {BIOINK_MATERIALS.map(mat => (
