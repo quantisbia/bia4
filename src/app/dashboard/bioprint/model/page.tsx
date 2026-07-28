@@ -36,6 +36,10 @@ import {
   useBioprintProcess,
   type ModelCategory,
 } from "@/lib/bioprint/process-context"
+// R12.57 — separa geometrias "prontas para uso" das "experimentais" que podem
+// travar / não fechar mesh. Por padrão só as básicas aparecem; usuário
+// pode habilitar as experimentais via toggle na sidebar.
+import { BASIC_GEOMETRY_IDS } from "@/lib/gcode/slicer/geometry-bounds"
 
 // ─── Mapeamento das 5 categorias ──────────────────────────────────────────
 //
@@ -113,6 +117,17 @@ const ALL_GEOMETRIES: STLGeometry[] = [...GEOMETRIES, ...BIOMIMETIC_GEOMETRIES]
 
 function getGeometryById(id: string): STLGeometry | undefined {
   return ALL_GEOMETRIES.find(g => g.id === id)
+}
+
+// R12.57 — Set imutável dos IDs "verificados" (não experimentais).
+// Tudo o que NÃO está aqui é considerado experimental e fica escondido por
+// padrão. Inclui as 13 geometrias BASIC + qualquer ID que exista no catálogo
+// mas não esteja em ADVANCED_GEOMETRY_IDS (defensivo — evita esconder por
+// engano formas triviais recém-adicionadas).
+const BASIC_ID_SET: ReadonlySet<string> = new Set(BASIC_GEOMETRY_IDS)
+
+function isVerifiedGeometry(id: string): boolean {
+  return BASIC_ID_SET.has(id)
 }
 
 const ACCENT_CLASSES: Record<CategoryDef["accent"], { ring: string; text: string; bg: string; border: string }> = {
@@ -465,11 +480,50 @@ function GeneratePanel({
   const [validation, setValidation] = useState<ValidationReport | null>(null)
   const [cachedTris, setCachedTris] = useState<Triangle[]>([])
 
+  // R12.57 — Toggle experimental (padrão OFF). Persiste em localStorage.
+  // Quando OFF: só formas verificadas (BASIC_GEOMETRY_IDS) aparecem.
+  // Quando ON: todas as formas aparecem, com badge "🧪 experimental".
+  // Se a geometria atual já for experimental, força o toggle inicial para ON
+  // (senão o usuário abriria a etapa e não veria mais o que já tinha escolhido).
+  const [showExperimental, setShowExperimental] = useState<boolean>(() => {
+    if (currentGeometry && !isVerifiedGeometry(currentGeometry)) return true
+    if (typeof window !== "undefined") {
+      return window.localStorage.getItem("bia:showExperimentalGeometries") === "true"
+    }
+    return false
+  })
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("bia:showExperimentalGeometries", String(showExperimental))
+    }
+  }, [showExperimental])
+
   const currentCategoryDef = CATEGORY_DEFS.find(c => c.id === category)!
   const accent = ACCENT_CLASSES[currentCategoryDef.accent]
-  const categoryGeometries = currentCategoryDef.geometryIds
+
+  // R12.57 — Total (todas as formas cadastradas) vs. visíveis (após filtro).
+  const allCategoryGeometries = currentCategoryDef.geometryIds
     .map(id => getGeometryById(id))
     .filter((g): g is STLGeometry => g !== undefined)
+  const categoryGeometries = showExperimental
+    ? allCategoryGeometries
+    : allCategoryGeometries.filter(g => isVerifiedGeometry(g.id))
+  const hiddenCount = allCategoryGeometries.length - categoryGeometries.length
+
+  // Se a categoria selecionada não tem nenhuma geometria verificada e o
+  // toggle está OFF, migra automaticamente para a primeira categoria que
+  // tenha ao menos 1 forma verificada (evita "sem geometrias").
+  useEffect(() => {
+    if (showExperimental) return
+    if (categoryGeometries.length > 0) return
+    const fallback = CATEGORY_DEFS.find(c =>
+      c.geometryIds.some(id => isVerifiedGeometry(id))
+    )
+    if (fallback && fallback.id !== category) {
+      setCategory(fallback.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showExperimental, category])
 
   const selectedGeo = selectedGeoId ? getGeometryById(selectedGeoId) : null
 
@@ -568,6 +622,11 @@ function GeneratePanel({
           const Ic = cat.icon
           const isActive = cat.id === category
           const a = ACCENT_CLASSES[cat.accent]
+          // R12.57 — mostra N/M quando o toggle experimental está OFF e há
+          // formas escondidas nesta categoria (ex: "5/17 verificadas").
+          const total = cat.geometryIds.length
+          const verified = cat.geometryIds.filter(isVerifiedGeometry).length
+          const showRatio = !showExperimental && verified < total
           return (
             <button
               key={cat.id}
@@ -588,12 +647,37 @@ function GeneratePanel({
                   {cat.description}
                 </div>
                 <div className="text-[10px] text-gray-600 mt-1">
-                  {cat.geometryIds.length} geometria{cat.geometryIds.length === 1 ? "" : "s"}
+                  {showRatio
+                    ? `${verified}/${total} verificada${total === 1 ? "" : "s"}`
+                    : `${total} geometria${total === 1 ? "" : "s"}`}
                 </div>
               </div>
             </button>
           )
         })}
+
+        {/* R12.57 — Toggle "mostrar experimentais" */}
+        <div className="mt-3 rounded-xl border border-white/8 bg-white/[0.02] p-3">
+          <label className="flex items-start gap-2.5 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={showExperimental}
+              onChange={(e) => setShowExperimental(e.target.checked)}
+              className="mt-0.5 w-4 h-4 shrink-0 rounded border-white/20 bg-white/5 text-amber-500 focus:ring-1 focus:ring-amber-500/40 focus:ring-offset-0 cursor-pointer"
+            />
+            <div className="min-w-0 flex-1">
+              <div className="text-[11px] font-semibold text-gray-200 group-hover:text-white transition-colors flex items-center gap-1">
+                <span>🧪</span>
+                <span>Mostrar experimentais</span>
+              </div>
+              <div className="text-[10px] text-gray-500 mt-0.5 leading-snug">
+                {showExperimental
+                  ? "Geometrias anatômicas complexas e TPMS visíveis — podem falhar ou levar mais tempo."
+                  : "Só formas verificadas. Ative para ver anatômicas (coração, fêmur…) e TPMS."}
+              </div>
+            </div>
+          </label>
+        </div>
 
         {/* R12.43 — Aviso de página dedicada para testes de imprimibilidade */}
         {category === "printability-test" && (
@@ -635,36 +719,78 @@ function GeneratePanel({
       <div className="space-y-4">
         {/* Lista de geometrias da categoria */}
         <div>
-          <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-semibold mb-2 px-1 flex items-center gap-1.5">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-semibold mb-2 px-1 flex items-center gap-1.5 flex-wrap">
             <span>{currentCategoryDef.label}</span>
             <span className="text-gray-700">·</span>
             <span>{categoryGeometries.length} disponíve{categoryGeometries.length === 1 ? "l" : "is"}</span>
+            {hiddenCount > 0 && (
+              <>
+                <span className="text-gray-700">·</span>
+                <button
+                  type="button"
+                  onClick={() => setShowExperimental(true)}
+                  className="text-amber-400/80 hover:text-amber-300 normal-case tracking-normal underline decoration-dotted underline-offset-2"
+                  title="Ativar toggle experimental para revelar essas formas"
+                >
+                  🧪 {hiddenCount} experimental{hiddenCount === 1 ? "" : "is"} oculta{hiddenCount === 1 ? "" : "s"}
+                </button>
+              </>
+            )}
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-            {categoryGeometries.map(geo => (
-              <button
-                key={geo.id}
-                onClick={() => handleSelectGeo(geo)}
-                className={cn(
-                  "rounded-xl border p-3 text-left transition-all",
-                  selectedGeoId === geo.id
-                    ? `${accent.bg} ${accent.border} ring-1 ${accent.ring}`
-                    : "bg-white/3 border-white/8 hover:border-white/20 hover:bg-white/5"
-                )}
-              >
-                <div className="text-2xl mb-1.5">{geo.icon}</div>
-                <div className={cn(
-                  "text-xs font-semibold leading-tight",
-                  selectedGeoId === geo.id ? accent.text : "text-gray-200"
-                )}>
-                  {geo.label}
-                </div>
-                <div className="text-[10px] text-gray-500 mt-1 leading-tight line-clamp-2">
-                  {geo.tissue}
-                </div>
-              </button>
-            ))}
-          </div>
+          {categoryGeometries.length === 0 ? (
+            <div className="rounded-xl border border-white/8 bg-white/[0.02] p-6 text-center text-xs text-gray-400">
+              Nenhuma geometria verificada nesta categoria.
+              {hiddenCount > 0 && (
+                <>
+                  <br />
+                  <button
+                    type="button"
+                    onClick={() => setShowExperimental(true)}
+                    className="mt-2 inline-flex items-center gap-1 text-amber-300 hover:text-amber-200 underline decoration-dotted underline-offset-2"
+                  >
+                    🧪 Ativar experimentais para ver {hiddenCount} forma{hiddenCount === 1 ? "" : "s"}
+                  </button>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+              {categoryGeometries.map(geo => {
+                const isExperimental = !isVerifiedGeometry(geo.id)
+                return (
+                  <button
+                    key={geo.id}
+                    onClick={() => handleSelectGeo(geo)}
+                    className={cn(
+                      "rounded-xl border p-3 text-left transition-all relative",
+                      selectedGeoId === geo.id
+                        ? `${accent.bg} ${accent.border} ring-1 ${accent.ring}`
+                        : "bg-white/3 border-white/8 hover:border-white/20 hover:bg-white/5"
+                    )}
+                  >
+                    {isExperimental && (
+                      <span
+                        className="absolute top-1.5 right-1.5 text-[8px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                        title="Geometria experimental — pode falhar ou levar mais tempo"
+                      >
+                        🧪 exp
+                      </span>
+                    )}
+                    <div className="text-2xl mb-1.5">{geo.icon}</div>
+                    <div className={cn(
+                      "text-xs font-semibold leading-tight",
+                      selectedGeoId === geo.id ? accent.text : "text-gray-200"
+                    )}>
+                      {geo.label}
+                    </div>
+                    <div className="text-[10px] text-gray-500 mt-1 leading-tight line-clamp-2">
+                      {geo.tissue}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Configuração + gerar */}
