@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils/helpers"
 import { useBioprintProcess, isBioinkReady } from "@/lib/bioprint/process-context"
 import { INFILL_PATTERNS, TEMPERATURE_PROFILES, CLASSIC_INFILL_PATTERNS } from "@/lib/bioprinter/biomedical-params"
 import { BIOPRINTERS, getBioprinterById, supportsWebSerial } from "@/lib/bioprinting/bioprinters"
-import { SUPPORTED_GEOMETRY_IDS, isPerimeterOnlyGeometry, classifyGeometry, ENGINE_TO_QUICK_ID } from "@/lib/gcode/slicer/geometry-bounds"
+import { SUPPORTED_GEOMETRY_IDS, isPerimeterOnlyGeometry, classifyGeometry } from "@/lib/gcode/slicer/geometry-bounds"
 import { TissueDesigner, type TissueDesignerValue } from "@/components/bioprinting/TissueDesigner"
 import { PrinterConnection } from "@/components/bioprinting/PrinterConnection"
 import { GcodeValidatorPanel } from "@/components/bioprinter/GcodeValidatorPanel"
@@ -43,8 +43,8 @@ import { TissueRecommendationCard } from "@/components/bioprint/TissueRecommenda
 import { inferTissueFromGeometry } from "@/lib/bioprint/tissue-presets"
 import type { PresetParams } from "@/lib/bioprint/tissue-presets"
 // R12.55: modo Básico (default) vs Avançado (gated) — pipeline verificado vs experimental
+// R12.59: BasicModePanel agora lê geometria/blend do contexto (fluxo contínuo)
 import { BasicModePanel } from "@/components/bioprinter/BasicModePanel"
-import type { QuickGeometryId } from "@/lib/bioprint/quick-gcode"
 
 // Timeout máximo de geração — evita rodar para sempre se o engine travar
 const GCODE_TIMEOUT_MS = 45_000
@@ -935,13 +935,13 @@ export default function BioprintSlicePage() {
       {/* Conteúdo da tab */}
       <main className="flex-1 px-4 sm:px-6 py-6 pb-24">
 
-        {/* ─── R12.55: Modo Básico renderiza painel dedicado ─────────── */}
+        {/* ─── R12.55/R12.59: Modo Básico renderiza painel dedicado ─────
+             R12.59: BasicModePanel agora lê geometria e biotinta DIRETAMENTE
+             do contexto (state.model + state.bioink.formulations[]), sem
+             re-perguntar. jobName vira opcional (default = bia_<model>_<geom>). */}
         {isUnlocked && sliceMode === "basic" && (
           <div className="max-w-5xl mx-auto">
             <BasicModePanel
-              initialGeometryId={
-                (ENGINE_TO_QUICK_ID[state.model.geometryId ?? ""] ?? "cube") as QuickGeometryId
-              }
               jobName={`bia_${state.model.name?.replace(/\W+/g, "_").toLowerCase() ?? "basic"}_${state.model.geometryId ?? "cube"}`}
               onGcodeGenerated={(gcode, quickResult) => {
                 updateSlice({

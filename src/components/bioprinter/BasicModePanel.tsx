@@ -1,18 +1,26 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  BasicModePanel — Painel do Modo BÁSICO de geração de G-code (R12.55)
+ *  BasicModePanel — Painel do Modo BÁSICO de geração de G-code (R12.59)
+ *
+ *  R12.59 · FLUXO CONTÍNUO (Opção B):
+ *  ─────────────────────────────────
+ *  Antes (R12.55..R12.58) este painel mantinha estado local próprio para
+ *  geometria (setGeomId/setDims) e para blend de biotinta (MultiBioinkSelector
+ *  com até 4 slots) — DUPLICANDO Etapa 1 (Modelo 3D) e Etapa 2 (Biotinta) e
+ *  contradizendo diretamente a R12.58 (que limita a 2 biotintas com 1 célula
+ *  cada).
+ *
+ *  Agora o painel é **100% controlado por contexto**:
+ *    - geometria vem de state.model (Etapa 1)
+ *    - blend vem de state.bioink.formulations[] (Etapa 2, R12.58)
+ *    - só permanece aqui: parâmetros DE FATIAMENTO (layer, walls, infill %,
+ *      densidade) + botão gerar + resultado/validação
+ *
+ *  Cards read-only mostram um resumo das etapas anteriores + link "← alterar"
+ *  que joga o usuário de volta na etapa correspondente sem perda de contexto.
  *
  *  Filosofia: G-code que FUNCIONA, geração síncrona <100ms, sem rede,
  *  sem timeout, com validação estática automática + Nelson 2021.
- *
- *  Fluxo:
- *    1. Usuário escolhe geometria BÁSICA (cube / cylinder / disk / patch / tube / grid)
- *    2. MultiBioinkSelector para definir blend (1..4 componentes)
- *    3. Parâmetros globais (layer, walls, infill %)
- *    4. Botão "⚡ Gerar G-code Básico" → generateQuickGcodeMulti() no browser
- *    5. Resultado: preview + validação + score Nelson + download
- *
- *  Substitui o pipeline pesado /api/gcode/generate para os casos comuns.
  *
  *  Janaina Dernowsek / Quantis Biotechnology — 2026
  * ═══════════════════════════════════════════════════════════════════════════
@@ -21,62 +29,55 @@
 "use client"
 
 import { useState, useMemo, useCallback } from "react"
+import Link from "next/link"
 import {
-  Zap, Box, Circle, Layers, Square, Sparkles, Download, Copy,
-  CheckCircle2, AlertTriangle, Loader2, FileCode2, ChevronDown,
-  ChevronRight, Info, Wrench,
+  Zap, Layers, Download, Copy,
+  CheckCircle2, AlertTriangle, Loader2, ChevronDown,
+  ChevronRight, Info, Microscope, Droplets, Edit3,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import {
-  generateQuickGcodeMulti, GEOMETRY_PRESETS, geometryLabel,
-  type QuickGeometry, type QuickGeometryId, type QuickGcodeResult,
-  type QuickGcodeOptions, type QuickInfillPattern, type QuickMultiBioink,
+  generateQuickGcodeMulti,
+  type QuickGcodeResult,
+  type QuickGcodeOptions,
+  type QuickInfillPattern,
 } from "@/lib/bioprint/quick-gcode"
-import { MultiBioinkSelector, defaultMultiBioink } from "./MultiBioinkSelector"
+import { useBioprintProcess } from "@/lib/bioprint/process-context"
+import {
+  contextToQuickGeometry,
+  contextToQuickBlend,
+  summarizeModel,
+  summarizeFormulation,
+} from "@/lib/bioprint/context-to-quick"
 import { validateGcode, DEFAULT_BIO_LIMITS, type ValidationResult } from "@/lib/bioprint/gcode-validator"
+
+// ─── Cores por tool (T0..T3) — R12.58 consistency ────────────────────────
+const TOOL_COLORS = ["#22d3ee", "#a78bfa", "#f472b6", "#facc15"]
 
 // ─── Props ──────────────────────────────────────────────────────────────
 
 export interface BasicModePanelProps {
-  /** Se fornecido, pré-seleciona esta geometria (mapping engine→quick já resolvido) */
-  initialGeometryId?: QuickGeometryId
-  /** Bioink inicial (opcional — default GelMA 10%) */
-  initialBioink?: QuickMultiBioink
   /** Callback quando G-code é gerado e validado com sucesso */
   onGcodeGenerated?: (gcode: string, result: QuickGcodeResult) => void
-  /** Nome do job (opcional) */
+  /** Nome do job (opcional) — se omitido, gerado a partir de state.model */
   jobName?: string
   className?: string
-}
-
-// ─── Ícones por geometria ────────────────────────────────────────────────
-
-const GEOMETRY_ICONS: Record<QuickGeometryId, React.ComponentType<{ className?: string }>> = {
-  cube: Box,
-  cylinder: Circle,
-  disk: Circle,
-  patch: Square,
-  tube: Circle,
-  grid: Layers,
-  "hollow-sphere": Circle, // não deve ser usado, mas mantém type completo
 }
 
 // ─── Painel principal ──────────────────────────────────────────────────
 
 export function BasicModePanel({
-  initialGeometryId = "cube",
-  initialBioink,
   onGcodeGenerated,
   jobName,
   className,
 }: BasicModePanelProps) {
-  // Estados
-  const [geomId, setGeomId] = useState<QuickGeometryId>(initialGeometryId)
-  const [dims, setDims] = useState(() => {
-    const preset = GEOMETRY_PRESETS.find(p => p.id === initialGeometryId)
-    return preset?.defaultParams ?? { width: 10, depth: 10, height: 5 }
-  })
-  const [blend, setBlend] = useState<QuickMultiBioink>(initialBioink ?? defaultMultiBioink())
+  const { state } = useBioprintProcess()
+
+  // ── R12.59: Geometria + blend derivados do contexto (NÃO local!) ──────
+  const geometry = useMemo(() => contextToQuickGeometry(state.model), [state.model])
+  const blend = useMemo(() => contextToQuickBlend(state.bioink), [state.bioink])
+
+  // Só parâmetros de FATIAMENTO ficam locais aqui (é o que o painel controla)
   const [opts, setOpts] = useState<QuickGcodeOptions>({
     layerHeight_mm: 0.2,
     infillPattern: "rectilinear",
@@ -90,30 +91,22 @@ export function BasicModePanel({
   const [showPreview, setShowPreview] = useState(false)
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle")
 
-  // Presets visíveis (Modo Básico não expõe hollow-sphere)
-  const visiblePresets = useMemo(
-    () => GEOMETRY_PRESETS.filter(p => p.id !== "hollow-sphere"),
-    []
-  )
+  // Nome do job (fallback baseado no modelo do contexto)
+  const effectiveJobName = useMemo(() => {
+    if (jobName) return jobName
+    const modelName = state.model.name?.replace(/\W+/g, "_").toLowerCase() ?? "basic"
+    const geomId = state.model.geometryId ?? "cube"
+    return `bia_${modelName}_${geomId}_${Date.now()}`
+  }, [jobName, state.model.name, state.model.geometryId])
 
-  // Sincroniza dimensões quando muda geometria
-  function selectGeometry(id: QuickGeometryId) {
-    setGeomId(id)
-    const preset = GEOMETRY_PRESETS.find(p => p.id === id)
-    if (preset) setDims(preset.defaultParams)
-    setResult(null)
-    setValidation(null)
-  }
-
-  // Ação: gerar G-code
+  // Ação: gerar G-code (usa geometria + blend derivados do contexto)
   const generateNow = useCallback(async () => {
     setIsGenerating(true)
     setError(null)
     try {
-      const geom: QuickGeometry = { id: geomId, ...dims }
-      const gcodeResult = generateQuickGcodeMulti(geom, blend, {
+      const gcodeResult = generateQuickGcodeMulti(geometry, blend, {
         ...opts,
-        jobName: jobName ?? `bia_basic_${geomId}_${Date.now()}`,
+        jobName: effectiveJobName,
       })
       setResult(gcodeResult)
       // Validação estática
@@ -126,7 +119,7 @@ export function BasicModePanel({
     } finally {
       setIsGenerating(false)
     }
-  }, [geomId, dims, blend, opts, jobName, onGcodeGenerated])
+  }, [geometry, blend, opts, effectiveJobName, onGcodeGenerated])
 
   // Ação: copiar G-code
   async function copyGcode() {
@@ -147,7 +140,7 @@ export function BasicModePanel({
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `${jobName ?? `bia_basic_${geomId}`}.gcode`
+    a.download = `${effectiveJobName}.gcode`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -159,6 +152,12 @@ export function BasicModePanel({
     : validation?.verdict === "review" ? "amber"
     : validation?.verdict === "blocked" ? "red"
     : "gray"
+
+  // Resumo textual do modelo + biotintas (usado nos cards read-only)
+  const modelSummary = summarizeModel(state.model)
+  const formulations = state.bioink.formulations ?? []
+  // Se formulations está vazio mas há legacy fields (bioink R12.0..R12.9), sintetiza 1 card
+  const hasLegacyFallback = formulations.length === 0 && !!state.bioink.material
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -182,125 +181,106 @@ export function BasicModePanel({
         </div>
       </div>
 
-      {/* ═══ Etapa 1: Geometria ═══ */}
-      <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gray-800 dark:text-gray-100">
-          <Wrench className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-          1. Geometria básica
-        </h3>
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
-          {visiblePresets.map((preset) => {
-            const Icon = GEOMETRY_ICONS[preset.id] ?? Box
-            const isSelected = preset.id === geomId
-            return (
-              <button
-                key={preset.id}
-                onClick={() => selectGeometry(preset.id)}
-                className={cn(
-                  "flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition",
-                  isSelected
-                    ? "border-indigo-500 bg-indigo-50 shadow-sm dark:border-indigo-400 dark:bg-indigo-900/30"
-                    : "border-gray-200 bg-gray-50 hover:border-indigo-300 hover:bg-indigo-50/50 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-indigo-600 dark:hover:bg-indigo-900/20"
-                )}
-              >
-                <div className="flex items-center gap-1.5">
-                  <Icon className={cn("h-4 w-4", isSelected ? "text-indigo-600 dark:text-indigo-300" : "text-gray-500")} />
-                  <span className={cn("text-xs font-semibold", isSelected ? "text-indigo-800 dark:text-indigo-200" : "text-gray-700 dark:text-gray-300")}>
-                    {preset.label}
-                  </span>
+      {/* ═══ R12.59: Cards read-only (Etapa 1 + Etapa 2) ═══ */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        {/* Card Etapa 1 · Modelo (read-only, com link "alterar") */}
+        <section className="rounded-lg border border-rose-200 bg-rose-50/40 p-3 shadow-sm dark:border-rose-800/50 dark:bg-rose-950/20">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2 min-w-0 flex-1">
+              <Microscope className="h-4 w-4 text-rose-600 dark:text-rose-400 mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase tracking-wider text-rose-600/80 dark:text-rose-400/80 font-semibold">
+                  Etapa 1 · Modelo 3D
                 </div>
-                <p className="text-[10px] leading-tight text-gray-500 dark:text-gray-400 line-clamp-2">
-                  {preset.description}
-                </p>
-              </button>
-            )
-          })}
-        </div>
+                <div className="text-sm font-semibold text-rose-900 dark:text-rose-100 truncate mt-0.5">
+                  {state.model.name ?? state.model.geometryId ?? "—"}
+                </div>
+                <div className="text-[11px] text-rose-700 dark:text-rose-300 mt-0.5">
+                  {modelSummary}
+                </div>
+              </div>
+            </div>
+            <Link
+              href="/dashboard/bioprint/model"
+              className="text-[10px] font-semibold px-2 py-1 rounded-md bg-rose-100 hover:bg-rose-200 text-rose-800 dark:bg-rose-900/50 dark:hover:bg-rose-900/70 dark:text-rose-200 transition-colors whitespace-nowrap flex items-center gap-1"
+              title="Voltar para Etapa 1 e alterar o modelo"
+            >
+              <Edit3 className="h-3 w-3" />
+              alterar
+            </Link>
+          </div>
+        </section>
 
-        {/* Dimensões */}
-        <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-          <label className="text-xs">
-            <span className="mb-0.5 block font-medium text-gray-600 dark:text-gray-400">
-              Largura (X) mm
-            </span>
-            <input
-              type="number"
-              min={1}
-              step={0.5}
-              value={dims.width}
-              onChange={(e) => setDims({ ...dims, width: parseFloat(e.target.value) || 10 })}
-              className="w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm shadow-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            />
-          </label>
-          <label className="text-xs">
-            <span className="mb-0.5 block font-medium text-gray-600 dark:text-gray-400">
-              Profundidade (Y) mm
-            </span>
-            <input
-              type="number"
-              min={1}
-              step={0.5}
-              value={dims.depth}
-              onChange={(e) => setDims({ ...dims, depth: parseFloat(e.target.value) || 10 })}
-              className="w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm shadow-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            />
-          </label>
-          <label className="text-xs">
-            <span className="mb-0.5 block font-medium text-gray-600 dark:text-gray-400">
-              Altura (Z) mm
-            </span>
-            <input
-              type="number"
-              min={0.2}
-              step={0.5}
-              value={dims.height}
-              onChange={(e) => setDims({ ...dims, height: parseFloat(e.target.value) || 5 })}
-              className="w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm shadow-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            />
-          </label>
-          {(geomId === "tube") && (
-            <label className="text-xs">
-              <span className="mb-0.5 block font-medium text-gray-600 dark:text-gray-400">
-                Parede (mm)
-              </span>
-              <input
-                type="number"
-                min={0.3}
-                step={0.1}
-                value={dims.wallThickness ?? 1.5}
-                onChange={(e) => setDims({ ...dims, wallThickness: parseFloat(e.target.value) || 1.5 })}
-                className="w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm shadow-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-              />
-            </label>
-          )}
-          {(geomId === "grid") && (
-            <label className="text-xs">
-              <span className="mb-0.5 block font-medium text-gray-600 dark:text-gray-400">
-                Pitch (mm)
-              </span>
-              <input
-                type="number"
-                min={0.5}
-                step={0.1}
-                value={dims.pitch ?? 1.5}
-                onChange={(e) => setDims({ ...dims, pitch: parseFloat(e.target.value) || 1.5 })}
-                className="w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm shadow-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-              />
-            </label>
-          )}
-        </div>
-      </section>
+        {/* Card Etapa 2 · Biotinta (read-only, mostra até 2 biotintas por R12.58) */}
+        <section className="rounded-lg border border-cyan-200 bg-cyan-50/40 p-3 shadow-sm dark:border-cyan-800/50 dark:bg-cyan-950/20">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2 min-w-0 flex-1">
+              <Droplets className="h-4 w-4 text-cyan-600 dark:text-cyan-400 mt-0.5 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] uppercase tracking-wider text-cyan-600/80 dark:text-cyan-400/80 font-semibold">
+                  Etapa 2 · Biotinta ({formulations.length > 0 ? formulations.length : (hasLegacyFallback ? 1 : 0)}
+                  {formulations.length > 0 || hasLegacyFallback ? " ativa(s)" : " — vazio"})
+                </div>
+                {/* Se tem formulations (R12.10+ path) */}
+                {formulations.length > 0 && (
+                  <div className="mt-1 space-y-0.5">
+                    {formulations.slice(0, 2).map((f, idx) => (
+                      <div key={idx} className="flex items-center gap-1.5 text-[11px] text-cyan-900 dark:text-cyan-100">
+                        <span
+                          className="inline-block h-2 w-2 rounded-full shrink-0"
+                          style={{ backgroundColor: f.color ?? TOOL_COLORS[f.tool ?? idx] }}
+                        />
+                        <span className="font-semibold uppercase text-[9px] text-cyan-700 dark:text-cyan-300">
+                          T{f.tool ?? idx}
+                        </span>
+                        <span className="truncate">{summarizeFormulation(f)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* Fallback legacy (R12.0..R12.9) */}
+                {hasLegacyFallback && (
+                  <div className="mt-1 text-[11px] text-cyan-900 dark:text-cyan-100">
+                    <span
+                      className="inline-block h-2 w-2 rounded-full mr-1.5"
+                      style={{ backgroundColor: TOOL_COLORS[0] }}
+                    />
+                    {state.bioink.material} {state.bioink.concentration ?? 5}%
+                    {state.bioink.cellType && (
+                      <span className="text-cyan-700 dark:text-cyan-300 ml-1">
+                        + {state.bioink.cellType} {state.bioink.cellDensityMillionMl}×10⁶/mL
+                      </span>
+                    )}
+                  </div>
+                )}
+                {/* Estado vazio */}
+                {formulations.length === 0 && !hasLegacyFallback && (
+                  <div className="mt-1 text-[11px] text-red-600 dark:text-red-400">
+                    ⚠️ Nenhuma biotinta configurada
+                  </div>
+                )}
+              </div>
+            </div>
+            <Link
+              href="/dashboard/bioprint/bioink"
+              className="text-[10px] font-semibold px-2 py-1 rounded-md bg-cyan-100 hover:bg-cyan-200 text-cyan-800 dark:bg-cyan-900/50 dark:hover:bg-cyan-900/70 dark:text-cyan-200 transition-colors whitespace-nowrap flex items-center gap-1"
+              title="Voltar para Etapa 2 e alterar a biotinta"
+            >
+              <Edit3 className="h-3 w-3" />
+              alterar
+            </Link>
+          </div>
+        </section>
+      </div>
 
-      {/* ═══ Etapa 2: Multi-bioink ═══ */}
-      <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <MultiBioinkSelector value={blend} onChange={setBlend} maxFormulations={4} />
-      </section>
-
-      {/* ═══ Etapa 3: Opções de fatiamento ═══ */}
+      {/* ═══ Etapa 3: Opções de fatiamento (única seção realmente controlada aqui) ═══ */}
       <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gray-800 dark:text-gray-100">
           <Layers className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-          3. Fatiamento
+          Parâmetros de fatiamento
+          <span className="text-[10px] font-normal text-gray-500 dark:text-gray-400">
+            (única coisa nova nesta etapa)
+          </span>
         </h3>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
           <label className="text-xs">
@@ -367,12 +347,14 @@ export function BasicModePanel({
       <div className="flex flex-col items-stretch gap-2 sm:flex-row">
         <button
           onClick={generateNow}
-          disabled={isGenerating || blend.length === 0}
+          disabled={isGenerating || blend.length === 0 || !state.model.geometryId}
           className={cn(
             "flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-bold shadow-md transition",
             isGenerating
               ? "bg-gray-400 text-white cursor-wait"
-              : "bg-gradient-to-r from-emerald-500 to-cyan-600 text-white hover:from-emerald-600 hover:to-cyan-700"
+              : blend.length === 0 || !state.model.geometryId
+                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                : "bg-gradient-to-r from-emerald-500 to-cyan-600 text-white hover:from-emerald-600 hover:to-cyan-700"
           )}
         >
           {isGenerating ? (

@@ -174,6 +174,33 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R12.59 — Etapa 3 · Fluxo contínuo (elimina duplicação Etapa 1/2 dentro do Fatiamento) (2026-07-28)
+
+Correção de arquitetura reportada pela usuária: **a Etapa 3 (Fatiamento) re-perguntava STL/geometria e biotinta que já tinham sido definidos nas Etapas 1 e 2**, criando confusão e — pior — o `BasicModePanel` oferecia `MultiBioinkSelector` com até **4 slots**, contradizendo diretamente a regra da R12.58 (máx 2 biotintas). Agora:
+
+- **BasicModePanel 100% controlado por contexto**: geometria vem de `state.model` (Etapa 1), blend vem de `state.bioink.formulations[]` (Etapa 2). Zero estado local para geometria/blend
+- **Cards read-only** no topo mostrando o resumo das Etapas 1 e 2 (com dimensões inferidas + até 2 pontos coloridos T0/T1 mostrando material + concentração + células) e botão **"← alterar"** que navega de volta para a etapa correspondente
+- **Removidas 108 linhas** do BasicModePanel: seção "1. Geometria básica" com seletor de 6 cards + inputs de dimensões (X/Y/Z/wall/pitch) + seção "2. Multi-bioink" com o `MultiBioinkSelector` de 4 slots. Só sobra o que faz sentido em fatiamento: parâmetros técnicos (layer height, walls, infill %, densidade) + botão Gerar + resultado
+- **Novo helper `context-to-quick.ts`**: 8 funções puras (`toQuickGeometryId`, `extractDims`, `contextToQuickGeometry`, `formulationToQuick`, `contextToQuickBlend`, `summarizeModel`, `summarizeFormulation` + heurísticas de bico/viscosidade/velocidade/pressão) que traduzem `state.model` + `state.bioink.formulations[]` → `QuickGeometry` + `QuickMultiBioink` que o `generateQuickGcodeMulti()` consome
+- **Fração automática entre biotintas**: 1 biotinta = fraction 1.0; 2 biotintas = fraction 0.5 cada (mistura homogênea). O backend `collapseMultiBioink()` do quick-gcode já sabe lidar com isso
+- **Backward compat total**: se `formulations[]` está vazio mas `state.bioink.material` (legacy R12.0..R12.9) existe, o helper sintetiza 1 QuickBioinkFormulation a partir dos campos legacy; se ambos vazios, cai em GelMA 10% default seguro
+- **Heurísticas de parâmetros de impressão**: sem `rheology.viscosityPaS` explícito, o helper infere por família de material (GelMA → 5 Pa·s, Alginato → 3, Colágeno → 8, Fibrina → 4, Pluronic → 30, PEGDA → 6, dECM → 10). Bico: 0.41 mm (22G) padrão, 0.58 mm (20G) para colágeno/Pluronic/dECM. Pressão: 60 kPa com células (Nelson 2021 safe), 60-150 kPa sem células
+- **Botão "Gerar" só habilita quando** `state.model.geometryId` existe E `blend.length > 0` — evita geração inválida
+- **BasicModePanelProps encolheu**: `initialGeometryId` e `initialBioink` foram REMOVIDOS. Só `onGcodeGenerated`, `jobName`, `className` sobraram
+- **`slice/page.tsx` simplificado**: chamada do `<BasicModePanel>` não passa mais `initialGeometryId`; imports `ENGINE_TO_QUICK_ID` e `QuickGeometryId` removidos (agora encapsulados no helper)
+
+**Rationale de arquitetura**: sem essa refatoração o usuário sentia que "estava começando do zero" ao entrar na Etapa 3 — as escolhas das etapas anteriores pareciam ter sido ignoradas. Além disso, a existência dos 4 slots no `MultiBioinkSelector` da Etapa 3 abria a porta para o usuário configurar 2 biotintas na Etapa 2 e ver 4 slots vazios/duplicados na Etapa 3, o que é UX incoerente. Agora o fluxo é linear: Modelo → Biotinta → Fatiamento (só parâmetros técnicos) → Execução.
+
+**Arquivos**:
+- `src/lib/bioprint/context-to-quick.ts` (novo, 264 linhas) — helpers puros de conversão + resumo textual
+- `src/components/bioprinter/BasicModePanel.tsx` (497 → 387 linhas, -108/-8 linhas úteis) — refactor completo removendo seções 1 e 2, mantendo só banner + cards read-only + parâmetros de fatiamento + botão Gerar + resultado
+- `src/app/dashboard/bioprint/slice/page.tsx` (2567 linhas → 2564) — remove imports não usados + prop `initialGeometryId`
+- `tests/r12_59_context_to_quick.test.ts` (novo, 38 testes) — cobre mapping engine→quick, extractDims com defaults/edge cases, formulationToQuick com/sem células, contextToQuickBlend (formulations vs legacy vs default), summaries, pipeline integrado
+
+**Testes**: 309/309 passing (271 anteriores + 38 novos R12.59).
+
+**Próximo**: escutar validação do usuário em produção. Se aprovado, marcar `/toolpath` e `/gcode` como rotas "auxiliares/pro" (fora do fluxo canônico) com banner discreto — elas ainda duplicam formulação via `BioinkMultiMaterialFormulator`, mas são secundárias.
+
 ### R12.58 — Etapa 2 · Multi-biotinta (max 2, 1 célula por biotinta) (2026-07-28)
 
 Correção de UX crítica reportada pela usuária: **a Etapa 2 forçava biotinta única com 1 tipo celular**, mas na prática real de bioimpressão trabalha-se com múltiplos materiais e tipos celulares. Agora:
@@ -306,4 +333,4 @@ Learning store persiste ajustes do usuário e re-alimenta as próximas sugestõe
 Proprietário — Quantis Biotechnology © 2026
 Janaina Dernowsek (CEO/Founder)
 
-**Last Updated:** 2026-07-28 — R12.58 (Etapa 2: multi-biotinta · max 2, 1 célula cada)
+**Last Updated:** 2026-07-28 — R12.59 (Etapa 3: fluxo contínuo · elimina duplicação Etapa 1/2 dentro do Fatiamento)
