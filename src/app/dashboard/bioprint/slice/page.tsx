@@ -1113,6 +1113,7 @@ export default function BioprintSlicePage() {
             <PrinterPrepSection
               gcode={result?.gcode ?? state.slice.gcode ?? ""}
               printerName={currentPrinter?.fullName ?? "Bioimpressora BIA"}
+              bioprinterId={bioprinterId}
             />
             <GCodePanel
               loading={loading}
@@ -2521,7 +2522,7 @@ function StatBox({
 // Permite que o usuário PREPARE a máquina (homing, Z-offset, purga)
 // ANTES de gerar/enviar o G-code.
 // ═══════════════════════════════════════════════════════════════════════
-function PrinterPrepSection({ gcode, printerName }: { gcode: string; printerName: string }) {
+function PrinterPrepSection({ gcode, printerName, bioprinterId }: { gcode: string; printerName: string; bioprinterId: string }) {
   const [expanded, setExpanded] = useState(true)
   const [isConnected, setIsConnected] = useState(false)
 
@@ -2558,6 +2559,7 @@ function PrinterPrepSection({ gcode, printerName }: { gcode: string; printerName
           <PrinterConnection
             gcode={gcode}
             printerName={printerName}
+            bioprinterId={bioprinterId}
             onConnectionChange={setIsConnected}
           />
         </div>

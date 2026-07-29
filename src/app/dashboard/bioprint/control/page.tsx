@@ -527,6 +527,7 @@ export default function BioprintControlPage() {
           <PrinterConnection
             gcode={state.slice.gcode ?? ""}
             printerName={state.model.name ?? "Bioimpressora BIA"}
+            bioprinterId={state.slice.bioprinterId ?? "bioender_bioedtech"}
             onConnectionChange={setIsConnected}
             renderExtraControls={({ connected, sendCommand }) => {
               sendCommandRef.current = sendCommand

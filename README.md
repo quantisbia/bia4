@@ -174,6 +174,37 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R12.60 — Conexão USB BioEnder · aplica filtros USB por bioprinterId, toggle escape, mensagens acionáveis (2026-07-29)
+
+Correção crítica reportada pela usuária: **"não estou conseguindo conectar com a bioender, USB, o que houve"**. A conexão USB via Web Serial não funcionava de forma confiável. Diagnóstico completo do componente `PrinterConnection.tsx` revelou **4 bugs** que juntos travavam a conexão:
+
+- **Bug #1 — Sem filtros USB**: `navigator.serial.requestPort()` era chamado sem `filters`, então o diálogo do navegador listava **TODAS** as portas seriais do sistema (impressora térmica, GPS, HC-05 Bluetooth, cabos USB-TTL soltos, teclado gamer com RGB). Usuário podia clicar na porta errada e ficar travado esperando resposta M115 que nunca vinha.
+- **Bug #2 — Sem consciência de bioprinterId**: O componente não puxava qual bioimpressora fora selecionada na Etapa 3 (`state.slice.bioprinterId`), então não sabia quais Vendor IDs filtrar. BioEnder usa 3 chips diferentes conforme a revisão da placa: **CH340 (0x1A86)** o mais comum, **CP210x (0x10C4)** em placas v4.2.7, **FTDI (0x0403)** em Sanguino antigo.
+- **Bug #3 — Sem escape hatch**: Se por algum motivo o chip USB do usuário fosse exótico (ex: clone com chip pirata que reporta VID diferente), o filtro esconderia a porta correta e o usuário ficaria preso sem alternativa.
+- **Bug #4 — Sem mensagens acionáveis**: Erros do navegador eram exibidos crus (`NotFoundError: No port selected by the user`) sem tradução ou hint de como resolver.
+
+**Bônus**: chamada `port.open()` estava incompleta — só passava `baudRate`, faltavam `dataBits: 8`, `stopBits: 1`, `parity: "none"`, `flowControl: "none"`, `bufferSize: 16384`. Alguns firmwares Marlin rejeitam data se esses campos ficarem undefined.
+
+**Correção aplicada** (`src/components/bioprinting/PrinterConnection.tsx` reescrito, ~950 linhas):
+- Nova prop `bioprinterId?: string` (fallback: `state.slice.bioprinterId` via `useBioprintProcess()`, último fallback `"bioender_bioedtech"`)
+- `getBioprinterById()` → puxa `usbVendorIds` do catálogo `BIOPRINTERS` → aplica no `requestPort({filters})`
+- Checkbox **"Filtrar por Vendor ID"** (default ON) — usuário pode desligar se precisar
+- Helper `vendorLabel()` traduz VIDs: 0x1A86→"WCH CH340/CH341", 0x10C4→"Silicon Labs CP210x", 0x0403→"FTDI FT232", 0x2341→"Arduino LLC", 0x2E8A→"Raspberry Pi Pico"
+- Helper `buildErrorHint()` — 5 cenários com hints acionáveis: "no port selected", "access denied/port in use", "not supported", "secure context (HTTPS)", "generic + hints de driver"
+- Painel diagnóstico colapsável (Web Serial support / secure context / bioprinter id / Marlin compat / baud / filtros ativos / vendor IDs esperados / portas pré-autorizadas)
+- Banner de aviso HTTPS quando `!isSecureContextForWebSerial()`
+- Botão "🔄 Portas Autorizadas" — chama `navigator.serial.getPorts()` e mostra portas já autorizadas pra reconexão em 1 clique (sem passar pelo diálogo)
+- `port.open()` completo com dataBits/stopBits/parity/flowControl/bufferSize
+
+**Files touched**:
+- `src/components/bioprinting/PrinterConnection.tsx` — reescrito
+- `src/app/dashboard/bioprint/slice/page.tsx` — `<PrinterPrepSection>` propaga `bioprinterId`, `<PrinterConnection>` recebe explícito
+- `src/app/dashboard/bioprint/control/page.tsx` — `<PrinterConnection>` recebe `bioprinterId={state.slice.bioprinterId ?? "bioender_bioedtech"}`
+
+**Testes**: 309/309 passing (nenhum teste anterior quebrou — Web Serial não é testável em vitest, então sem novos testes).
+
+---
+
 ### R12.59 — Etapa 3 · Fluxo contínuo (elimina duplicação Etapa 1/2 dentro do Fatiamento) (2026-07-28)
 
 Correção de arquitetura reportada pela usuária: **a Etapa 3 (Fatiamento) re-perguntava STL/geometria e biotinta que já tinham sido definidos nas Etapas 1 e 2**, criando confusão e — pior — o `BasicModePanel` oferecia `MultiBioinkSelector` com até **4 slots**, contradizendo diretamente a regra da R12.58 (máx 2 biotintas). Agora:
@@ -333,4 +364,4 @@ Learning store persiste ajustes do usuário e re-alimenta as próximas sugestõe
 Proprietário — Quantis Biotechnology © 2026
 Janaina Dernowsek (CEO/Founder)
 
-**Last Updated:** 2026-07-28 — R12.59 (Etapa 3: fluxo contínuo · elimina duplicação Etapa 1/2 dentro do Fatiamento)
+**Last Updated:** 2026-07-29 — R12.60 (Conexão USB BioEnder: filtros por Vendor ID + toggle escape + mensagens acionáveis + diagnóstico)
