@@ -239,6 +239,10 @@ export async function POST(req: NextRequest) {
     wellPlate: wpConfig,
     tissue,
     application,
+    // R12.61: propaga geometryId para o header do G-code, permitindo que
+    // checkCoherence() no /execute reconheça a forma 3D real (ear, heart…)
+    // ao invés de confundir keywords de infill (gyroid) com geometrias.
+    geometryId: geometry.id,
   }
 
   // R12.49/R12.50: Pré-carregar STL real para geometrias anatômicas que

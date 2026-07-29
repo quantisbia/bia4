@@ -1,8 +1,22 @@
 /**
- * BIA — Coherence Check (R12.47)
+ * BIA — Coherence Check (R12.47 · fix R12.61)
  *
  * Valida se o G-code carregado no /execute REALMENTE corresponde às
  * escolhas que o usuário fez no fluxo (modelo → biotinta → fatiamento).
+ *
+ * ── R12.61 (2026-07-29) ─── FIX bloqueio falso "geometria-divergente" ──
+ * Bug reportado: usuária escolhe orelha (ear) + gyroid infill; slicer emite
+ * G-code correto de orelha com `; Infill: gyroid_tpms @ 30%`. O coherence
+ * antigo tinha "gyroid" em GEOMETRY_KEYWORDS, então detectava geometryHint
+ * = "gyroid", comparava com expected "ear", divergia e BLOQUEAVA impressão
+ * válida. Correção:
+ *   1) `emitter.ts` (R12.61) agora emite `; JobName:` + `; Geometry: <id>`
+ *   2) `extractGcodeHints()` lê `; Geometry:` como fonte da verdade
+ *   3) Palavras de infill (gyroid/honeycomb/voronoi/tpms) REMOVIDAS de
+ *      GEOMETRY_KEYWORDS — só ficam em INFILL_PATTERN_KEYWORDS
+ *   4) Keyword scan de geometria (fallback pra G-code externo) SÓ emite
+ *      warning agora — nunca bloqueia. Bloqueio só quando `; Geometry:`
+ *      explícito diverge da escolha.
  *
  * Por que existe:
  *   A "fonte da verdade" (BioprintProcessState em process-context.tsx)
@@ -93,8 +107,17 @@ export interface CoherenceReport {
  * NÃO faz parse geométrico real — apenas leitura de cabeçalho/comentários.
  * G-codes gerados pela BIA têm header rico (jobName, geometry, infill).
  * G-codes externos podem ter pouco ou nada.
+ *
+ * R12.61: prioridade agora é ler `; Geometry: <id>` EXPLÍCITO emitido pelo
+ * emitter (fonte da verdade). Só cai em keyword scan como fallback para
+ * G-codes externos/legados. Também separa keywords de INFILL PATTERN
+ * (gyroid como preenchimento) das de GEOMETRIA (formas 3D), pra parar de
+ * confundir "gyroid" (padrão) com "orelha" (modelo) e bloquear falsamente.
  */
-function extractGcodeHints(gcode: string): CoherenceReport["detected"] {
+function extractGcodeHints(gcode: string): CoherenceReport["detected"] & {
+  /** Geometry ID explícito lido do header `; Geometry: <id>` (R12.61) */
+  explicitGeometryId: string | null
+} {
   const lines = gcode.split("\n").slice(0, 200)  // primeiras 200 linhas bastam
   const commentLines = lines
     .map((l) => l.trim())
@@ -102,37 +125,68 @@ function extractGcodeHints(gcode: string): CoherenceReport["detected"] {
     .map((l) => l.slice(1).trim())
     .filter((l) => l.length > 0)
 
-  // jobName: procura "jobName:", "Job:", "BIA · …"
+  // R12.61: PISTA EXPLÍCITA — `; Geometry: <id>` do emitter novo.
+  // Se presente, é a fonte da verdade e evita todo o keyword scan ambíguo.
+  let explicitGeometryId: string | null = null
+  for (const c of commentLines) {
+    const m = c.match(/^geometry\s*:\s*(\S+)/i)
+    if (m) { explicitGeometryId = m[1].trim().toLowerCase(); break }
+  }
+
+  // jobName: procura "; JobName: …", "jobName:", "Job:", "BIA · …"
   let jobName: string | null = null
   for (const c of commentLines) {
     const m =
-      c.match(/job\s*name\s*:\s*(.+)/i) ??
+      c.match(/^job\s*name\s*:\s*(.+)/i) ??
       c.match(/^job\s*:\s*(.+)/i) ??
       c.match(/bia\s*·\s*(.+?)(?:\s*—|\s*\||$)/i)
     if (m) { jobName = m[1].trim(); break }
   }
 
-  // Pistas de geometria: palavras-chave nos comentários
+  // Pistas de geometria: SÓ formas 3D reais (não misturar com padrões de infill).
+  // R12.61: removidos "gyroid" e afins que são PADRÕES DE PREENCHIMENTO,
+  // não geometrias de modelo. Um cubo com gyroid infill não é "geometria gyroid".
   const allText = commentLines.join(" ").toLowerCase()
   const GEOMETRY_KEYWORDS: Record<string, string[]> = {
-    ear:          ["orelha", "ear", "auric", "pavilhão"],
-    heart:        ["coração", "heart", "cardio"],
-    nose:         ["nariz", "nose", "septo"],
+    ear:          ["orelha", "auric", "pavilhão"],
+    heart:        ["coração", "coracao", "cardio"],
+    nose:         ["nariz", "septo"],
     femur:        ["femur", "fêmur", "osso longo"],
-    kidney:       ["rim", "kidney", "renal", "néfron", "nefron"],
-    hand:         ["mão", "mao", "hand", "palma"],
-    cube:         ["cubo", "cube"],
-    disk:         ["disco", "disk"],
-    grid:         ["grade", "grid", "scaffold aberto"],
-    patch:        ["patch", "membrana", "membrane"],
-    cylinder:     ["cilindro", "cylinder"],
-    sphere:       ["esfera", "sphere", "organoide"],
-    gyroid:       ["gyroid", "giroide", "tpms"],
-    "hollow-sphere": ["hollow-sphere", "esfera oca"],
+    kidney:       ["rim", "renal", "néfron", "nefron"],
+    hand:         ["mão", "mao", "palma"],
+    cube:         ["cubo"],
+    disk:         ["disco"],
+    // "grid" só como geometria se explícito ("scaffold aberto" ou padrão de casco);
+    // como INFILL vai pra INFILL_KEYWORDS abaixo.
+    grid:         ["scaffold aberto"],
+    patch:        ["membrana"],
+    cylinder:     ["cilindro"],
+    sphere:       ["esfera", "organoide"],
+    "hollow-sphere": ["esfera oca"],
+    // NOTA: "ear", "heart", "nose", "kidney" também aparecem em inglês —
+    // mas SÓ pegamos essas palavras se estiverem "isoladas" (word boundary),
+    // pra evitar match acidental em "gearbox" ou coisas assim.
   }
   const geometryHints: string[] = []
   for (const [id, kws] of Object.entries(GEOMETRY_KEYWORDS)) {
     if (kws.some((k) => allText.includes(k))) geometryHints.push(id)
+  }
+  // Palavras em inglês curtas precisam de word boundary pra reduzir falsos positivos
+  const EN_BOUNDARY: Record<string, RegExp> = {
+    ear:    /\bear\b/,
+    heart:  /\bheart\b/,
+    nose:   /\bnose\b/,
+    kidney: /\bkidney\b/,
+    hand:   /\bhand\b/,
+    femur:  /\bfemur\b/,
+    cube:   /\bcube\b/,
+    disk:   /\bdisk\b/,
+    cylinder: /\bcylinder\b/,
+    sphere: /\bsphere\b/,
+    patch:  /\bpatch\b/,
+  }
+  for (const [id, rx] of Object.entries(EN_BOUNDARY)) {
+    if (rx.test(allText) && !geometryHints.includes(id)) geometryHints.push(id)
   }
 
   // Pistas de material
@@ -146,18 +200,37 @@ function extractGcodeHints(gcode: string): CoherenceReport["detected"] {
     if (allText.includes(m)) materialHints.push(m)
   }
 
-  // Pistas de infill
-  const INFILL_KEYWORDS = [
+  // R12.61: Pistas de infill — SÓ olha a linha "; Infill: <algo>" (fonte
+  // limpa) ao invés de fazer scan em allText, que confunde "gyroid" (padrão)
+  // com "gyroid" (que o coherence antigo tratava como forma).
+  const infillHints: string[] = []
+  const INFILL_PATTERN_KEYWORDS = [
     "rectilinear", "linhas", "linear",
     "gyroid", "giroide",
-    "concentric", "concêntrico",
+    "concentric", "concêntrico", "concentrico",
     "honeycomb", "favo",
     "grid", "grade",
     "voronoi", "perlin", "wave",
+    "tpms", "schwarz", "diamond",
   ]
-  const infillHints: string[] = []
-  for (const m of INFILL_KEYWORDS) {
-    if (allText.includes(m)) infillHints.push(m)
+  for (const c of commentLines) {
+    const infillMatch = c.match(/^infill\s*:\s*(.+)/i)
+    if (infillMatch) {
+      const infillText = infillMatch[1].toLowerCase()
+      for (const kw of INFILL_PATTERN_KEYWORDS) {
+        if (infillText.includes(kw) && !infillHints.includes(kw)) {
+          infillHints.push(kw)
+        }
+      }
+      break  // primeira linha "; Infill:" basta
+    }
+  }
+  // Fallback pra G-codes externos sem "; Infill:" — scan geral, mas
+  // marcado como low-confidence (não usado para bloqueio)
+  if (infillHints.length === 0) {
+    for (const kw of INFILL_PATTERN_KEYWORDS) {
+      if (allText.includes(kw)) infillHints.push(kw)
+    }
   }
 
   // Layer count: tenta achar "; N layers" ou conta "; Layer X/Y"
@@ -184,6 +257,7 @@ function extractGcodeHints(gcode: string): CoherenceReport["detected"] {
     infillHints,
     layerCount,
     bedSize,
+    explicitGeometryId,
   }
 }
 
@@ -258,24 +332,46 @@ export function checkCoherence(
   }
 
   // ─── 1) Geometria escolhida vs geometria detectada ─────────────────
-  if (expected.modelGeometryId && detected.geometryHints.length > 0) {
-    // Match direto (orelha escolhida + orelha mencionada no G-code) → OK
+  // R12.61: prioridade agora é `; Geometry: <id>` explícito emitido pelo
+  // slicer BIA. Só faz keyword scan como sinal FRACO (warning, não blocking)
+  // porque scan de palavras em cabeçalho é heurístico e produz falsos
+  // positivos (ex: "gyroid" no infill não é "geometria gyroid").
+  if (expected.modelGeometryId && detected.explicitGeometryId) {
+    // Fonte da verdade: `; Geometry: <id>` no header
+    const expGid = expected.modelGeometryId.toLowerCase()
+    const gotGid = detected.explicitGeometryId
+    if (expGid !== gotGid) {
+      issues.push({
+        level: "blocking",
+        code: "geometria-divergente",
+        message: `Você escolheu o modelo "${expected.modelGeometryId}" na Etapa 1, mas o G-code foi gerado para "${gotGid}" (header ; Geometry:).`,
+        fixHint:
+          "Volte para a Etapa 3 (Fatiamento) e gere novamente o G-code para o modelo correto, ou volte para a Etapa 1 e troque o modelo para o que está no G-code.",
+        expected: expected.modelGeometryId,
+        found: gotGid,
+      })
+    }
+  } else if (
+    expected.modelGeometryId &&
+    detected.geometryHints.length > 0 &&
+    !detected.explicitGeometryId
+  ) {
+    // Sem `; Geometry:` explícito — cai no keyword scan (fraco).
+    // Só emite WARNING (não BLOCKING) porque a evidência é heurística.
     const expGid = expected.modelGeometryId.toLowerCase()
     const foundMatch = detected.geometryHints.some((h) => {
-      // ear vs ear, heart vs heart, etc.
       if (h === expGid) return true
-      // Sinônimos (gyroid pertence a tpms; sphere a organoid; etc.)
       if (expGid.includes(h)) return true
       if (h.includes(expGid)) return true
       return false
     })
     if (!foundMatch) {
       issues.push({
-        level: "blocking",
-        code: "geometria-divergente",
-        message: `Você escolheu o modelo "${expected.modelGeometryId}" na Etapa 1, mas o G-code carregado tem indícios de ser de outra geometria (${detected.geometryHints.join(", ")}).`,
+        level: "warning",
+        code: "geometria-possivelmente-divergente",
+        message: `Você escolheu "${expected.modelGeometryId}" na Etapa 1, mas o cabeçalho do G-code menciona ${detected.geometryHints.join(", ")}. O G-code pode ser de outra geometria — não foi possível confirmar (sem tag ; Geometry: explícita).`,
         fixHint:
-          "Volte para a Etapa 3 (Fatiamento) e gere novamente o G-code para o modelo correto, ou volte para a Etapa 1 e troque o modelo para o que está no G-code.",
+          "Se você gerou esse G-code pela BIA, regere na Etapa 3 (o header novo inclui ; Geometry: <id>). Se veio de fora, confira visualmente o preview 3D antes de imprimir.",
         expected: expected.modelGeometryId,
         found: detected.geometryHints.join(", "),
       })
@@ -359,10 +455,14 @@ export function checkCoherence(
 
   const isBlocking = issues.some((i) => i.level === "blocking")
 
+  // R12.61: `detected` internamente tem `explicitGeometryId` mas o tipo
+  // público `CoherenceReport["detected"]` não. Strip antes de retornar.
+  const { explicitGeometryId: _egid, ...publicDetected } = detected
+
   return {
     isBlocking,
     issues,
-    detected,
+    detected: publicDetected,
     expected,
   }
 }

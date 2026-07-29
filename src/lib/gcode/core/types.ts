@@ -161,6 +161,14 @@ export interface PrintJob {
   // Metadata
   tissue: string
   application: string
+  /**
+   * R12.61: ID da geometria 3D (ear, heart, kidney, cube, sphere, gyroid_tpms…).
+   * Emitido no header do G-code como `; Geometry: <id>` para permitir que
+   * `coherenceCheck()` no /execute compare corretamente contra o modelo
+   * escolhido na Etapa 1. Sem isso, a checagem falha comparando keywords
+   * de infill (gyroid) com geometrias (ear) e bloqueia impressão válida.
+   */
+  geometryId?: string
   estimatedTime_min?: number
   estimatedVolume_uL?: number
   estimatedViability_pct?: number

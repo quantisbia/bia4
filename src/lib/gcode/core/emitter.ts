@@ -38,6 +38,13 @@ export function emitHeader(
   lines.push(`; Cells: ${bioink.hasCells ? `YES (${bioink.cellDensity ?? "?"}×10⁶/mL)` : "NO (acellular)"}`)
   if (opts.jobMetadata) {
     const j = opts.jobMetadata
+    // R12.61: emite JobName e Geometry no header. Sem eles, o coherence-check
+    // no /execute não consegue identificar a geometria do modelo (ear, heart…)
+    // e confunde keywords de infill (gyroid) com formas 3D → bloqueio falso.
+    lines.push(`; JobName: ${j.name}`)
+    if (j.geometryId) {
+      lines.push(`; Geometry: ${j.geometryId}`)
+    }
     lines.push(`; Tissue: ${j.tissue}`)
     lines.push(`; Application: ${j.application}`)
     if (j.infillPercent <= 0) {

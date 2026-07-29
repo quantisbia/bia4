@@ -174,6 +174,41 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R12.61 — Coherence check: desbloqueio de G-codes válidos que confundiam padrão de infill com geometria (2026-07-29)
+
+Correção reportada pela usuária: **"tem muito erro em gcode Bloqueado: resolva incoerências modelo↔G-code. faca os gcodes funcionares."**. Investigação revelou que `coherence-check.ts` (R12.47) bloqueava impressões perfeitamente válidas por confundir **padrão de preenchimento** com **geometria 3D**:
+
+**Root cause**: `GEOMETRY_KEYWORDS` continha `gyroid`, `honeycomb`, `voronoi` etc — que são **algoritmos de infill**, não formas 3D. Quando o slicer emitia `; Infill: gyroid_tpms @ 30%` (padrão válido de preenchimento), o keyword scan interpretava "gyroid" como **geometria** = gyroid. Ao comparar com `state.model.geometryId = "ear"`, detectava divergência → **bloqueava impressão** com "geometria-divergente".
+
+**Correção completa em 4 camadas**:
+
+1. **`emitter.ts`** — Emite `; JobName: <name>` e `; Geometry: <id>` no header do G-code, dando ao coherence uma **fonte da verdade explícita** ao invés de keyword scan heurístico.
+2. **`route.ts` (/api/gcode/generate)** — Propaga `geometryId: geometry.id` para o `PrintJob`, para o emitter poder incluí-lo no header.
+3. **`types.ts` (PrintJob)** — Adicionado campo opcional `geometryId?: string`.
+4. **`coherence-check.ts`** — 4 subcorreções:
+   - **`; Geometry:` explícito é fonte da verdade**: se presente no header, comparação é direta (case-insensitive, tolerante a espaços) — não faz keyword scan
+   - **`GEOMETRY_KEYWORDS` limpo**: `gyroid/honeycomb/voronoi/tpms/schwarz/diamond` REMOVIDOS (são padrões de infill). Apenas formas 3D reais (ear, heart, kidney, cube, sphere, disk, patch, cylinder, ...) ficam
+   - **`INFILL_PATTERN_KEYWORDS` isolado**: scan de infill agora prioriza a linha `; Infill:` do header (fonte limpa) e só cai em scan geral como fallback
+   - **Keyword scan de geometria = warning, nunca blocking**: sem tag `; Geometry:` explícita, a evidência é heurística demais para bloquear impressão. Emite `geometria-possivelmente-divergente` (warning) permitindo que o usuário decida
+   - **Word boundary para keywords inglesas**: `\bear\b` em vez de `.includes("ear")` — evita falsos positivos como "gearbox" contendo "ear"
+
+**Files touched**:
+- `src/lib/gcode/core/types.ts` — `PrintJob.geometryId?`
+- `src/lib/gcode/core/emitter.ts` — emit `; JobName:` + `; Geometry:`
+- `src/app/api/gcode/generate/route.ts` — propaga `geometryId`
+- `src/lib/bioprint/coherence-check.ts` — 4 subcorreções acima
+- `tests/r12_61_coherence_geometry_infill.test.ts` — 20 testes novos (16 unit + 4 integração pipeline emitter→coherence)
+
+**Testes**: **329/329 passing** (309 anteriores + 20 novos R12.61).
+
+**Comportamento verificável**:
+- ✅ `state=ear + G-code com "; Geometry: ear" e "; Infill: gyroid_tpms"` → **NÃO bloqueia** (era o bug reportado)
+- ✅ `state=ear + G-code com "; Geometry: cube"` → **BLOQUEIA** com mensagem clara citando a tag `; Geometry:`
+- ✅ G-codes externos (sem `; Geometry:`) → no máximo `warning`, nunca `blocking`
+- ✅ Padrão de infill divergente (state=lines, gcode=gyroid) → warning, não bloqueia
+
+---
+
 ### R12.60 — Conexão USB BioEnder · aplica filtros USB por bioprinterId, toggle escape, mensagens acionáveis (2026-07-29)
 
 Correção crítica reportada pela usuária: **"não estou conseguindo conectar com a bioender, USB, o que houve"**. A conexão USB via Web Serial não funcionava de forma confiável. Diagnóstico completo do componente `PrinterConnection.tsx` revelou **4 bugs** que juntos travavam a conexão:
@@ -364,4 +399,4 @@ Learning store persiste ajustes do usuário e re-alimenta as próximas sugestõe
 Proprietário — Quantis Biotechnology © 2026
 Janaina Dernowsek (CEO/Founder)
 
-**Last Updated:** 2026-07-29 — R12.60 (Conexão USB BioEnder: filtros por Vendor ID + toggle escape + mensagens acionáveis + diagnóstico)
+**Last Updated:** 2026-07-29 — R12.61 (Coherence: desbloqueia G-codes válidos · separa padrão de infill vs geometria + `; Geometry:` como fonte da verdade)
