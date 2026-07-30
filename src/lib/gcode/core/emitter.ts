@@ -74,12 +74,19 @@ export function emitHeader(
   lines.push("G21                    ; set units to mm")
   lines.push("G90                    ; absolute positioning")
   lines.push(opts.relativeExtrusion ? "M83                    ; relative extrusion" : "M82                    ; absolute extrusion")
-  // R12.62: G92 X0 Y0 Z0 E0 zera TODAS as coordenadas, não apenas E.
-  // Antes: só "G92 E0" → firmware mantinha X/Y/Z do último trabalho, e
-  // o primeiro G1 podia parar em ponto errado (aparente "não está no zero").
-  // Agora: zeragem total, o ponto inicial fica exatamente onde o bico está
-  // depois do homing (G28) → coordenadas absolutas coerentes.
-  lines.push("G92 X0 Y0 Z0 E0        ; zerar TODAS as coordenadas (ponto inicial forte)")
+  // R12.64: SEM G28 EM HIPÓTESE ALGUMA — bioimpressora preserva bandeja/cartucho.
+  // O usuário posiciona o bico manualmente com o joystick sobre o ponto desejado
+  // (centro do poço, canto da lâmina, etc.) e o G92 define ESSE ponto como (0,0,0).
+  // Isto é ONTOLOGICAMENTE diferente de FDM tradicional: em bioimpressão o
+  // referencial vem da BIOLOGIA (o alvo — poço, tecido, hidrogel), não da mecânica.
+  //
+  // R12.62 + R12.64: G92 X0 Y0 Z0 E0 zera TODAS as coordenadas (X/Y/Z/E),
+  // não apenas E. Antes: só "G92 E0" → firmware mantinha X/Y/Z do último trabalho
+  // e o primeiro G1 podia parar em ponto errado (aparente "não está no zero").
+  // Agora: zeragem total no ponto físico atual do bico.
+  lines.push("; ⚠️ NENHUM G28 (home) — bioimpressora preserva bandeja/cartucho")
+  lines.push("; ⚠️ Posicione o bico MANUALMENTE sobre o ponto de origem antes de iniciar")
+  lines.push("G92 X0 Y0 Z0 E0        ; zerar TODAS as coordenadas AQUI (ponto atual = origem)")
 
   // Temperatura
   if (bp.hasHeatedBed && bioink.temperature_c) {
@@ -97,16 +104,16 @@ export function emitHeader(
     lines.push(`M751 S${fmt(bioink.pressure_kpa)}         ; Allevi set pressure`)
   }
 
-  // Auto-level / homing
-  if (bp.hasAutoLeveling) {
-    lines.push("G28                    ; home all axes")
-    lines.push("G29                    ; auto bed leveling")
-  } else {
-    lines.push("G28                    ; home all axes")
+  // R12.64: Auto-leveling (G29) só é emitido se o hardware suporta E o usuário
+  // habilitou explicitamente via bp.mcodes.startPrint. G28 foi REMOVIDO — em
+  // bioimpressão, o home mecânico esmaga o cartucho/bandeja/wells contra o bico.
+  if (bp.hasAutoLeveling && bp.mcodes.startPrint && bp.mcodes.startPrint.includes("G29")) {
+    lines.push("G29                    ; auto bed leveling (só se hardware suporta bio-probe)")
   }
 
-  // Start print code específico
-  if (bp.mcodes.startPrint) {
+  // Start print code específico da marca (M710 CELLINK, M110 N0 DLP, etc.)
+  // Filtra G28 defensivamente — se algum profile ainda tiver G28, é banido.
+  if (bp.mcodes.startPrint && !bp.mcodes.startPrint.startsWith("G28")) {
     lines.push(`${bp.mcodes.startPrint}      ; ${bp.manufacturer} start print`)
   }
 

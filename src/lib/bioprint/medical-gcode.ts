@@ -643,10 +643,12 @@ function emitGcodeHeader(
     `;   📚 Fundamentado em: Nelson 2021 (DOI 10.3390/ijms222413481).`,
     "; ═══════════════════════════════════════════════════════════════════════",
     "",
-    "G21        ; unidades em mm",
-    "G90        ; coordenadas absolutas",
-    "M83        ; extrusão relativa",
-    "G92 E0     ; zera extruder",
+    "G21             ; unidades em mm",
+    "G90             ; coordenadas absolutas",
+    "M83             ; extrusão relativa",
+    // R12.64: G92 X0 Y0 Z0 E0 zera TODAS as coordenadas (não só E).
+    // Antes só zerava o extrusor — firmware mantinha X/Y/Z do último trabalho.
+    "G92 X0 Y0 Z0 E0 ; zera TODAS as coordenadas AQUI (ponto atual = origem, sem home)",
     "",
   ].filter((l) => l !== "")
 }

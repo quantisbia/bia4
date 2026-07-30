@@ -710,4 +710,74 @@ function drawBed(
     ctx.lineTo(b.x, b.y)
     ctx.stroke()
   }
+
+  // R12.64: MESA REDONDA — desenha o contorno circular da plataforma
+  // de bioimpressão sobreposto ao grid. O diâmetro útil é a MENOR das
+  // dimensões do bounding box (a peça precisa caber dentro do círculo).
+  // Origem física: (0,0,0) é o CENTRO da mesa em bioimpressão (não canto).
+  //
+  // Para renderizar o círculo em projeção 3D, amostramos N pontos no
+  // círculo em Z=0 e ligamos como polyline (bom o suficiente pra 64
+  // segmentos de subdivisão).
+  const bedDiameter = Math.min(
+    bounds.max.x - bounds.min.x + 20, // +padding pra visualização
+    bounds.max.y - bounds.min.y + 20,
+  )
+  const bedRadius = Math.max(50, bedDiameter / 2) // mínimo 50mm para visualização
+  const bedCx = (bounds.min.x + bounds.max.x) / 2
+  const bedCy = (bounds.min.y + bounds.max.y) / 2
+  const segments = 64
+
+  // Círculo em traço destacado (azul-ciano — combina com identidade Bio)
+  ctx.strokeStyle = "rgba(34, 211, 238, 0.35)" // cyan-400 @ 35%
+  ctx.lineWidth = 1.4
+  ctx.setLineDash([])
+  ctx.beginPath()
+  for (let i = 0; i <= segments; i++) {
+    const theta = (i / segments) * 2 * Math.PI
+    const px = bedCx + bedRadius * Math.cos(theta)
+    const py = bedCy + bedRadius * Math.sin(theta)
+    const proj = project({ x: px, y: py, z: 0 }, cam, w, h)
+    if (i === 0) ctx.moveTo(proj.x, proj.y)
+    else ctx.lineTo(proj.x, proj.y)
+  }
+  ctx.stroke()
+
+  // Preenchimento sutil dentro do círculo (efeito "bandeja iluminada")
+  ctx.fillStyle = "rgba(34, 211, 238, 0.04)"
+  ctx.beginPath()
+  for (let i = 0; i <= segments; i++) {
+    const theta = (i / segments) * 2 * Math.PI
+    const px = bedCx + bedRadius * Math.cos(theta)
+    const py = bedCy + bedRadius * Math.sin(theta)
+    const proj = project({ x: px, y: py, z: 0 }, cam, w, h)
+    if (i === 0) ctx.moveTo(proj.x, proj.y)
+    else ctx.lineTo(proj.x, proj.y)
+  }
+  ctx.closePath()
+  ctx.fill()
+
+  // Marca central da mesa (indica origem física da plataforma)
+  const centerProj = project({ x: bedCx, y: bedCy, z: 0 }, cam, w, h)
+  ctx.strokeStyle = "rgba(34, 211, 238, 0.45)"
+  ctx.lineWidth = 0.8
+  ctx.setLineDash([2, 2])
+  // Cruz central
+  ctx.beginPath()
+  ctx.moveTo(centerProj.x - 6, centerProj.y)
+  ctx.lineTo(centerProj.x + 6, centerProj.y)
+  ctx.moveTo(centerProj.x, centerProj.y - 6)
+  ctx.lineTo(centerProj.x, centerProj.y + 6)
+  ctx.stroke()
+  ctx.setLineDash([])
+
+  // Rótulo "Mesa REDONDA · Ø{d}mm"
+  ctx.fillStyle = "rgba(34, 211, 238, 0.7)"
+  ctx.font = "9px monospace"
+  ctx.textAlign = "left"
+  ctx.fillText(
+    `⊙ Mesa redonda Ø${(bedRadius * 2).toFixed(0)} mm`,
+    centerProj.x + 10,
+    centerProj.y + 12,
+  )
 }

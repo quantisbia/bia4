@@ -82,7 +82,14 @@ export interface BioprinterProfile {
   flavor: BioprinterFlavor
   technology: PrintingTechnology  // determina o tipo de emissor
   heads: number              // número de cabeçotes (1 para DLP — único projetor)
-  buildVolume: BBox3D        // mm
+  buildVolume: BBox3D        // mm (bounding box mecânico do sistema XYZ)
+  // R12.64: Formato físico da mesa/plataforma. Bioimpressoras usam mesa
+  // REDONDA (compatível com Petri, wells circulares, culture plates) por
+  // padrão — diferente de FDM tradicional (mesa quadrada/retangular).
+  // Se `bedShape` for "circular", o `bedDiameter_mm` define o diâmetro útil
+  // — normalmente igual à menor dimensão do buildVolume.
+  bedShape: "circular" | "rectangular"
+  bedDiameter_mm?: number    // obrigatório quando bedShape === "circular"
   extrusionMode: ExtrusionMode
   // Limites físicos (mecânica Z — válido p/ todas tecnologias)
   maxFeedrate: { xy: number; z: number; e: number }  // mm/min

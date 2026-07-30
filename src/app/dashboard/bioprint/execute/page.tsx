@@ -1010,33 +1010,50 @@ export default function BioprintExecutePage() {
         loggerRef.current.warn(`Não foi possível definir fluxo inicial: ${e instanceof Error ? e.message : String(e)}`)
       }
 
-      // R12.23 + R12.33: Auto-home ao conectar envia G28 (home mecânico) e,
-      // se autoCenterAfterHome=true, move o cabeçote para o CENTRO da mesa
-      // com clearance Z (30mm). Isso resolve dois problemas:
-      //   (a) deixa a impressora pronta para receber G-code (start position
-      //       previsível no centro);
-      //   (b) tira os eixos dos soft endstops do canto (0,0,0), onde alguns
-      //       firmwares Marlin bloqueiam jog negativo em todos os eixos.
+      // R12.64: AUTO-HOME (G28) REMOVIDO POR COMPLETO.
       //
-      // O G92 (definir ponto inicial / origem lógica) foi desacoplado e agora é uma
-      // ação manual do usuário, disponível no painel de Comandos rápidos como
-      // "Ponto inicial". Isso permite ao usuário fazer o jog até a posição desejada
-      // (centro de poço, etc.) e só então definir aquele ponto como (0,0,0).
+      // Bioimpressora NUNCA faz home mecânico: a bandeja tem células vivas,
+      // Petri dishes, wells, scaffolds já posicionados — um G28 destruiria
+      // tudo isso. O referencial em bioimpressão vem da BIOLOGIA (o alvo:
+      // poço, tecido, hidrogel), não da mecânica do trilho.
+      //
+      // Nova sequência ao conectar (R12.64):
+      //   1. Usuário posiciona MANUALMENTE o bico sobre o ponto desejado
+      //      via joystick (centro de poço, canto de lâmina, etc.)
+      //   2. Sistema zera automaticamente TODAS as coordenadas nesse ponto:
+      //      G92 X0 Y0 Z0 E0 → ponto atual vira (0,0,0) sem mover nada
+      //   3. Impressora fica pronta para o G-code, que também começa com
+      //      G92 X0 Y0 Z0 E0 no header (redundante mas defensivo)
+      //
+      // Se autoZeroOnConnect=false: não zera nada; usuário faz manualmente
+      // via botão "Zerar aqui (G92)" nos Comandos rápidos.
       if (autoHomeOnConnect) {
         try {
-          loggerRef.current.info("Auto-home: enviando G28 (home all eixos)…", "controller")
-          // Marlin: G28 retorna ok só ao terminar o home; timeout padrão do controller (30s) basta
-          await controllerRef.current?.sendAndWait("G28 ; auto-home all (R12.23)")
-          loggerRef.current.ok("Home concluído em todos os eixos (G28).", "controller")
+          loggerRef.current.info(
+            "Auto-zero: enviando G92 X0 Y0 Z0 E0 (ponto atual = origem, SEM home mecânico)…",
+            "controller",
+          )
+          await controllerRef.current?.sendAndWait(
+            "G92 X0 Y0 Z0 E0 ; auto-zero coordenadas (R12.64 — sem G28)",
+          )
+          loggerRef.current.ok(
+            "✓ Coordenadas zeradas no ponto físico atual (G92 X0 Y0 Z0 E0). Bandeja e cartucho PRESERVADOS.",
+            "controller",
+          )
           setDidAutoHome(true)
-          // Posição lógica pós-G28: cabeçote no canto (assumido 0,0,0)
+          // Posição lógica pós-G92: onde estava o bico = agora (0,0,0)
           setPosition({ x: 0, y: 0, z: 0, e: 0 })
         } catch (e) {
-          loggerRef.current.warn(`Auto-home falhou: ${e instanceof Error ? e.message : String(e)}. Use o botão "Home All" do painel se a impressora estiver pronta.`)
+          loggerRef.current.warn(
+            `Auto-zero falhou: ${e instanceof Error ? e.message : String(e)}. Use "Zerar aqui (G92)" no painel se necessário.`,
+          )
           setDidAutoHome(false)
         }
       } else {
-        loggerRef.current.info("Auto-home desabilitado — use o botão \"Home All\" se necessário.", "controller")
+        loggerRef.current.info(
+          "Auto-zero desabilitado — posicione o bico manualmente e use \"Zerar aqui (G92)\" quando quiser definir a origem.",
+          "controller",
+        )
         setDidAutoHome(false)
       }
 
@@ -1069,22 +1086,21 @@ export default function BioprintExecutePage() {
         loggerRef.current.warn(`Não foi possível ajustar modo de coordenadas: ${e instanceof Error ? e.message : String(e)}`)
       }
 
-      // R12.33: PÓS-HOME — move cabeçote para o centro com clearance Z.
-      // Sem isso, o cabeçote fica em (0,0,0) onde:
-      //   · soft endstops podem bloquear jog negativo
-      //   · não há previsibilidade de start position para o G-code
-      //   · risco de colisão com placa de cultura ao tentar mover XY com Z=0
-      // Só roda se o auto-home teve sucesso E o usuário não desabilitou a opção.
-      if (autoHomeOnConnect && autoCenterAfterHome) {
-        try {
-          await moveToSafeCenterAfterHome()
-        } catch (e) {
-          loggerRef.current.warn(
-            `Centralização pós-home falhou: ${e instanceof Error ? e.message : String(e)}. ` +
-            `Você pode mover manualmente com o joystick.`,
-          )
-        }
-      }
+      // R12.64: PÓS-CONEXÃO REMOVIDO (moveToSafeCenter).
+      //
+      // Antes: após G28, movíamos o cabeçote automaticamente pro CENTRO da
+      // mesa retangular (100, 100) com clearance Z. Agora que a mesa é REDONDA
+      // e não fazemos home mecânico, esse movimento perdeu sentido:
+      //   · Não sabemos onde o bico está fisicamente (nenhum endstop foi
+      //     acionado) — mover cegamente pode causar colisão.
+      //   · O usuário já posicionou o bico no ponto que ele quer (poço,
+      //     scaffold, área da mesa redonda) ANTES de clicar Conectar.
+      //   · Após o G92 X0 Y0 Z0 E0, esse ponto físico virou (0,0,0), então
+      //     não há para onde "centralizar" — já estamos na origem lógica.
+      //
+      // O usuário faz jog manual com o joystick para posicionar o bico onde
+      // quiser. Botão "Zerar aqui (G92)" nos Comandos rápidos permite
+      // redefinir a origem a qualquer momento.
 
       // R12.45: handshake + post-home COMPLETOS → libera joystick + comandos manuais
       setIsHandshaking(false)
@@ -1518,60 +1534,52 @@ export default function BioprintExecutePage() {
     }
   }, [])
 
-  // R12.22 + R12.33: Home All manual (espelha o auto-home, mas sob demanda).
-  // Após o G28, opcionalmente move o cabeçote para o centro da mesa com
-  // clearance Z (igual ao auto-home no connect). Use isso quando você
-  // perdeu o registro de posição ou quando o joystick estiver travado nos
-  // soft endstops dos cantos.
-  const handleHomeAll = useCallback(async () => {
+  // R12.64: "Home All (G28)" foi SUBSTITUÍDO por "Zerar aqui (G92)".
+  //
+  // Bioimpressora NUNCA faz home mecânico — destrói bandeja/cartucho.
+  // Este botão agora envia G92 X0 Y0 Z0 E0 = zera coordenadas no ponto
+  // físico atual do bico (sem mover nada). É idêntico ao "Ponto inicial"
+  // dos Comandos rápidos, mas fica em destaque no painel principal por
+  // ser a ação mais crítica ao iniciar uma sessão de bioimpressão.
+  //
+  // Também re-aplica G90/M83/M302 para garantir modo consistente
+  // (alguns firmwares resetam modos de coordenadas após reset serial).
+  const handleZeroHere = useCallback(async () => {
     if (!controllerRef.current || !connected) {
-      loggerRef.current.warn("Conecte antes de fazer home.")
+      loggerRef.current.warn("Conecte antes de zerar as coordenadas.")
       return
     }
     if (controllerState === "streaming") {
-      loggerRef.current.warn("Aguarde o streaming terminar antes de fazer home.")
+      loggerRef.current.warn("Aguarde o streaming terminar antes de zerar.")
       return
     }
     try {
-      loggerRef.current.info("Home All: enviando G28…", "controller")
-      await controllerRef.current.sendAndWait("G28 ; home all (manual)")
-      // R12.27: re-aplica G90 + M83 após o home para garantir que o modo de
-      // coordenadas continue consistente (alguns firmwares resetam o modo do
-      // extrusor para absoluto após G28).
-      await controllerRef.current.sendAndWait("G90 ; XYZ absoluto")
-      await controllerRef.current.sendAndWait("M83 ; E relativo (R12.27)")
-      // R12.40: re-aplica cold-extrusion liberada após Home All. Alguns
-      // firmwares Marlin resetam M302 para o default quando reset/G28. Sem
-      // isso, E+/E- volta a "não funcionar" depois do home. Ver bloco
-      // equivalente em handleConnect para explicação completa.
-      await controllerRef.current.sendAndWait("M302 S0 P1 ; libera extrusão a frio (R12.40)")
-      setDidAutoHome(true)
-      // Posição lógica pós-G28: cabeçote no canto (assumido 0,0,0)
-      setPosition({ x: 0, y: 0, z: 0, e: 0 })
-      loggerRef.current.ok(
-        "Home All concluído (G28) + XYZ absoluto + E relativo + cold extrusion liberada.",
+      loggerRef.current.info(
+        "Zerar aqui: enviando G92 X0 Y0 Z0 E0 (ponto atual = origem, SEM mover)…",
         "controller",
       )
-      // R12.33: centraliza com clearance Z se a opção estiver ativa
-      if (autoCenterAfterHome) {
-        try {
-          await moveToSafeCenterAfterHome()
-        } catch (e) {
-          loggerRef.current.warn(
-            `Centralização pós-home falhou: ${e instanceof Error ? e.message : String(e)}. ` +
-            `Você pode mover manualmente com o joystick.`,
-          )
-        }
-      } else {
-        loggerRef.current.info(
-          "Para definir a origem (0,0,0), use \"Ponto inicial\" nos Comandos rápidos.",
-          "controller",
-        )
-      }
+      await controllerRef.current.sendAndWait(
+        "G92 X0 Y0 Z0 E0 ; zerar coordenadas AQUI (R12.64 — sem home mecânico)",
+      )
+      // R12.27: garante modo consistente após qualquer reset serial.
+      await controllerRef.current.sendAndWait("G90 ; XYZ absoluto")
+      await controllerRef.current.sendAndWait("M83 ; E relativo (R12.27)")
+      // R12.40: cold-extrusion liberada (crítico pra hidrogéis a temperatura ambiente).
+      await controllerRef.current.sendAndWait("M302 S0 P1 ; libera extrusão a frio (R12.40)")
+      setDidAutoHome(true)
+      // Posição lógica: ponto físico atual = (0, 0, 0)
+      setPosition({ x: 0, y: 0, z: 0, e: 0 })
+      loggerRef.current.ok(
+        "✓ Coordenadas zeradas AQUI (G92 X0 Y0 Z0 E0) + XYZ absoluto + E relativo + cold extrusion liberada. Bandeja e cartucho PRESERVADOS.",
+        "controller",
+      )
     } catch (e) {
-      loggerRef.current.error(`Home All falhou: ${e instanceof Error ? e.message : String(e)}`)
+      loggerRef.current.error(`Zerar aqui falhou: ${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [connected, controllerState, autoCenterAfterHome, moveToSafeCenterAfterHome])
+  }, [connected, controllerState])
+
+  // Alias mantido pra compatibilidade com callers antigos (legacy). Redireciona para handleZeroHere.
+  const handleHomeAll = handleZeroHere
 
   // ─── Manual command ──
   const [manualCmd, setManualCmd] = useState("")
@@ -2624,7 +2632,9 @@ export default function BioprintExecutePage() {
                     </div>
                   </label>
                 )}
-                {/* R12.22: Toggle auto-home — explícito antes de conectar */}
+                {/* R12.64: Auto-zero ao conectar — substituiu o antigo Auto-home (G28).
+                    Zera coordenadas no ponto físico atual (G92 X0 Y0 Z0 E0), SEM mover
+                    nada, SEM home mecânico — preserva bandeja/cartucho/wells. */}
                 <label className="flex items-start gap-2 mb-2 p-2 rounded-lg bg-cyan-500/5 border border-cyan-500/20 cursor-pointer hover:bg-cyan-500/10 transition-colors">
                   <input
                     type="checkbox"
@@ -2634,44 +2644,31 @@ export default function BioprintExecutePage() {
                   />
                   <div className="flex-1 min-w-0">
                     <div className="text-[11px] font-semibold text-cyan-100 flex items-center gap-1">
-                      <Sparkles className="w-3 h-3" /> Auto-home ao conectar
+                      <Sparkles className="w-3 h-3" /> Auto-zero ao conectar (G92)
                     </div>
                     <div className="text-[9px] text-cyan-200/70 leading-tight mt-0.5">
-                      Faz <span className="font-mono">G28</span> (home mecânico)
-                      ao conectar. Para definir o ponto atual como origem (0,0,0),
-                      clique em <span className="font-mono">Ponto inicial</span> nos
-                      Comandos rápidos quando quiser.
+                      Envia <span className="font-mono">G92 X0 Y0 Z0 E0</span> — zera
+                      as coordenadas no ponto físico atual do bico, <strong className="text-cyan-100">SEM
+                      mover nada</strong>. <span className="text-emerald-200">🚫 NÃO faz home mecânico (G28)</span> —
+                      bandeja, cartucho e wells são <strong>preservados</strong>. Posicione o
+                      bico manualmente ANTES de conectar, ou desative isso para zerar
+                      só quando você quiser via botão "Zerar aqui (G92)".
                     </div>
                   </div>
                 </label>
-                {/* R12.33: Toggle centralização pós-home — vai para (100,100) com Z+30mm */}
-                <label className={cn(
-                  "flex items-start gap-2 mb-2 p-2 rounded-lg cursor-pointer transition-colors",
-                  autoHomeOnConnect
-                    ? "bg-emerald-500/5 border border-emerald-500/20 hover:bg-emerald-500/10"
-                    : "bg-gray-500/5 border border-gray-500/20 opacity-50 cursor-not-allowed"
-                )}>
-                  <input
-                    type="checkbox"
-                    checked={autoCenterAfterHome}
-                    disabled={!autoHomeOnConnect}
-                    onChange={(e) => setAutoCenterAfterHome(e.target.checked)}
-                    className="mt-0.5 accent-emerald-400"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[11px] font-semibold text-emerald-100 flex items-center gap-1">
-                      <Crosshair className="w-3 h-3" /> Centralizar + aproximar mesa
-                    </div>
-                    <div className="text-[9px] text-emerald-200/70 leading-tight mt-0.5">
-                      Após o <span className="font-mono">G28</span>: sobe
-                      Z <span className="font-mono">+{POST_HOME_Z_CLEARANCE_MM}mm</span>,
-                      vai para o centro (<span className="font-mono">{BIOENDER_BED_X_MM / 2},{BIOENDER_BED_Y_MM / 2}</span>)
-                      e <span className="text-emerald-300 font-semibold">desce {POST_HOME_Z_APPROACH_DROP_MM}mm</span>
-                      {" "}até Z=<span className="font-mono">{POST_HOME_Z_CLEARANCE_MM - POST_HOME_Z_APPROACH_DROP_MM}mm</span> —
-                      pronto para iniciar a bioimpressão (R12.40).
-                    </div>
+                {/* R12.64: Toggle "Centralizar" REMOVIDO — mesa REDONDA + sem home mecânico
+                    torna esse movimento cego impossível de fazer com segurança. Mantemos a
+                    variável autoCenterAfterHome no state por retrocompatibilidade mas ela
+                    não é mais usada em novos fluxos. */}
+                <div className="mb-2 p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-[9px] text-emerald-200/80 leading-tight">
+                  <div className="text-[11px] font-semibold text-emerald-100 flex items-center gap-1 mb-0.5">
+                    <Crosshair className="w-3 h-3" /> Mesa REDONDA · sem home mecânico
                   </div>
-                </label>
+                  Bioimpressora usa mesa <strong className="text-emerald-100">circular</strong> (compatível
+                  com Petri/wells). Posicione o bico manualmente sobre o alvo (poço, scaffold,
+                  centro da mesa) usando o joystick, então clique <span className="font-mono">Zerar aqui (G92)</span>.
+                  O ponto físico atual vira <span className="font-mono">(0,0,0)</span> sem nenhum movimento.
+                </div>
                 <button
                   onClick={handleConnect}
                   disabled={mode === "real" && !supported}
@@ -2716,7 +2713,7 @@ export default function BioprintExecutePage() {
                     )}
                   </div>
                 )}
-                {/* R12.22: Status do auto-home + botão de Home All manual */}
+                {/* R12.64: Status do auto-zero (G92) + botão "Zerar aqui (G92)" — substituiu Home All. */}
                 <div className={cn(
                   "mb-2 px-2.5 py-1.5 rounded-lg border text-[10px] flex items-start gap-2",
                   didAutoHome
@@ -2726,17 +2723,18 @@ export default function BioprintExecutePage() {
                   <Sparkles className="w-3 h-3 mt-0.5 shrink-0" />
                   <span>
                     {didAutoHome
-                      ? "Home concluído (G28). Defina a origem com \"Ponto inicial\" nos Comandos rápidos antes de imprimir."
-                      : "Sem home nesta sessão. Faça Home All antes de imprimir."}
+                      ? "✓ Coordenadas zeradas AQUI (G92). Impressora pronta. Bandeja e cartucho PRESERVADOS."
+                      : "⚠️ Sem G92 nesta sessão. Posicione o bico e clique \"Zerar aqui (G92)\" antes de imprimir."}
                   </span>
                 </div>
                 <button
-                  onClick={handleHomeAll}
+                  onClick={handleZeroHere}
                   disabled={controllerState === "streaming"}
                   className="w-full mb-2 px-3 py-2 rounded-lg text-xs font-bold bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-100 transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="G92 X0 Y0 Z0 E0 — zera coordenadas no ponto físico atual. SEM mover, SEM home mecânico."
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  Home All (G28)
+                  Zerar aqui (G92 X0 Y0 Z0 E0)
                 </button>
                 <button
                   onClick={handleDisconnect}

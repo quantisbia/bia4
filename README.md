@@ -174,6 +174,54 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R12.64 — Zero G28 + G92 X0 Y0 Z0 E0 universal + Mesa REDONDA (2026-07-30)
+
+Correção crítica solicitada pela usuária: **"retirar todo home all - e sempre zerar as coordenadas, G92 X0 Y0 Z0 E0, e a mesa ser redonda. sejá criterioso, em todo fatiamento gcode, colocar no sistema o G92 x0 y0 z0 e0"**.
+
+**Racional biológico**: bioimpressora **NUNCA** faz home mecânico (G28). A bandeja carrega células vivas, placas de Petri, wells, scaffolds já posicionados. Um G28 destruiria tudo. O referencial em bioimpressão vem da **biologia** (o alvo: poço, tecido, hidrogel), não da mecânica dos endstops. Zeramos com **G92 X0 Y0 Z0 E0** — que define o ponto atual como origem sem mover nada.
+
+**A) G28 completamente banido do sistema**
+- `src/lib/gcode/core/emitter.ts` — removida a linha G28 do header; adicionado **filtro defensivo** que bloqueia qualquer `startPrint` iniciado com "G28"
+- `src/lib/gcode/core/dlp-emitter.ts` — `G28 Z` substituído por `G92 X0 Y0 Z0 E0` (mesmo em DLP, preservamos o vat)
+- `src/lib/gcode/profiles/bioprinters.ts` — 5 perfis com `startPrint: "G28"` (Allevi 2, Allevi 3, REGEMAT BIO V1, EnvisionTEC 3D-Bioplotter, Generic Marlin) agora usam comentário informativo `"; <nome> start (no home)"`. Perfis CELLINK mantêm `"M710"` (start proprietário, não é home).
+- `src/app/dashboard/bioprint/execute/page.tsx` — `handleHomeAll` renomeado para `handleZeroHere` (com alias retrocompat); botão UI agora exibe **"Zerar aqui (G92 X0 Y0 Z0 E0)"**; auto-home ao conectar substituído por **auto-zero (G92)**; chamada de `moveToSafeCenterAfterHome` removida do fluxo de conexão
+
+**B) G92 X0 Y0 Z0 E0 em TODO gerador de G-code**
+- `src/lib/gcode/core/emitter.ts` — header principal emite `G92 X0 Y0 Z0 E0 ; zerar TODAS as coordenadas AQUI (ponto atual = origem)` com comentários explicativos ("NENHUM G28", "preserva bandeja/cartucho")
+- `src/lib/gcode/core/dlp-emitter.ts` — mesma linha, adaptada para SLA/DLP
+- `src/lib/bioprint/medical-gcode.ts` — **bug corrigido**: linha 649 tinha só `G92 E0` (zerava apenas extrusor) → agora `G92 X0 Y0 Z0 E0` completo
+- `src/lib/bioprint/quick-gcode.ts` — já emitia G92 completo desde R12.62 (verificado)
+- `src/lib/bioprint/toolpath-engine.ts` — todos os infills (Gyroid, Voronoi, Concêntrico, Vector Field) e testes simples (helloSquare, cross, spiral, dotArray) verificados: emitem G92 completo, zero G28
+
+**C) Mesa REDONDA (circular) em todos os perfis**
+- `src/lib/gcode/core/types.ts` — `BioprinterProfile` ganhou `bedShape: "circular" | "rectangular"` + `bedDiameter_mm?: number` (obrigatório quando circular)
+- Todos os 8 perfis marcados como `bedShape: "circular"` com diâmetro coerente:
+  - CELLINK BIO X → **Ø 90 mm**
+  - CELLINK BIO X Incubator → **Ø 80 mm**
+  - Allevi 2 → **Ø 70 mm**
+  - Allevi 3 → **Ø 80 mm**
+  - REGEMAT BIO V1 → **Ø 150 mm**
+  - EnvisionTEC Perfactory P4K (DLP) → **Ø 84 mm**
+  - EnvisionTEC 3D-Bioplotter → **Ø 150 mm**
+  - Generic Marlin → **Ø 200 mm**
+- `src/components/bioprinter/GcodeViewer3D.tsx` — `drawBed()` agora desenha **círculo cyan-400** (64 segmentos), fill sutil, cruz central e label **"⊙ Mesa redonda Ø{d} mm"**
+- `src/app/dashboard/bioprint/execute/page.tsx` — antigo checkbox "Centralizar + aproximar mesa" substituído por card informativo explicando o novo referencial biológico
+
+**D) Testes de regressão (R12.64)**
+- Novo arquivo `tests/r12_64_no_home_all_g92_round_bed.test.ts` com **19 testes** em 4 blocos:
+  - **R12.64.A** — nenhum G28 em qualquer G-code (header/footer/infills/medical/quick/DLP)
+  - **R12.64.B** — G92 X0 Y0 Z0 E0 completo (com todos os 4 eixos) em todos os geradores
+  - **R12.64.C** — todos os 8 perfis têm `bedShape === "circular"` + `bedDiameter_mm > 0`
+  - **R12.64.D** — filtro defensivo do emitter bloqueia startPrint começando com "G28"
+
+**Testes**: **370/370 passing** (351 anteriores + 19 novos R12.64, zero regressões, 42.23s).
+
+**Arquivos modificados**: 7 (emitter.ts, dlp-emitter.ts, types.ts, bioprinters.ts, medical-gcode.ts, GcodeViewer3D.tsx, execute/page.tsx) + 1 novo (teste R12.64).
+
+**Próximo**: monitorar em produção se algum perfil legado (que ainda tenha `startPrint: "G28"` em fixture de teste antiga) tenta injetar G28 — o filtro defensivo já cobre esse caso.
+
+---
+
 ### R12.63 — Gyroid simples + Nivea padrão-ouro + Baby-step Z tempo real + Presets de flow (2026-07-30)
 
 4 melhorias em resposta ao feedback: **"adicionar o giroide nos modelos simples, adicionar abaixar o z em tempo real para ajustar, adicionar creme nivea como biomaterial (padrão ouro) testes iniciais e que tenha o gcode com fluxo de multiplicador de extrusão 0.4. e adicionar um botão no processo de escolha dos parametros, infill, altura da camada, um parametro do fluxo / multiplicador de extrusão para escolhermos antes de levar pra impressora."**
@@ -510,4 +558,4 @@ Learning store persiste ajustes do usuário e re-alimenta as próximas sugestõe
 Proprietário — Quantis Biotechnology © 2026
 Janaina Dernowsek (CEO/Founder)
 
-**Last Updated:** 2026-07-30 — R12.63 (Gyroid promovido a "simples" · Creme Nivea como padrão-ouro de teste com flow 0.4× · Baby-step Z tempo real durante impressão · Slider destacado com 4 presets 🧴🧫🔧🌊)
+**Last Updated:** 2026-07-30 — R12.64 (Zero G28 no sistema · G92 X0 Y0 Z0 E0 universal em todo G-code · Mesa REDONDA em todos os 8 perfis · Ponto atual = origem biológica, sem home mecânico que destruiria a bandeja com células vivas 🔴⭕🧬)

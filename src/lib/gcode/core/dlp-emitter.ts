@@ -180,7 +180,9 @@ export class DLPEmitter {
     this.raw("G21                              ; units: mm")
     this.raw("G90                              ; absolute positioning")
     this.raw("M17                              ; enable motors")
-    this.raw("G28 Z                            ; home Z axis")
+    // R12.64: SEM G28 — mesmo em DLP, preservamos a posição do vat/cuba.
+    // O operador ajusta manualmente Z sobre a cuba de resina antes do print.
+    this.raw("G92 X0 Y0 Z0 E0                  ; zerar TODAS as coordenadas AQUI (ponto atual)")
     this.raw("G1 Z5 F300                       ; park Z above vat")
     this.comment("")
     this.comment("─── VAT PREPARATION ────────────────────────────────────")

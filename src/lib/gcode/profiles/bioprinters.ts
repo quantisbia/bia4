@@ -19,6 +19,9 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
       min: { x: 0, y: 0, z: 0 },
       max: { x: 130, y: 90, z: 80 },
     },
+    // R12.64: mesa REDONDA (compatível com Petri/wells circulares).
+    bedShape: "circular",
+    bedDiameter_mm: 90,
     extrusionMode: "pressure_kpa",
     maxFeedrate: { xy: 3000, z: 600, e: 600 },
     minFeedrate: { xy: 60, z: 30, e: 30 },
@@ -59,6 +62,9 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
       min: { x: 0, y: 0, z: 0 },
       max: { x: 130, y: 80, z: 50 },
     },
+    // R12.64: mesa REDONDA (compatível com Petri/wells circulares).
+    bedShape: "circular",
+    bedDiameter_mm: 80,
     extrusionMode: "pressure_kpa",
     maxFeedrate: { xy: 2000, z: 400, e: 400 },
     minFeedrate: { xy: 60, z: 30, e: 30 },
@@ -95,6 +101,9 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
       min: { x: 0, y: 0, z: 0 },
       max: { x: 110, y: 70, z: 60 },
     },
+    // R12.64: mesa REDONDA (compatível com Petri/wells circulares).
+    bedShape: "circular",
+    bedDiameter_mm: 70,
     extrusionMode: "pressure_kpa",
     maxFeedrate: { xy: 2000, z: 400, e: 400 },
     minFeedrate: { xy: 60, z: 30, e: 30 },
@@ -107,7 +116,10 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
     hasAutoLeveling: true,
     hasWellPlateSupport: true,
     mcodes: {
-      startPrint: "G28",
+      // R12.64: SEM G28 — bioimpressora preserva bandeja/cartucho.
+      // startPrint agora só emite comentário informativo (o G92 X0Y0Z0E0
+      // do header do emitter é quem define o ponto inicial no ponto físico atual).
+      startPrint: "; Allevi start (no home)",
       pressureSet: "M751 S{kpa}",
       uvOn: "M106 P1 S255",
       uvOff: "M107 P1",
@@ -131,6 +143,9 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
       min: { x: 0, y: 0, z: 0 },
       max: { x: 120, y: 80, z: 65 },
     },
+    // R12.64: mesa REDONDA (compatível com Petri/wells circulares).
+    bedShape: "circular",
+    bedDiameter_mm: 80,
     extrusionMode: "pressure_kpa",
     maxFeedrate: { xy: 2500, z: 500, e: 500 },
     minFeedrate: { xy: 60, z: 30, e: 30 },
@@ -143,7 +158,8 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
     hasAutoLeveling: true,
     hasWellPlateSupport: true,
     mcodes: {
-      startPrint: "G28",
+      // R12.64: SEM G28 — bioimpressora preserva bandeja/cartucho.
+      startPrint: "; Allevi 3 start (no home)",
       pressureSet: "M751 S{kpa}",
       uvOn: "M106 P1 S255",
       uvOff: "M107 P1",
@@ -167,6 +183,9 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
       min: { x: 0, y: 0, z: 0 },
       max: { x: 150, y: 150, z: 150 },
     },
+    // R12.64: mesa REDONDA (compatível com Petri/wells circulares).
+    bedShape: "circular",
+    bedDiameter_mm: 150,
     extrusionMode: "volumetric_ul",
     maxFeedrate: { xy: 3000, z: 600, e: 600 },
     minFeedrate: { xy: 60, z: 30, e: 30 },
@@ -179,7 +198,8 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
     hasAutoLeveling: true,
     hasWellPlateSupport: true,
     mcodes: {
-      startPrint: "G28",
+      // R12.64: SEM G28 — bioimpressora preserva bandeja/cartucho.
+      startPrint: "; REGEMAT start (no home)",
       pressureSet: "M104 S{kpa}",
       uvOn: "M106 P1 S255",
       uvOff: "M107 P1",
@@ -201,6 +221,9 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
       min: { x: 0, y: 0, z: 0 },
       max: { x: 134, y: 84, z: 180 },
     },
+    // R12.64: mesa REDONDA (vat DLP é tipicamente circular).
+    bedShape: "circular",
+    bedDiameter_mm: 84,
     extrusionMode: "pressure_kpa",  // não se aplica a DLP, mas mantemos p/ compat
     // Mecânica Z (subida incremental entre camadas)
     maxFeedrate: { xy: 0, z: 300, e: 0 },  // DLP não move XY
@@ -265,6 +288,9 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
       min: { x: 0, y: 0, z: 0 },
       max: { x: 150, y: 150, z: 140 },
     },
+    // R12.64: mesa REDONDA (compatível com Petri/wells circulares).
+    bedShape: "circular",
+    bedDiameter_mm: 150,
     extrusionMode: "pressure_kpa",
     maxFeedrate: { xy: 2500, z: 500, e: 400 },
     minFeedrate: { xy: 60, z: 30, e: 30 },
@@ -277,7 +303,8 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
     hasAutoLeveling: true,
     hasWellPlateSupport: true,
     mcodes: {
-      startPrint: "G28",
+      // R12.64: SEM G28 — bioimpressora preserva bandeja/cartucho.
+      startPrint: "; 3D-Bioplotter start (no home)",
       pressureSet: "M751 P{head} S{kpa}",
       uvOn: "M106 P2 S255",
       uvOff: "M107 P2",
@@ -304,6 +331,9 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
       min: { x: 0, y: 0, z: 0 },
       max: { x: 200, y: 200, z: 100 },
     },
+    // R12.64: mesa REDONDA (compatível com Petri/wells circulares).
+    bedShape: "circular",
+    bedDiameter_mm: 200,
     extrusionMode: "filament_mm",
     maxFeedrate: { xy: 3000, z: 600, e: 600 },
     minFeedrate: { xy: 60, z: 30, e: 30 },
@@ -316,7 +346,8 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
     hasAutoLeveling: true,
     hasWellPlateSupport: false,
     mcodes: {
-      startPrint: "G28",
+      // R12.64: SEM G28 — mesmo em Marlin genérica, home destrói bandeja/cartucho.
+      startPrint: "; Generic Marlin start (no home)",
     },
     notes: [
       "Bioprinter customizada compatível com Marlin",
