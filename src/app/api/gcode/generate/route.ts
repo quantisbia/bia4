@@ -74,7 +74,10 @@ const bioinkSchema = z.object({
   pressure_kpa: z.number(),
   shearStressMax_Pa: z.number().optional(),
   nozzleDiameter_um: z.number(),
-  flowMultiplier: z.number().default(1.0),
+  // R12.62: default de 1.0 → 0.6. Bioimpressoras têm fluxo inicial fraco
+  // (bico bio 200-410µm + biotinta viscosa). 0.6× dá volume real ≈ ao que
+  // sai do bico na prática. UI da /slice envia o valor exato do slider.
+  flowMultiplier: z.number().default(0.6),
   retraction_mm: z.number().default(0.3),
   printSpeed_mms: z.number().default(10),
   travelSpeed_mms: z.number().default(50),

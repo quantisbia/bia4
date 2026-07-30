@@ -34,6 +34,10 @@ export function emitHeader(
   lines.push(`; Flavor: ${bp.flavor}`)
   lines.push(`; Bioink: ${bioink.material} @ ${bioink.concentration}%`)
   lines.push(`; Nozzle: ${bioink.nozzleDiameter_um} µm`)
+  // R12.62: emit ExtrusionMultiplier no header pra transparência e coherence.
+  // Valor real usado no cálculo extrusionPerMm (engine.ts). Default 0.6 pra
+  // biotintas viscosas — usuária pode ajustar 0.5-2.0× via slider da UI.
+  lines.push(`; ExtrusionMultiplier: ${bioink.flowMultiplier.toFixed(2)}× (flow rate)`)
   lines.push(`; Temp: ${bioink.temperature_c}°C  |  Pressure: ${bioink.pressure_kpa} kPa`)
   lines.push(`; Cells: ${bioink.hasCells ? `YES (${bioink.cellDensity ?? "?"}×10⁶/mL)` : "NO (acellular)"}`)
   if (opts.jobMetadata) {
@@ -70,7 +74,12 @@ export function emitHeader(
   lines.push("G21                    ; set units to mm")
   lines.push("G90                    ; absolute positioning")
   lines.push(opts.relativeExtrusion ? "M83                    ; relative extrusion" : "M82                    ; absolute extrusion")
-  lines.push("G92 E0                 ; zero extrusion counter")
+  // R12.62: G92 X0 Y0 Z0 E0 zera TODAS as coordenadas, não apenas E.
+  // Antes: só "G92 E0" → firmware mantinha X/Y/Z do último trabalho, e
+  // o primeiro G1 podia parar em ponto errado (aparente "não está no zero").
+  // Agora: zeragem total, o ponto inicial fica exatamente onde o bico está
+  // depois do homing (G28) → coordenadas absolutas coerentes.
+  lines.push("G92 X0 Y0 Z0 E0        ; zerar TODAS as coordenadas (ponto inicial forte)")
 
   // Temperatura
   if (bp.hasHeatedBed && bioink.temperature_c) {

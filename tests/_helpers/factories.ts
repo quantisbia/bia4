@@ -55,6 +55,8 @@ const EMPTY_SLICE: SliceStepState = {
   chamberTempC: null,
   skirtLoops: null,
   retractionMm: null,
+  extrusionMultiplier: null,
+  bioprinterId: null,
   gcode: null,
   estimate: null,
 }

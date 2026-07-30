@@ -200,79 +200,15 @@ export default function BioprintHubPage() {
         </section>
       )}
 
-      {/* ─── PRÉ-ETAPA · Testes de imprimibilidade (R12.43) ──────────── */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
-          <span className="text-[10px] uppercase tracking-[0.25em] text-amber-300/80 font-semibold flex items-center gap-1.5">
-            <Beaker className="w-3 h-3" />
-            Pré-etapa · Teste sua biotinta primeiro · R12.43
-          </span>
-          <div className="h-px flex-1 bg-gradient-to-r from-amber-500/40 via-transparent to-transparent" />
-        </div>
-
-        <Link
-          href="/dashboard/bioprint/printability"
-          className="group block rounded-2xl bg-gradient-to-br from-amber-500/[0.10] via-emerald-500/[0.06] to-cyan-500/[0.08] border border-amber-500/30 hover:border-amber-400/60 p-5 transition-all hover:scale-[1.005]"
-        >
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-              <Beaker className="w-6 h-6 text-amber-300" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] uppercase tracking-wider text-amber-300/90 font-semibold">
-                  Pré-etapa · Sem precisar das 5 etapas
-                </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 font-semibold uppercase tracking-wider">
-                  🧪 8 testes
-                </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-200 font-semibold uppercase tracking-wider">
-                  📊 Pf · Ouyang 2016
-                </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-violet-500/20 border border-violet-500/40 text-violet-200 font-semibold uppercase tracking-wider">
-                  🔬 Protocolo de análise
-                </span>
-              </div>
-              <h3 className="text-base font-bold text-white mt-0.5 group-hover:text-amber-100 transition-colors">
-                Testes de imprimibilidade — qualifique o hidrogel antes de imprimir um constructo
-              </h3>
-              <p className="text-[11.5px] text-gray-300 mt-1.5 leading-relaxed">
-                Página <strong className="text-amber-200">dedicada</strong> para validar a biotinta sem precisar
-                passar pelo fluxo completo de 5 etapas. Gere{" "}
-                <strong className="text-emerald-200">STL pronto</strong> dos testes consagrados
-                (Linha, Grade Pf, Ponte, Estrela, Torre, Escada Z, Leque, Fidelidade), baixe e imprima direto via{" "}
-                <strong className="text-cyan-200">USB / Web Serial</strong>. Cada teste vem com{" "}
-                <strong className="text-violet-200">racional científico</strong> e protocolo de análise (foto + ImageJ + paquímetro).
-              </p>
-              <div className="flex flex-wrap gap-1.5 mt-3">
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-200">
-                  ➖ Linha
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-200">
-                  ▦ Grade Pf
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-200">
-                  🌉 Ponte
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-violet-200">
-                  ✱ Estrela
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-200">
-                  🗼 Torre
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-200">
-                  📐 Leque
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-white/5 border border-white/20 text-gray-200">
-                  ⬡ Fidelidade
-                </span>
-              </div>
-            </div>
-            <ArrowRight className="w-5 h-5 text-amber-300/60 group-hover:text-amber-200 group-hover:translate-x-0.5 transition-all shrink-0 mt-1" />
-          </div>
-        </Link>
-      </section>
+      {/*
+        ─── R12.62: Card destacado de "Pré-etapa · Testes de imprimibilidade"
+        foi REMOVIDO daqui e integrado ao fluxo normal de bioimpressão.
+        Agora a usuária acessa selecionando a categoria "printability-test"
+        na Etapa 1 (Modelo) — decisão fica dentro do processo, não fora dele.
+        A página /dashboard/bioprint/printability continua acessível via
+        deep-link direto (mantida por compat), mas não é mais promovida
+        no hub — evita duplicar caminhos e confundir a ordem lógica.
+      */}
 
       {/* ─── Cards das 4 etapas ────────────────────────────────────── */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-4">

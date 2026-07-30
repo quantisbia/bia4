@@ -174,6 +174,62 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R12.62 — Ponto inicial forte + fator de extrusão configurável + printability no fluxo normal (2026-07-30)
+
+3 correções em resposta ao feedback da usuária: **"você pode melhorar a funcionalidade do ponto inicial - G92 X0 Y0 Z0, pois tem momentos que não funciona e é muito importante começar a imprimir no ponto 0. será importante o Gcode ter o parametro de fator de extrusão para selecionar. O fluxo está muito fraco quando inicia as bioimpressoes. será bom escolher o numero, mas pode deixar os GCode padores começar com 0.6 ou escolher. Além disso, esconda o teste de imprimibilidade, colocando ele no processo de bioimpressao, sendo selecionado no inicio."**
+
+**A) G92 X0 Y0 Z0 E0 — ponto inicial forte**
+
+Root cause: `emitter.ts` e `quick-gcode.ts` emitiam apenas `G92 E0`, zerando **só o extrusor**. O firmware Marlin mantinha resíduos de X/Y/Z do trabalho anterior, então o primeiro `G1` do novo job podia parar em coordenada errada — aparente "não começa no ponto zero".
+
+Fix: agora emitimos `G92 X0 Y0 Z0 E0` (zera **todas** as coordenadas). Combinado com o `G28` (homing) que precede, a origem fica exatamente no zero mecânico + zero de extrusão. Ponto inicial 100% previsível.
+
+**B) Fator de extrusão configurável (default 0.6×)**
+
+Root cause duplo:
+1. `slice/page.tsx` linha 569 tinha `flowMultiplier: 1.0` **hardcoded** no payload da API. O slider "Multiplicador de extrusão" (0.5-2.0×, presente na UI desde R12.11) **nunca teve efeito** no G-code gerado. Bug silencioso.
+2. Default de 1.0× (padrão FDM) era muito fraco para biotintas. Bicos bio 200-410µm + hidrogéis viscosos (500-5000 cP) exigem fluxo maior no início pra vencer inércia do êmbolo.
+
+Fix:
+- `flowMultiplier: extrusionMultiplier` (passa o valor real do slider da UI).
+- Default global mudou de **1.0 → 0.6** (Zod schema em `route.ts` + `useState` em `slice/page.tsx`).
+- Campo `extrusionMultiplier: number | null` adicionado a `SliceStepState` — persiste entre navegações via context/sessionStorage.
+- `execute/page.tsx` agora lê `state.slice.extrusionMultiplier * 100` para `flowPercent` (antes hardcoded 100). Preset editor recebe valor real.
+- Emitter emite `; ExtrusionMultiplier: 0.60× (flow rate)` no header do G-code para transparência e debug.
+
+Usuária escolhe 0.5-2.0× via slider (step 0.05). 0.6× é o novo padrão seguro; 1.5-2.0× para biotintas muito viscosas.
+
+**C) Testes de imprimibilidade → integrado ao processo (não mais pré-etapa separada)**
+
+Antes: card destacado no hub `/dashboard/bioprint` (linhas 203-275) apontava para `/dashboard/bioprint/printability` como **pré-etapa fora do fluxo das 5 etapas**. Duplicava caminhos: usuária podia entrar por lá ou pela categoria "printability-test" na Etapa 1 (Modelo).
+
+Fix: card destacado do hub **removido**. Agora acessa-se **apenas via Etapa 1 → Categoria "Testes de imprimibilidade"**, com badge visual `🧪 Recomendado 1º` na lateral do seletor de categorias. Fluxo linear, sem porta dos fundos. A página standalone `/dashboard/bioprint/printability` continua acessível por deep-link (mantida por compatibilidade), apenas não é mais promovida no hub.
+
+**Files touched**:
+- `src/lib/gcode/core/emitter.ts` — `G92 X0 Y0 Z0 E0` + `; ExtrusionMultiplier:` no header
+- `src/lib/bioprint/quick-gcode.ts` — `G92 X0 Y0 Z0 E0` no header
+- `src/app/api/gcode/generate/route.ts` — Zod default `flowMultiplier: 0.6`
+- `src/app/dashboard/bioprint/slice/page.tsx` — default 0.6, **fix bug hardcoded 1.0**, persist no context
+- `src/app/dashboard/bioprint/execute/page.tsx` — `flowPercent` derivado do context
+- `src/lib/bioprint/process-context.tsx` — campo `extrusionMultiplier` em `SliceStepState`
+- `src/app/dashboard/bioprint/page.tsx` — remove card destacado printability do hub
+- `src/app/dashboard/bioprint/model/page.tsx` — badge `🧪 Recomendado 1º` em `printability-test`
+- `tests/_helpers/factories.ts` — `extrusionMultiplier: null` em `EMPTY_SLICE`
+- `tests/quick-gcode.test.ts` — regex atualizado para `G92 X0 Y0 Z0 E0` (era `G92 E0`)
+- `tests/r12_62_extrusion_and_g92.test.ts` — 9 testes novos (G92, ExtrusionMultiplier, context roundtrip, sanity footer)
+
+**Testes**: **338/338 passing** (329 anteriores + 9 novos R12.62).
+
+**Comportamento verificável**:
+- ✅ Primeiro G1 sempre parte do (0,0,0) — resíduos do trabalho anterior zerados
+- ✅ Slider "Multiplicador de extrusão" agora realmente altera o G-code (default 0.6×)
+- ✅ Header do G-code documenta o valor: `; ExtrusionMultiplier: 0.60×`
+- ✅ Voltar para `/slice` depois de navegar preserva o valor escolhido (context)
+- ✅ Hub `/dashboard/bioprint` sem card de printability — acesso via Etapa 1 → categoria
+- ✅ Etapa 1 exibe badge `🧪 Recomendado 1º` chamando atenção pra testar biotinta antes
+
+---
+
 ### R12.61 — Coherence check: desbloqueio de G-codes válidos que confundiam padrão de infill com geometria (2026-07-29)
 
 Correção reportada pela usuária: **"tem muito erro em gcode Bloqueado: resolva incoerências modelo↔G-code. faca os gcodes funcionares."**. Investigação revelou que `coherence-check.ts` (R12.47) bloqueava impressões perfeitamente válidas por confundir **padrão de preenchimento** com **geometria 3D**:
@@ -399,4 +455,4 @@ Learning store persiste ajustes do usuário e re-alimenta as próximas sugestõe
 Proprietário — Quantis Biotechnology © 2026
 Janaina Dernowsek (CEO/Founder)
 
-**Last Updated:** 2026-07-29 — R12.61 (Coherence: desbloqueia G-codes válidos · separa padrão de infill vs geometria + `; Geometry:` como fonte da verdade)
+**Last Updated:** 2026-07-30 — R12.62 (Ponto inicial forte `G92 X0 Y0 Z0 E0` · fator de extrusão configurável default 0.6× · printability integrado ao fluxo normal via Etapa 1)

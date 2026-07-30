@@ -817,7 +817,10 @@ function emitGcodeText(
     "G21        ; unidades em mm",
     "G90        ; coordenadas absolutas",
     "M83        ; extrusão relativa",
-    "G92 E0     ; zera extruder",
+    // R12.62: zerar TODAS as coordenadas — não só E. Sem X/Y/Z=0 aqui, o
+    // firmware podia manter valores residuais do trabalho anterior e o
+    // primeiro G1 parava fora do bed.
+    "G92 X0 Y0 Z0 E0 ; zerar TODAS as coordenadas (ponto inicial forte)",
     "",
   )
 

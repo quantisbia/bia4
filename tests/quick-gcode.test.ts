@@ -108,9 +108,11 @@ describe("footer de segurança (R12.45 anti-vazamento)", () => {
     expect(gcode).toMatch(/M83/)
   })
 
-  it("inclui G92 E0 (zera extrusor no final)", () => {
+  it("inclui G92 X0 Y0 Z0 E0 (zera TODAS as coordenadas — R12.62)", () => {
+    // R12.62: antes era só G92 E0 (só zera extrusor). Agora zera todas as
+    // coordenadas — ponto inicial forte, primeiro G1 sempre parte do (0,0,0).
     const { gcode } = generateQuickGcode(baseGeom, baseBioink, baseOpts)
-    expect(gcode).toMatch(/G92\s+E0/)
+    expect(gcode).toMatch(/G92\s+X0\s+Y0\s+Z0\s+E0/)
   })
 
   it("inclui G91 → G1 Z → G90 (levanta cabeçote em modo relativo)", () => {

@@ -203,8 +203,16 @@ export default function BioprintSlicePage() {
   const [pressureKPa, setPressureKPa] = useState<number>(state.slice.pressureKPa ?? 80)
   /** R12.11: Pressão pode ser desabilitada (printers FDM puros não usam) */
   const [pressureEnabled, setPressureEnabled] = useState<boolean>(true)
-  /** R12.11: Multiplicador de extrusão (flow rate, equivalente ao 'Flow' do Cura) */
-  const [extrusionMultiplier, setExtrusionMultiplier] = useState<number>(1.0)
+  /**
+   * R12.11: Multiplicador de extrusão (flow rate, equivalente ao 'Flow' do Cura).
+   * R12.62: Default 0.6 (bioimpressoras têm fluxo inicial fraco — bico bio
+   * 200-410µm + biotinta viscosa 500-5000 cP). Usuária ajusta 0.5-2.0×
+   * conforme viscosidade real. Persistido no context para /execute reemitir
+   * M221 se ajustado em tempo real.
+   */
+  const [extrusionMultiplier, setExtrusionMultiplier] = useState<number>(
+    state.slice.extrusionMultiplier ?? 0.6,
+  )
   const [nozzleDiameterUm, setNozzleDiameterUm] = useState<number>(state.slice.nozzleDiameterUm ?? 410)
   const [infillPercent, setInfillPercent] = useState<number>(state.slice.infillPercent ?? 30)
   const [infillPatternId, setInfillPatternId] = useState<string>(state.slice.infillPatternId ?? INFILL_PATTERNS[0].id)
@@ -412,6 +420,8 @@ export default function BioprintSlicePage() {
       chamberTempC,
       skirtLoops,
       retractionMm,
+      // R12.62: persiste multiplicador de extrusão pra /execute reemitir M221
+      extrusionMultiplier,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -419,7 +429,7 @@ export default function BioprintSlicePage() {
     layerHeightMm, printSpeedMmS, pressureKPa, nozzleDiameterUm,
     infillPatternId, infillPercent, perimeterOnly,
     cartridgeTempC, bedTempC, chamberTempC,
-    skirtLoops, retractionMm, result,
+    skirtLoops, retractionMm, extrusionMultiplier, result,
   ])
 
   // ── Helper: gera lista de sugestões contextuais quando há falha ──
@@ -566,7 +576,10 @@ export default function BioprintSlicePage() {
         pressure_kpa: pressureKPa,
         shearStressMax_Pa: 50,
         nozzleDiameter_um: nozzleDiameterUm,
-        flowMultiplier: 1.0,
+        // R12.62: BUGFIX — antes hardcoded em 1.0, ignorando o slider da UI.
+        // Agora respeita o valor escolhido pela usuária (default 0.6 para
+        // biotintas viscosas; ver comentário no useState acima).
+        flowMultiplier: extrusionMultiplier,
         retraction_mm: retractionMm,
         printSpeed_mms: printSpeedMmS,
         travelSpeed_mms: 50,

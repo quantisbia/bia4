@@ -165,6 +165,15 @@ export interface SliceStepState {
   skirtLoops: number | null
   retractionMm: number | null
   /**
+   * R12.62: Multiplicador de fluxo/extrusão (equivalente ao "Flow" do Cura).
+   * Padrão 0.6 — bioimpressoras têm fluxo inicial fraco (bico bio 200-410µm
+   * + biotinta viscosa 500-5000 cP), então 0.6× dá volume real ≈ ao que a
+   * usuária vê. 1.0× = padrão FDM; 1.5-2.0× para materiais muito viscosos.
+   * Persistido aqui para que o /execute possa reemitir M221 ao vivo se
+   * a usuária ajustar em tempo real.
+   */
+  extrusionMultiplier: number | null
+  /**
    * R12.53: ID da bioimpressora selecionada no /slice (default
    * "bioender_bioedtech"). Persistido aqui para que o /execute saiba
    * quais filtros USB aplicar no `navigator.serial.requestPort()` —
@@ -254,6 +263,7 @@ const DEFAULT_STATE: BioprintProcessState = {
     chamberTempC: null,
     skirtLoops: null,
     retractionMm: null,
+    extrusionMultiplier: null,
     bioprinterId: null,
     gcode: null,
     estimate: null,

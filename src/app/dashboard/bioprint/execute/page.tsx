@@ -670,7 +670,10 @@ export default function BioprintExecutePage() {
       layerHeightMm: s.layerHeightMm ?? 0.25,
       printSpeedMmS: s.printSpeedMmS ?? 8,
       pressureKPa: s.pressureKPa ?? 80,
-      flowPercent: 100,  // R12.54: ainda não persistimos extrusionMultiplier
+      // R12.62: extrusionMultiplier agora é persistido no context pela /slice.
+      // Default 0.6× (60%) — biotintas viscosas precisam de fluxo maior no bico
+      // bio de 200-410µm. Usuária pode ajustar 0.5-2.0× via slider da UI.
+      flowPercent: Math.round((s.extrusionMultiplier ?? 0.6) * 100),
       infillPercent: s.infillPercent ?? 30,
       infillPatternId: s.infillPatternId ?? "classic-lines",
       walls: 2,  // R12.54: walls ainda não persistidos no context

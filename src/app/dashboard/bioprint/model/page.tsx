@@ -640,8 +640,19 @@ function GeneratePanel({
             >
               <Ic className={cn("w-5 h-5 mt-0.5 shrink-0", isActive ? a.text : "text-gray-500")} />
               <div className="min-w-0 flex-1">
-                <div className={cn("text-sm font-semibold", isActive ? a.text : "text-gray-200")}>
-                  {cat.label}
+                <div className={cn("text-sm font-semibold flex items-center gap-1.5", isActive ? a.text : "text-gray-200")}>
+                  <span>{cat.label}</span>
+                  {/*
+                    R12.62 — badge "🧪 Recomendado 1º" na categoria de testes
+                    de imprimibilidade. Card destacado do hub foi removido;
+                    agora essa é a única entrada visível, então precisa se
+                    destacar dentro do fluxo normal da Etapa 1.
+                  */}
+                  {cat.id === "printability-test" && (
+                    <span className="text-[8.5px] px-1.5 py-0.5 rounded-full bg-amber-500/25 border border-amber-400/50 text-amber-100 font-bold uppercase tracking-wider whitespace-nowrap">
+                      🧪 Recomendado 1º
+                    </span>
+                  )}
                 </div>
                 <div className="text-[11px] text-gray-500 mt-0.5 leading-snug">
                   {cat.description}
