@@ -718,6 +718,10 @@ export const BASIC_GEOMETRY_IDS = [
   // Testes de impressibilidade (rápidos, perimeter-only, validados)
   "test_fidelity_biotinta", "test_grid", "test_line", "test_collapse_bridge",
   "test_star", "test_stacking_tower", "test_z_staircase", "test_angle_fan",
+  // R12.63: gyroid promovido a "simples" — TPMS mais usado, benchmark
+  // clássico de scaffold poroso. Removido de ADVANCED_GEOMETRY_IDS para
+  // manter os conjuntos disjuntos (classifyGeometry retorna "basic").
+  "tpms_gyroid",
 ] as const
 
 /**
@@ -726,14 +730,17 @@ export const BASIC_GEOMETRY_IDS = [
  * - Anatômicas: heart, kidney, femur, nose, ear, hand, hexagonal_liver,
  *   meniscus, cornea, lens, organoid_sphere → carregam STL grande + Voronoi
  *   e podem exceder 45s no build.
- * - TPMS: gyroid/schwarz/diamond → gerações matematicamente pesadas.
+ * - TPMS: schwarz/diamond → gerações matematicamente pesadas.
+ *   R12.63: tpms_gyroid removido daqui e promovido a BASIC (é o TPMS mais
+ *   usado, geração é bem otimizada, benchmark de scaffold poroso).
+ *   BASIC e ADVANCED voltam a ser conjuntos disjuntos.
  * - bone_block: bloco denso trabecular → também via engine.ts.
  */
 export const ADVANCED_GEOMETRY_IDS = [
   "bone_block",
   "femur", "nose", "meniscus", "cornea", "lens", "organoid_sphere",
   "ear", "heart", "kidney", "hand", "hexagonal_liver",
-  "tpms_gyroid", "tpms_schwarz", "tpms_diamond",
+  "tpms_schwarz", "tpms_diamond",
 ] as const
 
 export function isBasicGeometry(id: string): boolean {

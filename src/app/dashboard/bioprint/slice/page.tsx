@@ -402,6 +402,26 @@ export default function BioprintSlicePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.bioink.material])
 
+  /**
+   * R12.63 — Auto-preset de flow multiplier por material.
+   * Se a usuária escolher Nivea na Etapa 2, aplicamos 0.4× automaticamente
+   * (a menos que ela já tenha ajustado manualmente antes). Isso porque o
+   * Nivea é menos viscoso que biotintas típicas, então precisa de MENOS
+   * extrusão pra evitar over-extrusion. Ver
+   * `FLOW_MULTIPLIER_BY_MATERIAL` em biomaterials.ts.
+   */
+  useEffect(() => {
+    const mat = (state.bioink.material ?? "").toLowerCase()
+    // Detecta Nivea (id "nivea_cream" ou nome contendo "nivea")
+    const isNivea = mat.includes("nivea")
+    // Só auto-aplica se o context ainda não tem valor persistido —
+    // respeita override manual da usuária.
+    if (isNivea && state.slice.extrusionMultiplier === null) {
+      setExtrusionMultiplier(0.4)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.bioink.material])
+
   // Persistir parâmetros no context (sem o gcode, que é separado)
   useEffect(() => {
     if (!isUnlocked) return
@@ -1438,13 +1458,79 @@ function ParamsPanel(p: ParamsProps) {
             display={`${p.nozzleDiameterUm} µm`}
             hint="Bio: 200–410 µm padrão"
           />
-          <SliderField
-            label="Multiplicador de extrusão" icon={Activity}
-            min={0.5} max={2.0} step={0.05}
-            value={p.extrusionMultiplier} onChange={p.onExtrusionMultiplierChange}
-            display={`${p.extrusionMultiplier.toFixed(2)}×`}
-            hint="Flow rate · 1.0 = padrão · ↑ se faltar material"
-          />
+          {/*
+            R12.63: bloco de multiplicador de extrusão destacado — passa a
+            ser DECISÃO explícita antes de mandar pra impressora, não só um
+            slider perdido. Presets rápidos (Nivea 0.4× / Bio padrão 0.6× /
+            FDM 1.0×) evitam que a usuária tenha que lembrar o valor certo.
+          */}
+          <div className="rounded-xl border border-amber-500/25 bg-amber-500/[0.04] p-3 -mx-1">
+            <SliderField
+              label="⚡ Multiplicador de extrusão (flow rate)"
+              icon={Activity}
+              min={0.3} max={2.0} step={0.05}
+              value={p.extrusionMultiplier} onChange={p.onExtrusionMultiplierChange}
+              display={`${p.extrusionMultiplier.toFixed(2)}×`}
+              hint="Escolha antes de imprimir · será gravado no G-code (M221 + volume por passo)"
+            />
+            <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-amber-500/15">
+              <span className="text-[10px] text-amber-300/80 font-semibold mr-1 self-center">
+                Presets:
+              </span>
+              <button
+                type="button"
+                onClick={() => p.onExtrusionMultiplierChange(0.4)}
+                className={cn(
+                  "text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors",
+                  Math.abs(p.extrusionMultiplier - 0.4) < 0.001
+                    ? "bg-amber-500/25 border-amber-400/60 text-amber-100"
+                    : "bg-white/[0.03] border-white/10 text-gray-300 hover:bg-amber-500/10 hover:border-amber-500/30"
+                )}
+                title="Padrão-ouro pra teste inicial com Creme Nivea — creme puro, menos viscoso"
+              >
+                🧴 Nivea 0.4×
+              </button>
+              <button
+                type="button"
+                onClick={() => p.onExtrusionMultiplierChange(0.6)}
+                className={cn(
+                  "text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors",
+                  Math.abs(p.extrusionMultiplier - 0.6) < 0.001
+                    ? "bg-emerald-500/25 border-emerald-400/60 text-emerald-100"
+                    : "bg-white/[0.03] border-white/10 text-gray-300 hover:bg-emerald-500/10 hover:border-emerald-500/30"
+                )}
+                title="Padrão para biotintas viscosas (GelMA, Alginato, Colágeno)"
+              >
+                🧫 Bio 0.6×
+              </button>
+              <button
+                type="button"
+                onClick={() => p.onExtrusionMultiplierChange(1.0)}
+                className={cn(
+                  "text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors",
+                  Math.abs(p.extrusionMultiplier - 1.0) < 0.001
+                    ? "bg-cyan-500/25 border-cyan-400/60 text-cyan-100"
+                    : "bg-white/[0.03] border-white/10 text-gray-300 hover:bg-cyan-500/10 hover:border-cyan-500/30"
+                )}
+                title="Padrão FDM clássico — filamento sólido"
+              >
+                🔧 FDM 1.0×
+              </button>
+              <button
+                type="button"
+                onClick={() => p.onExtrusionMultiplierChange(1.5)}
+                className={cn(
+                  "text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors",
+                  Math.abs(p.extrusionMultiplier - 1.5) < 0.001
+                    ? "bg-violet-500/25 border-violet-400/60 text-violet-100"
+                    : "bg-white/[0.03] border-white/10 text-gray-300 hover:bg-violet-500/10 hover:border-violet-500/30"
+                )}
+                title="Biotintas muito viscosas (>3000 cP) ou entupimento parcial"
+              >
+                🌊 Viscosa 1.5×
+              </button>
+            </div>
+          </div>
           <SliderField
             label="Preenchimento (densidade)" icon={BarChart3}
             min={0} max={100} step={1}

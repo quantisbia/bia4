@@ -174,6 +174,61 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R12.63 — Gyroid simples + Nivea padrão-ouro + Baby-step Z tempo real + Presets de flow (2026-07-30)
+
+4 melhorias em resposta ao feedback: **"adicionar o giroide nos modelos simples, adicionar abaixar o z em tempo real para ajustar, adicionar creme nivea como biomaterial (padrão ouro) testes iniciais e que tenha o gcode com fluxo de multiplicador de extrusão 0.4. e adicionar um botão no processo de escolha dos parametros, infill, altura da camada, um parametro do fluxo / multiplicador de extrusão para escolhermos antes de levar pra impressora."**
+
+**A) Gyroid promovido a "geometria simples"**
+
+`tpms_gyroid` movido de `ADVANCED_GEOMETRY_IDS` para `BASIC_GEOMETRY_IDS` em `geometry-bounds.ts`. Agora aparece na Etapa 1 mesmo com o toggle "Mostrar experimentais" **desligado** — antes ficava escondido por padrão. Schwarz e Diamond continuam experimentais (menos usados, gerações mais pesadas). Gyroid é o TPMS clássico, benchmark de scaffold poroso na literatura (Karageorgiou 2005, Bobbert 2017).
+
+**B) Baby-step Z em tempo real durante impressão**
+
+Adicionada barra destacada de **Ajuste fino Z** ao lado dos botões Pausar/Retomar em `/execute`. Aparece **apenas durante `isStreaming || isPaused`**. Botões grandes para descer (`Z−0.05`, `Z−0.1`, `Z−0.2`, `Z−0.5` mm) e subir (`Z+0.05`, `Z+0.1`, `Z+0.2`, `Z+0.5` mm), com Z atual visível no topo. Usa `sendJog("Z", ±d)` via `controller.inject()` — latência 50-300ms, **sem pausar a impressão**. Antes o micro-ajuste ficava escondido no painel lateral de joystick; agora está onde a atenção da usuária realmente está durante o print.
+
+**C) Creme Nivea como biomaterial padrão-ouro (0.4×)**
+
+Novo item `nivea_cream` em `BIOMATERIALS` com categoria dedicada `test-standard`. Documentado com literatura reológica (Paxton 2017 Biofabrication, Ouyang 2016). Marcado explicitamente como **NÃO biocompatível** (`cellViability_24h_pct: 0`) — só para calibração mecânica.
+
+Preset `nivea_test_standard` em `BIOINK_PRESETS` para seleção rápida. **Auto-preset**: quando usuária escolhe Nivea na Etapa 2, `slice/page.tsx` detecta e aplica automaticamente `extrusionMultiplier = 0.4` (respeitando override manual se ela já ajustou antes).
+
+Nova função `getRecommendedFlowMultiplier(materialId)` em `biomaterials.ts` — retorna 0.4 para Nivea, fallback global 0.6 para outros. Documentado o racional: creme puro é MENOS viscoso que biotintas típicas, então precisa de MENOS extrusão pra evitar over-extrusion.
+
+Nova categoria `🧴 Padrão-ouro (teste)` em `BIOMATERIAL_CATEGORIES`, posicionada no topo (logo depois de "Todos") — convida a calibrar antes de gastar biotinta cara.
+
+**D) Slider de multiplicador de extrusão destacado com presets**
+
+O slider da /slice foi encapsulado em um **card com borda âmbar destacada**, título `⚡ Multiplicador de extrusão (flow rate)`, e range expandido de `0.5-2.0×` para `0.3-2.0×` (Nivea usa 0.4). Adicionados 4 botões de preset rápido logo abaixo:
+
+- 🧴 **Nivea 0.4×** — teste inicial com creme
+- 🧫 **Bio 0.6×** — biotintas viscosas típicas (GelMA, Alginato)
+- 🔧 **FDM 1.0×** — padrão filamento sólido
+- 🌊 **Viscosa 1.5×** — biotintas muito viscosas (>3000 cP)
+
+Cada botão fica destacado quando o valor atual bate (tolerância 0.001). Hint atualizada: "Escolha antes de imprimir · será gravado no G-code (M221 + volume por passo)".
+
+**Files touched**:
+- `src/lib/gcode/slicer/geometry-bounds.ts` — `tpms_gyroid`: ADVANCED → BASIC
+- `src/lib/bioprinting/biomaterials.ts` — item `nivea_cream`, categoria `test-standard`, preset `nivea_test_standard`, `FLOW_MULTIPLIER_BY_MATERIAL`, `getRecommendedFlowMultiplier()`
+- `src/app/dashboard/bioprint/slice/page.tsx` — slider destacado + 4 presets + auto-detecção Nivea
+- `src/app/dashboard/bioprint/execute/page.tsx` — barra de baby-step Z durante streaming
+- `tests/r12_63_gyroid_nivea_babystep.test.ts` — 11 testes novos (gyroid basic, Nivea catalog, flowMultiplier 0.4, integration com emitter)
+- `tests/r12_55_smoke.test.ts` — ajustes 13→14 basic, 15→14 advanced
+- `tests/r12_57_experimental_filter.test.ts` — ajustes de contagem + novo teste "gyroid é BASIC"
+
+**Testes**: **351/351 passing** (338 anteriores + 11 novos R12.63 + 2 casos ajustados).
+
+**Comportamento verificável**:
+- ✅ Toggle experimental OFF na Etapa 1 → gyroid aparece na categoria TPMS
+- ✅ Etapa 2 → seletor tem "🧴 Padrão-ouro (teste)" no topo, com Nivea listado
+- ✅ Escolher Nivea → slider da Etapa 3 vai automaticamente para 0.4×
+- ✅ G-code emitido tem `; ExtrusionMultiplier: 0.40×` no header
+- ✅ Durante impressão → barra "Ajuste fino Z" visível com botões Z± em incrementos 0.05-0.5mm
+- ✅ Botão Z−0.1 durante streaming → injeta `G91 → G1 Z-0.1 F300 → G90` na fila do controller (~50-300ms)
+- ✅ Presets do slider (Nivea/Bio/FDM/Viscosa) → um clique define o multiplicador
+
+---
+
 ### R12.62 — Ponto inicial forte + fator de extrusão configurável + printability no fluxo normal (2026-07-30)
 
 3 correções em resposta ao feedback da usuária: **"você pode melhorar a funcionalidade do ponto inicial - G92 X0 Y0 Z0, pois tem momentos que não funciona e é muito importante começar a imprimir no ponto 0. será importante o Gcode ter o parametro de fator de extrusão para selecionar. O fluxo está muito fraco quando inicia as bioimpressoes. será bom escolher o numero, mas pode deixar os GCode padores começar com 0.6 ou escolher. Além disso, esconda o teste de imprimibilidade, colocando ele no processo de bioimpressao, sendo selecionado no inicio."**
@@ -455,4 +510,4 @@ Learning store persiste ajustes do usuário e re-alimenta as próximas sugestõe
 Proprietário — Quantis Biotechnology © 2026
 Janaina Dernowsek (CEO/Founder)
 
-**Last Updated:** 2026-07-30 — R12.62 (Ponto inicial forte `G92 X0 Y0 Z0 E0` · fator de extrusão configurável default 0.6× · printability integrado ao fluxo normal via Etapa 1)
+**Last Updated:** 2026-07-30 — R12.63 (Gyroid promovido a "simples" · Creme Nivea como padrão-ouro de teste com flow 0.4× · Baby-step Z tempo real durante impressão · Slider destacado com 4 presets 🧴🧫🔧🌊)

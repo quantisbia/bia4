@@ -83,12 +83,20 @@ describe("R12.57 · Etapa 1 · filtro de geometrias experimentais", () => {
       expect(classifyGeometry("cube_tissue")).toBe("basic")
     })
 
-    it("heart, kidney, femur e TPMS são ADVANCED", () => {
+    it("heart, kidney, femur e TPMS schwarz/diamond são ADVANCED", () => {
+      // R12.63: tpms_gyroid subiu para BASIC — testado separadamente abaixo.
       expect(isAdvancedGeometry("heart")).toBe(true)
       expect(isAdvancedGeometry("kidney")).toBe(true)
       expect(isAdvancedGeometry("femur")).toBe(true)
-      expect(isAdvancedGeometry("tpms_gyroid")).toBe(true)
+      expect(isAdvancedGeometry("tpms_schwarz")).toBe(true)
+      expect(isAdvancedGeometry("tpms_diamond")).toBe(true)
       expect(classifyGeometry("heart")).toBe("advanced")
+    })
+
+    it("tpms_gyroid é BASIC (R12.63 — promovido de ADVANCED)", () => {
+      expect(isBasicGeometry("tpms_gyroid")).toBe(true)
+      expect(isAdvancedGeometry("tpms_gyroid")).toBe(false)
+      expect(classifyGeometry("tpms_gyroid")).toBe("basic")
     })
 
     it("IDs desconhecidos retornam 'unknown' (tratados como experimentais pela UI)", () => {
@@ -133,11 +141,18 @@ describe("R12.57 · Etapa 1 · filtro de geometrias experimentais", () => {
       expect(visible.every(id => id.startsWith("test_"))).toBe(true)
     })
 
-    it("padrão OFF: geometrias que travam (heart, kidney, femur, TPMS) ficam ESCONDIDAS", () => {
-      const crashers = ["heart", "kidney", "femur", "tpms_gyroid", "hexagonal_liver"]
+    it("padrão OFF: geometrias que travam (heart, kidney, femur, TPMS schwarz/diamond) ficam ESCONDIDAS", () => {
+      // R12.63: tpms_gyroid REMOVIDO desta lista — foi promovido a BASIC
+      // (verificada e mostrada por padrão). Schwarz e Diamond continuam
+      // experimentais.
+      const crashers = ["heart", "kidney", "femur", "tpms_schwarz", "tpms_diamond", "hexagonal_liver"]
       for (const id of crashers) {
         expect(isVerified(id), `"${id}" apareceria por padrão — deveria estar escondida`).toBe(false)
       }
+    })
+
+    it("R12.63: padrão OFF · tpms_gyroid AGORA APARECE (foi promovido a BASIC)", () => {
+      expect(isVerified("tpms_gyroid")).toBe(true)
     })
 
     it("padrão OFF: geometrias compostas experimentais (skin_3layer, cardiac_patch, etc.) ficam ESCONDIDAS", () => {
@@ -152,15 +167,17 @@ describe("R12.57 · Etapa 1 · filtro de geometrias experimentais", () => {
   })
 
   describe("contagem total esperada", () => {
-    it("13 geometrias BASIC (5 paramétricas + 8 testes)", () => {
-      expect(BASIC_GEOMETRY_IDS.length).toBe(13)
+    it("14 geometrias BASIC (5 paramétricas + 8 testes + gyroid · R12.63)", () => {
+      // R12.63: tpms_gyroid promovido de ADVANCED para BASIC.
+      expect(BASIC_GEOMETRY_IDS.length).toBe(14)
     })
 
-    it("15 geometrias ADVANCED (anatômicas + TPMS + bone_block)", () => {
-      expect(ADVANCED_GEOMETRY_IDS.length).toBe(15)
+    it("14 geometrias ADVANCED (anatômicas + TPMS schwarz/diamond + bone_block · R12.63)", () => {
+      // R12.63: gyroid saiu daqui → 15 - 1 = 14.
+      expect(ADVANCED_GEOMETRY_IDS.length).toBe(14)
     })
 
-    it("com toggle OFF, usuário vê ~13 formas total (contra ~30 com toggle ON)", () => {
+    it("com toggle OFF, usuário vê ~14 formas total (contra ~28 com toggle ON)", () => {
       const allShown = new Set<string>()
       const basicShown = new Set<string>()
       for (const ids of Object.values(CATEGORY_GEOMETRY_IDS)) {
@@ -169,11 +186,10 @@ describe("R12.57 · Etapa 1 · filtro de geometrias experimentais", () => {
           if (isBasicGeometry(id)) basicShown.add(id)
         }
       }
-      // Com toggle OFF: só as básicas que estão referenciadas por alguma
-      // categoria — deve ser exatamente todas as 13 (todas têm categoria).
-      expect(basicShown.size).toBe(13)
-      // Com toggle ON: catálogo completo referenciado por categorias.
-      expect(allShown.size).toBeGreaterThanOrEqual(28) // 13 + 15 = 28 mínimo
+      // Com toggle OFF: as 14 básicas (13 antigas + gyroid).
+      expect(basicShown.size).toBe(14)
+      // Com toggle ON: catálogo completo. 14 + 14 = 28 mínimo (sem duplicatas).
+      expect(allShown.size).toBeGreaterThanOrEqual(28)
     })
   })
 })

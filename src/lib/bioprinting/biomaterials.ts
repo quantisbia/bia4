@@ -28,7 +28,13 @@ export interface Biomaterial {
   id: string
   name: string
   shortName: string
-  category: "natural" | "synthetic" | "decellularized" | "composite"
+  /**
+   * R12.63: adicionada categoria "test-standard" para materiais padrão-ouro
+   * de testes iniciais (não biológicos, mas com reologia bem conhecida) —
+   * ex: Creme Nivea, pasta de dente, mostarda. Servem pra calibrar
+   * bioimpressora antes de gastar biotinta cara.
+   */
+  category: "natural" | "synthetic" | "decellularized" | "composite" | "test-standard"
   family: string           // "Alginate", "GelMA", "Collagen"...
   description: string
   concentrationRange: { min: number; max: number; typical: number; unit: string }  // % m/v
@@ -747,6 +753,54 @@ export const BIOMATERIALS: Biomaterial[] = [
     costTier: "low",
     icon: "📄",
   },
+  // ═══════════════════════════════════════════════════════════
+  // R12.63 — MATERIAIS PADRÃO-OURO PARA TESTES INICIAIS
+  // ═══════════════════════════════════════════════════════════
+  // Não são biomateriais reais — são pastas domésticas com reologia
+  // bem estudada, baratas e disponíveis em qualquer supermercado.
+  // Servem pra calibrar a bioimpressora ANTES de gastar biotinta cara.
+  {
+    id: "nivea_cream",
+    name: "Creme Nivea (padrão-ouro de teste)",
+    shortName: "Nivea",
+    category: "test-standard",
+    family: "Cosmetic paste (test)",
+    description:
+      "Creme cosmético (Nivea Creme lata azul) usado como padrão-ouro para testes iniciais de extrusão em bioimpressoras. Reologia shear-thinning previsível, viscosidade ~1000-3000 cP, custo baixíssimo, disponível em qualquer farmácia. NÃO é biocompatível — apenas para calibração mecânica.",
+    concentrationRange: { min: 100, max: 100, typical: 100, unit: "% (puro)" },
+    crosslink: ["physical"],
+    modulus_kPa: { min: 0.5, max: 5 },
+    poreSize_um: { min: 0, max: 0 },  // sem poros (creme homogêneo)
+    printability: ["extrusion"],
+    viscosity_Pas: { min: 1, max: 3 },
+    cellViability_24h_pct: 0,  // NÃO biocompatível
+    tissueApplications: [
+      "Calibração inicial de bioimpressora",
+      "Teste de flow / pressure / retract",
+      "Validação de imprimibilidade de geometria",
+    ],
+    keyReferences: [
+      "Paxton et al. 2017 Biofabrication (Nivea como referência reológica)",
+      "Ouyang et al. 2016 Biofabrication (padronização de testes)",
+    ],
+    pros: [
+      "Baratíssimo (R$ 10-20 a lata)",
+      "Não gasta biotinta cara em calibração",
+      "Reologia previsível e reprodutível",
+      "Disponível em qualquer supermercado",
+      "Segurança total (não toxico, não patogênico)",
+      "Bom shear-thinning — extrusão fluida",
+    ],
+    cons: [
+      "NÃO biocompatível — apenas para testes mecânicos",
+      "Descartar após teste (não cultivar células)",
+      "Pode entupir bico <200 µm (partículas de emulsão)",
+    ],
+    typicalPartners: [],
+    costTier: "low",
+    regulatoryStatus: "Uso apenas para calibração — sem aplicação clínica",
+    icon: "🧴",
+  },
 ]
 
 // Helper de busca rápida
@@ -757,6 +811,9 @@ export function getBiomaterialById(id: string): Biomaterial | undefined {
 // Categorias para filtros na UI
 export const BIOMATERIAL_CATEGORIES = [
   { id: "all", label: "Todos", color: "gray" },
+  // R12.63: padrão-ouro no topo — primeira coisa que a usuária vê ao abrir
+  // Etapa 2. Convida a calibrar antes de gastar biotinta cara.
+  { id: "test-standard", label: "🧴 Padrão-ouro (teste)", color: "amber" },
   { id: "natural", label: "Naturais", color: "emerald" },
   { id: "synthetic", label: "Sintéticos", color: "blue" },
   { id: "decellularized", label: "Decelularizados (dECM)", color: "rose" },
@@ -847,4 +904,41 @@ export const BIOINK_PRESETS: BioinkPreset[] = [
     crosslinkProtocol: "405 nm DLP, LAP 0.15% m/v",
     reference: "Grigoryan 2019 Science",
   },
+  // R12.63 — Preset de calibração inicial
+  {
+    id: "nivea_test_standard",
+    name: "🧴 Nivea (padrão-ouro para testes iniciais)",
+    tissue: "Calibração / Teste",
+    description:
+      "Creme Nivea puro (lata azul), usado como padrão-ouro para calibração inicial da bioimpressora. Flow multiplier recomendado: 0.4× (creme é MENOS viscoso que biotintas viscosas, então precisa de MENOS extrusão pra evitar over-extrusion). NÃO biocompatível — apenas mecânico.",
+    components: [
+      { biomaterialId: "nivea_cream", concentration: 100, unit: "% (puro)", role: "Calibração mecânica de extrusão" },
+    ],
+    crosslinkProtocol: "Nenhum — teste mecânico apenas. Descartar após impressão.",
+    reference: "Paxton 2017 Biofabrication — Nivea como padrão reológico",
+  },
 ]
+
+/**
+ * R12.63 — Presets de flow multiplier por material.
+ * Sobrescreve o default global de 0.6× (R12.62) para materiais com
+ * viscosidade fora do range típico de biotinta.
+ *
+ * Cálculo empírico:
+ *   - Nivea puro: creme com shear-thinning bom mas MENOS viscoso que
+ *     GelMA/Alginato. Se usar 0.6× ele sai demais (over-extrusion),
+ *     borrão nas camadas. 0.4× dá volume consistente com o que a
+ *     usuária vê saindo do bico.
+ *   - GelMA/Alginato/etc: default global 0.6× (biotintas viscosas típicas).
+ *   - Materiais muito viscosos (>3000 cP): usuária ajusta 1.0-1.5× no slider.
+ */
+export const FLOW_MULTIPLIER_BY_MATERIAL: Record<string, number> = {
+  nivea_cream: 0.4,
+  // outros materiais herdam o default global de 0.6
+}
+
+/** R12.63: helper — retorna flow multiplier recomendado para um biomaterialId */
+export function getRecommendedFlowMultiplier(biomaterialId: string | null | undefined): number {
+  if (!biomaterialId) return 0.6  // default global (R12.62)
+  return FLOW_MULTIPLIER_BY_MATERIAL[biomaterialId] ?? 0.6
+}

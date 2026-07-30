@@ -10,11 +10,13 @@ import {
 import { MATERIAL_SUMMARY, getRecommendedParams } from "@/lib/bioprint/material-database"
 
 describe("R12.55 sanity", () => {
-  it("Basic geometries: 5 formas + 8 testes = 13 IDs", () => {
-    expect(BASIC_GEOMETRY_IDS).toHaveLength(13)
+  it("Basic geometries: 5 formas + 8 testes + gyroid = 14 IDs (R12.63)", () => {
+    // R12.63: tpms_gyroid promovido a BASIC (era ADVANCED) — total 13 → 14.
+    expect(BASIC_GEOMETRY_IDS).toHaveLength(14)
   })
-  it("Advanced geometries: 15 IDs", () => {
-    expect(ADVANCED_GEOMETRY_IDS).toHaveLength(15)
+  it("Advanced geometries: 14 IDs (R12.63: gyroid saiu, foi p/ BASIC)", () => {
+    // R12.63: tpms_gyroid removido daqui → 15 → 14.
+    expect(ADVANCED_GEOMETRY_IDS).toHaveLength(14)
   })
   it("classifyGeometry funciona", () => {
     expect(classifyGeometry("cube_tissue")).toBe("basic")

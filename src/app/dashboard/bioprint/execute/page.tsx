@@ -2460,6 +2460,75 @@ export default function BioprintExecutePage() {
                 <X className="w-4 h-4" /> EMERGENCY (M112)
               </button>
             </div>
+
+            {/*
+              R12.63 — BABY-STEP Z DESTACADO (tempo real).
+              Aparece só durante isStreaming || isPaused. Foi pedido pela
+              usuária: "abaixar o Z em tempo real para ajustar" — antes o
+              micro-ajuste ficava escondido no painel lateral de joystick,
+              agora fica na barra principal, ao lado dos botões de
+              Pausar/Retomar, exatamente onde a atenção está durante a
+              impressão. Usa o mesmo sendJog(Z, ±d) via inject (latência
+              ~50-300ms).
+            */}
+            {(isStreaming || isPaused) && (
+              <div className="mt-3 rounded-xl border border-cyan-500/30 bg-cyan-500/[0.06] p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-cyan-200 uppercase tracking-wider">
+                      ⚙️ Ajuste fino Z — tempo real
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-100 font-semibold">
+                      z atual: {position.z.toFixed(2)} mm
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-gray-400">
+                    Sem pausar a impressão · injeta na fila do controller
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {/* DESCER Z (mais perto da mesa) */}
+                  <span className="text-[10px] font-semibold text-amber-300/90 mr-1">
+                    ↓ Descer (aproximar mesa):
+                  </span>
+                  {[0.05, 0.1, 0.2, 0.5].map((d) => (
+                    <button
+                      key={`babyz-down-${d}`}
+                      onClick={() => sendJog("Z", -d)}
+                      disabled={!connected}
+                      title={`Desce ${d} mm — use se está saindo gap entre filamentos`}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-amber-500/15 hover:bg-amber-500/30 border border-amber-500/40 text-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Z−{d}
+                    </button>
+                  ))}
+                  <span className="mx-2 h-6 w-px bg-white/10" />
+                  {/* SUBIR Z (afastar da mesa) */}
+                  <span className="text-[10px] font-semibold text-cyan-300/90 mr-1">
+                    ↑ Subir (afastar mesa):
+                  </span>
+                  {[0.05, 0.1, 0.2, 0.5].map((d) => (
+                    <button
+                      key={`babyz-up-${d}`}
+                      onClick={() => sendJog("Z", +d)}
+                      disabled={!connected}
+                      title={`Sobe ${d} mm — use se está esmagando o filamento`}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-cyan-500/15 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Z+{d}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-2 pt-2 border-t border-cyan-500/15 text-[10px] text-gray-400 leading-relaxed">
+                  💡 <strong className="text-cyan-200">Como usar:</strong>{" "}
+                  <span className="text-amber-200">Z−0.05</span> ou{" "}
+                  <span className="text-amber-200">Z−0.1</span> se a primeira camada
+                  está saindo com gap entre linhas (biotinta não adere). Use{" "}
+                  <span className="text-cyan-200">Z+0.05</span> se está esmagando o
+                  filamento (linhas achatadas demais).
+                </div>
+              </div>
+            )}
           </Panel>
         </section>
 
