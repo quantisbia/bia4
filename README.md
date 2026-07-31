@@ -174,6 +174,65 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R12.65 — Regenerador embutido na pré-execução + destaque MAGNÍFICO do ponto inicial G92 X0 Y0 Z0 E0 (2026-07-31)
+
+Mandato Janaina: **"para regenerar um gcode, precisa ser feito no painel Validação visual do G-code · pré-execução, onde podemos alterar dimensões do STL e Parâmetros de GCode para visualizar depois de uma regeneracao e antes de bioimpimir. deixe no painel a vista onde está o ponto inicial da impressão, onde está o G92 x0 y0 z0 e0 para facilitar termos um resultado magnifico e todo conseguirem imprimir sem dificuldade."**
+
+**A) Novo componente RegeneratePanel — embutido acima do validador visual em /execute**
+- `src/components/bioprinter/RegeneratePanel.tsx` — painel expansível com controles para:
+  - **Dimensões do STL** — escala X (25–200%), escala Y, escala Z (aplicadas aos parâmetros numéricos da geometria por heurística de nomes: `width/x/diameter` → escala X, `depth/y` → escala Y, `height/z/thickness` → escala Z)
+  - **Parâmetros de G-code** — Layer height (0.1–0.8 mm), Infill (0–100%), Print speed (2–30 mm/s), Flow / multiplicador de extrusão (0.2–2.0×), Walls (1–5), Temperatura cartucho (4–60°C)
+- Botão **"Regerar G-code"** faz POST para o mesmo endpoint da Etapa 3 (`/api/gcode/generate`) com o payload completo (geometria + bioink + slicer + bioprinterId) + overrides atuais
+- Ao regerar com sucesso, o `gcodeText` da /execute é substituído **sem sair da página** — validador + viewer 3D atualizam imediatamente
+- Feedback visual: badge "parâmetros alterados" quando há mudanças, botão "Resetar", cards de sucesso/erro, logs no PrintLogger com source `regenerator`
+- Pré-check: se falta modelo ou biotinta (usuária importou G-code direto sem passar pelas Etapas 1/2), o painel avisa e sugere alterar o arquivo diretamente
+
+**B) Destaque MAGNÍFICO do ponto inicial G92 X0 Y0 Z0 E0 no GcodeViewer3D**
+
+O marcador antigo era um círculo esmeralda de 5 pixels com o texto "G92 zero" — sutil demais. R12.65 transforma em um destaque inequívoco:
+- **Cruz de origem** (X vermelho, Y verde) — 24px de raio, marca os eixos ao redor do zero
+- **Anel externo esmeralda largo** (raio 18px) — visibilidade máxima
+- **Anel intermediário sólido** (raio 11px) — bordas duplas reforçam
+- **Ponto sólido central** (4px) — âncora inequívoca
+- **Label multilinha com fundo esmeralda-900**:
+  - `⊙ INÍCIO · G92 X0 Y0 Z0 E0` (linha 1, bold)
+  - `Posicione o bico AQUI antes de imprimir` (linha 2, instrução prática)
+- **Marcador do "1º filamento"** (primeiro G1 com E>0) — círculo laranja + linha tracejada saindo do zero até ele + label com coordenadas exatas: `▶ 1º filamento (x, y, z) mm`
+  - Deixa evidente que o bico VAI se mover do G92 zero até esse ponto antes de depositar biotinta
+  - Ajuda a usuária a antecipar a trajetória e conferir se o skirt/perímetro começa onde esperado
+
+**C) Integração na /execute (pré-execução)**
+- `src/app/dashboard/bioprint/execute/page.tsx` — o `<RegeneratePanel>` é renderizado ANTES do `<GcodeValidatorPanel>` (que já contém o viewer 3D com os marcadores destacados)
+- Título do validador atualizado: `"Validação visual do G-code · pré-execução · ponto inicial destacado"` — enfatiza a nova funcionalidade
+- Callback `onRegenerated`: `setGcodeText(newGcode)` + rename de `gcodeName` para `"(regerado · HH:MM:SS)"` + log OK no PrintLogger
+- Callback `onLog`: liga o painel ao PrintLogger global (info/ok/warn/error com source `regenerator`)
+
+**D) Fluxo de uso — magnífico e simples**
+
+1. Usuária chega no /execute com um G-code carregado (do handoff ou do state.slice.gcode)
+2. Vê o viewer 3D com o ponto inicial CLARAMENTE destacado (cruz + anéis + label) e o 1º filamento marcado
+3. Se quiser ajustar antes de imprimir: expande o "Regenerar G-code"
+4. Move sliders — vê ao vivo o badge "parâmetros alterados" e o botão "Regerar" ficar em gradiente cyan→violet
+5. Clica "Regerar" — o motor `/api/gcode/generate` roda com os novos valores
+6. Novo G-code substitui o antigo instantaneamente — viewer + validador atualizam
+7. Ponto inicial permanece destacado no novo G-code
+8. Se satisfeita, prossegue para "Enviar para Bioimpressora"
+
+**E) Testes de regressão (R12.65)**
+- Novo arquivo `tests/r12_65_regenerate_panel_and_start_marker.test.ts` com **23 testes** em 6 blocos:
+  - **R12.65.A** — arquivo `RegeneratePanel.tsx` existe, exporta o componente, tipo `RegenerateOverrides` tem 9 campos obrigatórios
+  - **R12.65.B** — source do painel expõe controles de Escala X/Y/Z + Layer height + Infill + Print speed + Flow + Walls + Temp cartucho + botão "Regerar G-code"
+  - **R12.65.C** — painel faz POST em `/api/gcode/generate` e envia `flowMultiplier`, `layerHeight_mm`, `walls`, `infillPercent` com overrides do usuário
+  - **R12.65.D** — GcodeViewer3D desenha label `⊙ INÍCIO · G92 X0 Y0 Z0 E0` + instrução "Posicione o bico AQUI antes de imprimir" + anel externo raio 18 + cruz de origem (X vermelho / Y verde, raio 24)
+  - **R12.65.E** — GcodeViewer3D destaca 1º filamento: busca `parsed.moves.find(m => m.type === "G1" && m.e > 0)` + linha tracejada `setLineDash([4, 4])` + label "1º filamento" com coordenadas x/y/z
+  - **R12.65.F** — /execute importa RegeneratePanel, renderiza com `bioprintState` + `onRegenerated`, o callback chama `setGcodeText(newGcode)`, o painel aparece ANTES do validador, título contém "ponto inicial destacado"
+
+**Testes**: **393/393 passing** (370 anteriores + 23 novos R12.65, zero regressões, 41.38s).
+
+**Arquivos modificados/criados**: `src/components/bioprinter/RegeneratePanel.tsx` (novo, 470 linhas), `src/components/bioprinter/GcodeViewer3D.tsx` (marcadores destacados), `src/app/dashboard/bioprint/execute/page.tsx` (integração + título), `tests/r12_65_regenerate_panel_and_start_marker.test.ts` (novo, 23 testes).
+
+---
+
 ### R12.64 — Zero G28 + G92 X0 Y0 Z0 E0 universal + Mesa REDONDA (2026-07-30)
 
 Correção crítica solicitada pela usuária: **"retirar todo home all - e sempre zerar as coordenadas, G92 X0 Y0 Z0 E0, e a mesa ser redonda. sejá criterioso, em todo fatiamento gcode, colocar no sistema o G92 x0 y0 z0 e0"**.
@@ -558,4 +617,4 @@ Learning store persiste ajustes do usuário e re-alimenta as próximas sugestõe
 Proprietário — Quantis Biotechnology © 2026
 Janaina Dernowsek (CEO/Founder)
 
-**Last Updated:** 2026-07-30 — R12.64 (Zero G28 no sistema · G92 X0 Y0 Z0 E0 universal em todo G-code · Mesa REDONDA em todos os 8 perfis · Ponto atual = origem biológica, sem home mecânico que destruiria a bandeja com células vivas 🔴⭕🧬)
+**Last Updated:** 2026-07-31 — R12.65 (Regenerador embutido na pré-execução · alterar dimensões do STL e parâmetros de G-code sem sair da tela · destaque MAGNÍFICO do ponto inicial G92 X0 Y0 Z0 E0 no viewer 3D · marcador do 1º filamento · usuária vê ANTES de imprimir onde o bico precisa estar posicionado 🎯⊙▶)

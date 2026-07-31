@@ -79,6 +79,9 @@ import { inferTissueFromGeometry, type PresetParams } from "@/lib/bioprint/tissu
 import { type ColorMode } from "@/components/bioprinter/GcodeViewer3D"
 import { SafeGcodeViewer3D } from "@/components/bioprinter/SafeGcodeViewer3D"
 import { GcodeValidatorPanel } from "@/components/bioprinter/GcodeValidatorPanel"
+// R12.65: painel de regeneração embutido na pré-execução (pode alterar
+// dimensões do STL e parâmetros de G-code sem sair da tela).
+import { RegeneratePanel } from "@/components/bioprinter/RegeneratePanel"
 import { parseGcode, type ParsedGcode } from "@/lib/bioprint/toolpath-engine"
 import { DEMO_GYROID_GCODE } from "@/lib/bioprint/demo-gyroid-gcode"
 
@@ -2320,13 +2323,39 @@ export default function BioprintExecutePage() {
             </Panel>
           )}
 
+          {/* ── 🪄 R12.65 · Painel de Regeneração ─────────────────────────────
+              Permite alterar dimensões do STL (escala X/Y/Z) e parâmetros
+              de G-code (layer height, infill, print speed, flow, walls,
+              temp) e regerar o G-code SEM sair da /execute. O viewer
+              abaixo (com destaque do ponto inicial G92 X0 Y0 Z0 E0)
+              atualiza imediatamente para refletir o novo G-code. */}
+          <SectionErrorBoundary title="Regenerador de G-code">
+            <RegeneratePanel
+              bioprintState={bioprintState}
+              onRegenerated={(newGcode, meta) => {
+                setGcodeText(newGcode)
+                setGcodeName(`(regerado · ${new Date().toLocaleTimeString()})`)
+                loggerRef.current.ok(
+                  `G-code regerado no /execute — ${newGcode.split("\n").length} linhas · fonte: ${meta.source}`,
+                  "regenerator",
+                )
+              }}
+              onLog={(sev, msg) => {
+                if (sev === "ok") loggerRef.current.ok(msg, "regenerator")
+                else if (sev === "warn") loggerRef.current.warn(msg, "regenerator")
+                else if (sev === "error") loggerRef.current.error(msg, "regenerator")
+                else loggerRef.current.info(msg, "regenerator")
+              }}
+            />
+          </SectionErrorBoundary>
+
           {/* ── 🔬 Validador Visual Unificado — viewer + validação + complexidade em tabs ── */}
           {gcodeText.trim() && (
             <div id="toolpath-visual-panel" className="scroll-mt-24">
               <SectionErrorBoundary title="Validador visual do G-code">
                 <GcodeValidatorPanel
                   gcode={gcodeText}
-                  title="Validação visual do G-code · pré-execução"
+                  title="Validação visual do G-code · pré-execução · ponto inicial destacado"
                   viewerHeight={460}
                 />
               </SectionErrorBoundary>

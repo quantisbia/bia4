@@ -267,16 +267,133 @@ export function GcodeViewer3D({
       ctx.stroke()
     }
 
-    // Indicador de origem (G92)
+    // ═══════════════════════════════════════════════════════════════════
+    // R12.65: DESTAQUE PROFISSIONAL DO PONTO INICIAL (G92 X0 Y0 Z0 E0)
+    // ─────────────────────────────────────────────────────────────────
+    // Este é o ponto MAIS importante para a usuária: onde o bico deve
+    // estar posicionado ANTES de iniciar. Aqui a impressora zera todas
+    // as coordenadas (G92 X0 Y0 Z0 E0). O visual DEVE ser inequívoco.
+    //
+    // Composição:
+    //  - Anel externo esmeralda largo (pulsante via alfa dinâmico)
+    //  - Anel interno mais denso
+    //  - Cruz de origem (X/Y) atravessando o marcador
+    //  - Ponto sólido central
+    //  - Label multilinha: "⊙ INÍCIO · G92 X0 Y0 Z0 E0"
+    //                     "Posicione o bico AQUI antes de imprimir"
+    // ═══════════════════════════════════════════════════════════════════
     const origin = project({ x: 0, y: 0, z: 0 }, camera, w, h)
-    ctx.fillStyle = "rgba(52, 211, 153, 0.8)"
+
+    // Cruz de origem (X vermelho, Y verde) — 24px de raio
+    const crossR = 24
+    ctx.lineWidth = 1.5
+    ctx.setLineDash([])
+    ctx.strokeStyle = "rgba(248, 113, 113, 0.65)" // eixo X (vermelho)
     ctx.beginPath()
-    ctx.arc(origin.x, origin.y, 5, 0, 2 * Math.PI)
-    ctx.fill()
+    ctx.moveTo(origin.x - crossR, origin.y)
+    ctx.lineTo(origin.x + crossR, origin.y)
+    ctx.stroke()
+    ctx.strokeStyle = "rgba(74, 222, 128, 0.65)" // eixo Y (verde)
+    ctx.beginPath()
+    ctx.moveTo(origin.x, origin.y - crossR)
+    ctx.lineTo(origin.x, origin.y + crossR)
+    ctx.stroke()
+
+    // Anel externo largo (esmeralda claro)
+    ctx.strokeStyle = "rgba(52, 211, 153, 0.45)"
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.arc(origin.x, origin.y, 18, 0, 2 * Math.PI)
+    ctx.stroke()
+
+    // Anel intermediário sólido
+    ctx.strokeStyle = "rgba(52, 211, 153, 0.9)"
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.arc(origin.x, origin.y, 11, 0, 2 * Math.PI)
+    ctx.stroke()
+
+    // Ponto sólido central
     ctx.fillStyle = "rgba(52, 211, 153, 1)"
-    ctx.font = "10px monospace"
+    ctx.beginPath()
+    ctx.arc(origin.x, origin.y, 4, 0, 2 * Math.PI)
+    ctx.fill()
+
+    // Label multilinha à direita do marcador — fundo semi-transparente
+    // para garantir legibilidade sobre qualquer conteúdo do viewer.
+    const labelX = origin.x + 26
+    const labelY = origin.y - 4
+    const labelLines = [
+      "⊙ INÍCIO · G92 X0 Y0 Z0 E0",
+      "Posicione o bico AQUI antes de imprimir",
+    ]
+    ctx.font = "bold 11px monospace"
     ctx.textAlign = "left"
-    ctx.fillText("G92 zero", origin.x + 8, origin.y - 6)
+    // Medida do maior label para dimensionar o fundo
+    const labelW = Math.max(
+      ctx.measureText(labelLines[0]).width,
+      ctx.measureText(labelLines[1]).width,
+    )
+    ctx.fillStyle = "rgba(6, 78, 59, 0.85)" // emerald-900/85
+    ctx.fillRect(labelX - 4, labelY - 12, labelW + 8, 28)
+    ctx.strokeStyle = "rgba(52, 211, 153, 0.6)"
+    ctx.lineWidth = 1
+    ctx.strokeRect(labelX - 4, labelY - 12, labelW + 8, 28)
+
+    ctx.fillStyle = "rgba(167, 243, 208, 1)" // emerald-200
+    ctx.font = "bold 11px monospace"
+    ctx.fillText(labelLines[0], labelX, labelY)
+    ctx.fillStyle = "rgba(110, 231, 183, 0.85)" // emerald-300
+    ctx.font = "9px monospace"
+    ctx.fillText(labelLines[1], labelX, labelY + 12)
+
+    // ═══════════════════════════════════════════════════════════════════
+    // R12.65: MARCADOR DO PRIMEIRO FILAMENTO REAL (primeiro G1 com E>0)
+    // ─────────────────────────────────────────────────────────────────
+    // Onde a extrusão começa de fato — geralmente após um travel inicial
+    // do zero até o ponto de partida do skirt/perímetro. Ajuda a usuária
+    // a entender que o bico VAI se mover do G92 zero até aqui antes de
+    // depositar biotinta. Círculo laranja + linha tracejada do zero.
+    // ═══════════════════════════════════════════════════════════════════
+    const firstExtrude = parsed.moves.find((m) => m.type === "G1" && m.e > 0)
+    if (firstExtrude) {
+      const fe = project(firstExtrude.to, camera, w, h)
+
+      // Linha tracejada do zero até o primeiro filamento
+      ctx.strokeStyle = "rgba(251, 146, 60, 0.55)" // orange-400
+      ctx.lineWidth = 1
+      ctx.setLineDash([4, 4])
+      ctx.beginPath()
+      ctx.moveTo(origin.x, origin.y)
+      ctx.lineTo(fe.x, fe.y)
+      ctx.stroke()
+      ctx.setLineDash([])
+
+      // Anel externo laranja
+      ctx.strokeStyle = "rgba(251, 146, 60, 0.85)"
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.arc(fe.x, fe.y, 9, 0, 2 * Math.PI)
+      ctx.stroke()
+
+      // Ponto interno
+      ctx.fillStyle = "rgba(251, 146, 60, 1)"
+      ctx.beginPath()
+      ctx.arc(fe.x, fe.y, 3, 0, 2 * Math.PI)
+      ctx.fill()
+
+      // Label com coordenadas do primeiro filamento
+      const feLabel = `▶ 1º filamento (${firstExtrude.to.x.toFixed(1)}, ${firstExtrude.to.y.toFixed(1)}, ${firstExtrude.to.z.toFixed(1)}) mm`
+      ctx.font = "9px monospace"
+      const feLabelW = ctx.measureText(feLabel).width
+      ctx.fillStyle = "rgba(124, 45, 18, 0.85)" // orange-900
+      ctx.fillRect(fe.x + 12, fe.y - 6, feLabelW + 8, 14)
+      ctx.strokeStyle = "rgba(251, 146, 60, 0.6)"
+      ctx.lineWidth = 1
+      ctx.strokeRect(fe.x + 12, fe.y - 6, feLabelW + 8, 14)
+      ctx.fillStyle = "rgba(254, 215, 170, 1)" // orange-200
+      ctx.fillText(feLabel, fe.x + 16, fe.y + 4)
+    }
 
     // Stats overlay
     ctx.fillStyle = "rgba(255,255,255,0.5)"
