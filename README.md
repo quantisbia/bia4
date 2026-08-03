@@ -174,6 +174,96 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R12.66 — Backend: versionamento + projetos + biblioteca de imagens do Notebook (Fase 1 de 4) (2026-08-03)
+
+Mandato Janaina (pacote completo):
+> **"Implementar recursos de exportação, salvamento e rastreabilidade de protocolos em todas as ferramentas da plataforma. Cada alteração realizada em um conteúdo salvo deve gerar automaticamente uma nova versão numerada, sem apagar as versões anteriores. Exemplo: Versão 1; Versão 2; Versão 3. Cada versão deve registrar: Número da versão; Data e horário da alteração; Usuário responsável; Descrição resumida da alteração; Conteúdo anterior; Conteúdo atualizado. Antes de substituir ou alterar um conteúdo existente, perguntar ao usuário se deseja: 1. Atualizar a versão atual; ou 2. Criar uma nova versão. Como padrão, priorizar a criação de uma nova versão para preservar a rastreabilidade."**
+
+Faseamento acordado com 5 "sim" da Janaina:
+- **R12.66 (esta sprint):** Backend — modelos Prisma + APIs
+- R12.67: Frontend — componente universal `<ExportBar>` + libs jspdf/docx
+- R12.68: Integração — espalhar ExportBar em Pipeline, Formulador Pro, Bioink, Chat IA, Próximos Passos
+- R12.69: UI do Notebook — hierárquica (Projetos → Entradas → Versões) + busca global + diff
+
+**A) Schema Prisma (`prisma/schema.prisma`) — 3 modelos novos + 2 campos em `NotebookEntry`**
+
+| Modelo | Papel | Campos-chave |
+|---|---|---|
+| `NotebookVersion` | Rastreabilidade completa (Janaina verbatim) | `versionNumber`, `changeSummary`, `snapshot Json` (conteúdo atualizado), `previousSnapshot Json?` (conteúdo anterior), `userId`, `createdAt`, `@@unique([entryId, versionNumber])` |
+| `NotebookImage` | Biblioteca de imagens científicas | `title`, `caption`, `experimentId`, `sampleNumber`, `tags[]`, `observations`, `versionNumber?` (associação a versão), `dataBase64` (base64-in-Postgres · R12.70 migra para Vercel Blob), `storageUrl?`, `mimeType`, `sizeBytes`, `width`, `height` |
+| `Project` | Guarda-chuva de organização (dedicado ao Notebook, separado de `PipelineProject`) | `name`, `description`, `researchArea`, `color`, `isArchived`, relação `entries NotebookEntry[]` |
+
+**Novos campos em `NotebookEntry`:** `currentVersion Int @default(1)` + `projectId String?` (FK opcional para `Project`).
+
+**B) Migration `20260731000001_r12_66_notebook_versioning_projects_images` — aplicada no Neon Postgres**
+
+- 111 linhas SQL — ALTER `notebook_entries` (2 colunas novas) + CREATE 3 tabelas + 10 índices + 6 FK constraints
+- Vercel corre `prisma migrate deploy` no build → migration ficará marcada como "already applied" no próximo deploy
+- Antes: 2 migrations legadas (`add_organoid_lab_plan` e `add_password_reset_tokens`) estavam em estado `failed` no Neon com objetos já criados manualmente → resolvidas com `prisma migrate resolve --applied <name>` sem re-rodar SQL
+
+**C) Helper `src/lib/notebook/versioning.ts` — camada transacional única de versionamento**
+
+- `snapshotFromEntry(entry)` — extrai snapshot serializável (`{ title, content, entryType, category, tags, generatedDoc, metadata, projectId }`)
+- `createInitialVersion(prisma, entry)` — grava V1 automaticamente na criação (`changeSummary: "Criação inicial"`)
+- `createNewVersion(prisma, params)` — insere versão N+1 pura (helper de baixo nível)
+- `updateEntryWithVersion(prisma, { entryId, userId, patch, updateInPlace?, changeSummary? })` — **fluxo padrão da Janaina**: dentro de uma `$transaction`, lê entrada atual → grava `previousSnapshot` → aplica patch → incrementa `currentVersion` → cria nova versão. Se `updateInPlace: true`, só atualiza a entrada (exceção — não cria versão).
+- `restoreVersion(prisma, { entryId, userId, targetVersionNumber })` — **NUNCA APAGA**: recria uma versão N+1 com o snapshot da versão-alvo, marca `changeSummary: "Restaurada versão N"` e preserva todo o histórico intermediário
+- `snapshotsAreEqual(a, b)` — utilidade para o PATCH não abrir versão fantasma quando o patch é no-op
+
+**D) APIs criadas — todas com validação Zod + `session.user.id` (NextAuth v5) + ownership check**
+
+| Rota | Verbos | Função |
+|---|---|---|
+| `/api/notebook/[id]/versions` | GET, POST | Lista histórico (ordem DESC, sem snapshot para leveza) · POST manual (uso raro — o PATCH principal já cria) |
+| `/api/notebook/[id]/versions/[version]` | GET | Snapshot completo da versão N · `?compareTo=M` → diff campo-a-campo com `changedFields[]` |
+| `/api/notebook/[id]/versions/restore` | POST | Body `{ targetVersion }` → chama helper `restoreVersion` (sempre cria N+1) |
+| `/api/notebook/[id]/images` | GET, POST, DELETE | GET com `?includeData=true` opcional (base64 pesado, default = só metadata) · POST valida `mimeType image/*`, aceita dataURL ou base64+mime, limite de 5 MB originais (≈ 6.7 MB base64), armazena como dataURL em `dataBase64` · DELETE via `?imageId=` |
+| `/api/projects` | GET, POST, PATCH, DELETE | GET com `?includeArchived=true` + `?q=` para busca em name/description/researchArea · PATCH via `?id=` (rename/arquivar/cor) · DELETE via `?id=` (desassocia entradas em vez de perder — `projectId` vira null) |
+
+**E) `/api/notebook/route.ts` — POST/PATCH estendidos (R12.66)**
+
+- **POST** agora aceita `projectId` no schema, valida ownership do projeto se enviado, cria a entrada + versão V1 (via `createInitialVersion`) dentro de uma única `$transaction`. Resposta inclui `currentVersion: 1` e `versionNumber: 1`.
+- **PATCH** por padrão **CRIA NOVA VERSÃO** (via `updateEntryWithVersion`) — rastreabilidade preservada verbatim como a Janaina pediu. Para sobrescrever a versão atual, é preciso passar explicitamente `?updateInPlace=true` na URL (exceção). Suporta `changeSummary` no body para descrever a alteração. Trata `isPinned` à parte (não gera versão só para pin/unpin). Resposta inclui `newVersionNumber` para o front usar em toast/confirmation.
+
+**F) Defaults aceitos pela Janaina (5x "sim"):**
+
+1. Vercel corre `prisma migrate deploy` no build ✅
+2. `userId` do NextAuth (`session.user.id`) preenche `NotebookVersion.userId` ✅
+3. Imagens em **base64 no Postgres** por enquanto — R12.70 migra para Vercel Blob ✅
+4. Novo modelo `Project` **dedicado ao Notebook** (separado de `PipelineProject`) ✅
+5. **Padrão = criar nova versão** ao editar; "atualizar versão atual" é exceção via `?updateInPlace=true` ✅
+
+**G) Testes de regressão (`tests/r12_66_notebook_versioning_backend.test.ts`) — 35 testes verdes**
+
+Análise estática dos arquivos-fonte (não roda Prisma real; suficiente para validar surface pública, imports, e alinhamento com o mandato verbatim da Janaina):
+- **R12.66.A** — schema Prisma tem Project + NotebookVersion + NotebookImage com todos os campos exigidos verbatim (número, data, usuário, descrição, conteúdo anterior, conteúdo atualizado); NotebookEntry tem `currentVersion` e `projectId`
+- **R12.66.B** — migration SQL R12.66 existe e cria as 3 tabelas + alter em `notebook_entries`
+- **R12.66.C** — helper `versioning.ts` expõe todas as funções (`snapshotFromEntry`, `createInitialVersion`, `createNewVersion`, `updateEntryWithVersion`, `restoreVersion`, `snapshotsAreEqual`); `createInitialVersion` sempre grava V1 com `changeSummary: "Criação inicial"`; `restoreVersion` **jamais chama `.delete()`** e sempre incrementa `currentVersion + 1`
+- **R12.66.D** — todas as 5 APIs existem, exportam os verbos corretos, validam ownership via `session.user.id`; `images/route.ts` valida `mimeType image/*` e tem limite de tamanho
+- **R12.66.E** — POST `/api/notebook` importa `createInitialVersion`, aceita `projectId`, executa dentro de `$transaction`, valida ownership do projeto
+- **R12.66.F** — PATCH `/api/notebook` lê `?updateInPlace=true`, chama `updateEntryWithVersion`, padrão é criar nova versão (updateInPlace só ativa com match exato "true"), retorna `newVersionNumber`, passa `changeSummary` para o helper
+- **R12.66.G** — todos os 9 arquivos R12.66 existem em disco, nenhum vaza secrets
+
+**Testes:** **428/428 passing** (393 anteriores + 35 novos R12.66, zero regressões, 45.26s).
+
+**Arquivos criados (6):**
+- `prisma/migrations/20260731000001_r12_66_notebook_versioning_projects_images/migration.sql` (111 linhas SQL)
+- `src/lib/notebook/versioning.ts` (helper transacional único)
+- `src/app/api/notebook/[id]/versions/route.ts` (GET+POST)
+- `src/app/api/notebook/[id]/versions/[version]/route.ts` (GET + diff)
+- `src/app/api/notebook/[id]/versions/restore/route.ts` (POST restore)
+- `src/app/api/notebook/[id]/images/route.ts` (GET+POST+DELETE)
+- `src/app/api/projects/route.ts` (GET+POST+PATCH+DELETE)
+- `tests/r12_66_notebook_versioning_backend.test.ts` (35 testes)
+
+**Arquivos modificados (2):**
+- `prisma/schema.prisma` (User relations + NotebookEntry campos + 3 modelos novos)
+- `src/app/api/notebook/route.ts` (POST cria V1, PATCH usa updateEntryWithVersion com padrão = nova versão)
+
+**Próximo (R12.67):** Frontend — componente `<ExportBar>` com botões `Salvar no Notebook` / `Editar` / `Gerar nova versão` / `Exportar PDF` / `Exportar DOCX` / `Adicionar imagem` / `Consultar histórico` + libs `jspdf` + `docx`.
+
+---
+
 ### R12.65 — Regenerador embutido na pré-execução + destaque MAGNÍFICO do ponto inicial G92 X0 Y0 Z0 E0 (2026-07-31)
 
 Mandato Janaina: **"para regenerar um gcode, precisa ser feito no painel Validação visual do G-code · pré-execução, onde podemos alterar dimensões do STL e Parâmetros de GCode para visualizar depois de uma regeneracao e antes de bioimpimir. deixe no painel a vista onde está o ponto inicial da impressão, onde está o G92 x0 y0 z0 e0 para facilitar termos um resultado magnifico e todo conseguirem imprimir sem dificuldade."**
@@ -617,4 +707,4 @@ Learning store persiste ajustes do usuário e re-alimenta as próximas sugestõe
 Proprietário — Quantis Biotechnology © 2026
 Janaina Dernowsek (CEO/Founder)
 
-**Last Updated:** 2026-07-31 — R12.65 (Regenerador embutido na pré-execução · alterar dimensões do STL e parâmetros de G-code sem sair da tela · destaque MAGNÍFICO do ponto inicial G92 X0 Y0 Z0 E0 no viewer 3D · marcador do 1º filamento · usuária vê ANTES de imprimir onde o bico precisa estar posicionado 🎯⊙▶)
+**Last Updated:** 2026-08-03 — R12.66 (Backend do Notebook · rastreabilidade completa · versionamento automático V1/V2/V3 sem apagar histórico · nunca destrói versões · restore cria N+1 · biblioteca de imagens científicas com metadados de experimento · modelos Prisma Project/NotebookVersion/NotebookImage · migration aplicada no Neon Postgres · 5 APIs REST · 428/428 testes verdes · Fase 1 de 4 do pacote export/salvar/rastreabilidade da Janaina 📓🔢🖼️)
