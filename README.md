@@ -174,6 +174,144 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R13.03 — BIA Academy: Dashboard do aluno + Minha Jornada + Página de aula (2026-08-07)
+
+**Terceiro sprint da trilha R13 — o coração da experiência do aluno.** Toda a área logada de `/academy/*` foi construída: sidebar próprio, dashboard "home" com 5 cards de agregação, timeline dos 12 módulos, página de módulo listando aulas, e a página de aula com iframe YouTube + biaHook + prev/next. 7 decisões travadas com a Janaina antes do commit.
+
+**Decisões locked (Janaina · 2026-08-07):**
+1. **Sidebar próprio (Opção B)** — `/academy` é um universo próprio (não reusa DashboardSidebar). AcademySidebar com 7 itens (Dashboard, Jornada, Módulos, Biblioteca, Projeto, Encontros, Certificado) + botão "Voltar para a BIA" + paleta violet→fuchsia
+2. **continueFrom heurística A + fallback C** — última aula IN_PROGRESS por `updatedAt DESC`; se não houver, cai no fallback para a próxima aula não concluída em ordem (Aula 1 do Módulo 1 no primeiro acesso)
+3. **Página de aula A: iframe simples + botão manual** — `<iframe>` YouTube embed + botão "Marcar como concluída". R13.04 vai substituir por IFrame API com tracking automático de segundos assistidos
+4. **Gate acesso A** — anônimo/NO_ENROLLMENT/EXPIRED → redirect `/academy/welcome` (Opção B do R13.02 é reusada, único ponto para gerenciar CTAs Asaas/WhatsApp)
+5. **biaHook A: nova aba** — clicar em "Abrir na BIA" navega `/dashboard/{tool}?params...&from=academy&lessonId=xxx` em `target="_blank"`. Tracka `bia_hook_opened` e promove NOT_STARTED → IN_PROGRESS automaticamente
+6. **Selo "Concluído" B** — módulo ganha badge esmeralda quando 100% das aulas publicadas estão COMPLETED. Aulas não publicadas NÃO contam no cálculo (não bloqueia gate)
+7. **Aula não publicada B** — aparece na lista com ícone de cadeado + label "em breve" (não some), mas retorna 404 se acessada diretamente por URL
+
+**A) Helper `src/lib/academy/journey.ts` — 9.4 KB (funções puras)**
+
+Encapsula toda a lógica de agregação de progresso do aluno. Zero I/O — recebe objetos Prisma já carregados. Exports:
+
+- `computeStudentJourney(modules, progress, now?)` — retorna `StudentJourney` com módulos+aulas+progresso+% por módulo+% global+continueFrom+nextRecommendedLesson
+- `findLessonInJourney(journey, moduleSlug, lessonSlug)` — encontra aula publicada específica (null se não existe/não publicada)
+- `findNextLesson(journey, currentLessonId)` — próxima aula publicada na sequência global (atravessa fronteira de módulo)
+- `findPreviousLesson(journey, currentLessonId)` — aula anterior publicada
+
+Regras determinísticas: ordena módulos por `order ASC`, aulas por `order ASC`, aulas não publicadas viram status LOCKED e não contam no percent, módulos não publicados ficam fora do fluxo de próxima aula.
+
+**B) AcademySidebar `src/components/academy/AcademySidebar.tsx` — 14.4 KB (client)**
+
+Sidebar dedicado para `/academy/*` logado. 7 itens de nav + botão "Voltar para a BIA" no topo + user row + logout. Paleta violet→fuchsia (identidade Academy). Mesma UX do DashboardSidebar (desktop persistente + drawer mobile com hamburger). InfoTooltip hover-desktop/click-mobile em cada item.
+
+**C) APIs (3):**
+
+- `GET /api/academy/journey` — agrega toda a jornada do aluno em uma única chamada. Retorna `{ enrollment: { state, daysRemaining, ... }, journey: StudentJourney }`. Usa `hasAccess()` do R13.01. 401 anônimo, 403 sem matrícula ou EXPIRED
+- `GET /api/academy/lessons/[lessonSlug]?moduleSlug=xxx` — retorna aula (title, objective, summary, youtubeId, biaHook, attachments, quiz?) + progresso do aluno + `navigation.previous/next`. Faz upsert idempotente em NOT_STARTED no primeiro acesso. 404 se aula/módulo não publicado. Compatível Next.js 15 async params
+- `PATCH /api/academy/progress` — atualiza status/watchedSeconds/biaHookOpened/quizScore com Zod. Deriva `completedAt=now` automaticamente quando status=COMPLETED, e `completedAt=null` quando volta a NOT_STARTED. Detecta conclusão do programa (todas aulas publicadas COMPLETED) e marca `enrollment.completedAt` — retorna `enrollmentJustCompleted: true` no response (certificado sai em R13.09)
+
+**D) Layout `src/app/academy/(app)/layout.tsx` — route group protegido**
+
+O route group `(app)` do Next.js segrega as rotas logadas da landing pública. O layout `(app)/layout.tsx` faz:
+1. Guarda de sessão: anônimo → `/auth/login?callbackUrl=/academy/dashboard`
+2. Guarda de matrícula: `!hasAccess()` → `/academy/welcome` (reusa Opção B do R13.02)
+3. Renderiza `<AcademySidebar />` + `<main>{children}</main>`
+
+Como fica organizado:
+```
+/academy/                          ← landing PÚBLICA (R13.02)
+/academy/welcome                   ← onboarding (R13.02)
+/academy/(app)/dashboard           ← [protegida] home do aluno  ← NOVO
+/academy/(app)/journey             ← [protegida] Minha Jornada  ← NOVO
+/academy/(app)/modules/[slug]      ← [protegida] módulo         ← NOVO
+/academy/(app)/modules/[m]/[l]     ← [protegida] aula           ← NOVO
+```
+
+**E) Página `/academy/dashboard` — 14 KB (server component)**
+
+Home do aluno pós-login. 5 cards com testIds `dashboard-card-*`:
+
+1. **Continue de onde parou** (card grande) — link direto para a aula IN_PROGRESS mais recente (ou fallback para próxima recomendada)
+2. **Progresso geral** — % concluído + aulas completadas/total + dias restantes de acesso
+3. **Próxima aula recomendada** — só aparece se for diferente do continueFrom
+4. **Próximo encontro ao vivo** — próximo AcademyLiveEvent futuro, ou placeholder
+5. **Feed de atualizações** (compacto) — últimas 3 AcademyUpdates publicadas
+6. **CTA "Ver jornada completa"** — atalho para `/academy/journey`
+
+Saudação personalizada com o primeiro nome do aluno da sessão.
+
+**F) Página `/academy/journey` — 12.3 KB (server component)**
+
+Timeline dos 12 módulos com progresso individual. Cada módulo é um card expandido mostrando:
+- Ordem (padStart 2 dígitos), título, descrição, barra de progresso do módulo, badge de status
+- Lista completa de aulas com status individual (COMPLETED/IN_PROGRESS/NOT_STARTED/LOCKED)
+- Módulos concluídos com borda esmeralda + badge "Concluído ✓" (decisão #6)
+- Módulos em andamento com borda fuchsia + badge "Em andamento"
+- Módulos não publicados com opacity + badge "Em breve"
+
+**G) Página `/academy/modules/[moduleSlug]` — 7.9 KB (server component)**
+
+Página do módulo listando todas as aulas com status individual em cards maiores. Chama `notFound()` se o módulo não existe ou não está publicado. Breadcrumb: Jornada → Módulo N. Badge "Concluído" no header quando o módulo está 100%.
+
+**H) Página `/academy/modules/[moduleSlug]/[lessonSlug]` — server + client (22 KB total)**
+
+`page.tsx` (server) — carrega aula + módulo + progresso + prev/next. Chama `notFound()` se aula/módulo não publicado (decisão #7). Faz upsert idempotente do progresso em NOT_STARTED no primeiro acesso.
+
+`_components/LessonView.tsx` (client) — renderiza:
+- Breadcrumb (Jornada → Módulo → Aula N.N)
+- Header (título, objetivo em card destacado)
+- iframe YouTube embed (`https://www.youtube.com/embed/{youtubeId}?rel=0&modestbranding=1`)
+- Barra de ações: badge de status + botão "Marcar como concluída" (verde) ou "Marcar como não concluída"
+- Banner de confete "Aula concluída! 🎓" com link para próxima aula
+- **biaHook card** (gradiente Academy): link em nova aba para `/dashboard/{tool}?...&from=academy&lessonId=xxx`, tracka `bia_hook_opened` e promove NOT_STARTED → IN_PROGRESS
+- Resumo (markdown-plain)
+- Anexos: PDF/LINK/STL/GCODE/IMAGE com ícones específicos
+- Card do quiz "em breve" (funcional em R13.05)
+- Navegação prev/next em grid 2 colunas
+
+Tracka via `/api/academy/analytics` (fire-and-forget): `lesson_opened` (mount), `lesson_completed` (patch OK), `bia_hook_opened` (clique).
+
+**I) Redirect do onboarding para /academy/dashboard**
+
+Agora que a "casa do aluno" existe, `WelcomeForm.submit`, `WelcomeForm.skip` e `welcome/page.tsx` (already-answered) todos redirecionam para `/academy/dashboard?from=academy-welcome` em vez de `/dashboard/notebook`.
+
+**J) Testes `tests/r13_03_academy_dashboard_journey_lesson.test.ts` — 81 verdes**
+
+- **R13.03.A** (13) — Helper puro: agregação, %, LOCKED, ordenação, continueFrom com múltiplos IN_PROGRESS, findNextLesson atravessando módulos, edge cases
+- **R13.03.B** (7) — AcademySidebar: 7 itens, botão voltar BIA, gradient violet-fuchsia, InfoTooltip
+- **R13.03.C** (6) — API journey: GET, auth 401, hasAccess, 403, force-dynamic
+- **R13.03.D** (6) — API lesson: query moduleSlug, 404 não publicado, upsert idempotente, prev/next, Next.js 15
+- **R13.03.E** (8) — API progress: Zod, deriva completedAt, enrollmentJustCompleted, 404 não publicado
+- **R13.03.F** (4) — Layout (app): redirect anon + redirect welcome + AcademySidebar
+- **R13.03.G** (6) — /academy/dashboard: 5 cards com testIds, live event, updates feed
+- **R13.03.H** (5) — /academy/journey: badges concluído/em breve, aulas LOCKED, barras
+- **R13.03.I** (5) — /academy/modules/[slug]: notFound() gate, Next.js 15, testIds
+- **R13.03.J** (13) — Página de aula: iframe YT, marcar concluída, biaHook target=_blank, tracking, 5 tipos de anexo, prev/next, quiz "em breve"
+- **R13.03.K** (2) — Redirect onboarding → /academy/dashboard
+- **R13.03.L** (4) — Sanidade global: helper exports, route group isola, force-dynamic em todas APIs, JSDoc R13.03
+
+**Testes:** **791/791 passing** (710 anteriores + 81 novos R13.03, zero regressões, 45.15s).
+
+**Arquivos criados (11):**
+- `src/lib/academy/journey.ts` (9.4 KB — helper puro)
+- `src/components/academy/AcademySidebar.tsx` (14.4 KB — client)
+- `src/app/api/academy/journey/route.ts` (2.8 KB)
+- `src/app/api/academy/lessons/[lessonSlug]/route.ts` (5.5 KB)
+- `src/app/api/academy/progress/route.ts` (5.7 KB)
+- `src/app/academy/(app)/layout.tsx` (1.7 KB — server, protegido)
+- `src/app/academy/(app)/dashboard/page.tsx` (14 KB — 5 cards)
+- `src/app/academy/(app)/journey/page.tsx` (12.3 KB — timeline)
+- `src/app/academy/(app)/modules/[moduleSlug]/page.tsx` (7.9 KB — lista aulas)
+- `src/app/academy/(app)/modules/[moduleSlug]/[lessonSlug]/page.tsx` (4.9 KB — server)
+- `src/app/academy/(app)/modules/[moduleSlug]/[lessonSlug]/_components/LessonView.tsx` (17.6 KB — client)
+- `tests/r13_03_academy_dashboard_journey_lesson.test.ts` (29.9 KB — 81 testes)
+
+**Arquivos modificados (2):**
+- `src/app/academy/welcome/_components/WelcomeForm.tsx` (redirect: `/dashboard/notebook` → `/academy/dashboard`)
+- `src/app/academy/welcome/page.tsx` (redirect: `/dashboard/notebook` → `/academy/dashboard`)
+
+**Próximo (R13.04):** Player YouTube com IFrame API + tracking automático de `watchedSeconds` — substitui o iframe simples desta sprint.
+
+---
+
 ### R13.02 — BIA Academy: Landing pública `/academy` + onboarding + analytics mínimo (2026-08-07)
 
 **Segundo sprint da trilha R13** — a porta de entrada comercial da plataforma educacional. Landing pública `biaquantis.bio/academy` (sem login), onboarding leve de 3 perguntas para o primeiro acesso do aluno, e tracking mínimo para dar visibilidade do funil comercial sem cookies e sem GA. 6 decisões travadas com a Janaina antes do commit.
@@ -406,8 +544,8 @@ npx tsx scripts/seed-academy-module-01.ts --publish
 
 ```
 ✅ R13.01  Schema Prisma + Migration + Seed do Módulo 1
-✅ R13.02  Landing pública /academy + onboarding + analytics mínimo (ESTA SPRINT)
-⏳ R13.03  Dashboard aluno + Minha Jornada + página de aula
+✅ R13.02  Landing pública /academy + onboarding + analytics mínimo
+✅ R13.03  Dashboard aluno + Minha Jornada + página de aula (ESTA SPRINT)
 ⏳ R13.04  Player YouTube com tracking de progresso (IFrame API)
 ⏳ R13.05  Quizzes + Biblioteca
 ⏳ R13.06  Integração BIA (bia-hook + retorno de progresso)
@@ -1395,4 +1533,4 @@ Learning store persiste ajustes do usuário e re-alimenta as próximas sugestõe
 Proprietário — Quantis Biotechnology © 2026
 Janaina Dernowsek (CEO/Founder)
 
-**Last Updated:** 2026-08-07 — R13.02 (BIA Academy · Landing pública `/academy` + onboarding + analytics mínimo · 6 decisões locked com a Janaina · migration R13.02 aplicada no Neon (onboarding Json? em AcademyEnrollment + model AcademyAnalytics com 3 índices) · API /api/academy/onboarding GET+PATCH com Zod enums (13 áreas × 3 níveis × 6 objetivos + skip) · API /api/academy/analytics POST fire-and-forget para anônimos + GET agregado restrito ADMIN/INSTRUCTOR · **ZERO cookies, ZERO gtag, ZERO GA** — só server-side · landing pública 28 KB com 8 seções (nav/hero/programa/como-funciona/12-módulos/público/investimento/FAQ-6-itens) · layout próprio sem DashboardSidebar · onboarding /academy/welcome com 4 branches (anon/pending/answered/active) · WelcomeForm com 3 perguntas + botão skip · PendingEnrollment (Opção B) com CTAs Asaas + WhatsApp para não-matriculados · link Academy no sidebar visível para TODOS (Opção A) com badge "novo" + destaque fuchsia · links comerciais LOCKED (Asaas iu7ym1dp93cei9zk + WhatsApp 11968632231) · **710/710 testes verdes** (632 anteriores + 78 novos R13.02, zero regressões, 46.79s) · próximo = R13.03 Dashboard do aluno + Minha Jornada + página de aula 🎓📚🎯💜)
+**Last Updated:** 2026-08-07 — R13.03 (BIA Academy · Dashboard do aluno + Minha Jornada + Página de aula · 7 decisões locked com a Janaina · sidebar próprio Opção B (AcademySidebar 14.4 KB com 7 itens de nav + botão Voltar-BIA + paleta violet→fuchsia) · helper puro journey.ts (9.4 KB — computeStudentJourney + findLessonInJourney + findNextLesson + findPreviousLesson, ZERO I/O) · 3 APIs (GET /journey agregado, GET /lessons/[slug] com upsert idempotente, PATCH /progress derivando completedAt + detectando conclusão do programa) · route group /academy/(app) segrega rotas logadas com layout protegido (redirect anon → /auth/login, redirect NO_ENROLLMENT/EXPIRED → /academy/welcome Opção B) · 4 páginas server: dashboard 5 cards (continue/progresso/next/live/updates), journey timeline 12 módulos com selos "Concluído ✓" + "Em breve", modules/[slug] lista de aulas, modules/[m]/[l] com iframe YouTube + botão manual "Marcar concluída" + biaHook em nova aba + tracking (lesson_opened, lesson_completed, bia_hook_opened) · aulas não publicadas aparecem com cadeado (não somem) mas 404 se acessadas direto · onboarding pós-completed agora redireciona para /academy/dashboard (não mais /dashboard/notebook) · continueFrom = último IN_PROGRESS por updatedAt DESC com fallback para próxima aula não concluída · módulo ganha selo "Concluído" quando 100% das aulas publicadas · R13.04 vai substituir iframe simples por YouTube IFrame API com tracking automático de watchedSeconds · **791/791 testes verdes** (710 anteriores + 81 novos R13.03 em 12 blocos A–L, zero regressões, 45.15s) · próximo = R13.04 Player YouTube IFrame API 🎓📺🧭🎯💜)

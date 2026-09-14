@@ -6,8 +6,8 @@
  * Contrato:
  *  - PATCH /api/academy/onboarding com { preferredArea, experienceLevel, mainGoal }
  *  - Aluno pode pular (botão secundário → PATCH { skip: true })
- *  - Após sucesso, redireciona para /dashboard/notebook?from=academy-welcome
- *    (dashboard do aluno propriamente dito virá no R13.03)
+ *  - Após sucesso, redireciona para /academy/dashboard?from=academy-welcome
+ *    (a casa do aluno — dashboard próprio da Academy — chegou no R13.03)
  */
 
 import { useState } from "react"
@@ -107,7 +107,7 @@ export function WelcomeForm({
         experienceLevel,
         mainGoal,
       })
-      router.push("/dashboard/notebook?from=academy-welcome")
+      router.push("/academy/dashboard?from=academy-welcome")
     } catch (e) {
       setError((e as Error).message)
       setBusy(null)

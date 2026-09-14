@@ -86,9 +86,8 @@ export default async function WelcomePage({
   const editMode = resolvedSearch?.edit === "true"
 
   if (alreadyAnswered && !editMode) {
-    // Dashboard do aluno ainda não existe (R13.03) — enquanto isso,
-    // manda para o Notebook, que é o próximo destino natural pós-onboarding.
-    redirect("/dashboard/notebook?from=academy-welcome")
+    // R13.03: manda para o dashboard próprio do aluno na Academy.
+    redirect("/academy/dashboard?from=academy-welcome")
   }
 
   return (

@@ -396,9 +396,9 @@ describe("R13.02.G · /academy/welcome (server component, 4 branches)", () => {
     expect(src).toMatch(/WelcomeForm/)
   })
 
-  it("Redireciona para notebook quando já respondeu (from=academy-welcome)", () => {
+  it("Redireciona para /academy/dashboard quando já respondeu (from=academy-welcome, atualizado no R13.03)", () => {
     const src = readSrc(pagePath)
-    expect(src).toMatch(/\/dashboard\/notebook/)
+    expect(src).toMatch(/\/academy\/dashboard/)
     expect(src).toMatch(/from=academy-welcome|academy-welcome/)
   })
 
@@ -452,9 +452,9 @@ describe("R13.02.H · WelcomeForm (3 perguntas + skip)", () => {
     expect(src).toContain("onboarding_skipped")
   })
 
-  it("Redireciona para /dashboard/notebook após submit ou skip", () => {
+  it("Redireciona para /academy/dashboard após submit ou skip (atualizado no R13.03)", () => {
     const src = readSrc(compPath)
-    expect(src).toContain("/dashboard/notebook")
+    expect(src).toContain("/academy/dashboard")
   })
 })
 
