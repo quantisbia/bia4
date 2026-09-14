@@ -174,6 +174,122 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R13.01 — BIA Academy: schema Prisma (11 models) + migration aplicada no Neon + seed do Módulo 1 piloto + helper de matrícula (2026-08-07)
+
+**Início da trilha R13** — a plataforma educacional integrada `biaquantis.bio/academy`. Todas as decisões acordadas em `docs/roadmap/R13_bia_academy_decisions.md` (10 decisões travadas com a Janaina).
+
+**A) Schema Prisma — 11 novos models Academy**
+
+| Model | Papel |
+|---|---|
+| `AcademyEnrollment` | Matrícula do aluno (1 por user, com `accessUntil = enrolledAt + 12 meses`) |
+| `AcademyModule` | Módulo do curso (12 no total quando publicados) |
+| `AcademyLesson` | Aula (com `youtubeId`, `objective`, `summary`, `biaHook Json?`) |
+| `AcademyAttachment` | Anexos da aula (PDF/LINK/STL/GCODE/IMAGE) |
+| `AcademyQuiz` | Quiz opcional por aula (passingScore default 70) |
+| `AcademyQuizQuestion` | Pergunta do quiz (options Json + correctIndex) |
+| `AcademyProgress` | Progresso do aluno (1 registro por lesson via `@@unique([enrollmentId, lessonId])`) |
+| `AcademyProject` | "Meu Projeto de Biofabricação" — amarrado a `NotebookEntry` (R12.66) |
+| `AcademyLiveEvent` | Encontros online ao vivo (3 no programa) |
+| `AcademyUpdate` | Feed de atualizações (PROTOCOL/ARTICLE/LESSON_EXTRA/EVENT) |
+| `AcademyCertificate` | Certificado emitido com `code @unique` |
+
+**Relations bidirecionais:**
+- `User.academyEnrollment` (opcional, 1:1)
+- `NotebookEntry.academyProject` (opcional, 1:1) — permite versionamento automático V1/V2/V3 do projeto do aluno via R12.66
+
+**B) Enum `UserRole` estendido**
+
+- `USER`, `ADMIN`, `RESEARCHER` (existentes) + **`STUDENT`** (aluno matriculado) + **`INSTRUCTOR`** (professor/monitor que pode criar módulos/aulas/agendar encontros)
+
+**C) Migration `20260806000001_r13_01_academy_schema` — APLICADA no Neon Postgres**
+
+- 262 linhas SQL: 2 `ALTER TYPE UserRole ADD VALUE` + 11 `CREATE TABLE` + 22 `CREATE INDEX` + 13 FK constraints
+- Aplicada com `npx prisma migrate deploy` — resultado: `Applying migration '20260806000001_r13_01_academy_schema'` OK
+- Prisma Client regenerado (`npx prisma generate`) — v7.6.0 em 1.17s
+- Vercel próxima deploy vai reportar "already applied" e passar direto
+
+**D) Helper `src/lib/academy/enrollment.ts` — cálculos deterministas (6 KB)**
+
+Funções puras (sem I/O — 100% testáveis):
+- `ACCESS_DURATION_MS` = 365 dias em ms
+- `calculateAccessUntil(enrolledAt)` = `enrolledAt + 12 meses`
+- `getEnrollmentState(enrollment, now)` → `PENDING | ACTIVE | COMPLETED | EXPIRED`
+- `hasAccess(enrollment, now)` — atalho: ACTIVE ou COMPLETED = true
+- `daysRemaining(enrollment, now)` — número positivo, 0 (EXPIRED), ou null (COMPLETED)
+- `moduleCompletionPercent(lessons, progress)` — % de aulas concluídas do módulo
+- `overallCompletionPercent(modules, progress)` — % do programa (só publicados)
+- `generateCertificateCode(year, seq)` → `"BIA-ACAD-2027-0001"`
+- `prepareEnrollmentData({ userId, source, asaasPaymentId?, enrolledAt? })` — payload para `prisma.academyEnrollment.create`
+
+**E) Seed script `scripts/seed-academy-module-01.ts` — Módulo 1 piloto (14 KB)**
+
+**RODADO em produção com `--publish`** → Neon agora tem o Módulo 1 completo:
+
+- 1 módulo: **"Introdução à Biofabricação"** (slug `introducao-biofabricacao`, order 1)
+- 5 aulas piloto:
+  1. **O que é biofabricação?** (12 min · basic · quiz de 1 pergunta · 1 link Groll 2019)
+  2. **Fundamentos de engenharia tecidual** (15 min · basic · biaHook para Formulator Pro)
+  3. **Panorama da bioimpressão 3D** (18 min · intermediate · biaHook para bioprint/model)
+  4. **Aplicações clínicas atuais** (14 min · intermediate · 1 link Murphy & Atala 2014)
+  5. **Limitações e desafios do estado da arte** (16 min · advanced · quiz de 2 perguntas)
+- `youtubeId` como `PLACEHOLDER_M01_L01..L05` — time de conteúdo substitui pelos IDs reais dos vídeos não listados antes do lançamento público
+- **Idempotente**: 2ª execução relatou `updated: true` em vez de duplicar
+- **Não-destrutivo**: nunca chama `.delete()` em `AcademyModule`, `AcademyLesson` ou `AcademyEnrollment`. Attachments/quizzes SÃO recriados por lesson (reconciliação local, sem risco global)
+- Suporta `--dry-run` (preview sem gravar) e `--publish` (marca isPublished=true; sem flag fica como draft)
+- Reusa o singleton `prisma` do app (`src/lib/db/prisma.ts`) — adapter Neon já configurado
+
+Rodar depois:
+```bash
+# preview
+npx tsx scripts/seed-academy-module-01.ts --dry-run
+
+# executar (carrega .env.local automaticamente com set -a; source .env.local; set +a)
+set -a; source .env.local; set +a
+npx tsx scripts/seed-academy-module-01.ts --publish
+```
+
+**F) Testes `tests/r13_01_academy_schema.test.ts` — 44 verdes**
+
+- **R13.01.A** (7) — Schema tem 11 models com campos verbatim (AcademyEnrollment.accessUntil, AcademyLesson.youtubeId+biaHook Json, AcademyProject.notebookEntryId @unique, AcademyProgress @@unique lesson+enrollment, AcademyLiveEvent.order 1|2|3, AcademyCertificate.code @unique)
+- **R13.01.B** (2) — Relations bidirecionais: `User.academyEnrollment` e `NotebookEntry.academyProject`
+- **R13.01.C** (3) — Enum UserRole mantém originais + adiciona STUDENT + INSTRUCTOR
+- **R13.01.D** (4) — Migration existe, cria 11 tabelas com prefixo `academy_`, adiciona 2 enum values, FKs corretas
+- **R13.01.E** (10) — Helper enrollment.ts: constante correta, cálculo determinista de accessUntil, ordem COMPLETED > EXPIRED > ACTIVE > PENDING, dias restantes, moduleCompletionPercent (retorna 0 se vazio), overallCompletionPercent só considera publicados, formato do certificate code, prepareEnrollmentData
+- **R13.01.F** (9) — Seed idempotente (upsert por slug), suporta flags, NÃO chama .delete em módulos/aulas/enrollments, contém as 5 aulas piloto, reusa singleton prisma do app, saída JSON
+- **R13.01.G** (4) — Coerência com o doc R13: 11 models mencionados batem, roles STUDENT+INSTRUCTOR no doc, `notebookEntryId` no doc, rolling+12 meses
+- **R13.01.H** (5) — Sanidade global: arquivos existem, 9 exports do helper, seed sem secrets
+
+**Testes:** **632/632 passing** (588 anteriores + 44 novos R13.01, zero regressões, 44.72s).
+
+**Arquivos criados (4):**
+- `prisma/migrations/20260806000001_r13_01_academy_schema/migration.sql` (262 linhas)
+- `src/lib/academy/enrollment.ts` (6 KB — helper transacional)
+- `scripts/seed-academy-module-01.ts` (14 KB — seed idempotente)
+- `tests/r13_01_academy_schema.test.ts` (18 KB — 44 testes)
+
+**Arquivos modificados (1):**
+- `prisma/schema.prisma` (+ 11 models Academy + 2 roles + 2 relations bidirecionais)
+
+**🎯 Estado atual do R13 · BIA Academy**
+
+```
+✅ R13.01  Schema Prisma + Migration + Seed do Módulo 1 (ESTA SPRINT)
+⏳ R13.02  Landing pública /academy + onboarding
+⏳ R13.03  Dashboard aluno + Minha Jornada + página de aula
+⏳ R13.04  Player YouTube com tracking de progresso (IFrame API)
+⏳ R13.05  Quizzes + Biblioteca
+⏳ R13.06  Integração BIA (bia-hook + retorno de progresso)
+⏳ R13.07  Meu Projeto (reusa Notebook R12.69)
+⏳ R13.08  Feed de Atualizações
+⏳ R13.09  Certificado (reusa jspdf do R12.67)
+⏳ R13.10  Admin (CRUD módulos/aulas/alunos/eventos)
+```
+
+**Próximo (R13.02):** Landing pública `/academy` — página comercial + botões de compra Asaas + WhatsApp corporativo + onboarding de 3 perguntas para primeiro login.
+
+---
+
 ### R12.69 — UI hierárquica do Notebook: Projetos → Entradas → Versões + busca global + diff visual (Fase 4 de 4 · CONCLUI o pacote export/salvar/rastreabilidade) (2026-08-06)
 
 Mandato Janaina (Fase 4 final do pacote):
@@ -1148,4 +1264,4 @@ Learning store persiste ajustes do usuário e re-alimenta as próximas sugestõe
 Proprietário — Quantis Biotechnology © 2026
 Janaina Dernowsek (CEO/Founder)
 
-**Last Updated:** 2026-08-06 — R12.69 (UI hierárquica do Notebook: Projetos → Entradas → Versões · ProjectSidebar com slots virtuais e criar-projeto · EntryList com busca global e 4 filtros · VersionTimeline horizontal com seleção múltipla e restore · VersionDiff side-by-side ZERO libs · layout 3 colunas responsivo com tabs mobile · views create/generate PRESERVADAS · Fase 4 de 4 · PACOTE COMPLETO ✅ · 588/588 testes verdes · próximo = R13.01 BIA Academy 🌳📁🔍⏱️🔀🎉)
+**Last Updated:** 2026-08-07 — R13.01 (INÍCIO DA TRILHA R13 · BIA Academy: schema Prisma com 11 models (Enrollment/Module/Lesson/Attachment/Quiz/Question/Progress/Project/LiveEvent/Update/Certificate) · 2 novos roles STUDENT + INSTRUCTOR · migration 262 linhas aplicada no Neon · helper enrollment.ts com 9 funções puras · seed do Módulo 1 piloto "Introdução à Biofabricação" com 5 aulas + 2 quizzes rodado em produção · AcademyProject amarrado a NotebookEntry R12.66 para versionamento V1/V2/V3 do "Meu Projeto" · 632/632 testes verdes · próximo = R13.02 Landing pública /academy 🎓📚🎯)
