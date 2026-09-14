@@ -30,9 +30,26 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
-// ─── Links comerciais oficiais (verbatim do doc R13) ─────────────
+// ─── Constantes comerciais oficiais (LOCKED) ─────────────────────
+// Link Asaas do checkout individual online (verbatim, não alterar sem OK da Janaina).
 const ASAAS_LINK = "https://www.asaas.com/c/iu7ym1dp93cei9zk"
+// WhatsApp comercial da Janaina para o card corporativo/in-company.
 const WHATSAPP_LINK = "https://wa.me/11968632231"
+// Valor do curso online individual (R$) — confirmado por Janaina em 2026-08-07.
+// Curso online individual com plataforma BIA integrada + 12 meses de acesso.
+const PRICE_BRL = 2375
+const PRICE_BRL_FORMATTED = PRICE_BRL.toLocaleString("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+  minimumFractionDigits: 2,
+})
+// Parcelamento sugerido (12x sem juros no cartão — Asaas oferece)
+const PRICE_INSTALLMENTS = 12
+const PRICE_PER_INSTALLMENT = (PRICE_BRL / PRICE_INSTALLMENTS).toLocaleString("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+  minimumFractionDigits: 2,
+})
 
 // ─── Tracking helper (fire-and-forget) ──────────────────────────
 function trackEvent(event: string, metadata?: Record<string, unknown>) {
@@ -108,6 +125,10 @@ const FAQ = [
   {
     q: "O que acontece depois dos 12 meses?",
     a: "Você continua tendo acesso ao Notebook com todos os seus protocolos e formulações (permanente). O acesso a novas atualizações do Academy e à BIA precisa ser renovado — entre em contato com o time comercial.",
+  },
+  {
+    q: "Quais são as formas de pagamento?",
+    a: "R$ 2.375,00 à vista via Pix ou boleto, OU até 12x de R$ 197,92 no cartão de crédito (sem juros). Pagamento processado com segurança pela Asaas. A liberação do acesso à plataforma acontece em até 24 horas úteis após confirmação.",
   },
 ]
 
@@ -425,11 +446,30 @@ export default function AcademyLandingPage() {
                   Curso online individual
                 </span>
               </div>
-              <h3 className="text-xl sm:text-2xl font-bold text-white mb-3">BIA Academy · Online</h3>
+              <h3 className="text-xl sm:text-2xl font-bold text-white mb-1">BIA Academy · Online</h3>
+              <p className="text-xs text-gray-500 mb-4">Com plataforma BIA integrada</p>
+
+              {/* Bloco de preço destacado */}
+              <div
+                data-testid="academy-price-block"
+                className="rounded-xl bg-black/30 border border-violet-500/20 px-4 py-3 mb-5"
+              >
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+                    {PRICE_BRL_FORMATTED}
+                  </span>
+                  <span className="text-xs text-gray-400">à vista</span>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  ou até <span className="font-semibold text-violet-300">{PRICE_INSTALLMENTS}x de {PRICE_PER_INSTALLMENT}</span> no cartão
+                </p>
+              </div>
+
               <ul className="space-y-2 mb-6 text-sm text-gray-300">
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-violet-400 flex-shrink-0" />12 módulos + 12 meses</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-violet-400 flex-shrink-0" />12 módulos + 12 meses de acesso</li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-violet-400 flex-shrink-0" />3 encontros online ao vivo</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-violet-400 flex-shrink-0" />Acesso completo à BIA</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-violet-400 flex-shrink-0" />Acesso completo à plataforma BIA</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-violet-400 flex-shrink-0" />Notebook eletrônico com versionamento</li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-violet-400 flex-shrink-0" />Certificado ao final</li>
               </ul>
               <a
@@ -444,7 +484,7 @@ export default function AcademyLandingPage() {
                 <ArrowRight className="w-4 h-4" />
               </a>
               <p className="text-[11px] text-gray-500 mt-3 text-center">
-                Pagamento seguro via Asaas
+                Pagamento seguro via Asaas · Boleto, Pix ou cartão
               </p>
             </div>
 

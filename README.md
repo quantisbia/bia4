@@ -174,6 +174,28 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R13.03.1 — BIA Academy: Preço R$ 2.375,00 publicado na landing (2026-08-07)
+
+Hotfix comercial pequeno, apenas para dar visibilidade do valor final na página `/academy` e alinhar com a descrição do checkout do Asaas.
+
+**O que mudou:**
+- Landing `/academy` agora exibe o preço em destaque no card "Curso online individual" (seção Investimento): **R$ 2.375,00 à vista** ou **12x de R$ 197,92 no cartão sem juros**
+- Nova constante LOCKED `PRICE_BRL = 2375` no `page.tsx` (formatada via `toLocaleString("pt-BR", { style: "currency" })`)
+- FAQ ganhou 7ª pergunta: "Quais são as formas de pagamento?" com resposta detalhada (Pix, boleto, cartão + liberação em 24h úteis)
+- Novo `data-testid="academy-price-block"` no bloco de preço para automação
+- Link Asaas continua o mesmo (LOCKED): `https://www.asaas.com/c/iu7ym1dp93cei9zk`
+
+**Bloco novo de testes R13.02.M · Preço:**
+- Constante `PRICE_BRL === 2375` presente
+- Formatação pt-BR com currency BRL
+- Card com `academy-price-block` testId
+- Menção a 12x parcelas
+- FAQ contém pergunta sobre pagamento com valor "R$ 2.375"
+
+**Testes:** **796/796 passing** (791 anteriores + 5 novos R13.02.M, zero regressões).
+
+---
+
 ### R13.03 — BIA Academy: Dashboard do aluno + Minha Jornada + Página de aula (2026-08-07)
 
 **Terceiro sprint da trilha R13 — o coração da experiência do aluno.** Toda a área logada de `/academy/*` foi construída: sidebar próprio, dashboard "home" com 5 cards de agregação, timeline dos 12 módulos, página de módulo listando aulas, e a página de aula com iframe YouTube + biaHook + prev/next. 7 decisões travadas com a Janaina antes do commit.
@@ -1533,4 +1555,4 @@ Learning store persiste ajustes do usuário e re-alimenta as próximas sugestõe
 Proprietário — Quantis Biotechnology © 2026
 Janaina Dernowsek (CEO/Founder)
 
-**Last Updated:** 2026-08-07 — R13.03 (BIA Academy · Dashboard do aluno + Minha Jornada + Página de aula · 7 decisões locked com a Janaina · sidebar próprio Opção B (AcademySidebar 14.4 KB com 7 itens de nav + botão Voltar-BIA + paleta violet→fuchsia) · helper puro journey.ts (9.4 KB — computeStudentJourney + findLessonInJourney + findNextLesson + findPreviousLesson, ZERO I/O) · 3 APIs (GET /journey agregado, GET /lessons/[slug] com upsert idempotente, PATCH /progress derivando completedAt + detectando conclusão do programa) · route group /academy/(app) segrega rotas logadas com layout protegido (redirect anon → /auth/login, redirect NO_ENROLLMENT/EXPIRED → /academy/welcome Opção B) · 4 páginas server: dashboard 5 cards (continue/progresso/next/live/updates), journey timeline 12 módulos com selos "Concluído ✓" + "Em breve", modules/[slug] lista de aulas, modules/[m]/[l] com iframe YouTube + botão manual "Marcar concluída" + biaHook em nova aba + tracking (lesson_opened, lesson_completed, bia_hook_opened) · aulas não publicadas aparecem com cadeado (não somem) mas 404 se acessadas direto · onboarding pós-completed agora redireciona para /academy/dashboard (não mais /dashboard/notebook) · continueFrom = último IN_PROGRESS por updatedAt DESC com fallback para próxima aula não concluída · módulo ganha selo "Concluído" quando 100% das aulas publicadas · R13.04 vai substituir iframe simples por YouTube IFrame API com tracking automático de watchedSeconds · **791/791 testes verdes** (710 anteriores + 81 novos R13.03 em 12 blocos A–L, zero regressões, 45.15s) · próximo = R13.04 Player YouTube IFrame API 🎓📺🧭🎯💜)
+**Last Updated:** 2026-08-07 — R13.03.1 (BIA Academy · Preço publicado · R$ 2.375,00 à vista OU 12x de R$ 197,92 sem juros no cartão · card destacado no bloco Investimento da landing /academy com testId academy-price-block · nova constante LOCKED `PRICE_BRL = 2375` formatada via toLocaleString pt-BR + currency BRL · nova pergunta 7 no FAQ sobre formas de pagamento · link Asaas MANTIDO (https://www.asaas.com/c/iu7ym1dp93cei9zk) — só o valor foi confirmado · 5 testes novos no bloco R13.02.M validam preço/formato/parcelas/FAQ · **796/796 testes verdes** (791 anteriores + 5 novos R13.02.M, zero regressões) · próximo = R13.04 Player YouTube IFrame API 🎓💰📺💜) — anteriormente = R13.03 (BIA Academy · Dashboard do aluno + Minha Jornada + Página de aula · 7 decisões locked com a Janaina · sidebar próprio Opção B (AcademySidebar 14.4 KB com 7 itens de nav + botão Voltar-BIA + paleta violet→fuchsia) · helper puro journey.ts (9.4 KB — computeStudentJourney + findLessonInJourney + findNextLesson + findPreviousLesson, ZERO I/O) · 3 APIs (GET /journey agregado, GET /lessons/[slug] com upsert idempotente, PATCH /progress derivando completedAt + detectando conclusão do programa) · route group /academy/(app) segrega rotas logadas com layout protegido (redirect anon → /auth/login, redirect NO_ENROLLMENT/EXPIRED → /academy/welcome Opção B) · 4 páginas server: dashboard 5 cards (continue/progresso/next/live/updates), journey timeline 12 módulos com selos "Concluído ✓" + "Em breve", modules/[slug] lista de aulas, modules/[m]/[l] com iframe YouTube + botão manual "Marcar concluída" + biaHook em nova aba + tracking (lesson_opened, lesson_completed, bia_hook_opened) · aulas não publicadas aparecem com cadeado (não somem) mas 404 se acessadas direto · onboarding pós-completed agora redireciona para /academy/dashboard (não mais /dashboard/notebook) · continueFrom = último IN_PROGRESS por updatedAt DESC com fallback para próxima aula não concluída · módulo ganha selo "Concluído" quando 100% das aulas publicadas · R13.04 vai substituir iframe simples por YouTube IFrame API com tracking automático de watchedSeconds · **791/791 testes verdes** (710 anteriores + 81 novos R13.03 em 12 blocos A–L, zero regressões, 45.15s) · próximo = R13.04 Player YouTube IFrame API 🎓📺🧭🎯💜)

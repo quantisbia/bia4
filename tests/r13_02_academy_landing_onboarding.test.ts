@@ -288,14 +288,15 @@ describe("R13.02.E · Landing /academy (página pública)", () => {
     expect(nCount, `esperado 12 módulos, achei ${nCount}`).toBe(12)
   })
 
-  it("Tem FAQ com 6 itens (template academy-faq-toggle-${i} + array FAQ com 6 entradas)", () => {
+  it("Tem FAQ com pelo menos 6 itens (template academy-faq-toggle-${i} + array FAQ)", () => {
     const src = readSrc(pagePath)
     expect(src).toMatch(/academy-faq-toggle-\$\{[^}]+\}/)
     const faqBlock = src.match(/(?:FAQ|Faq)\s*[:=]\s*\[[\s\S]*?\n\s*\]/)?.[0] ?? ""
     expect(faqBlock, "array FAQ não encontrado").not.toBe("")
     // cada entrada do FAQ tem uma propriedade "q:" (pergunta)
+    // R13.02 lançou com 6 · R13.04 adicionou pergunta de formas de pagamento (7)
     const qCount = (faqBlock.match(/\bq\s*:\s*["'`]/g) ?? []).length
-    expect(qCount, `esperado 6 perguntas no FAQ, achei ${qCount}`).toBe(6)
+    expect(qCount, `esperado >=6 perguntas no FAQ, achei ${qCount}`).toBeGreaterThanOrEqual(6)
   })
 
   it("Tem CTAs Asaas em múltiplas posições (nav, hero, pricing, footer)", () => {
@@ -641,5 +642,33 @@ describe("R13.02.L · Consistência dos links comerciais (LOCKED)", () => {
         expect(link, `${f}: WhatsApp diferente ${link}`).toBe(WHATSAPP_LINK)
       }
     }
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────
+describe("R13.02.M · Preço do curso online (LOCKED em R$ 2.375,00)", () => {
+  const landingSrc = readSrc("src/app/academy/page.tsx")
+
+  it("Landing tem constante PRICE_BRL = 2375 (valor confirmado por Janaina)", () => {
+    expect(landingSrc).toMatch(/PRICE_BRL\s*=\s*2375\b/)
+  })
+
+  it("Landing formata preço em pt-BR (currency BRL)", () => {
+    expect(landingSrc).toMatch(/toLocaleString\(["']pt-BR["']/)
+    expect(landingSrc).toMatch(/currency:\s*["']BRL["']/)
+  })
+
+  it("Card de preço destacado tem testId academy-price-block", () => {
+    expect(landingSrc).toContain("academy-price-block")
+  })
+
+  it("Menciona parcelamento em 12x sem juros", () => {
+    expect(landingSrc).toMatch(/PRICE_INSTALLMENTS\s*=\s*12\b/)
+    expect(landingSrc).toMatch(/12x|12\s+de/)
+  })
+
+  it("FAQ inclui pergunta sobre formas de pagamento com valor R$ 2.375", () => {
+    expect(landingSrc).toMatch(/formas de pagamento|forma de pagamento/i)
+    expect(landingSrc).toMatch(/2\.375|R\$\s*2\.375/)
   })
 })
