@@ -9,7 +9,7 @@ import {
   LayoutDashboard, GitBranch, CircleDot,
   FileText, BookOpen, MessageSquare, CreditCard, Settings,
   LogOut, Zap, ChevronRight, Menu, X, Printer, ClipboardCheck, BookMarked,
-  Crown, Wrench, Info, Map, Atom, Library,
+  Crown, Wrench, Info, Map, Atom, Library, GraduationCap,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { isSuperAdmin } from "@/lib/auth/admin-shared"
@@ -63,6 +63,9 @@ export const NAV_ITEMS = [
     info: "Converse com a BIA em linguagem natural. Tire dúvidas técnicas, valide hipóteses, peça revisão de protocolos. Treinada em biofabricação avançada. Custo: 2 créditos/mensagem." },
   { href: "/dashboard/notebook",           label: "Notebook",             icon: BookMarked,      exact: false,
     info: "Caderno digital do pesquisador: anote experimentos, gere papers e métodos científicos com IA, mantenha rastreabilidade GLP de cada decisão." },
+  { href: "/academy",                      label: "Academy",              icon: GraduationCap,   exact: false,
+    info: "BIA Academy — programa de formação em biofabricação e bioimpressão 3D com plataforma integrada. 12 módulos, 12 meses de acesso, 3 encontros online ao vivo. Já tem matrícula? Continue sua jornada. Novo por aqui? Conheça o programa.",
+    badge: "novo" },
   { href: "/dashboard/tools",              label: "Ferramentas",          icon: Wrench,          exact: false,
     info: "Caixa de ferramentas: comparador de até 4 biomateriais lado-a-lado, calculadora de custos do projeto e exportação PDF profissional." },
 ]
@@ -209,19 +212,39 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </p>
         {NAV_ITEMS.map(item => {
           const active = isActive(item.href, item.exact)
+          const badge = (item as { badge?: string }).badge
+          const isAcademy = item.href === "/academy"
           return (
             <div key={item.href} className="flex items-center gap-1">
-              <Link href={item.href} onClick={onNavigate}
+              <Link
+                href={item.href}
+                onClick={onNavigate}
+                data-testid={isAcademy ? "sidebar-academy-link" : undefined}
                 className={cn(
                   "flex-1 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group min-w-0",
                   active
-                    ? "bg-violet-500/12 text-violet-300 border border-violet-500/20"
-                    : "text-gray-400 hover:bg-white/[0.05] hover:text-gray-200"
+                    ? isAcademy
+                      ? "bg-gradient-to-r from-violet-500/15 to-fuchsia-500/15 text-fuchsia-200 border border-fuchsia-500/25"
+                      : "bg-violet-500/12 text-violet-300 border border-violet-500/20"
+                    : isAcademy
+                      ? "text-fuchsia-300 hover:bg-gradient-to-r hover:from-violet-500/10 hover:to-fuchsia-500/10"
+                      : "text-gray-400 hover:bg-white/[0.05] hover:text-gray-200"
                 )}>
                 <item.icon className={cn("w-4 h-4 shrink-0 transition-colors",
-                  active ? "text-violet-400" : "text-gray-500 group-hover:text-gray-300")} />
+                  active
+                    ? isAcademy ? "text-fuchsia-300" : "text-violet-400"
+                    : isAcademy ? "text-fuchsia-400" : "text-gray-500 group-hover:text-gray-300"
+                )} />
                 <span className="flex-1 truncate">{item.label}</span>
-                {active && <ChevronRight className="w-3 h-3 text-violet-400/50 shrink-0" />}
+                {badge && (
+                  <span
+                    data-testid={isAcademy ? "sidebar-academy-badge" : undefined}
+                    className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-gradient-to-r from-violet-500/30 to-fuchsia-500/30 text-fuchsia-200 border border-fuchsia-500/30 shrink-0"
+                  >
+                    {badge}
+                  </span>
+                )}
+                {active && !badge && <ChevronRight className="w-3 h-3 text-violet-400/50 shrink-0" />}
               </Link>
               {item.info && (
                 <InfoTooltip label={item.label} text={item.info} />

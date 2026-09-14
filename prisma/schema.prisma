@@ -496,6 +496,9 @@ model AcademyEnrollment {
   completedAt    DateTime?
   source         String? // "asaas" | "corporate" | "manual"
   asaasPaymentId String? // rastreio da compra Asaas
+  // R13.02 · Respostas do onboarding (opcional — o aluno pode pular)
+  //   Formato: { preferredArea?, experienceLevel?, mainGoal?, answeredAt? }
+  onboarding     Json?
 
   user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   progress    AcademyProgress[]
@@ -677,6 +680,27 @@ model AcademyCertificate {
 
   @@index([code])
   @@map("academy_certificates")
+}
+
+// R13.02 · Analytics mínimo do Academy (sem cookies, sem GA).
+// Uso: tracking de conversão dos CTAs da landing + navegação básica
+// para o time comercial ver funil sem depender de terceiros.
+//   - userId é OPCIONAL: visitante anônimo (landing pública) fica null
+//   - path guarda a rota da página onde o evento ocorreu
+//   - event é livre em string (ex: "cta_asaas_clicked", "onboarding_completed")
+//   - metadata Json? para payload extra (ex: A/B variant, área escolhida)
+model AcademyAnalytics {
+  id        String   @id @default(cuid())
+  event     String
+  userId    String?
+  path      String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([event])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("academy_analytics")
 }
 
 enum NotebookEntryType {

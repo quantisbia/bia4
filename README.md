@@ -174,6 +174,137 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R13.02 — BIA Academy: Landing pública `/academy` + onboarding + analytics mínimo (2026-08-07)
+
+**Segundo sprint da trilha R13** — a porta de entrada comercial da plataforma educacional. Landing pública `biaquantis.bio/academy` (sem login), onboarding leve de 3 perguntas para o primeiro acesso do aluno, e tracking mínimo para dar visibilidade do funil comercial sem cookies e sem GA. 6 decisões travadas com a Janaina antes do commit.
+
+**Decisões locked (Janaina · 2026-08-07):**
+1. **Onboarding** = `Json?` no `AcademyEnrollment` (não colunas dedicadas) → schema flexível para evoluir perguntas sem migration
+2. **Skip permitido** — onboarding é opcional (não bloqueia o fluxo do aluno)
+3. **Opção B para pending/expired** — visitante sem matrícula ativa vê página dedicada com CTAs Asaas + WhatsApp em vez de ser jogado para o dashboard
+4. **Opção A no sidebar** — link "Academy" visível para **TODOS** os usuários (canal de descoberta comercial), com badge "novo"
+5. **pt-BR only** — sem preparação de i18n
+6. **Analytics mínimo** — 1 API leve + 1 tabela (`AcademyAnalytics`), **sem cookies, sem GA, sem gtag** — só dados agregados server-side
+
+**A) Schema Prisma — extensão + 1 novo model**
+
+| Alteração | Detalhe |
+|---|---|
+| `AcademyEnrollment.onboarding Json?` | Guarda as 3 respostas (preferredArea/experienceLevel/mainGoal) + timestamps completed/skipped |
+| `AcademyAnalytics` (novo model) | `id`, `event`, `userId?`, `path?`, `metadata Json?`, `createdAt` + 3 índices (event, userId, createdAt) |
+
+**B) Migration `20260807000001_r13_02_academy_onboarding_analytics` — APLICADA no Neon Postgres**
+
+- 22 linhas SQL: `ALTER TABLE academy_enrollments ADD COLUMN onboarding JSONB` + `CREATE TABLE academy_analytics` + 3 índices
+- `npx prisma migrate deploy` → OK
+- `npx prisma generate` → Client v7.6.0 regenerado
+
+**C) API `/api/academy/onboarding` (GET + PATCH)**
+
+- **GET** — retorna estado da matrícula + onboarding atual. 403 se `NO_ENROLLMENT` ou `EXPIRED`
+- **PATCH** — aceita `{ preferredArea?, experienceLevel?, mainGoal?, skip? }` com Zod enums:
+  - `preferredArea`: 13 opções (formulacao, bioimpressao, organoides, cicatrizacao_pele, osso_cartilagem, cardiovascular, neural, hepatico, renal, mucosa_oral, drug_delivery, regulatorio, outros)
+  - `experienceLevel`: 3 opções (iniciante, intermediario, avancado)
+  - `mainGoal`: 6 opções (formacao_academica, projeto_pesquisa, aplicacao_clinica, negocio_startup, atualizacao_profissional, curiosidade)
+- Usa `hasAccess()` do helper R13.01 — reusa lógica de expiração
+
+**D) API `/api/academy/analytics` (POST + GET)**
+
+- **POST** — fire-and-forget event tracking. Aceita `{ event, path?, metadata? }`. Autenticação opcional (funciona para visitantes anônimos na landing). Retorna 204 (ok) ou 202 (erro silencioso, não bloqueia UX)
+- **GET** — restrito a `ADMIN` ou `INSTRUCTOR`. Retorna agregação por evento via `Prisma.groupBy` (contagens agregadas — dashboards internos)
+- **13 eventos oficiais rastreados**: `landing_viewed`, `cta_asaas_clicked`, `cta_whatsapp_clicked`, `cta_login_clicked`, `module_preview_clicked`, `faq_expanded`, `onboarding_started`, `onboarding_completed`, `onboarding_skipped`, `lesson_opened`, `bia_hook_opened`, `quiz_started`, `quiz_completed`
+- **Zero cookies**, **zero gtag**, **zero Google Analytics** — apenas registros server-side na tabela `academy_analytics`
+
+**E) Landing pública `/academy` (28 KB — client component)**
+
+Layout próprio (`/academy/layout.tsx`, minimalista, **não** usa `DashboardSidebar`) + página de 8 seções:
+
+1. **Nav sticky** — logo BIA + link Login + CTA Asaas
+2. **Hero** — headline "Aprenda biofabricação com a ferramenta ao lado", 2 CTAs (Asaas + WhatsApp)
+3. **Programa oficial** — 12 módulos · 12 meses de acesso · 3 encontros ao vivo · certificado · plataforma BIA integrada
+4. **Como funciona?** — passo-a-passo do fluxo aula → BIA → notebook → projeto pessoal
+5. **12 Módulos** — cards com título, resumo e badge "disponível/em breve" (Módulo 1 já liberado do R13.01)
+6. **Público-alvo** — 4 perfis (pesquisador acadêmico, clínico/dentista, empreendedor biotech, estudante avançado)
+7. **Investimento** — 2 cards lado-a-lado: Asaas (matrícula direta) e WhatsApp (falar com Janaina)
+8. **FAQ (6 itens)** — dúvidas comuns (pré-requisitos, prazo de acesso, certificado, encontros ao vivo, formas de pagamento, cancelamento)
+9. **CTA final + Footer** — última chamada Asaas + créditos Quantis Biotechnology
+
+Chama `trackEvent("landing_viewed")` no mount e rastreia cliques em todos os CTAs (Asaas nav/hero/pricing/footer, WhatsApp hero/pricing, login, preview de módulo, expansão de FAQ). Fire-and-forget via `fetch({ keepalive: true }).catch(() => {})` — analytics nunca bloqueia UX.
+
+**Links comerciais LOCKED (idênticos em toda a base):**
+- Asaas: `https://www.asaas.com/c/iu7ym1dp93cei9zk`
+- WhatsApp: `https://wa.me/11968632231` (Janaina)
+
+**F) Onboarding `/academy/welcome` (server component + 2 client components)**
+
+`page.tsx` (server component) — 4 branches determinísticos:
+
+1. **Anônimo** → `redirect("/auth/login?callbackUrl=/academy/welcome")`
+2. **NO_ENROLLMENT / EXPIRED / PENDING** → renderiza `<PendingEnrollment>` (Opção B)
+3. **Já respondeu** (e não veio com `?edit=1`) → `redirect("/dashboard/notebook?from=academy-welcome")`
+4. **Ativo + não respondeu** → renderiza `<WelcomeForm>`
+
+Compatível com Next.js 15 async `searchParams` via `instanceof Promise` check.
+
+`WelcomeForm.tsx` (client, 10 KB):
+- 3 perguntas em cards com radio-buttons visuais (área preferida · nível de experiência · principal objetivo)
+- Botão "Pular por enquanto" (`skip: true` → tracka `onboarding_skipped`)
+- Botão "Começar" só habilita com as 3 respostas (→ tracka `onboarding_completed`)
+- Ambos redirecionam para `/dashboard/notebook?from=academy-welcome`
+
+`PendingEnrollment.tsx` (client, 5.7 KB):
+- Card âmbar explicando que a matrícula está pendente/inativa
+- 2 CTAs: Asaas (`pending-cta-asaas`) e WhatsApp (`pending-cta-whatsapp`)
+- Tracka `pending_enrollment_viewed`, `cta_asaas_clicked`, `cta_whatsapp_clicked`
+- Links de retorno para `/academy` (conhecer o programa) e `/dashboard` (fallback)
+
+**G) Sidebar — link Academy (Opção A: visível para TODOS)**
+
+`DashboardSidebar.tsx` NAV_ITEMS agora tem 14 itens (era 13). Item Academy:
+
+- `icon: GraduationCap` (lucide-react)
+- `href: /academy`
+- Badge visual "novo" (gradient violet→fuchsia)
+- Cor de destaque fuchsia quando ativo (diferencia visualmente da paleta violet padrão do sidebar)
+- Sem gate de role — canal de descoberta comercial para prospects (pesquisadores que ainda não são alunos veem a landing)
+- `data-testid="sidebar-academy-link"` para automação
+
+**H) Testes `tests/r13_02_academy_landing_onboarding.test.ts` — 78 verdes**
+
+- **R13.02.A** (5) — Schema tem `onboarding Json?` em AcademyEnrollment + model AcademyAnalytics com todos os campos, `@@map`, 3 índices, e **NÃO** tem colunas dedicadas (decisão #1)
+- **R13.02.B** (4) — Migration SQL R13.02 existe, tem ALTER TABLE, CREATE TABLE academy_analytics com colunas corretas e 3 índices
+- **R13.02.C** (8) — API onboarding: GET+PATCH exportados, usa auth() com 401, Zod enums para os 3 campos, aceita skip, usa hasAccess do R13.01, 403 sem enrollment, grava em campo Json (não colunas)
+- **R13.02.D** (7) — API analytics: POST+GET, POST não exige auth (anônimo funciona), retorna 204/202, GET restrito ADMIN/INSTRUCTOR, groupBy, KNOWN_EVENTS oficiais, sem cookies
+- **R13.02.E** (12) — Landing: client component, links Asaas/WhatsApp LOCKED, 8 seções, 12 módulos, FAQ 6 itens, CTAs Asaas em 4 posições + WhatsApp 2, CTA login, tracka landing_viewed com keepalive+catch, pt-BR
+- **R13.02.F** (4) — Layout: existe, NÃO importa DashboardSidebar, exporta metadata com keywords SEO
+- **R13.02.G** (7) — /academy/welcome: server component, usa auth(), redireciona anônimo com callbackUrl, renderiza PendingEnrollment/WelcomeForm nas branches certas, redireciona já-respondido para notebook, usa helpers R13.01
+- **R13.02.H** (8) — WelcomeForm: client, PATCH /api/academy/onboarding, 3 perguntas, botão skip, botão submit, tracka completed/skipped, redireciona notebook
+- **R13.02.I** (6) — PendingEnrollment: client, links Asaas/WhatsApp LOCKED, testIds pending-cta-*, tracka 3 eventos, links de retorno
+- **R13.02.J** (7) — DashboardSidebar: importa GraduationCap, NAV_ITEMS tem item /academy com label/icon/badge/info, render loop suporta badge, sem gate de role (Opção A), tem sidebar-academy-link
+- **R13.02.K** (4) — Analytics: landing tracka eventos comerciais, API conhece todos, sem cookies/gtag/GA
+- **R13.02.L** (3) — Consistência: links Asaas/WhatsApp idênticos em todos os arquivos onde aparecem, sem variantes antigas, WhatsApp sempre 11968632231
+
+**Testes:** **710/710 passing** (632 anteriores + 78 novos R13.02, zero regressões, 46.79s).
+
+**Arquivos criados (8):**
+- `prisma/migrations/20260807000001_r13_02_academy_onboarding_analytics/migration.sql` (22 linhas)
+- `src/app/api/academy/onboarding/route.ts` (5.5 KB — GET+PATCH com Zod)
+- `src/app/api/academy/analytics/route.ts` (4.3 KB — POST fire-and-forget + GET restrito)
+- `src/app/academy/layout.tsx` (1.5 KB — layout minimalista + metadata SEO)
+- `src/app/academy/page.tsx` (28.6 KB — landing pública 8 seções)
+- `src/app/academy/welcome/page.tsx` (2.9 KB — server component 4 branches)
+- `src/app/academy/welcome/_components/WelcomeForm.tsx` (10.3 KB — form 3 perguntas + skip)
+- `src/app/academy/welcome/_components/PendingEnrollment.tsx` (5.8 KB — Opção B)
+- `tests/r13_02_academy_landing_onboarding.test.ts` (23.6 KB — 78 testes)
+
+**Arquivos modificados (2):**
+- `prisma/schema.prisma` (+ `onboarding Json?` em AcademyEnrollment + model AcademyAnalytics)
+- `src/components/layout/DashboardSidebar.tsx` (+ import GraduationCap, + NAV_ITEM Academy com badge, render loop com badge + destaque fuchsia quando ativo)
+
+**Próximo (R13.03):** Dashboard do aluno + "Minha Jornada" + página de aula (player embed + notas + biaHook).
+
+---
+
 ### R13.01 — BIA Academy: schema Prisma (11 models) + migration aplicada no Neon + seed do Módulo 1 piloto + helper de matrícula (2026-08-07)
 
 **Início da trilha R13** — a plataforma educacional integrada `biaquantis.bio/academy`. Todas as decisões acordadas em `docs/roadmap/R13_bia_academy_decisions.md` (10 decisões travadas com a Janaina).
@@ -274,8 +405,8 @@ npx tsx scripts/seed-academy-module-01.ts --publish
 **🎯 Estado atual do R13 · BIA Academy**
 
 ```
-✅ R13.01  Schema Prisma + Migration + Seed do Módulo 1 (ESTA SPRINT)
-⏳ R13.02  Landing pública /academy + onboarding
+✅ R13.01  Schema Prisma + Migration + Seed do Módulo 1
+✅ R13.02  Landing pública /academy + onboarding + analytics mínimo (ESTA SPRINT)
 ⏳ R13.03  Dashboard aluno + Minha Jornada + página de aula
 ⏳ R13.04  Player YouTube com tracking de progresso (IFrame API)
 ⏳ R13.05  Quizzes + Biblioteca
@@ -1264,4 +1395,4 @@ Learning store persiste ajustes do usuário e re-alimenta as próximas sugestõe
 Proprietário — Quantis Biotechnology © 2026
 Janaina Dernowsek (CEO/Founder)
 
-**Last Updated:** 2026-08-07 — R13.01 (INÍCIO DA TRILHA R13 · BIA Academy: schema Prisma com 11 models (Enrollment/Module/Lesson/Attachment/Quiz/Question/Progress/Project/LiveEvent/Update/Certificate) · 2 novos roles STUDENT + INSTRUCTOR · migration 262 linhas aplicada no Neon · helper enrollment.ts com 9 funções puras · seed do Módulo 1 piloto "Introdução à Biofabricação" com 5 aulas + 2 quizzes rodado em produção · AcademyProject amarrado a NotebookEntry R12.66 para versionamento V1/V2/V3 do "Meu Projeto" · 632/632 testes verdes · próximo = R13.02 Landing pública /academy 🎓📚🎯)
+**Last Updated:** 2026-08-07 — R13.02 (BIA Academy · Landing pública `/academy` + onboarding + analytics mínimo · 6 decisões locked com a Janaina · migration R13.02 aplicada no Neon (onboarding Json? em AcademyEnrollment + model AcademyAnalytics com 3 índices) · API /api/academy/onboarding GET+PATCH com Zod enums (13 áreas × 3 níveis × 6 objetivos + skip) · API /api/academy/analytics POST fire-and-forget para anônimos + GET agregado restrito ADMIN/INSTRUCTOR · **ZERO cookies, ZERO gtag, ZERO GA** — só server-side · landing pública 28 KB com 8 seções (nav/hero/programa/como-funciona/12-módulos/público/investimento/FAQ-6-itens) · layout próprio sem DashboardSidebar · onboarding /academy/welcome com 4 branches (anon/pending/answered/active) · WelcomeForm com 3 perguntas + botão skip · PendingEnrollment (Opção B) com CTAs Asaas + WhatsApp para não-matriculados · link Academy no sidebar visível para TODOS (Opção A) com badge "novo" + destaque fuchsia · links comerciais LOCKED (Asaas iu7ym1dp93cei9zk + WhatsApp 11968632231) · **710/710 testes verdes** (632 anteriores + 78 novos R13.02, zero regressões, 46.79s) · próximo = R13.03 Dashboard do aluno + Minha Jornada + página de aula 🎓📚🎯💜)
