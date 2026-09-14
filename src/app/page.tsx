@@ -68,6 +68,9 @@ export default function HomePage() {
             <Link href="#what-is" className="hover:text-white transition-colors">O que é?</Link>
             <Link href="#markets" className="hover:text-white transition-colors">Mercados</Link>
             <Link href="#modules" className="hover:text-white transition-colors">Módulos</Link>
+            <Link href="#academy" className="hover:text-fuchsia-300 transition-colors font-medium">
+              Academy
+            </Link>
             <Link href="#pricing" className="hover:text-white transition-colors">Planos</Link>
           </div>
 
@@ -158,6 +161,123 @@ export default function HomePage() {
                 <div className="text-xs sm:text-sm text-gray-500">{stat.label}</div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── BIA Academy · Banner destacado (R13.03.2) ──────────────────── */}
+      <section
+        id="academy"
+        className="relative py-14 sm:py-20 px-4 sm:px-6"
+        data-testid="home-academy-banner"
+      >
+        {/* Glow de fundo */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-fuchsia-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="max-w-6xl mx-auto relative z-10">
+          <div className="rounded-2xl sm:rounded-3xl border border-fuchsia-500/25 bg-gradient-to-br from-violet-500/10 via-fuchsia-500/10 to-purple-500/5 overflow-hidden">
+
+            <div className="grid md:grid-cols-2 gap-0">
+              {/* Coluna esquerda · conteúdo */}
+              <div className="p-6 sm:p-10 md:p-12 flex flex-col justify-center">
+                <div className="inline-flex items-center gap-2 bg-fuchsia-500/15 border border-fuchsia-500/30 rounded-full px-3 py-1 text-xs text-fuchsia-300 mb-5 self-start">
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  <span className="font-semibold uppercase tracking-wider">Novo · BIA Academy</span>
+                </div>
+
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white leading-tight mb-4">
+                  Aprenda biofabricação com a{" "}
+                  <span className="bg-gradient-to-r from-violet-300 to-fuchsia-300 bg-clip-text text-transparent">
+                    ferramenta ao lado
+                  </span>
+                </h2>
+
+                <p className="text-sm sm:text-base text-gray-300 mb-6 leading-relaxed">
+                  12 módulos + 12 meses de acesso à plataforma BIA. Cada aula abre a
+                  ferramenta correspondente (Formulador Pro, Bioimpressão, Organoid Builder)
+                  para você aplicar o que aprendeu na hora. 3 encontros online ao vivo com
+                  a equipe científica Quantis + certificado.
+                </p>
+
+                {/* Bloco de preço destacado */}
+                <div
+                  data-testid="home-academy-price"
+                  className="rounded-xl bg-black/30 border border-fuchsia-500/25 px-4 py-3 mb-6"
+                >
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+                      R$ 2.375,00
+                    </span>
+                    <span className="text-xs text-gray-400">à vista</span>
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    ou até <span className="font-semibold text-fuchsia-300">12x de R$ 197,92</span> no cartão sem juros
+                  </p>
+                </div>
+
+                {/* CTAs */}
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Link
+                    href="/academy"
+                    data-testid="home-academy-cta-primary"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-sm sm:text-base font-semibold px-5 py-3 shadow-lg shadow-fuchsia-500/20 transition-all"
+                  >
+                    Conhecer o programa
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                  <a
+                    href="https://www.asaas.com/c/iu7ym1dp93cei9zk"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid="home-academy-cta-asaas"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-fuchsia-500/30 text-fuchsia-200 hover:bg-fuchsia-500/10 hover:border-fuchsia-500/50 hover:text-white text-sm sm:text-base font-semibold px-5 py-3 transition-all"
+                  >
+                    Inscrever-se agora
+                    <ChevronRight className="w-4 h-4" />
+                  </a>
+                </div>
+
+                <p className="text-[11px] text-gray-500 mt-4">
+                  Pagamento seguro via Asaas · Boleto, Pix ou cartão · Liberação em 24h úteis
+                </p>
+              </div>
+
+              {/* Coluna direita · mockup visual (grid dos 12 módulos) */}
+              <div className="relative bg-gradient-to-br from-violet-900/20 to-fuchsia-900/10 p-6 sm:p-10 md:p-12 hidden md:flex items-center justify-center">
+                <div className="grid grid-cols-3 gap-3 w-full max-w-sm">
+                  {[
+                    "Introdução", "Biomateriais", "Biotintas",
+                    "Bioimpressão", "Arquitetura", "Células",
+                    "Tecidos", "Organoides", "Avaliação",
+                    "Translação", "Projeto", "Final",
+                  ].map((label, i) => (
+                    <div
+                      key={label}
+                      className={`aspect-square rounded-lg border p-2 flex flex-col items-center justify-center text-center transition-all ${
+                        i === 0
+                          ? "bg-gradient-to-br from-violet-500/25 to-fuchsia-500/25 border-fuchsia-500/40"
+                          : "bg-white/[0.03] border-white/[0.06]"
+                      }`}
+                    >
+                      <span className={`text-[10px] font-bold mb-0.5 ${i === 0 ? "text-fuchsia-200" : "text-gray-500"}`}>
+                        M{String(i + 1).padStart(2, "0")}
+                      </span>
+                      <span className={`text-[8px] leading-tight ${i === 0 ? "text-fuchsia-300" : "text-gray-600"}`}>
+                        {label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Badge "disponível agora" */}
+                <div className="absolute top-6 right-6 inline-flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/30 rounded-full px-2.5 py-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-[10px] font-semibold text-emerald-300 uppercase tracking-wider">
+                    Módulo 1 aberto
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -373,12 +493,18 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* R12.25: Catálogo enxuto — 2 planos principais + Academy.
+          {/* R12.25: Catálogo enxuto — 2 planos principais.
               Organoid Lab e Discovery descontinuados (Organoid Builder
-              agora incluso no Biofabricação 3D). */}
+              agora incluso no Biofabricação 3D).
+              R13.03.2: Card ACADEMY (R$ 4.970 · 6 meses · presencial) escondido
+              — não é mais oferecido nesse formato. O plano ACADEMY continua
+              existindo no enum e sendo atribuído a alunos que compram o novo
+              curso online (R$ 2.375 via Asaas iu7ym1dp93cei9zk).
+              A venda da Academy agora vive no banner destacado abaixo do hero
+              (section #academy) + landing dedicada /academy. */}
 
-          {/* Paid plans — grid responsivo */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6 max-w-6xl mx-auto">
+          {/* Paid plans — grid responsivo (2 colunas — Academy R$ 4.970 removido do carrossel) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 max-w-4xl mx-auto">
 
             {/* BIOFABRICAÇÃO 3D (era ADVANCED) — mais popular */}
             <div className="relative rounded-xl sm:rounded-2xl border-2 border-blue-500/50 bg-blue-500/5 p-5 sm:p-6 flex flex-col">
@@ -441,35 +567,15 @@ export default function HomePage() {
               </Link>
             </div>
 
-            {/* ACADEMY */}
-            <div className="rounded-xl sm:rounded-2xl border border-indigo-500/40 bg-gradient-to-b from-indigo-500/8 to-violet-500/5 p-5 sm:p-6 flex flex-col hover:border-indigo-500/60 transition-all">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
-                  <GraduationCap className="w-4 h-4 text-indigo-400" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold">Academy</h3>
-                  <span className="text-[10px] text-indigo-400 uppercase tracking-wider">Educacional</span>
-                </div>
-              </div>
-              <div className="mb-4">
-                <span className="text-2xl sm:text-3xl font-bold">R$ 4.970</span>
-                <span className="text-gray-400 text-sm"> · 6 meses</span>
-                <div className="credit-pill mt-2 w-fit text-xs bg-indigo-500/10 border-indigo-500/20 text-indigo-400"><Zap className="w-3 h-3" />Curso completo + 20.000 créditos</div>
-              </div>
-              <ul className="space-y-2 mb-6 flex-1 text-xs sm:text-sm text-gray-300">
-                {["6 meses de acesso completo à plataforma","Curso presencial incluso","Turmas de até 10 alunos","Certificação oficial","Materiais personalizados","Aulas práticas em laboratório","Suporte pedagógico dedicado"].map((f) => (
-                  <li key={f} className="flex items-start gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400 mt-0.5 shrink-0" />
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <Link href="/auth/register"
-                className="w-full text-center py-2.5 px-4 rounded-xl font-medium text-sm border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/10 transition-all">
-                Começar Academy
-              </Link>
-            </div>
+            {/*
+              R13.03.2 — Card ACADEMY (R$ 4.970 · 6 meses · presencial) ESCONDIDO.
+              Não é mais o formato oferecido. A venda da Academy agora acontece
+              pelo banner destacado abaixo do hero (section #academy) com o novo
+              formato online (R$ 2.375,00 · 12 meses · plataforma BIA integrada).
+              O plano ACADEMY continua ativo no enum e no schema — alunos que
+              pagam o curso online recebem plan="ACADEMY" automaticamente.
+              Bloco preservado (comentado) para retomada rápida se necessário.
+            */}
           </div>
         </div>
       </section>

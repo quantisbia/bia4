@@ -63,25 +63,36 @@ const PLANS = [
       "Projetos ilimitados",
     ],
   },
-  {
-    id: "ACADEMY",
-    name: "BIA Academy",
-    price: 4970,
-    credits: 20000,
-    color: "amber",
-    badge: "6 MESES + CURSO",
-    paymentUrl: "https://www.asaas.com/c/9nvzkrlezi7ht2u5",
-    features: [
-      "6 meses de acesso completo",
-      "Curso presencial incluso",
-      "Turmas de até 10 alunos",
-      "Certificação oficial",
-      "Materiais personalizados",
-      "Aulas práticas em laboratório",
-      "20.000 créditos inclusos",
-      "Suporte pedagógico dedicado",
-    ],
-  },
+  /*
+    R13.03.2 · Card ACADEMY (R$ 4.970 · 6 meses · presencial) REMOVIDO da UI.
+    Formato descontinuado — o novo curso Academy é online (R$ 2.375 · 12 meses ·
+    plataforma BIA integrada), vendido em /academy com Asaas iu7ym1dp93cei9zk.
+    O plano ACADEMY continua ATIVO no enum + no schema — usuários que compraram
+    antes mantêm acesso, e novos alunos do curso online ganham plan="ACADEMY"
+    automaticamente. Um card informativo próprio aparece abaixo da grade de
+    planos convidando os usuários a conhecer a Academy.
+    Bloco antigo preservado (comentado) para retomada se necessário:
+
+    {
+      id: "ACADEMY",
+      name: "BIA Academy",
+      price: 4970,
+      credits: 20000,
+      color: "amber",
+      badge: "6 MESES + CURSO",
+      paymentUrl: "https://www.asaas.com/c/9nvzkrlezi7ht2u5",
+      features: [
+        "6 meses de acesso completo",
+        "Curso presencial incluso",
+        "Turmas de até 10 alunos",
+        "Certificação oficial",
+        "Materiais personalizados",
+        "Aulas práticas em laboratório",
+        "20.000 créditos inclusos",
+        "Suporte pedagógico dedicado",
+      ],
+    },
+  */
 ]
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -776,6 +787,55 @@ export function BillingClient({
           {/* R12.25: OrganoidLabValueCard removido — plano Organoid Lab
               foi descontinuado. Organoid Builder agora está incluso no
               plano Biofabricação 3D. */}
+
+          {/* R13.03.2 · Banner BIA Academy — 2 estados (aluno vs prospect) */}
+          {currentPlan === "ACADEMY" ? (
+            <a
+              href="/academy/dashboard"
+              data-testid="billing-academy-banner-active"
+              className="group relative overflow-hidden rounded-xl border border-fuchsia-500/25 bg-gradient-to-br from-violet-500/10 via-fuchsia-500/10 to-purple-500/5 px-4 py-4 flex gap-3 items-center hover:border-fuchsia-500/45 transition-all"
+            >
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center shrink-0 shadow-lg shadow-fuchsia-900/30">
+                <GraduationCap className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-fuchsia-200">Você é aluno da BIA Academy 🎓</p>
+                <p className="text-xs text-gray-400 leading-relaxed">
+                  Sua matrícula está ativa. Continue sua jornada de aprendizado direto no dashboard do curso.
+                </p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-fuchsia-300 shrink-0 group-hover:translate-x-0.5 transition-transform" />
+            </a>
+          ) : (
+            <a
+              href="/academy"
+              data-testid="billing-academy-banner-prospect"
+              className="group relative overflow-hidden rounded-xl border border-fuchsia-500/20 bg-gradient-to-br from-violet-500/[0.06] via-fuchsia-500/[0.06] to-purple-500/[0.03] px-4 py-4 hover:border-fuchsia-500/40 transition-all"
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600/80 to-fuchsia-600/80 flex items-center justify-center shrink-0 shadow-lg shadow-fuchsia-900/20">
+                  <GraduationCap className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <p className="text-sm font-semibold text-fuchsia-200">Conheça a BIA Academy</p>
+                    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-fuchsia-500/20 text-fuchsia-200 border border-fuchsia-500/30">
+                      Novo
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 leading-relaxed mb-3">
+                    Formação em biofabricação e bioimpressão 3D com plataforma BIA integrada.
+                    12 módulos + 12 meses de acesso + 3 encontros ao vivo + certificado.
+                  </p>
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className="text-xl font-bold text-white">R$ 2.375,00</span>
+                    <span className="text-[11px] text-gray-500">à vista · ou 12x de R$ 197,92</span>
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-fuchsia-300 shrink-0 mt-1 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </a>
+          )}
 
           {/* Payment info notice */}
           <div className="bg-violet-500/[0.05] border border-violet-500/15 rounded-xl px-4 py-4 flex gap-3">

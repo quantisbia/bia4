@@ -118,11 +118,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 url: "https://quantis.bio",
               },
               offers: {
+                // R13.03.2 · Preço máximo visível atualizado: Academy R$ 4.970 (6m presencial)
+                // descontinuado → agora o topo é BIA Academy Online R$ 2.375 (12m + plataforma).
+                // offerCount ajustado de 6 → 5 (Free + Discovery + Advanced + Enterprise + Academy Online).
                 "@type": "AggregateOffer",
                 lowPrice: "0",
-                highPrice: "4970",
+                highPrice: "2375",
                 priceCurrency: "BRL",
-                offerCount: "6",
+                offerCount: "5",
               },
               aggregateRating: {
                 "@type": "AggregateRating",

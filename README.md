@@ -174,6 +174,69 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R13.03.2 — BIA Academy: Visibilidade na home + esconder formato antigo (2026-08-07)
+
+Feedback comercial da Janaina após ver o R13.03 no ar: **"Cadê a Academy na home? Ninguém vai descobrir. E o formato antigo (R$ 4.970 · 6 meses presencial) não existe mais — precisa esconder."**
+
+Hotfix para dar visibilidade máxima à Academy nos canais de descoberta e limpar o formato descontinuado da UI, sem quebrar dados de alunos existentes que já estão no plano ACADEMY.
+
+**O que mudou:**
+
+**A) Home pública `/` (canal de descoberta principal):**
+- Novo item **"Academy"** no nav top (destaque fuchsia) linkando para `#academy`
+- Novo **banner destacado abaixo do hero** (`section id="academy"` · testId `home-academy-banner`) com:
+  * Título "Aprenda biofabricação com a ferramenta ao lado"
+  * Descrição do programa (12 módulos + 12 meses + 3 encontros + certificado)
+  * Bloco de preço destacado (testId `home-academy-price`): **R$ 2.375,00 à vista** ou **12x de R$ 197,92** no cartão
+  * CTA primário (testId `home-academy-cta-primary`) → `/academy` (landing detalhada)
+  * CTA secundário (testId `home-academy-cta-asaas`) → checkout Asaas direto
+  * Mockup visual à direita: grid dos 12 módulos com o Módulo 1 destacado ("aberto agora")
+  * Badge âncora "Módulo 1 aberto" com pulse verde
+  * Rodapé com "Pagamento seguro via Asaas · Boleto, Pix ou cartão · Liberação em 24h úteis"
+
+**B) Formato antigo ESCONDIDO (não mais oferecido):**
+- Card **"Academy · R$ 4.970 · 6 meses · presencial"** removido da seção Planos da home `/` (grid reduzido de 3 colunas → 2)
+- Linha **"Academy · R$ 4.970 · 6 meses"** removida do grid de "Planos disponíveis" em `/auth/register`
+- Card **ACADEMY (R$ 4.970 · 6 meses + curso presencial)** removido do array `PLANS` em `/dashboard/billing/BillingClient.tsx`
+- Link Asaas antigo do plano descontinuado (`9nvzkrlezi7ht2u5`) preservado apenas em comentários de código (documentação/retomada)
+
+**C) `/dashboard/billing` (todos os usuários logados):**
+- Novo **banner Academy com 2 estados** logo antes do "Payment info notice":
+  * `currentPlan === "ACADEMY"` → banner ativo (`billing-academy-banner-active`): "Você é aluno da BIA Academy 🎓" com link direto para `/academy/dashboard`
+  * Outros planos → banner prospect (`billing-academy-banner-prospect`): "Conheça a BIA Academy" com preço R$ 2.375,00 + link para `/academy`
+- Aluno com plano ACADEMY tem atalho direto para o dashboard do curso sem passar pelo menu lateral
+
+**D) SEO structured data (`src/app/layout.tsx`):**
+- `AggregateOffer.highPrice` atualizado: **4970 → 2375** (novo preço máximo visível)
+- `AggregateOffer.offerCount`: 6 → 5 (removido plano descontinuado)
+
+**IMPORTANTE — Backend intocado (compatibilidade total):**
+- Enum `plan: "ACADEMY"` continua **ATIVO** em `Prisma.User`, `api/billing`, `api/admin/*`, admin dashboard, chapters do manual e todas as APIs
+- `PLAN_CREDITS.ACADEMY = 20000` mantido
+- Alunos que já compraram o formato antigo (R$ 4.970) **mantêm acesso total** — nada mudou para eles
+- Novos alunos do curso online R$ 2.375,00 recebem automaticamente `plan: "ACADEMY"` quando o pagamento é confirmado (processo manual atual, webhook automático virá em R13.10 Admin)
+
+**Testes `tests/r13_03_2_academy_home_visibility.test.ts` — 26 verdes:**
+- **R13.03.2.A** (2) — Item "Academy" no nav top da home com `href="#academy"`
+- **R13.03.2.B** (8) — Banner destacado: testIds, R$ 2.375, 12x R$ 197,92, CTAs para /academy + Asaas, descrição do programa, gradient violet-fuchsia, "24h úteis"
+- **R13.03.2.C** (3) — Card R$ 4.970 removido da home (fora de comentários), "Curso presencial incluso" removido, grid reduzido para 2 colunas
+- **R13.03.2.D** (1) — Linha Academy R$ 4.970 removida do grid de `/auth/register`
+- **R13.03.2.E** (2) — Card ACADEMY R$ 4.970 removido do array `PLANS` de billing, mas `PLAN_CREDITS.ACADEMY = 20000` preservado
+- **R13.03.2.F** (5) — Banner billing com 2 estados: testIds active/prospect, link `/academy/dashboard` para aluno, link `/academy` para prospect, preço R$ 2.375 no prospect, condicional `currentPlan === "ACADEMY"`
+- **R13.03.2.G** (1) — `layout.tsx` SEO highPrice atualizado para 2375 (não mais 4970)
+- **R13.03.2.H** (4) — Consistência: links Asaas em `/academy`, `PendingEnrollment` e banner home todos apontam para `iu7ym1dp93cei9zk`; link antigo `9nvzkrlezi7ht2u5` só existe em comentários
+
+**Testes:** **822/822 passing** (796 anteriores + 26 novos R13.03.2, zero regressões).
+
+**Arquivos modificados (5):**
+- `src/app/page.tsx` — item nav "Academy" + banner destacado (`#academy`) + card R$ 4.970 comentado
+- `src/app/auth/register/page.tsx` — linha "Academy R$ 4.970" comentada no grid
+- `src/app/dashboard/billing/BillingClient.tsx` — card ACADEMY R$ 4.970 removido do array `PLANS` + banner 2-estados adicionado
+- `src/app/layout.tsx` — SEO highPrice 4970 → 2375, offerCount 6 → 5
+- `tests/r13_03_2_academy_home_visibility.test.ts` — novo arquivo, 26 testes
+
+---
+
 ### R13.03.1 — BIA Academy: Preço R$ 2.375,00 publicado na landing (2026-08-07)
 
 Hotfix comercial pequeno, apenas para dar visibilidade do valor final na página `/academy` e alinhar com a descrição do checkout do Asaas.
@@ -1555,4 +1618,4 @@ Learning store persiste ajustes do usuário e re-alimenta as próximas sugestõe
 Proprietário — Quantis Biotechnology © 2026
 Janaina Dernowsek (CEO/Founder)
 
-**Last Updated:** 2026-08-07 — R13.03.1 (BIA Academy · Preço publicado · R$ 2.375,00 à vista OU 12x de R$ 197,92 sem juros no cartão · card destacado no bloco Investimento da landing /academy com testId academy-price-block · nova constante LOCKED `PRICE_BRL = 2375` formatada via toLocaleString pt-BR + currency BRL · nova pergunta 7 no FAQ sobre formas de pagamento · link Asaas MANTIDO (https://www.asaas.com/c/iu7ym1dp93cei9zk) — só o valor foi confirmado · 5 testes novos no bloco R13.02.M validam preço/formato/parcelas/FAQ · **796/796 testes verdes** (791 anteriores + 5 novos R13.02.M, zero regressões) · próximo = R13.04 Player YouTube IFrame API 🎓💰📺💜) — anteriormente = R13.03 (BIA Academy · Dashboard do aluno + Minha Jornada + Página de aula · 7 decisões locked com a Janaina · sidebar próprio Opção B (AcademySidebar 14.4 KB com 7 itens de nav + botão Voltar-BIA + paleta violet→fuchsia) · helper puro journey.ts (9.4 KB — computeStudentJourney + findLessonInJourney + findNextLesson + findPreviousLesson, ZERO I/O) · 3 APIs (GET /journey agregado, GET /lessons/[slug] com upsert idempotente, PATCH /progress derivando completedAt + detectando conclusão do programa) · route group /academy/(app) segrega rotas logadas com layout protegido (redirect anon → /auth/login, redirect NO_ENROLLMENT/EXPIRED → /academy/welcome Opção B) · 4 páginas server: dashboard 5 cards (continue/progresso/next/live/updates), journey timeline 12 módulos com selos "Concluído ✓" + "Em breve", modules/[slug] lista de aulas, modules/[m]/[l] com iframe YouTube + botão manual "Marcar concluída" + biaHook em nova aba + tracking (lesson_opened, lesson_completed, bia_hook_opened) · aulas não publicadas aparecem com cadeado (não somem) mas 404 se acessadas direto · onboarding pós-completed agora redireciona para /academy/dashboard (não mais /dashboard/notebook) · continueFrom = último IN_PROGRESS por updatedAt DESC com fallback para próxima aula não concluída · módulo ganha selo "Concluído" quando 100% das aulas publicadas · R13.04 vai substituir iframe simples por YouTube IFrame API com tracking automático de watchedSeconds · **791/791 testes verdes** (710 anteriores + 81 novos R13.03 em 12 blocos A–L, zero regressões, 45.15s) · próximo = R13.04 Player YouTube IFrame API 🎓📺🧭🎯💜)
+**Last Updated:** 2026-08-07 — R13.03.2 (BIA Academy · Visibilidade máxima nos canais de descoberta + esconder formato antigo R$ 4.970 · feedback comercial da Janaina "cadê a Academy na home?" · novo item "Academy" no nav top da home (destaque fuchsia linkando para #academy) · novo BANNER destacado abaixo do hero (`section id="academy"` testId home-academy-banner) com preço R$ 2.375,00 + parcelamento 12x R$ 197,92 + CTAs para /academy landing e Asaas direto + mockup visual grid 12 módulos + badge "Módulo 1 aberto" com pulse verde · Card ACADEMY R$ 4.970 · 6 meses · presencial REMOVIDO da home (grid 3→2 colunas) + de /auth/register (grid planos) + de /dashboard/billing (array PLANS) — link antigo Asaas 9nvzkrlezi7ht2u5 preservado só em comentários · Novo BANNER 2-ESTADOS em /dashboard/billing: aluno com plan=ACADEMY vê "Você é aluno da Academy 🎓" com link para /academy/dashboard, outros veem "Conheça a Academy R$ 2.375,00" com link para /academy landing · SEO structured data highPrice 4970 → 2375, offerCount 6 → 5 · BACKEND INTOCADO: enum plan=ACADEMY continua ATIVO (alunos existentes mantêm acesso, novos alunos do curso online recebem plan=ACADEMY automaticamente) · **822/822 testes verdes** (796 anteriores + 26 novos R13.03.2 em 8 blocos A-H, zero regressões) · próximo = R13.04 Player YouTube IFrame API 🎓📢💜) — anteriormente = R13.03.1 (BIA Academy · Preço publicado · R$ 2.375,00 à vista OU 12x de R$ 197,92 sem juros no cartão · card destacado no bloco Investimento da landing /academy com testId academy-price-block · nova constante LOCKED `PRICE_BRL = 2375` formatada via toLocaleString pt-BR + currency BRL · nova pergunta 7 no FAQ sobre formas de pagamento · link Asaas MANTIDO (https://www.asaas.com/c/iu7ym1dp93cei9zk) — só o valor foi confirmado · 5 testes novos no bloco R13.02.M validam preço/formato/parcelas/FAQ · **796/796 testes verdes** (791 anteriores + 5 novos R13.02.M, zero regressões) · próximo = R13.04 Player YouTube IFrame API 🎓💰📺💜) — anteriormente = R13.03 (BIA Academy · Dashboard do aluno + Minha Jornada + Página de aula · 7 decisões locked com a Janaina · sidebar próprio Opção B (AcademySidebar 14.4 KB com 7 itens de nav + botão Voltar-BIA + paleta violet→fuchsia) · helper puro journey.ts (9.4 KB — computeStudentJourney + findLessonInJourney + findNextLesson + findPreviousLesson, ZERO I/O) · 3 APIs (GET /journey agregado, GET /lessons/[slug] com upsert idempotente, PATCH /progress derivando completedAt + detectando conclusão do programa) · route group /academy/(app) segrega rotas logadas com layout protegido (redirect anon → /auth/login, redirect NO_ENROLLMENT/EXPIRED → /academy/welcome Opção B) · 4 páginas server: dashboard 5 cards (continue/progresso/next/live/updates), journey timeline 12 módulos com selos "Concluído ✓" + "Em breve", modules/[slug] lista de aulas, modules/[m]/[l] com iframe YouTube + botão manual "Marcar concluída" + biaHook em nova aba + tracking (lesson_opened, lesson_completed, bia_hook_opened) · aulas não publicadas aparecem com cadeado (não somem) mas 404 se acessadas direto · onboarding pós-completed agora redireciona para /academy/dashboard (não mais /dashboard/notebook) · continueFrom = último IN_PROGRESS por updatedAt DESC com fallback para próxima aula não concluída · módulo ganha selo "Concluído" quando 100% das aulas publicadas · R13.04 vai substituir iframe simples por YouTube IFrame API com tracking automático de watchedSeconds · **791/791 testes verdes** (710 anteriores + 81 novos R13.03 em 12 blocos A–L, zero regressões, 45.15s) · próximo = R13.04 Player YouTube IFrame API 🎓📺🧭🎯💜)
