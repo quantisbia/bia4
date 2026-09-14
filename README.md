@@ -174,6 +174,141 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R12.67 — Frontend: `<ExportBar>` universal (7 botões) + jsPDF + docx + preservação R13 BIA Academy (Fase 2 de 4) (2026-08-04)
+
+Mandato Janaina (Fase 2 do pacote export/salvar/rastreabilidade):
+> **"Botões padrão em TODA a plataforma: Salvar no Notebook / Editar / Gerar nova versão / Exportar PDF / Exportar DOCX / Adicionar imagem / Consultar histórico. Antes de substituir conteúdo existente, perguntar ao usuário: atualizar versão atual OU criar nova versão. Padrão = criar nova."**
+
+Este sprint entrega o **componente universal** que a partir de R12.68 vai ser espalhado em Pipeline, Formulator Pro, Bioink, Chat IA e Próximos Passos.
+
+**A) Contrato universal `ExportableContent` (`src/lib/export/types.ts`)**
+
+Interface neutra que **qualquer ferramenta da BIA** produz para ser exportada/salva/versionada — o `<ExportBar>` cuida do resto. Suporta 9 tipos de bloco:
+- `heading` (níveis 1/2/3) · `paragraph` · `list` (bullet/numbered)
+- `keyvalue` (pares chave-valor científicos) · `table` (com título)
+- `code` (com syntax hint) · `image` (dataURL ou http)
+- `divider` · `callout` (info/warning/success/note)
+
+Campos-chave: `title`, `subtitle`, `source`, `entryType`, `tags`, `category`, `blocks`, `metadata`, `existing` (para editar), `projectId`, `autoChangeSummary`. Helpers: `slugifyFileName()`, `timestampForFileName()`.
+
+**B) PDF Exporter (`src/lib/export/pdf-exporter.ts`) — 17 KB de renderer**
+
+Renderer completo em jsPDF 4.2.1 com identidade visual BIA:
+- A4 · margens 20mm · fonte Helvetica · rodapé com marca "BIA · Biofabrication Intelligent Assistant · Quantis Biotechnology"
+- Barra fina roxa no topo (cor da marca `#7C3AED`) + fonte-marca "BIA" à esquerda + source (nome da ferramenta) à direita
+- Callouts com variantes visuais (info/warning/success) — cada uma com bg + barra lateral colorida
+- Tabelas com cabeçalho sombreado + linhas de divisão · listas com bullets/números em roxo · blocos de código com fundo cinza claro em Courier
+- Imagens dataURL embutidas com detecção automática de PNG/WEBP/JPG + caption em itálico
+- **Quebra de página automática** (`ensureSpace(needed)` antes de escrever cada bloco)
+- Paginação `1 / N` no rodapé de todas as páginas
+
+**Smoke test em Node:** documento científico com todos os 9 tipos de bloco → **PDF de 6.9 KB gerado com sucesso**.
+
+**C) DOCX Exporter (`src/lib/export/docx-exporter.ts`) — 17 KB de renderer**
+
+Renderer paralelo em `docx@9.7.1`:
+- Compatível com **Word / LibreOffice / Google Docs** · fonte Calibri
+- Header com "BIA" + source · footer centralizado com marca completa
+- Callouts em Tables com barra lateral colorida (border-left 12pt)
+- KeyValue como Table sem bordas · Tables científicas com header shaded + bordas rule
+- Code blocks em Consolas com fundo · imagens base64 decodificadas via `atob`/`Buffer` (funciona em browser E em Node/testes)
+- Pageorientation portrait · margens 1200 twips
+
+**Smoke test em Node:** mesmo documento científico → **DOCX de 11.4 KB gerado com sucesso**, começa com magic bytes `PK` (ZIP válido).
+
+**D) Componente `<ExportBar>` (`src/components/notebook/ExportBar.tsx`) — 38 KB**
+
+Client Component com os **7 botões oficiais na ordem aprovada pela Janaina**:
+
+| # | Botão | Ícone | Variant | Aparece quando |
+|---|---|---|---|---|
+| 1 | 💾 **Salvar no Notebook** | `Save` | primary | conteúdo é NOVO (sem `existing`) |
+| 2 | ✏️ **Editar** | `Pencil` | secondary | conteúdo já existe |
+| 3 | 🆕 **Gerar nova versão** | `GitBranch` | primary | conteúdo já existe |
+| 4 | 📄 **Exportar PDF** | `FileDown` | ghost | sempre |
+| 5 | 📝 **Exportar DOCX** | `FileText` | ghost | sempre |
+| 6 | 🖼️ **Adicionar imagem** | `ImagePlus` | ghost | conteúdo já existe |
+| 7 | 🕐 **Consultar histórico** | `History` | ghost | conteúdo já existe |
+
+Botões primários usam **gradient violet→fuchsia** (`from-violet-600 to-fuchsia-600`) — mesma paleta que será usada em BIA Academy (R13).
+
+Contrato de uso:
+```tsx
+<ExportBar
+  buildContent={() => buildMyExportable(state)}
+  onSaved={(res) => setState(s => ({ ...s, entryId: res.entryId, currentVersion: res.versionNumber }))}
+  hide={["addImage"]}   // opcional — ocultar botões específicos
+  askMetadataOnSave     // opcional — abre modal antes do POST
+/>
+```
+
+Ferramenta = **1 função** `buildContent()` que devolve `ExportableContent`. Toda a orquestração (fetch, versão, histórico, imagens) fica no ExportBar.
+
+**E) 4 diálogos internos (todos inline no mesmo arquivo — evita split-loading e simplifica testes)**
+
+1. **`SaveDialog`** — form de metadados (título / descrição / tags / projectId). Chama `POST /api/notebook` (R12.66) → cria entry + V1 automática
+2. **`EditDialog`** — pergunta verbatim da Janaina: *"Como aplicar as alterações?"* com 2 RadioCards:
+   - **Criar nova versão (recomendado)** — mode="newVersion" · **estado inicial = este** (padrão Janaina)
+   - **Atualizar versão atual** — mode="inPlace" · warning visual porque sobrescreve
+   - Campo `changeSummary` só aparece quando mode=newVersion
+   - Chama `PATCH /api/notebook?id=xxx` ou `PATCH /api/notebook?id=xxx&updateInPlace=true`
+3. **`AddImageDialog`** — file picker + preview + campos científicos completos: title, caption, experimentId, sampleNumber, tags, observations, checkbox "associar à versão atual". Valida `image/*` + limite 5 MB. Envia dataURL para `POST /api/notebook/[id]/images`
+4. **`HistoryDialog`** — carrega versões via `GET /api/notebook/[id]/versions` (**dentro de `useEffect` com flag `cancelled`** — anti-pattern `useState(fn)` corrigido antes do commit). Lista todas as versões com badge de "atual", data/hora, autor e changeSummary. Botão "Restaurar" em cada versão antiga → `window.confirm()` de segurança → `POST /api/notebook/[id]/versions/restore` (que **nunca apaga** — cria N+1 com snapshot antigo). Modal wide (`max-w-2xl`)
+
+**F) Integração 100% com APIs R12.66 (backend versionamento)**
+
+- ✅ `POST /api/notebook` para criar (com `projectId`, `createInitialVersion` automática)
+- ✅ `PATCH /api/notebook?id=xxx` (padrão = nova versão via `updateEntryWithVersion`)
+- ✅ `PATCH /api/notebook?id=xxx&updateInPlace=true` (exceção — sobrescreve versão atual)
+- ✅ `GET /api/notebook/[id]/versions` para listar histórico
+- ✅ `POST /api/notebook/[id]/versions/restore` para restaurar (cria N+1)
+- ✅ `POST /api/notebook/[id]/images` para adicionar imagens (base64)
+- ✅ `changeSummary` viaja do EditDialog até a API preservando rastreabilidade
+- ✅ Blocos do `ExportableContent` são preservados em `NotebookEntry.metadata.__exportableBlocks` para permitir reidratação futura (R12.68 vai usar isso)
+
+**G) Preservação R13 · BIA Academy (`docs/roadmap/R13_bia_academy_decisions.md` · 18 KB)**
+
+Documento oficial travando **todas as decisões acordadas com a Janaina** para o produto BIA Academy — a plataforma educacional que vai integrar aprender + aplicar num único ambiente `biaquantis.bio/academy`. **Este documento é fonte de verdade** — se conflitar com README, prevalece ele. Registra:
+
+- **10 decisões travadas** (1x URL `/academy` path · 2x oferta padronizada · 3x compras via Asaas + WhatsApp · 4x roles STUDENT/INSTRUCTOR · 5x YouTube não listado + nocookie · 6x certificado simples · 7x Meu Projeto via Notebook R12.66 · 8x tracking IFrame API · 9x acesso rolling · 10x prioridade R12.67-69 antes)
+- **Oferta oficial padronizada verbatim** (12 módulos + 12 meses + 3 encontros ao vivo + práticas presenciais só corporativo)
+- Links comerciais: Asaas `asaas.com/c/iu7ym1dp93cei9zk` + WhatsApp `wa.me/11968632231`
+- **10 modelos Prisma propostos** para R13.01 (AcademyEnrollment, AcademyModule, AcademyLesson, AcademyAttachment, AcademyQuiz, AcademyQuizQuestion, AcademyProgress, AcademyProject, AcademyLiveEvent, AcademyUpdate, AcademyCertificate)
+- **Sitemap oficial** com 14 rotas
+- **12 módulos do curso** enumerados (Intro → Biomateriais → Biotintas → Bioimpressão → Arquitetura → Células → Tecidos → Organoides → Avaliação → Translação → Projeto → Final)
+- **Roadmap R13.01 → R13.10** com dependências (R13.01 depende de R12.69, R13.07 depende de R12.69, R13.09 depende de R12.67…)
+- **Fluxo completo de compra + primeiro acesso** (via Asaas → cadastro manual no admin → email com senha temporária)
+- **Fora do escopo do MVP** (fórum, gamificação pesada, mobile nativo, checkout embutido, IA de correção, marketplace, i18n, webhook Asaas)
+- **Guia de retomada** para quem abrir o arquivo meses depois
+
+**H) Testes de regressão (`tests/r12_67_export_bar_component.test.ts`) — 43 testes verdes**
+
+- **R12.67.A** (3) — Helpers (slugify, timestamp) + interface `ExportableContent` aceita todos os 9 tipos de bloco
+- **R12.67.B** (4) — PDF Exporter gera Blob real para conteúdo mínimo, rico (9 tipos), longo (30 parágrafos com quebra de página) e tabela larga (5 colunas)
+- **R12.67.C** (3) — DOCX Exporter gera ArrayBuffer real com magic bytes `PK` (ZIP válido) para conteúdo mínimo, rico e com imagem base64 embutida
+- **R12.67.D** (10) — Source-code do ExportBar tem `"use client"`, exporta ExportBar + ExportBarProps, importa jspdf + docx exporters, contém os **7 botões oficiais na ordem correta com testIds únicos**, usa gradient violet→fuchsia, permite ocultar cada um dos 7 botões via prop `hide`
+- **R12.67.E** (7) — Integração com APIs R12.66: POST /api/notebook, PATCH com/sem updateInPlace, POST /images, GET /versions, POST /versions/restore, envia changeSummary, preserva blocks em `__exportableBlocks`
+- **R12.67.F** (5) — Diálogos: SaveDialog tem 5 testIds (title/description/tags/projectid/confirm); EditDialog usa estado inicial `"newVersion"` (padrão Janaina verbatim); AddImageDialog tem todos os 6 campos científicos; HistoryDialog usa **useEffect** (não useState anti-pattern) e **`window.confirm()`** antes de restaurar
+- **R12.67.G** (4) — Documento R13 BIA Academy preservado com **10 decisões verbatim**, roadmap R13.01-10 completo, 12 módulos oficiais e 10 modelos Prisma listados
+- **R12.67.H** (3) — Todos os 5 arquivos existem, `package.json` declara jspdf+docx+file-saver+@types/file-saver, nenhum arquivo vaza secret/DATABASE_URL
+
+**Testes:** **471/471 passing** (428 anteriores + 43 novos R12.67, zero regressões, 42.27s).
+
+**Arquivos criados (5):**
+- `docs/roadmap/R13_bia_academy_decisions.md` (18 KB — decisões Academy)
+- `src/lib/export/types.ts` (5 KB — interface universal)
+- `src/lib/export/pdf-exporter.ts` (17 KB — renderer PDF)
+- `src/lib/export/docx-exporter.ts` (17 KB — renderer DOCX)
+- `src/components/notebook/ExportBar.tsx` (38 KB — componente + 4 diálogos)
+- `tests/r12_67_export_bar_component.test.ts` (18 KB — 43 testes)
+
+**Dependências instaladas (3+1):**
+- `jspdf@4.2.1` · `docx@9.7.1` · `file-saver@2.0.5` · `@types/file-saver@2.0.7` (dev)
+
+**Próximo (R12.68):** Espalhar `<ExportBar>` em 5 ferramentas — Pipeline, Formulator Pro, Bioink, Chat IA, Próximos Passos. Cada ferramenta implementa apenas 1 função `buildContent()` que converte seu estado atual em `ExportableContent`. Todo o resto (7 botões, 4 diálogos, integração APIs R12.66) já está pronto.
+
+---
+
 ### R12.66 — Backend: versionamento + projetos + biblioteca de imagens do Notebook (Fase 1 de 4) (2026-08-03)
 
 Mandato Janaina (pacote completo):
@@ -707,4 +842,4 @@ Learning store persiste ajustes do usuário e re-alimenta as próximas sugestõe
 Proprietário — Quantis Biotechnology © 2026
 Janaina Dernowsek (CEO/Founder)
 
-**Last Updated:** 2026-08-03 — R12.66 (Backend do Notebook · rastreabilidade completa · versionamento automático V1/V2/V3 sem apagar histórico · nunca destrói versões · restore cria N+1 · biblioteca de imagens científicas com metadados de experimento · modelos Prisma Project/NotebookVersion/NotebookImage · migration aplicada no Neon Postgres · 5 APIs REST · 428/428 testes verdes · Fase 1 de 4 do pacote export/salvar/rastreabilidade da Janaina 📓🔢🖼️)
+**Last Updated:** 2026-08-04 — R12.67 (Frontend `<ExportBar>` universal com 7 botões · Salvar/Editar/Nova versão/PDF/DOCX/Adicionar imagem/Consultar histórico · integração 100% com APIs R12.66 · padrão = criar nova versão · exceção via ?updateInPlace=true · jsPDF 4.2 + docx 9.7 · marca visual violet→fuchsia · 4 diálogos inline · decisões BIA Academy R13 preservadas em docs/roadmap · Fase 2 de 4 · 471/471 testes verdes 💾✏️🆕📄📝🖼️🕐)
