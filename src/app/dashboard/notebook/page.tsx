@@ -7,10 +7,17 @@ import {
   BookOpen, Scroll, Award, BookCopy, FileCheck2, Tag,
   Sparkles, Download, Printer, Copy, ChevronDown, ChevronUp,
   GitBranch, Atom, Star, Filter, RefreshCw, AlertCircle,
-  Newspaper, Lightbulb, GraduationCap, ArrowLeft,
+  Newspaper, Lightbulb, GraduationCap, ArrowLeft, FolderTree,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { BiaMarkdown } from "@/components/ui/BiaMarkdown"
+// R12.69 · UI hierárquica (Projetos → Entradas → Versões)
+import { ProjectSidebar, type ProjectSelection } from "@/components/notebook/ProjectSidebar"
+import { EntryList } from "@/components/notebook/EntryList"
+import { VersionTimeline } from "@/components/notebook/VersionTimeline"
+import { VersionDiff } from "@/components/notebook/VersionDiff"
+import { ExportBar } from "@/components/notebook/ExportBar"
+import type { ExportableContent } from "@/lib/export/types"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface NotebookEntry {
@@ -95,8 +102,17 @@ export default function NotebookPage() {
   const [loading, setLoading]         = useState(false)
   const [selected, setSelected]       = useState<NotebookEntry | null>(null)
   const [loadingEntry, setLoadingEntry] = useState(false)
-  const [view, setView]               = useState<"list"|"create"|"generate"|"viewer">("list")
+  const [view, setView]               = useState<"list"|"create"|"generate"|"viewer"|"explorer">("list")
   const [typeFilter, setTypeFilter]   = useState("ALL")
+
+  // R12.69 · UI hierárquica — estado do explorer
+  const [projectSel, setProjectSel]        = useState<ProjectSelection>({ kind: "all" })
+  const [explorerEntryId, setExplorerEntryId] = useState<string | null>(null)
+  const [explorerEntry, setExplorerEntry]     = useState<NotebookEntry | null>(null)
+  const [loadingExplorerEntry, setLoadingExplorerEntry] = useState(false)
+  const [diffPair, setDiffPair] = useState<{ newV: number; oldV: number } | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
+  const [mobileTab, setMobileTab] = useState<"projects" | "entries" | "viewer">("projects")
   const [search, setSearch]           = useState("")
   const [error, setError]             = useState("")
   const [success, setSuccess]         = useState("")
@@ -144,6 +160,62 @@ export default function NotebookPage() {
   }, [typeFilter, search])
 
   useEffect(() => { loadEntries() }, [loadEntries])
+
+  // R12.69 · Carrega a entrada selecionada no explorer (só quando muda o ID)
+  useEffect(() => {
+    if (!explorerEntryId) {
+      setExplorerEntry(null)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      setLoadingExplorerEntry(true)
+      try {
+        const res = await fetch(`/api/notebook?id=${explorerEntryId}`)
+        if (!res.ok) {
+          if (!cancelled) setExplorerEntry(null)
+          return
+        }
+        const data = await res.json()
+        if (!cancelled) setExplorerEntry(data)
+      } catch {
+        if (!cancelled) setExplorerEntry(null)
+      } finally {
+        if (!cancelled) setLoadingExplorerEntry(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [explorerEntryId, reloadKey])
+
+  // Converte a entrada selecionada em ExportableContent para reidratar a ExportBar do viewer
+  const buildExplorerContent = useCallback((): ExportableContent => {
+    if (!explorerEntry) {
+      return { title: "", blocks: [] }
+    }
+    // Tenta reidratar os blocos preservados em metadata.__exportableBlocks (R12.67)
+    const md = (explorerEntry.metadata ?? {}) as Record<string, unknown>
+    const preservedBlocks = md.__exportableBlocks
+    const blocks: ExportableContent["blocks"] = Array.isArray(preservedBlocks)
+      ? (preservedBlocks as ExportableContent["blocks"])
+      : [{ type: "paragraph", text: explorerEntry.content ?? "" }]
+
+    return {
+      title: explorerEntry.title,
+      subtitle: undefined,
+      source: (md.__source as string) ?? "Notebook",
+      entryType: explorerEntry.entryType as ExportableContent["entryType"],
+      tags: explorerEntry.tags ?? [],
+      category: explorerEntry.category ?? undefined,
+      blocks,
+      metadata: md,
+      existing: {
+        entryId: explorerEntry.id,
+        currentVersion: (md.__currentVersion as number) ??
+          // Fallback: se a API retorna currentVersion no top-level (nova rota)
+          ((explorerEntry as unknown as { currentVersion?: number }).currentVersion ?? 1),
+      },
+    }
+  }, [explorerEntry])
 
   // ── Load full entry ─────────────────────────────────────────────────────────
   async function openEntry(e: NotebookEntry) {
@@ -324,6 +396,21 @@ export default function NotebookPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* R12.69 · Toggle Explorador hierárquico ↔ Lista simples */}
+            <button
+              onClick={() => setView(view === "explorer" ? "list" : "explorer")}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all border",
+                view === "explorer"
+                  ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white shadow-lg shadow-violet-500/20 border-violet-500/30"
+                  : "bg-white/[0.06] hover:bg-white/[0.10] text-gray-300 border-white/[0.08]",
+              )}
+              data-testid="notebook-toggle-explorer"
+              title="Explorador hierárquico: Projetos → Entradas → Versões"
+            >
+              <FolderTree className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{view === "explorer" ? "Vista simples" : "Explorador"}</span>
+            </button>
             <button onClick={() => { setView("generate"); setGeneratedDoc(null) }}
               className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-indigo-600/80 to-purple-600/80 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-xs font-semibold transition-all shadow-lg shadow-indigo-500/20 border border-indigo-500/30">
               <Sparkles className="w-3.5 h-3.5" />
@@ -354,6 +441,159 @@ export default function NotebookPage() {
             <Check className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{success}</span>
             <button onClick={() => setSuccess("")} className="ml-auto"><X className="w-4 h-4" /></button>
+          </div>
+        )}
+
+        {/* ── VIEW: EXPLORER (R12.69) — layout hierárquico 3 colunas ─────── */}
+        {view === "explorer" && (
+          <div className="-mx-4 sm:-mx-6" data-testid="notebook-explorer">
+            {/* Tabs mobile (< md) */}
+            <div className="md:hidden flex border-b border-white/5 bg-white/[0.02]">
+              {[
+                { key: "projects", label: "Projetos", icon: FolderTree },
+                { key: "entries",  label: "Entradas", icon: FileText   },
+                { key: "viewer",   label: "Detalhes", icon: BookMarked },
+              ].map((t) => {
+                const Icon = t.icon
+                return (
+                  <button
+                    key={t.key}
+                    onClick={() => setMobileTab(t.key as typeof mobileTab)}
+                    className={cn(
+                      "flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors",
+                      mobileTab === t.key
+                        ? "text-violet-300 border-b-2 border-violet-500"
+                        : "text-gray-500 border-b-2 border-transparent hover:text-gray-300",
+                    )}
+                    data-testid={`explorer-mobile-tab-${t.key}`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {t.label}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Layout de 3 colunas (md+) OU 1 coluna com tab ativa (< md) */}
+            <div className="flex md:min-h-[calc(100vh-140px)]">
+              {/* Col 1 · Projetos */}
+              <div
+                className={cn(
+                  "w-full md:w-56 flex-shrink-0",
+                  mobileTab === "projects" ? "block" : "hidden md:block",
+                )}
+              >
+                <ProjectSidebar
+                  selected={projectSel}
+                  onSelect={(sel) => {
+                    setProjectSel(sel)
+                    setExplorerEntryId(null)
+                    setMobileTab("entries")
+                  }}
+                  reloadKey={reloadKey}
+                />
+              </div>
+
+              {/* Col 2 · Entradas */}
+              <div
+                className={cn(
+                  "w-full md:w-80 flex-shrink-0",
+                  mobileTab === "entries" ? "block" : "hidden md:block",
+                )}
+              >
+                <EntryList
+                  projectSelection={projectSel}
+                  selectedEntryId={explorerEntryId}
+                  onSelectEntry={(id) => {
+                    setExplorerEntryId(id)
+                    setMobileTab("viewer")
+                  }}
+                  reloadKey={reloadKey}
+                />
+              </div>
+
+              {/* Col 3 · Viewer + versões */}
+              <div
+                className={cn(
+                  "flex-1 min-w-0 bg-white/[0.01] px-4 py-4 overflow-y-auto",
+                  mobileTab === "viewer" ? "block" : "hidden md:block",
+                )}
+              >
+                {!explorerEntryId && (
+                  <div className="flex flex-col items-center justify-center h-full py-12 text-center">
+                    <BookMarked className="w-10 h-10 text-gray-700 mb-3" />
+                    <p className="text-sm text-gray-500">
+                      Selecione uma entrada na lista ao lado para ver os detalhes.
+                    </p>
+                  </div>
+                )}
+                {loadingExplorerEntry && (
+                  <div className="flex items-center gap-2 text-sm text-gray-500 py-4">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Carregando entrada…
+                  </div>
+                )}
+                {explorerEntry && !loadingExplorerEntry && (
+                  <div className="space-y-4">
+                    {/* Título + meta */}
+                    <div>
+                      <h2 className="text-lg font-bold text-white mb-1">{explorerEntry.title}</h2>
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-gray-500">
+                        <span>{explorerEntry.entryType}</span>
+                        {explorerEntry.category && (
+                          <>
+                            <span>·</span>
+                            <span>{explorerEntry.category}</span>
+                          </>
+                        )}
+                        {explorerEntry.tags.map((t) => (
+                          <span key={t} className="rounded px-1.5 py-0.5 bg-white/5">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* ExportBar */}
+                    <ExportBar
+                      buildContent={buildExplorerContent}
+                      onSaved={() => setReloadKey((k) => k + 1)}
+                    />
+
+                    {/* Timeline de versões */}
+                    <VersionTimeline
+                      entryId={explorerEntry.id}
+                      currentVersion={
+                        (explorerEntry as unknown as { currentVersion?: number }).currentVersion ?? 1
+                      }
+                      onCompare={(newV, oldV) => setDiffPair({ newV, oldV })}
+                      onRestored={() => setReloadKey((k) => k + 1)}
+                      reloadKey={reloadKey}
+                    />
+
+                    {/* Conteúdo principal */}
+                    <div className="rounded-xl bg-white/[0.02] border border-white/5 p-4">
+                      <h3 className="text-xs font-semibold text-white uppercase tracking-wide mb-2">
+                        Conteúdo
+                      </h3>
+                      <div className="prose prose-invert prose-sm max-w-none">
+                        <BiaMarkdown content={explorerEntry.content ?? ""} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Diff modal (R12.69) */}
+            {diffPair && explorerEntry && (
+              <VersionDiff
+                entryId={explorerEntry.id}
+                versionNew={diffPair.newV}
+                versionOld={diffPair.oldV}
+                onClose={() => setDiffPair(null)}
+              />
+            )}
           </div>
         )}
 

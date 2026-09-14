@@ -54,10 +54,13 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url)
-  const id       = searchParams.get("id")
-  const type     = searchParams.get("type")
-  const pinned   = searchParams.get("pinned")
-  const search   = searchParams.get("q")
+  const id        = searchParams.get("id")
+  const type      = searchParams.get("type")
+  const pinned    = searchParams.get("pinned")
+  const search    = searchParams.get("q")
+  // R12.69 · novos filtros p/ UI hierárquica (Projetos → Entradas → Versões)
+  const projectId = searchParams.get("projectId") // "null" = entradas sem projeto
+  const sinceDays = searchParams.get("sinceDays") // filtro por data (7/30/90)
   const page     = parseInt(searchParams.get("page") ?? "1")
   const pageSize = Math.min(parseInt(searchParams.get("pageSize") ?? "20"), 50)
 
@@ -72,11 +75,35 @@ export async function GET(req: NextRequest) {
   const where: Record<string, unknown> = { userId: session.user.id }
   if (type)   where.entryType = type
   if (pinned === "true") where.isPinned = true
-  if (search) where.OR = [
-    { title:    { contains: search, mode: "insensitive" } },
-    { content:  { contains: search, mode: "insensitive" } },
-    { category: { contains: search, mode: "insensitive" } },
-  ]
+
+  // R12.69 · projectId: "null" (string) = filtrar SEM projeto; qualquer outro = FK
+  if (projectId === "null") {
+    where.projectId = null
+  } else if (projectId) {
+    where.projectId = projectId
+  }
+
+  // R12.69 · busca global inclui tags (Postgres array contains — case-sensitive
+  // por default; usamos `hasSome` com um array de 1 item que casa qualquer tag
+  // igual, mantendo o comportamento anterior para title/content/category)
+  if (search) {
+    const q = search.trim()
+    where.OR = [
+      { title:    { contains: q, mode: "insensitive" } },
+      { content:  { contains: q, mode: "insensitive" } },
+      { category: { contains: q, mode: "insensitive" } },
+      { tags:     { has: q } }, // case-sensitive exact match em qualquer tag
+    ]
+  }
+
+  // R12.69 · filtro por data (updatedAt >= now - N dias)
+  if (sinceDays) {
+    const days = parseInt(sinceDays, 10)
+    if (Number.isFinite(days) && days > 0) {
+      const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+      where.updatedAt = { gte: cutoff }
+    }
+  }
 
   const [entries, total] = await Promise.all([
     prisma.notebookEntry.findMany({
@@ -90,6 +117,10 @@ export async function GET(req: NextRequest) {
         isPublic: true, createdAt: true, updatedAt: true,
         content: false, // não retornar conteúdo na listagem
         generatedDoc: true, metadata: true,
+        // R12.69 · UI hierárquica precisa saber a que projeto pertence
+        //         + versão atual + se tem imagens (para filtro rápido)
+        projectId: true, currentVersion: true,
+        _count: { select: { images: true, versions: true } },
       },
     }),
     prisma.notebookEntry.count({ where }),

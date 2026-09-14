@@ -174,6 +174,160 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R12.69 — UI hierárquica do Notebook: Projetos → Entradas → Versões + busca global + diff visual (Fase 4 de 4 · CONCLUI o pacote export/salvar/rastreabilidade) (2026-08-06)
+
+Mandato Janaina (Fase 4 final do pacote):
+> **"Hierarquia Projetos → Experimentos → Protocolos → Formulações → Bioinks → Resultados → Imagens → Próximos Passos → Versões; busca por título/projeto/palavra-chave/data/protocolo/tag; UI para consultar/abrir/comparar/restaurar/exportar versões."**
+
+Esta sprint entrega o **Explorador hierárquico** do Notebook — a UI que finalmente amarra Projetos + Entradas + Versões numa única experiência. Depois disso, o pacote de 4 fases está encerrado e ficamos livres para começar o **R13.01 BIA Academy**.
+
+**5 defaults aprovados pela Janaina:**
+1. ✅ Mobile: tabs no topo (Projetos | Entradas | Viewer)
+2. ✅ Diff: **side-by-side simples, ZERO libs novas** (opção A)
+3. ✅ Projetos ordenados por atividade recente (`updatedAt DESC`)
+4. ✅ 4 filtros na EntryList: Tipo · Data · Tem imagens · Pinned
+5. ✅ Views `create` e `generate` existentes **preservadas intactas** (o explorer é adicionado como modo separado; nada foi removido)
+
+**A) API GET `/api/notebook` estendida (retro-compatível)**
+
+3 novos query params:
+- `?projectId=<id>` — filtra entradas de um projeto específico
+- `?projectId=null` — filtra entradas SEM projeto (soltas)
+- `?sinceDays=N` — filtra `updatedAt >= now - N dias` (usado no filtro de Data)
+
+Busca `?q=` **agora inclui `tags[]`** (`{ tags: { has: q } }`) além de title/content/category — quem procurar "gelma" acha entradas com essa tag mesmo sem ela aparecer no título.
+
+Select expandido: adiciona `projectId`, `currentVersion`, `_count.images`, `_count.versions` — o mínimo que a UI precisa para renderizar badges e filtros.
+
+**B) `<ProjectSidebar>` — Nível 1 da hierarquia (13 KB)**
+
+```
+┌────────────────────────────┐
+│ 🌳 PROJETOS            [+] │
+├────────────────────────────┤
+│ 📁 Todas as entradas       │
+│ 📁 Sem projeto             │
+│ ─────                      │
+│ 🟪 Cartilagem MVP     12   │
+│ 🟦 Reparo condral      5   │
+└────────────────────────────┘
+```
+
+- Consome `GET /api/projects` (R12.66) — ordenação já vem por `updatedAt DESC` do backend
+- 2 slots virtuais no topo: **"all"** (todas as entradas) e **"none"** (sem projeto)
+- Botão `[+]` abre modal de criação: nome + área de pesquisa + color picker (default `#a78bfa` — violet-400)
+- Projetos arquivados aparecem com `opacity-50` (não escondidos)
+- Após criar, o novo projeto vai automaticamente para o topo da lista e fica selecionado
+
+**C) `<EntryList>` — Nível 2 com busca global + 4 filtros (17 KB)**
+
+- **Busca global** com debounce de 250ms (query em title/content/category/tags)
+- **4 filtros oficiais** ocultos por default (clique em "Filtros" para expandir):
+  1. **Tipo** (dropdown com todos os `NotebookEntryType`)
+  2. **Data** (botões: Todos / 7d / 30d / 90d)
+  3. **Tem imagens** (checkbox — filtro client-side via `_count.images > 0`)
+  4. **Pinned** (checkbox — usa `?pinned=true` da API)
+- Badge com contador de filtros ativos + botão "Limpar filtros"
+- Cards de entrada mostram: tipo (pill colorido) + versão (v3 quando > 1) + nº de imagens + data relativa ("há 5 min", "há 2 d") + 2 primeiras tags
+- Pinned entries têm ícone dourado no canto
+
+**D) `<VersionTimeline>` — Nível 3 parte 1 (10 KB)**
+
+Timeline **horizontal** com scroll (mobile-friendly):
+
+```
+[v5·atual] [v4] [v3] [v2] [v1]
+    ●       ○    ●    ○    ○    ← seleção múltipla (max 2)
+```
+
+- Consome `GET /api/notebook/[id]/versions` (R12.66)
+- Cada card mostra: badge da versão + data/hora + autor + `changeSummary` + botão "Restaurar" (só nas não-atuais)
+- **Selecionar 2 versões → botão "Comparar vN × vM"** aparece no header
+- Se já tem 2 selecionadas e clicar em uma 3ª, substitui a mais antiga (não acumula)
+- **Restaurar usa `window.confirm()`** antes de chamar API (proteção contra clique acidental)
+- Restaurar é NÃO-destrutivo — chama `POST /versions/restore` que cria N+1 preservando todo o histórico
+
+**E) `<VersionDiff>` — Nível 3 parte 2 · side-by-side ZERO libs (13 KB)**
+
+Modal com layout de 2 colunas comparando 2 versões:
+
+```
+┌─────────────────────────────────────────────┐
+│ Comparar v3 ↔ v5           [3 alterados] × │
+├─────────────────────────────────────────────┤
+│ 🔴 v3 (mais antiga)  🟢 v5 (mais nova)      │
+├─────────────────────────────────────────────┤
+│ TÍTULO (alterado 🟨)                        │
+│ ┌──────────────┐  ┌──────────────┐          │
+│ │ − v3         │  │ + v5         │          │
+│ │ GelMA v2     │  │ GelMA v3     │          │
+│ └──────────────┘  └──────────────┘          │
+│                                             │
+│ TAGS (alterado 🟨)                          │
+│ ┌──────────────┐  ┌──────────────┐          │
+│ │ [gelma]      │  │ [gelma][HA]  │          │
+│ └──────────────┘  └──────────────┘          │
+└─────────────────────────────────────────────┘
+```
+
+- Consome `GET /api/notebook/[id]/versions/[versionNew]?compareTo=[versionOld]` (R12.66)
+- Backend já entrega `changedFields[]` + `diff[]` prontos
+- **Renderiza 6 campos versionáveis:** title / entryType / category / tags / projectId / content
+- **Campos alterados:** background âmbar + coluna vermelha (antiga) / verde (nova)
+- **Campos idênticos:** aparecem esmaecidos (opacity-60) — para dar contexto sem distrair
+- **Tags viram pills**, content vira `<pre>` com scroll interno de 224px
+- Se `changedFields.length === 0` mostra callout: *"Estas duas versões têm conteúdo idêntico"* (raro mas possível quando usuária apenas confirma "gerar nova versão" sem mudar nada)
+- **ZERO libs de diff externas** — nem `diff`, nem `fast-diff`, nem `diff-match-patch`. Testado explicitamente.
+- Layout responsive: `grid-cols-1 md:grid-cols-2` (empilha em mobile)
+
+**F) Página `/dashboard/notebook/page.tsx` refatorada (não-destrutiva)**
+
+- Estado `view` estendido: `"list" | "create" | "generate" | "viewer" | "explorer"` (+1 valor)
+- **Views existentes preservadas 100%** (`create`, `generate`, `viewer`, `list`)
+- Novo botão **"Explorador"** (ícone `FolderTree`) no header — toggle entre `list` (vista antiga) e `explorer` (nova)
+- Modo `explorer` renderiza layout de **3 colunas responsivo**:
+  - Desktop (`md+`): sidebar 224px + list 320px + viewer flex-1
+  - Mobile (`<md`): **tabs no topo** (Projetos | Entradas | Detalhes) — navegação sequencial
+- Ao selecionar projeto → auto-navega para tab "Entradas" no mobile
+- Ao selecionar entrada → auto-navega para tab "Detalhes" no mobile
+- Viewer mostra: título + tags + **ExportBar** (R12.67) + **VersionTimeline** (R12.69) + conteúdo em Markdown
+- ExportBar reidrata blocos via `metadata.__exportableBlocks` preservados pelo R12.67 — quem salvou pelo Formulator Pro/Pipeline/Bioink/Chat consegue re-exportar como PDF/DOCX sem perder formatação
+- Timeline `.onCompare()` abre modal `<VersionDiff>` sobreposto
+- Timeline `.onRestored()` bumpa `reloadKey` — força reload da entry + versions
+
+**G) Testes `tests/r12_69_notebook_ui_hierarchical.test.ts` — 57 verdes**
+
+- **R12.69.A** (7) — API estendida: projectId (real + null), busca em tags via `has`, sinceDays com cutoff, _count.images/versions no select, projectId+currentVersion no select
+- **R12.69.B** (7) — ProjectSidebar: Client Component, exports corretos, 2 slots virtuais, botão criar + modal com 3 campos, arquivados com opacity-50
+- **R12.69.C** (9) — EntryList: fetch dinâmico, debounce 250ms, projectId=null literal, 4 filtros (Tipo/Data 4×/Imagens/Pinned), hasImagesOnly client-side, badge de versão, contador de imagens, testId busca, formatRelative
+- **R12.69.D** (8) — VersionTimeline: consumo APIs R12.66, seleção max 2 (substitui mais antiga), sort desc, onCompare(a,b), window.confirm, botão restaurar oculto na atual, badge "atual"
+- **R12.69.E** (10) — VersionDiff: URL compareTo=, ZERO libs de diff, 2 colunas semânticas (red/emerald), background âmbar em alterados, 6 campos versionáveis, tags→pills, content→pre com scroll, empilha em mobile, callout de idêntico, testIds por campo
+- **R12.69.F** (10) — Página: imports dos 4 componentes + ExportBar, tipo `view` com 5 valores, create/generate/viewer preservadas, botão toggle, layout 3 colunas + tabs mobile, mobile tabs 3 valores, auto-navegação, VersionDiff modal, reloadKey após restauração, reidratação via __exportableBlocks
+- **R12.69.G** (5) — Sanidade: 4 arquivos existem, todos são Client Components, zero secrets, ZERO deps de diff instaladas, namespace @/components/notebook/
+
+**Testes:** **588/588 passing** (531 anteriores + 57 novos R12.69, zero regressões, 44.84s).
+
+**Arquivos criados (5):**
+- `src/components/notebook/ProjectSidebar.tsx` (13 KB — sidebar + modal de criar projeto)
+- `src/components/notebook/EntryList.tsx` (17 KB — busca global + 4 filtros + cards ricos)
+- `src/components/notebook/VersionTimeline.tsx` (10 KB — timeline horizontal + restore + seleção múltipla)
+- `src/components/notebook/VersionDiff.tsx` (13 KB — modal side-by-side sem libs externas)
+- `tests/r12_69_notebook_ui_hierarchical.test.ts` (16 KB — 57 testes)
+
+**Arquivos modificados (2):**
+- `src/app/api/notebook/route.ts` (+ 3 query params + tags no OR + _count/projectId/currentVersion no select)
+- `src/app/dashboard/notebook/page.tsx` (+ imports + view=explorer + layout 3 colunas + mobile tabs; **create/generate 100% preservados**)
+
+**🎉 PACOTE EXPORT/SALVAR/RASTREABILIDADE 100% CONCLUÍDO (R12.66 → R12.69):**
+- ✅ **R12.66** Backend versionamento + projetos + imagens (Prisma + 5 APIs)
+- ✅ **R12.67** ExportBar universal com 7 botões + jsPDF + docx
+- ✅ **R12.68** Espalhado em Pipeline + Formulator Pro + Bioink + Chat IA
+- ✅ **R12.69** UI hierárquica Projetos → Entradas → Versões + diff visual
+
+**Próximo:** **R13.01 · BIA Academy** — Schema Prisma + migration + seed do primeiro módulo teste. Todas as decisões travadas em `docs/roadmap/R13_bia_academy_decisions.md`.
+
+---
+
 ### R12.68 — Integração: `<ExportBar>` espalhada em Pipeline + Formulator Pro + Bioink + Chat IA + Próximos Passos + script de migração Protocol → Notebook (Fase 3 de 4) (2026-08-05)
 
 Mandato Janaina (Fase 3 do pacote export/salvar/rastreabilidade):
@@ -994,4 +1148,4 @@ Learning store persiste ajustes do usuário e re-alimenta as próximas sugestõe
 Proprietário — Quantis Biotechnology © 2026
 Janaina Dernowsek (CEO/Founder)
 
-**Last Updated:** 2026-08-05 — R12.68 (Integração: `<ExportBar>` espalhada em Pipeline + Formulator Pro + Bioink + Chat IA · "Próximos Passos" coberto pela ExportBar da Pipeline · Formulator Pro removeu botão antigo "Salvar Protocolo" · Bioink com dropdown de escopo active/both/T0/T1 · Chat IA com filtro por autor all/assistant/user · 4 adapters puros como funções · script de migração Protocol → NotebookEntry não-destrutivo e idempotente · Fase 3 de 4 · 531/531 testes verdes 🔧🧪🎨💬🔄)
+**Last Updated:** 2026-08-06 — R12.69 (UI hierárquica do Notebook: Projetos → Entradas → Versões · ProjectSidebar com slots virtuais e criar-projeto · EntryList com busca global e 4 filtros · VersionTimeline horizontal com seleção múltipla e restore · VersionDiff side-by-side ZERO libs · layout 3 colunas responsivo com tabs mobile · views create/generate PRESERVADAS · Fase 4 de 4 · PACOTE COMPLETO ✅ · 588/588 testes verdes · próximo = R13.01 BIA Academy 🌳📁🔍⏱️🔀🎉)
