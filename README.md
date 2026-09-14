@@ -174,6 +174,130 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R13.10.1 — BIA Academy: CRUD web para criar/editar aulas (2026-08-07)
+
+Feedback da Janaina: **"Crie um acesso admin para mim, para eu ter acesso e conseguir adicionar as aulas."**
+
+Como o R13.10 completo (CRUD administrativo) estava planejado para depois, criei uma sprint intermediária focada só no que ela precisa **agora**: subir os vídeos e materiais das 12 aulas. Interface simples, sem migration, disponível já.
+
+**3 decisões locked com Janaina:**
+1. **Autorização Opção B** — CRUD acessível para SUPERADMIN (email hardcoded) + role ADMIN + role INSTRUCTOR (prepara futuro time de conteúdo sem precisar mudar código)
+2. **Entrada de vídeo por URL** — o form aceita qualquer forma (URL completa `https://youtu.be/xxx`, `watch?v=xxx`, `/embed/xxx`, `/shorts/xxx` ou o ID puro de 11 chars) — o helper `extractYoutubeId` normaliza
+3. **11 módulos placeholder** criados automaticamente como drafts (M02-M12) — ela abre e vai preenchendo conforme cronograma de gravação
+
+**A) Seed dos 11 módulos placeholder (aplicado no Neon):**
+- Script `scripts/seed-academy-modules-02-12.ts` idempotente que criou os módulos 2 a 12 como `isPublished=false`
+- Slugs oficiais: `biomateriais`, `biotintas`, `bioimpressao-3d`, `arquitetura-3d`, `celulas`, `tecidos`, `esferoides-organoides`, `avaliacao-pos-impressao`, `translacao`, `desenvolvimento-projeto`, `projeto-final`
+- Descrições verbatim do array `MODULES` da landing (source of truth)
+- Preserva `isPublished` em execuções subsequentes (não despublica módulos ativos)
+
+**B) 2 helpers puros:**
+- `src/lib/academy/admin-auth.ts` — `requireAcademyAdmin()` (route handlers) + `checkAcademyAdminOrRedirect()` (server components)
+- `src/lib/academy/youtube.ts` — `extractYoutubeId(input)` aceita:
+  * ID puro: `dQw4w9WgXcQ`
+  * URL curta: `https://youtu.be/dQw4w9WgXcQ`
+  * URL watch: `https://www.youtube.com/watch?v=dQw4w9WgXcQ`
+  * URL embed: `https://www.youtube.com/embed/dQw4w9WgXcQ`
+  * URL shorts: `https://youtube.com/shorts/dQw4w9WgXcQ`
+  * Placeholder: `PLACEHOLDER_M01_L01`
+  * Com querystring: extrai limpo `?t=42s`
+- Bonus: `buildYoutubeEmbedUrl` + `buildYoutubeThumbnailUrl` para preview visual
+
+**C) 6 APIs REST em `/api/admin/academy/*`:**
+
+| Endpoint | Método | Função |
+|---|---|---|
+| `/modules` | GET | Lista todos os módulos com counts de aulas |
+| `/modules` | POST | Cria módulo (Zod: slug kebab-case único, 409 se existe) |
+| `/modules/[moduleId]` | PATCH | Atualiza campos (slug único, 409 se conflito) |
+| `/modules/[moduleId]` | DELETE | Apaga só se módulo não tem aulas (409 senão) |
+| `/lessons` | POST | Cria aula (extractYoutubeId + slug único por módulo) |
+| `/lessons/[lessonId]` | PATCH | Atualiza + gerencia `publishedAt` automaticamente |
+| `/lessons/[lessonId]` | DELETE | Bloqueia se aula publicada (protege progresso do aluno) |
+| `/attachments` | POST | Cria anexo (kind ∈ PDF/LINK/STL/GCODE/IMAGE + URL válida) |
+| `/attachments/[attachmentId]` | DELETE | Apaga anexo |
+
+Todos com `requireAcademyAdmin` + `dynamic="force-dynamic"` + validação Zod completa.
+
+**D) 3 páginas server component em `/dashboard/admin/academy/*`:**
+
+- `/dashboard/admin/academy` (lista) — Cards dos 12 módulos com badges de publicação, contagem de aulas, fluxo recomendado inline, stats compactos
+- `/dashboard/admin/academy/[moduleSlug]` — Edita módulo (slug, título, descrição, ordem, cover, isPublished) + lista de aulas + form "Nova aula" no rodapé
+- `/dashboard/admin/academy/[moduleSlug]/[lessonSlug]` — Edita aula completa: order/slug/título/YouTube (auto-preview thumbnail)/objetivo/resumo/duração/nível/**biaHook** (select das 11 ferramentas BIA + label + JSON params)/isPublished + gerenciador de anexos
+
+**E) 4 componentes client:**
+- `ModuleEditForm` — salvar/apagar módulo com feedback
+- `NewLessonForm` — form compacto, auto-slug ao digitar título, redireciona para edição completa após criar
+- `LessonEditForm` — form completo com preview do YT + integração biaHook por ferramenta com params JSON
+- `AttachmentsManager` — lista + form inline para adicionar/remover anexos (URL only nesta sprint · upload real em R13.10.2)
+
+**F) Atalho no `/dashboard/admin`:**
+- Card destacado "Gerenciar BIA Academy" no topo (gradient violet→fuchsia) com testId `admin-academy-shortcut`
+- Direto do painel principal, sem precisar navegar pelo sidebar
+
+**G) Testes `tests/r13_10_1_academy_admin_crud.test.ts` — 53 verdes:**
+- **R13.10.1.A** (10) — `extractYoutubeId`: ID puro, youtu.be, watch?v=, /embed, /shorts, placeholder, inválido, trim, isValid, buildEmbedUrl, buildThumbnail
+- **R13.10.1.B** (5) — `requireAcademyAdmin`: exports, 3 roles, 401/403, checkOrRedirect
+- **R13.10.1.C** (8) — API modules: GET+POST+PATCH+DELETE, Zod, 409 slug único, DELETE bloqueia se tem aulas
+- **R13.10.1.D** (7) — API lessons: POST com extractYoutubeId, 409 slug no módulo, PATCH gerencia publishedAt, DELETE bloqueia publicada
+- **R13.10.1.E** (6) — API attachments: 5 kinds, URL válida, 404 aula não existe, DELETE
+- **R13.10.1.F** (10) — 3 páginas server + 4 clients existem, testIds, gate `checkAcademyAdminOrRedirect`, biaHook tools, 5 attachment kinds
+- **R13.10.1.G** (5) — Seed idempotente com 11 módulos, isPublished preservado, atalho no admin dashboard, GraduationCap importado
+
+**Testes:** **875/875 passing** (822 anteriores + 53 novos R13.10.1, zero regressões, 46.92s).
+
+**Como você acessa (Janaina):**
+1. Login com `janaina.dernowsek@quantis.bio` ou `janaina@quantis.bio` (ambos já são SUPERADMIN)
+2. Vai em `/dashboard/admin` (ou clica no card "Admin Dashboard" no sidebar)
+3. Clica no card destacado **"Gerenciar BIA Academy"** (novo em R13.10.1)
+4. Escolhe um módulo → clica **"Nova aula"** → cola a URL do YouTube → clica **"Criar"**
+5. Preenche objetivo, resumo, duração, biaHook, adiciona anexos → clica **"Salvar"**
+6. Quando estiver pronto, marca **"Publicada"** — aluno passa a ver imediatamente
+
+**Regras de segurança embutidas:**
+- Aula **publicada** só pode ser apagada após ser despublicada (protege progresso de alunos)
+- Módulo **com aulas** só pode ser apagado após remover aulas (evita cascade acidental)
+- Slug de módulo é **único global** (URLs limpas)
+- Slug de aula é **único dentro do módulo** (permite mesmo slug em módulos diferentes)
+- `youtubeId` validado no server (não aceita URL/ID inválidos)
+- Auth server-side em **todas** as rotas — nunca client-only
+
+**O que ainda não tem (fica pra R13.10.2 completo):**
+- Upload direto de arquivos (só URL por enquanto)
+- CRUD de quizzes com preview
+- CRUD de encontros ao vivo
+- Bulk import CSV
+- Auditoria de mudanças
+- Preview lado-a-lado
+
+**Arquivos criados (17):**
+- `scripts/seed-academy-modules-02-12.ts` (7.2 KB)
+- `src/lib/academy/admin-auth.ts` (2.9 KB)
+- `src/lib/academy/youtube.ts` (3.8 KB)
+- `src/app/api/admin/academy/modules/route.ts` (3.4 KB)
+- `src/app/api/admin/academy/modules/[moduleId]/route.ts` (3.5 KB)
+- `src/app/api/admin/academy/lessons/route.ts` (3.9 KB)
+- `src/app/api/admin/academy/lessons/[lessonId]/route.ts` (5.4 KB)
+- `src/app/api/admin/academy/attachments/route.ts` (1.9 KB)
+- `src/app/api/admin/academy/attachments/[attachmentId]/route.ts` (1.0 KB)
+- `src/app/dashboard/admin/academy/page.tsx` (8.2 KB)
+- `src/app/dashboard/admin/academy/[moduleSlug]/page.tsx` (7.1 KB)
+- `src/app/dashboard/admin/academy/[moduleSlug]/_components/ModuleEditForm.tsx` (7.9 KB)
+- `src/app/dashboard/admin/academy/[moduleSlug]/_components/NewLessonForm.tsx` (7.2 KB)
+- `src/app/dashboard/admin/academy/[moduleSlug]/[lessonSlug]/page.tsx` (6.1 KB)
+- `src/app/dashboard/admin/academy/[moduleSlug]/[lessonSlug]/_components/LessonEditForm.tsx` (12.8 KB)
+- `src/app/dashboard/admin/academy/[moduleSlug]/[lessonSlug]/_components/AttachmentsManager.tsx` (8.7 KB)
+- `tests/r13_10_1_academy_admin_crud.test.ts` (16.5 KB — 53 testes)
+
+**Arquivos modificados (1):**
+- `src/app/dashboard/admin/page.tsx` — imports (GraduationCap/ChevronRight/Info) + atalho "Gerenciar BIA Academy"
+
+**Neon PostgreSQL:**
+- **11 módulos** placeholder criados (M02-M12) via seed → agora banco tem 12 módulos completos
+- Módulo 1 (Introdução à Biofabricação) do R13.01 mantido intacto com 5 aulas piloto
+
+---
+
 ### R13.03.2 — BIA Academy: Visibilidade na home + esconder formato antigo (2026-08-07)
 
 Feedback comercial da Janaina após ver o R13.03 no ar: **"Cadê a Academy na home? Ninguém vai descobrir. E o formato antigo (R$ 4.970 · 6 meses presencial) não existe mais — precisa esconder."**
@@ -1618,4 +1742,4 @@ Learning store persiste ajustes do usuário e re-alimenta as próximas sugestõe
 Proprietário — Quantis Biotechnology © 2026
 Janaina Dernowsek (CEO/Founder)
 
-**Last Updated:** 2026-08-07 — R13.03.2 (BIA Academy · Visibilidade máxima nos canais de descoberta + esconder formato antigo R$ 4.970 · feedback comercial da Janaina "cadê a Academy na home?" · novo item "Academy" no nav top da home (destaque fuchsia linkando para #academy) · novo BANNER destacado abaixo do hero (`section id="academy"` testId home-academy-banner) com preço R$ 2.375,00 + parcelamento 12x R$ 197,92 + CTAs para /academy landing e Asaas direto + mockup visual grid 12 módulos + badge "Módulo 1 aberto" com pulse verde · Card ACADEMY R$ 4.970 · 6 meses · presencial REMOVIDO da home (grid 3→2 colunas) + de /auth/register (grid planos) + de /dashboard/billing (array PLANS) — link antigo Asaas 9nvzkrlezi7ht2u5 preservado só em comentários · Novo BANNER 2-ESTADOS em /dashboard/billing: aluno com plan=ACADEMY vê "Você é aluno da Academy 🎓" com link para /academy/dashboard, outros veem "Conheça a Academy R$ 2.375,00" com link para /academy landing · SEO structured data highPrice 4970 → 2375, offerCount 6 → 5 · BACKEND INTOCADO: enum plan=ACADEMY continua ATIVO (alunos existentes mantêm acesso, novos alunos do curso online recebem plan=ACADEMY automaticamente) · **822/822 testes verdes** (796 anteriores + 26 novos R13.03.2 em 8 blocos A-H, zero regressões) · próximo = R13.04 Player YouTube IFrame API 🎓📢💜) — anteriormente = R13.03.1 (BIA Academy · Preço publicado · R$ 2.375,00 à vista OU 12x de R$ 197,92 sem juros no cartão · card destacado no bloco Investimento da landing /academy com testId academy-price-block · nova constante LOCKED `PRICE_BRL = 2375` formatada via toLocaleString pt-BR + currency BRL · nova pergunta 7 no FAQ sobre formas de pagamento · link Asaas MANTIDO (https://www.asaas.com/c/iu7ym1dp93cei9zk) — só o valor foi confirmado · 5 testes novos no bloco R13.02.M validam preço/formato/parcelas/FAQ · **796/796 testes verdes** (791 anteriores + 5 novos R13.02.M, zero regressões) · próximo = R13.04 Player YouTube IFrame API 🎓💰📺💜) — anteriormente = R13.03 (BIA Academy · Dashboard do aluno + Minha Jornada + Página de aula · 7 decisões locked com a Janaina · sidebar próprio Opção B (AcademySidebar 14.4 KB com 7 itens de nav + botão Voltar-BIA + paleta violet→fuchsia) · helper puro journey.ts (9.4 KB — computeStudentJourney + findLessonInJourney + findNextLesson + findPreviousLesson, ZERO I/O) · 3 APIs (GET /journey agregado, GET /lessons/[slug] com upsert idempotente, PATCH /progress derivando completedAt + detectando conclusão do programa) · route group /academy/(app) segrega rotas logadas com layout protegido (redirect anon → /auth/login, redirect NO_ENROLLMENT/EXPIRED → /academy/welcome Opção B) · 4 páginas server: dashboard 5 cards (continue/progresso/next/live/updates), journey timeline 12 módulos com selos "Concluído ✓" + "Em breve", modules/[slug] lista de aulas, modules/[m]/[l] com iframe YouTube + botão manual "Marcar concluída" + biaHook em nova aba + tracking (lesson_opened, lesson_completed, bia_hook_opened) · aulas não publicadas aparecem com cadeado (não somem) mas 404 se acessadas direto · onboarding pós-completed agora redireciona para /academy/dashboard (não mais /dashboard/notebook) · continueFrom = último IN_PROGRESS por updatedAt DESC com fallback para próxima aula não concluída · módulo ganha selo "Concluído" quando 100% das aulas publicadas · R13.04 vai substituir iframe simples por YouTube IFrame API com tracking automático de watchedSeconds · **791/791 testes verdes** (710 anteriores + 81 novos R13.03 em 12 blocos A–L, zero regressões, 45.15s) · próximo = R13.04 Player YouTube IFrame API 🎓📺🧭🎯💜)
+**Last Updated:** 2026-08-07 — R13.10.1 (BIA Academy · CRUD web para criar/editar aulas · resposta ao feedback "cria acesso admin para eu subir as aulas" · 3 decisões locked: (1) opção B autorização = SUPERADMIN + ADMIN + INSTRUCTOR, (2) entrada de vídeo aceita URL completa OU ID puro OU placeholder (extractor normaliza), (3) 11 módulos placeholder criados como drafts no Neon (M02-M12 com slugs oficiais verbatim da landing) · Helper puro extractYoutubeId cobre 6 formatos + placeholder + trim · Helper requireAcademyAdmin com 401/403 + checkAcademyAdminOrRedirect para pages · 6 APIs REST: modules GET/POST/PATCH/DELETE (Zod, slug único global, 409 se tem aulas), lessons POST/PATCH/DELETE (extractYoutubeId, publishedAt automático, protege aulas publicadas), attachments POST/DELETE (5 kinds PDF/LINK/STL/GCODE/IMAGE, URL válida) · 3 páginas server /dashboard/admin/academy: lista 12 módulos com stats, editar módulo + lista aulas + form nova aula, editar aula completa (YT preview thumbnail + biaHook 11 ferramentas com JSON params + anexos manager) · 4 client components (ModuleEditForm/NewLessonForm/LessonEditForm/AttachmentsManager) com auto-slug ao digitar título · Atalho destacado "Gerenciar BIA Academy" no /dashboard/admin (gradient violet-fuchsia) · Seed idempotente que preserva isPublished · Regras de segurança: aula publicada não pode ser apagada (protege progresso), módulo com aulas não pode ser apagado, slugs únicos, validação server-side · **875/875 testes verdes** (822 anteriores + 53 novos R13.10.1 em 7 blocos A-G, zero regressões) · Neon agora tem 12 módulos (M01 R13.01 intacto + M02-M12 R13.10.1) · próximo = R13.04 Player YouTube IFrame API 🎓⚙️🔧💜) — anteriormente = R13.03.2 (BIA Academy · Visibilidade máxima nos canais de descoberta + esconder formato antigo R$ 4.970 · feedback comercial da Janaina "cadê a Academy na home?" · novo item "Academy" no nav top da home (destaque fuchsia linkando para #academy) · novo BANNER destacado abaixo do hero (`section id="academy"` testId home-academy-banner) com preço R$ 2.375,00 + parcelamento 12x R$ 197,92 + CTAs para /academy landing e Asaas direto + mockup visual grid 12 módulos + badge "Módulo 1 aberto" com pulse verde · Card ACADEMY R$ 4.970 · 6 meses · presencial REMOVIDO da home (grid 3→2 colunas) + de /auth/register (grid planos) + de /dashboard/billing (array PLANS) — link antigo Asaas 9nvzkrlezi7ht2u5 preservado só em comentários · Novo BANNER 2-ESTADOS em /dashboard/billing: aluno com plan=ACADEMY vê "Você é aluno da Academy 🎓" com link para /academy/dashboard, outros veem "Conheça a Academy R$ 2.375,00" com link para /academy landing · SEO structured data highPrice 4970 → 2375, offerCount 6 → 5 · BACKEND INTOCADO: enum plan=ACADEMY continua ATIVO (alunos existentes mantêm acesso, novos alunos do curso online recebem plan=ACADEMY automaticamente) · **822/822 testes verdes** (796 anteriores + 26 novos R13.03.2 em 8 blocos A-H, zero regressões) · próximo = R13.04 Player YouTube IFrame API 🎓📢💜) — anteriormente = R13.03.1 (BIA Academy · Preço publicado · R$ 2.375,00 à vista OU 12x de R$ 197,92 sem juros no cartão · card destacado no bloco Investimento da landing /academy com testId academy-price-block · nova constante LOCKED `PRICE_BRL = 2375` formatada via toLocaleString pt-BR + currency BRL · nova pergunta 7 no FAQ sobre formas de pagamento · link Asaas MANTIDO (https://www.asaas.com/c/iu7ym1dp93cei9zk) — só o valor foi confirmado · 5 testes novos no bloco R13.02.M validam preço/formato/parcelas/FAQ · **796/796 testes verdes** (791 anteriores + 5 novos R13.02.M, zero regressões) · próximo = R13.04 Player YouTube IFrame API 🎓💰📺💜) — anteriormente = R13.03 (BIA Academy · Dashboard do aluno + Minha Jornada + Página de aula · 7 decisões locked com a Janaina · sidebar próprio Opção B (AcademySidebar 14.4 KB com 7 itens de nav + botão Voltar-BIA + paleta violet→fuchsia) · helper puro journey.ts (9.4 KB — computeStudentJourney + findLessonInJourney + findNextLesson + findPreviousLesson, ZERO I/O) · 3 APIs (GET /journey agregado, GET /lessons/[slug] com upsert idempotente, PATCH /progress derivando completedAt + detectando conclusão do programa) · route group /academy/(app) segrega rotas logadas com layout protegido (redirect anon → /auth/login, redirect NO_ENROLLMENT/EXPIRED → /academy/welcome Opção B) · 4 páginas server: dashboard 5 cards (continue/progresso/next/live/updates), journey timeline 12 módulos com selos "Concluído ✓" + "Em breve", modules/[slug] lista de aulas, modules/[m]/[l] com iframe YouTube + botão manual "Marcar concluída" + biaHook em nova aba + tracking (lesson_opened, lesson_completed, bia_hook_opened) · aulas não publicadas aparecem com cadeado (não somem) mas 404 se acessadas direto · onboarding pós-completed agora redireciona para /academy/dashboard (não mais /dashboard/notebook) · continueFrom = último IN_PROGRESS por updatedAt DESC com fallback para próxima aula não concluída · módulo ganha selo "Concluído" quando 100% das aulas publicadas · R13.04 vai substituir iframe simples por YouTube IFrame API com tracking automático de watchedSeconds · **791/791 testes verdes** (710 anteriores + 81 novos R13.03 em 12 blocos A–L, zero regressões, 45.15s) · próximo = R13.04 Player YouTube IFrame API 🎓📺🧭🎯💜)

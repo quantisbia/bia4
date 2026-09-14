@@ -8,6 +8,7 @@ import {
   Crown, Lock, AlertTriangle, CheckCircle2, Clock, X,
   BarChart3, Database, BookOpen, MessageSquare, Layers,
   Eye, Loader2, Check, Terminal, AlertCircle,
+  GraduationCap, ChevronRight, Info,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { useSession } from "next-auth/react"
@@ -299,6 +300,34 @@ export default function AdminDashboard() {
             className="p-2 bg-white/[0.05] border border-white/[0.08] rounded-xl hover:bg-white/[0.08] transition-all">
             <RefreshCw className={cn("w-4 h-4 text-gray-400", (loading || statsLoading) && "animate-spin")} />
           </button>
+        </div>
+      </div>
+
+      {/* ── R13.10.1 · Atalhos rápidos ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <a
+          href="/dashboard/admin/academy"
+          data-testid="admin-academy-shortcut"
+          className="group rounded-xl border border-fuchsia-500/25 bg-gradient-to-br from-violet-500/10 via-fuchsia-500/10 to-purple-500/5 px-4 py-3 flex items-center gap-3 hover:border-fuchsia-500/45 transition-all"
+        >
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center shrink-0 shadow-lg shadow-fuchsia-900/30">
+            <GraduationCap className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-fuchsia-200">Gerenciar BIA Academy</p>
+            <p className="text-[11px] text-gray-400">Editar módulos, aulas, anexos e biaHooks · Publicar conteúdo</p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-fuchsia-300 shrink-0 group-hover:translate-x-0.5 transition-transform" />
+        </a>
+
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center shrink-0">
+            <Info className="w-4 h-4 text-gray-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-300">Novo em R13.10.1</p>
+            <p className="text-[11px] text-gray-500">CRUD web da Academy · sem migration · disponível para SUPERADMIN, ADMIN e INSTRUCTOR</p>
+          </div>
         </div>
       </div>
 
