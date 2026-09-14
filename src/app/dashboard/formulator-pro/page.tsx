@@ -22,9 +22,13 @@ import {
   FlaskConical, Sparkles, Plus, Trash2, Loader2, AlertTriangle,
   CheckCircle2, Info, Beaker, Target, ChevronRight, ChevronDown,
   Search, Wand2, Save, RefreshCw, Activity, ShieldCheck,
-  BookOpen, Printer, Atom, Zap, FolderHeart, ExternalLink,
+  BookOpen, Printer, Atom, Zap, ExternalLink,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
+// R12.68 · ExportBar universal + adapter do Formulator Pro
+// (substitui o antigo "Salvar protocolo" — Notebook R12.66 é a fonte única de verdade)
+import { ExportBar } from "@/components/notebook/ExportBar"
+import { buildContentFromProFormulation } from "@/lib/export/adapters/formulator-pro-adapter"
 
 // ─────────────────────────────────────────────────────────────────────────
 // TIPOS (espelham formulator-pro.ts)
@@ -1168,36 +1172,26 @@ function ResultView({
 }) {
   const score = result.scientificScore ?? { overall: 0, mechanical: 0, biological: 0, manufacturability: 0, regulatory: 0 }
 
-  // R12.28: "Salvar protocolo" — persiste o resultado no backend para que o
-  // usuário possa acessá-lo em /dashboard/protocols, de outro dispositivo,
-  // ou em outra sessão. Não cobra créditos (a formação já foi paga na
-  // geração). Idempotência leve: após salvar, o botão vira "Salvo ✓ — abrir"
-  // e linka direto para o protocolo persistido. Para salvar de novo (ex.
-  // edição), basta clicar de novo — cria uma nova entrada com timestamp.
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle")
-  const [savedId, setSavedId] = useState<string | null>(null)
-  const [saveError, setSaveError] = useState<string | null>(null)
+  // R12.68 · Notebook R12.66 é a fonte única de verdade — o antigo
+  // "Salvar protocolo" (R12.28, escrevia em /api/protocols/save-formulation)
+  // foi removido em favor do ExportBar universal. Formulações antigas
+  // continuam acessíveis via /dashboard/protocols; novas formulações
+  // vivem no Notebook com versionamento V1/V2/V3, imagens e histórico.
+  const [notebookEntry, setNotebookEntry] = useState<{ entryId: string; currentVersion: number } | null>(null)
 
-  const handleSaveProtocol = useCallback(async () => {
-    setSaveState("saving")
-    setSaveError(null)
-    try {
-      const res = await fetch("/api/protocols/save-formulation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ formulation: result, inputContext }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error(data?.error ?? `Falha ao salvar (HTTP ${res.status})`)
-      }
-      setSavedId(data.id ?? null)
-      setSaveState("saved")
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "Erro desconhecido")
-      setSaveState("error")
-    }
-  }, [result, inputContext])
+  // Sempre que o resultado da IA mudar (nova geração), desconecta o vínculo
+  // — a próxima ação "Salvar" vai criar uma nova entrada.
+  useEffect(() => {
+    setNotebookEntry(null)
+  }, [result])
+
+  const buildFormulatorContent = useCallback(() => {
+    return buildContentFromProFormulation({
+      result,
+      inputContext,
+      existing: notebookEntry ?? undefined,
+    })
+  }, [result, inputContext, notebookEntry])
 
   return (
     <div className="space-y-4">
@@ -1472,35 +1466,12 @@ function ResultView({
           <ChevronRight className="w-3 h-3 opacity-70" />
         </button>
 
-        {/* R12.28: Salvar protocolo no backend ("em outros locais") */}
-        {saveState === "saved" && savedId ? (
-          <a
-            href={`/dashboard/protocols?open=${savedId}`}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-xs text-emerald-200 font-semibold hover:bg-emerald-500/25 transition-colors"
-            title="Protocolo salvo — clique para abrir em Meus Protocolos"
-          >
-            <CheckCircle2 className="w-3.5 h-3.5" /> Salvo — abrir
-            <ExternalLink className="w-3 h-3 opacity-70" />
-          </a>
-        ) : (
-          <button
-            onClick={handleSaveProtocol}
-            disabled={saveState === "saving"}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-500/15 to-teal-500/15 hover:from-emerald-500/25 hover:to-teal-500/25 border border-emerald-500/40 text-xs text-emerald-100 font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-            title="Salva esta formulação em Meus Protocolos para acessar de outros dispositivos"
-          >
-            {saveState === "saving" ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Salvando…
-              </>
-            ) : (
-              <>
-                <FolderHeart className="w-3.5 h-3.5" /> Salvar protocolo
-              </>
-            )}
-          </button>
-        )}
-
+        {/* R12.68 · botões utilitários secundários (JSON/Markdown) ficam ao lado
+             das ações de export. O "Salvar protocolo" antigo (R12.28) foi
+             substituído pelo ExportBar universal abaixo — Notebook R12.66 é
+             a fonte única de verdade com versionamento V1/V2/V3, imagens e
+             histórico. Formulações antigas (Protocol) continuam acessíveis
+             em /dashboard/protocols (retrocompatibilidade). */}
         <button
           onClick={() => {
             const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" })
@@ -1526,21 +1497,16 @@ function ResultView({
         </button>
       </div>
 
-      {/* R12.28: feedback de erro do save (raro — IA não é chamada aqui, só DB write) */}
-      {saveState === "error" && saveError && (
-        <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-xs text-red-200">
-          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-          <div>
-            <strong>Não foi possível salvar:</strong> {saveError}
-            <button
-              onClick={handleSaveProtocol}
-              className="ml-2 underline hover:text-red-100"
-            >
-              Tentar novamente
-            </button>
-          </div>
-        </div>
-      )}
+      {/* R12.68 · ExportBar universal (7 botões oficiais Janaina) */}
+      <ExportBar
+        buildContent={buildFormulatorContent}
+        onSaved={(res) =>
+          setNotebookEntry({
+            entryId: res.entryId,
+            currentVersion: res.versionNumber,
+          })
+        }
+      />
     </div>
   )
 }

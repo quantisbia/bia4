@@ -174,6 +174,158 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R12.68 — Integração: `<ExportBar>` espalhada em Pipeline + Formulator Pro + Bioink + Chat IA + Próximos Passos + script de migração Protocol → Notebook (Fase 3 de 4) (2026-08-05)
+
+Mandato Janaina (Fase 3 do pacote export/salvar/rastreabilidade):
+> **"Botões padrão em TODAS as ferramentas: Pipeline, Formulator Pro, Bioink, Chat IA, Próximos Passos."**
+
+5 decisões da Janaina aplicadas verbatim:
+1. ✅ "Próximos Passos" é uma **seção do card de análise da Pipeline** (não uma rota) → 1 ExportBar da Pipeline cobre as duas features
+2. ✅ Formulator Pro: **botão antigo "Salvar Protocolo" removido**; Notebook R12.66 é fonte única de verdade
+3. ✅ Script de migração Protocol → NotebookEntry criado agora (não-destrutivo, idempotente)
+4. ✅ Bioink: dropdown de escopo no clique (`active` / `both` / `single-0` / `single-1`) — opção C
+5. ✅ Chat IA: filtro por autor (`all` / `assistant` / `user`) — opção C
+
+**A) 4 adapters puros em `src/lib/export/adapters/` (~800 linhas líquidas)**
+
+Cada adapter é uma **função pura** que converte o estado da ferramenta em `ExportableContent`. Sem `fetch()`, sem side-effects — 100% testável isoladamente.
+
+| Adapter | Arquivo | Tamanho | Output |
+|---|---|---|---|
+| `buildContentFromPipeline` | `pipeline-adapter.ts` | 5.3 KB | project + analysis (recommendation + parameters + warnings + Próximos Passos numerada) |
+| `buildContentFromProFormulation` | `formulator-pro-adapter.ts` | 12 KB | **16 campos ricos**: score (5 dims), componentes (tabela), crosslinking, protocolo (headings + parágrafos), warnings (callouts), printing params, characterization, regulatório, referências, alternativas |
+| `buildContentFromBioinkDrafts` | `bioink-adapter.ts` | 7.9 KB | Escopo `active`/`both`/`single` + reologia (bloco individual) + setup de bioimpressão |
+| `buildContentFromChatSession` | `chat-adapter.ts` | 7.1 KB | Filtro `all`/`assistant`/`user` + detecção heurística de code fences markdown → CodeBlock |
+
+Smoke test em Node: Pipeline PDF 7.8 KB, Formulator PDF 12 KB (rico!), Bioink PDF 8 KB, Chat PDF 6.4 KB. **Todos os 4 adapters produzem PDF real navegável.**
+
+**B) Integração na `/dashboard/pipeline/page.tsx`**
+
+- `<ExportBar>` renderizado **dentro** do card `analysis`, **logo depois da seção "Próximos Passos"** (linha exata da regra da Janaina)
+- Estado `notebookEntry` rastreia vínculo com entrada do Notebook (reset ao trocar projeto ou etapa)
+- `buildPipelineContent()` via `useCallback` lê estado atualizado no clique de cada botão
+- **1 ExportBar cobre Pipeline + Próximos Passos** (economia de 1 sprint)
+
+**C) Integração na `/dashboard/formulator-pro/page.tsx` — REMOÇÃO do save antigo**
+
+**Removido do código (R12.28 → deprecado no R12.68):**
+- `useState<"idle" | "saving" | "saved" | "error">("idle")` (3 states de save)
+- `useCallback handleSaveProtocol` (18 linhas)
+- Botão visual "Salvar protocolo" (18 linhas com ícone FolderHeart)
+- Link "Salvo — abrir" (10 linhas)
+- Bloco de erro `saveState === "error"` (15 linhas)
+- Import `FolderHeart` (não usado)
+
+**Adicionado:**
+- Import `ExportBar` + `buildContentFromProFormulation`
+- Estado `notebookEntry` (reset a cada nova geração de resultado)
+- `buildFormulatorContent()` via `useCallback`
+- `<ExportBar>` no rodapé do bloco de resultado — mantendo os botões utilitários (Baixar JSON, Copiar Markdown) ao lado
+
+**Retrocompatibilidade preservada:**
+- API `/api/protocols/save-formulation` **continua funcionando** (não foi deletada)
+- Rota `/dashboard/protocols` **continua acessível**
+- Formulações antigas continuam onde estavam → **Nada perdido**
+- Novas formulações (a partir do R12.68) vão diretamente para o Notebook com versionamento
+
+**D) Integração na `/dashboard/bioprint/bioink/page.tsx` — dropdown de escopo**
+
+Barra fixa **acima do `<main>`** dentro da tab "formulate":
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│ Escopo: [Biotinta ativa (T0) ▾]   💾 Salvar  ✏ Editar  🆕 v+1  ... │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+O `<select>` só aparece quando há 2 biotintas (`drafts.length === 2`). Opções:
+- **"Biotinta ativa (T0/T1)"** — só a que a usuária está editando (default)
+- **"Ambas as biotintas (T0 + T1)"** — documento com as duas + callout info explicando que reologia é individual
+- **"Apenas T0"** / **"Apenas T1"** — export forçado de uma biotinta específica
+
+Reologia (Hagen-Poiseuille) só é incluída no PDF quando escopo `= 1 biotinta`; para escopo `both`, é substituída por callout informando o comportamento.
+
+**E) Integração na `/dashboard/chat/page.tsx` — filtro por autor**
+
+Barra logo abaixo do header do chat, **só aparece com sessão + mensagens**:
+
+```
+Filtro: [Integral (você + BIA) ▾]  💾 Salvar  ✏ Editar  🆕 v+1  📄 PDF  📝 DOCX
+```
+
+Opções:
+- **`all` — Integral (você + BIA)** — transcrição verbatim (default)
+- **`assistant` — Só respostas da BIA** — vira "resumo científico" para arquivar
+- **`user` — Só suas perguntas** — útil para revisão de dúvidas
+
+Mensagens `role: "system"` são **sempre filtradas** (independente do escopo). Blocos de código markdown (```lang) são detectados heuristicamente e viram `CodeBlock` no ExportableContent — a formatação sobrevive ao PDF/DOCX.
+
+**F) Script de migração `scripts/migrate-protocols-to-notebook.ts` (não-destrutivo)**
+
+```bash
+# Preview:
+npx tsx scripts/migrate-protocols-to-notebook.ts --dry-run
+
+# Executar:
+npx tsx scripts/migrate-protocols-to-notebook.ts
+
+# Migrar 1 usuário:
+npx tsx scripts/migrate-protocols-to-notebook.ts --user-id=<cuid>
+
+# Migrar 1 protocolo:
+npx tsx scripts/migrate-protocols-to-notebook.ts --protocol-id=<cuid>
+```
+
+- **NUNCA apaga** `Protocol` (retrocompatibilidade total)
+- **Idempotente:** procura `NotebookEntry.metadata.__migratedFromProtocolId` antes de criar → pula se já migrado
+- Cria `NotebookEntry` + versão V1 (via helper `createInitialVersion` do R12.66) em transação
+- Preserva metadados: `__migratedFromProtocolId`, `__migratedAt`, `protocolMeta` (duration/difficulty/aiGenerated/validated), `sourceInputs`
+- Converte `steps`/`materials`/`equipment`/`safetyNotes` em markdown estruturado
+- `category === "synthesis"` → `entryType = FORMULATION`; demais → `entryType = PROTOCOL`
+- Saída JSON no stdout: `{ total, migrated, skipped, failed[], dryRun }`
+- Exit code 0 se tudo OK, 1 se algum falhou, 2 se erro fatal
+
+**Estratégia sugerida para rodar em produção (opcional, quando a Janaina decidir):**
+1. `--dry-run` para ver quantos protocolos existem
+2. Executar sem flag em horário de baixo tráfego
+3. Verificar em `/dashboard/notebook` se as entradas migradas apareceram com tag `migrado`
+4. Se OK, comunicar aos usuários que suas formulações antigas agora estão no Notebook
+5. `Protocol` continua intacto — script de cleanup fica para uma sprint futura R12.68.5 (se necessário)
+
+**G) Testes `tests/r12_68_exportbar_integration.test.ts` — 60 testes verdes**
+
+- **R12.68.A** (5) — Todos os 4 adapters existem e são funções exportadas
+- **R12.68.B** (7) — Adapter Pipeline: título com etapa, entryType=PIPELINE_SUMMARY, warnings→callouts, Próximos Passos→lista numerada, metadata preservada, PDF real
+- **R12.68.C** (7) — Adapter Formulator Pro: 16 campos ricos (scores formato N/100, componentes tabela, protocolo com heading crítico, warnings callout, regulatório+referências+alternativas), PDF >4KB
+- **R12.68.D** (5) — Adapter Bioink: 3 escopos (active/both/single), material resolvido pelo catálogo, reologia condicional
+- **R12.68.E** (7) — Adapter Chat: 3 filtros, system sempre filtrado, code fences preservados, callout informativo para filtro vazio
+- **R12.68.F** (5) — Pipeline page: ExportBar renderizado após "Próximos Passos", estado notebookEntry, imports corretos
+- **R12.68.G** (5) — Formulator Pro: **REMOVEU handleSaveProtocol + setSaveState + fetch save-formulation + botão "Salvar protocolo" + FolderHeart**; instalou ExportBar
+- **R12.68.H** (4) — Bioink: dropdown com 4 opções (active/both/single-0/single-1), só aparece com drafts.length===2, na tab formulate
+- **R12.68.I** (4) — Chat: filtro com 3 opções, só aparece com mensagens, reset de vínculo
+- **R12.68.J** (9) — Script de migração: --dry-run, --user-id, --protocol-id, **jamais chama .delete() no Protocol**, idempotente via `__migratedFromProtocolId`, usa `createInitialVersion` do R12.66, saída JSON
+- **R12.68.K** (2) — Sanidade: zero secrets, adapters são funções puras (sem fetch)
+
+**Testes:** **531/531 passing** (471 anteriores + 60 novos R12.68, zero regressões, 42.96s).
+
+**Arquivos criados (6):**
+- `src/lib/export/adapters/pipeline-adapter.ts` (5.3 KB)
+- `src/lib/export/adapters/formulator-pro-adapter.ts` (12 KB — o mais rico)
+- `src/lib/export/adapters/bioink-adapter.ts` (7.9 KB)
+- `src/lib/export/adapters/chat-adapter.ts` (7.1 KB)
+- `scripts/migrate-protocols-to-notebook.ts` (8.4 KB — não-destrutivo)
+- `tests/r12_68_exportbar_integration.test.ts` (25.7 KB — 60 testes)
+
+**Arquivos modificados (4):**
+- `src/app/dashboard/pipeline/page.tsx` (+ ExportBar após Próximos Passos)
+- `src/app/dashboard/formulator-pro/page.tsx` (- 60 linhas do save antigo, + ExportBar universal)
+- `src/app/dashboard/bioprint/bioink/page.tsx` (+ dropdown de escopo + ExportBar na tab formulate)
+- `src/app/dashboard/chat/page.tsx` (+ dropdown de filtro + ExportBar após header)
+
+**Próximo (R12.69):** UI hierárquica do Notebook (Projetos → Entradas → Versões) + busca global + diff visual entre versões. Depois disso, **R13.01 · BIA Academy** começa (schema + migration + seed do primeiro módulo teste).
+
+---
+
 ### R12.67 — Frontend: `<ExportBar>` universal (7 botões) + jsPDF + docx + preservação R13 BIA Academy (Fase 2 de 4) (2026-08-04)
 
 Mandato Janaina (Fase 2 do pacote export/salvar/rastreabilidade):
@@ -842,4 +994,4 @@ Learning store persiste ajustes do usuário e re-alimenta as próximas sugestõe
 Proprietário — Quantis Biotechnology © 2026
 Janaina Dernowsek (CEO/Founder)
 
-**Last Updated:** 2026-08-04 — R12.67 (Frontend `<ExportBar>` universal com 7 botões · Salvar/Editar/Nova versão/PDF/DOCX/Adicionar imagem/Consultar histórico · integração 100% com APIs R12.66 · padrão = criar nova versão · exceção via ?updateInPlace=true · jsPDF 4.2 + docx 9.7 · marca visual violet→fuchsia · 4 diálogos inline · decisões BIA Academy R13 preservadas em docs/roadmap · Fase 2 de 4 · 471/471 testes verdes 💾✏️🆕📄📝🖼️🕐)
+**Last Updated:** 2026-08-05 — R12.68 (Integração: `<ExportBar>` espalhada em Pipeline + Formulator Pro + Bioink + Chat IA · "Próximos Passos" coberto pela ExportBar da Pipeline · Formulator Pro removeu botão antigo "Salvar Protocolo" · Bioink com dropdown de escopo active/both/T0/T1 · Chat IA com filtro por autor all/assistant/user · 4 adapters puros como funções · script de migração Protocol → NotebookEntry não-destrutivo e idempotente · Fase 3 de 4 · 531/531 testes verdes 🔧🧪🎨💬🔄)

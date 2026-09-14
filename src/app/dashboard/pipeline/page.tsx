@@ -1,11 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   GitBranch, Plus, CheckCircle2, Circle, Clock,
   Loader2, Zap, ArrowRight, ChevronLeft, X, Box, ExternalLink
 } from "lucide-react"
 import { PIPELINE_STAGES } from "@/lib/ai/pipeline"
+// R12.68 · ExportBar universal + adapter da Pipeline
+import { ExportBar } from "@/components/notebook/ExportBar"
+import { buildContentFromPipeline } from "@/lib/export/adapters/pipeline-adapter"
 
 interface PipelineProject {
   id: string; name: string; tissueType: string; targetApplication: string
@@ -25,6 +28,24 @@ export default function PipelinePage() {
   const [showCreate, setShowCreate]         = useState(false)
   const [showList, setShowList]             = useState(false) // mobile panel
   const [form, setForm] = useState({ name: "", tissueType: "", application: "", cellSource: "" })
+
+  // R12.68 · rastreamento da entrada do Notebook quando a Pipeline é salva/versionada
+  const [notebookEntry, setNotebookEntry] = useState<{ entryId: string; currentVersion: number } | null>(null)
+
+  // Sempre que trocarmos de projeto ou fizermos nova análise, resetamos o vínculo
+  useEffect(() => {
+    setNotebookEntry(null)
+  }, [selectedProject?.id, analysis?.stage])
+
+  // buildContent é passado à ExportBar; chamado sob demanda no clique de cada botão
+  const buildPipelineContent = useCallback(() => {
+    if (!selectedProject) throw new Error("Nenhum projeto selecionado")
+    return buildContentFromPipeline({
+      project: selectedProject,
+      analysis,
+      existing: notebookEntry ?? undefined,
+    })
+  }, [selectedProject, analysis, notebookEntry])
 
   useEffect(() => { loadProjects() }, [])
 
@@ -289,6 +310,21 @@ export default function PipelinePage() {
                         </li>
                       ))}
                     </ol>
+                  </div>
+                )}
+
+                {/* R12.68 · ExportBar universal (7 botões) — Salvar/Editar/Nova versão/PDF/DOCX/Imagem/Histórico */}
+                {selectedProject && (
+                  <div className="mb-4">
+                    <ExportBar
+                      buildContent={buildPipelineContent}
+                      onSaved={(res) =>
+                        setNotebookEntry({
+                          entryId: res.entryId,
+                          currentVersion: res.versionNumber,
+                        })
+                      }
+                    />
                   </div>
                 )}
 

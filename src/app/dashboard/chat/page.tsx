@@ -6,6 +6,9 @@ import {
   ChevronDown, X, Menu as MenuIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
+// R12.68 · ExportBar universal + adapter do Chat IA
+import { ExportBar } from "@/components/notebook/ExportBar"
+import { buildContentFromChatSession, type ChatExportFilter } from "@/lib/export/adapters/chat-adapter"
 
 interface ChatMessage {
   id?: string
@@ -53,6 +56,16 @@ export default function ChatPage() {
   const [streamingText, setStreamingText] = useState("")
   const [showSessions, setShowSessions] = useState(false) // mobile: session drawer
   const [showModeMenu, setShowModeMenu] = useState(false)
+
+  // ─── R12.68 · ExportBar do Chat ────────────────────────────────
+  // Filtro opção C (Janaina): transcrição integral com opção de filtrar por autor.
+  const [chatExportFilter, setChatExportFilter] = useState<ChatExportFilter>("all")
+  const [chatNotebookEntry, setChatNotebookEntry] = useState<{ entryId: string; currentVersion: number } | null>(null)
+
+  // Ao mudar de sessão ou filtro, desassocia o vínculo com Notebook
+  useEffect(() => {
+    setChatNotebookEntry(null)
+  }, [currentSession?.id, chatExportFilter])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -296,6 +309,53 @@ export default function ChatPage() {
             <span>2 cr/msg</span>
           </div>
         </div>
+
+        {/* R12.68 · ExportBar da conversa + filtro por autor (opção C Janaina) */}
+        {currentSession && messages.length > 0 && (
+          <div className="px-3 sm:px-4 py-2 border-b border-white/5 flex flex-wrap items-center gap-2 shrink-0">
+            <label className="flex items-center gap-1.5 text-[11px] text-gray-500">
+              <span className="font-medium">Filtro:</span>
+              <select
+                value={chatExportFilter}
+                onChange={(e) => setChatExportFilter(e.target.value as ChatExportFilter)}
+                className="rounded-md bg-white/5 border border-white/10 text-[11px] text-white px-2 py-1 focus:outline-none focus:border-purple-500/40"
+                data-testid="chat-export-filter"
+              >
+                <option value="all">Integral (você + BIA)</option>
+                <option value="assistant">Só respostas da BIA</option>
+                <option value="user">Só suas perguntas</option>
+              </select>
+            </label>
+            <div className="flex-1 min-w-0">
+              <ExportBar
+                buildContent={() =>
+                  buildContentFromChatSession({
+                    session: {
+                      id: currentSession.id,
+                      title: currentSession.title,
+                      mode,
+                      createdAt: currentSession.createdAt,
+                    },
+                    messages: messages as Array<{
+                      role: "user" | "assistant"
+                      content: string
+                      createdAt?: string | Date
+                    }>,
+                    filter: chatExportFilter,
+                    existing: chatNotebookEntry ?? undefined,
+                  })
+                }
+                onSaved={(res) =>
+                  setChatNotebookEntry({
+                    entryId: res.entryId,
+                    currentVersion: res.versionNumber,
+                  })
+                }
+                size="sm"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-4">

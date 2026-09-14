@@ -28,6 +28,9 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { useBioprintProcess, type BioinkRole, type BioinkFormulation } from "@/lib/bioprint/process-context"
+// R12.68 · ExportBar universal + adapter da Biotinta (Bioink)
+import { ExportBar } from "@/components/notebook/ExportBar"
+import { buildContentFromBioinkDrafts } from "@/lib/export/adapters/bioink-adapter"
 
 // ─── Constantes da biotinta (importadas da página antiga, agora aqui) ─────
 
@@ -390,6 +393,17 @@ export default function BioprintBioinkPage() {
   const [nozzleUm, setNozzleUm]         = useState<number>(300)
   const [printSpeedMmS, setPrintSpeedMmS] = useState<number>(15)
 
+  // ─── R12.68 · ExportBar: escopo + vínculo com Notebook ────────────────
+  // Escopo padrão "active" (só a biotinta ativa). Se drafts.length === 2,
+  // usuária pode escolher via dropdown "Exportar: ativa | ambas | T0 | T1"
+  const [exportScope, setExportScope] = useState<"active" | "both" | "single-0" | "single-1">("active")
+  const [notebookEntry, setNotebookEntry] = useState<{ entryId: string; currentVersion: number } | null>(null)
+
+  // Ao mudar drafts (nova formulação) ou o escopo, o vínculo com Notebook é resetado
+  useEffect(() => {
+    setNotebookEntry(null)
+  }, [drafts, exportScope])
+
   // Reologia derivada — calculada só para a biotinta ATIVA
   const rheology = useMemo<RheologyResult>(() => calculateRheology({
     materialId: activeDraft.materialId,
@@ -524,6 +538,69 @@ export default function BioprintBioinkPage() {
           >
             Voltar à Etapa 1
           </Link>
+        </div>
+      )}
+
+      {/* R12.68 · ExportBar universal + dropdown de escopo (Janaina opção C) */}
+      {tab === "formulate" && drafts.length > 0 && (
+        <div className="px-4 sm:px-6 pt-4">
+          <div className="flex flex-wrap items-center gap-3 rounded-xl bg-white/[0.03] border border-white/10 p-2">
+            {drafts.length === 2 && (
+              <label className="flex items-center gap-2 text-xs text-gray-400">
+                <span className="font-medium">Escopo:</span>
+                <select
+                  value={exportScope}
+                  onChange={(e) => setExportScope(e.target.value as typeof exportScope)}
+                  className="rounded-md bg-white/5 border border-white/10 text-xs text-white px-2 py-1 focus:outline-none focus:border-violet-500/40"
+                  data-testid="bioink-export-scope"
+                >
+                  <option value="active">Biotinta ativa (T{activeIdx})</option>
+                  <option value="both">Ambas as biotintas (T0 + T1)</option>
+                  <option value="single-0">Apenas T0</option>
+                  <option value="single-1">Apenas T1</option>
+                </select>
+              </label>
+            )}
+            <div className="flex-1 min-w-0">
+              <ExportBar
+                buildContent={() => {
+                  // Resolve o escopo em runtime, para pegar drafts/activeIdx atualizados
+                  const scope =
+                    exportScope === "both"
+                      ? "both"
+                      : exportScope === "single-0" || exportScope === "single-1"
+                        ? "single"
+                        : "active"
+                  const singleIdx: 0 | 1 =
+                    exportScope === "single-1" ? 1 : 0
+                  return buildContentFromBioinkDrafts({
+                    drafts,
+                    materialsInfo: BIOINK_MATERIALS.map((m) => ({ id: m.id, label: m.label })),
+                    rheology: rheology as unknown as {
+                      shearRateS: number
+                      wallShearStressPa: number
+                      viscosityPas?: number
+                      printabilityScore?: number
+                      warnings?: string[]
+                    },
+                    scope,
+                    activeIdx,
+                    singleIdx,
+                    nozzleUm,
+                    printSpeedMmS,
+                    existing: notebookEntry ?? undefined,
+                  })
+                }}
+                onSaved={(res) =>
+                  setNotebookEntry({
+                    entryId: res.entryId,
+                    currentVersion: res.versionNumber,
+                  })
+                }
+                size="sm"
+              />
+            </div>
+          </div>
         </div>
       )}
 
