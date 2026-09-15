@@ -75,13 +75,20 @@ export default function HomePage() {
           </div>
 
           {/* CTA */}
-          <div className="flex items-center gap-2">
-            <Link href="/auth/login"
-              className="hidden sm:block text-sm text-gray-300 hover:text-white transition-colors px-3 py-2">
+          {/* R13.10.2 fix: "Entrar" DEVE aparecer também no mobile
+              (bug reportado pela Janaina — só aparecia sm:block). */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <Link
+              href="/auth/login"
+              className="text-xs sm:text-sm text-violet-200 hover:text-white transition-colors px-2.5 sm:px-3 py-2 rounded-lg border border-violet-500/30 sm:border-transparent hover:border-violet-500/50 whitespace-nowrap"
+              data-testid="home-nav-login"
+            >
               Entrar
             </Link>
-            <Link href="/auth/register"
-              className="bia-button-primary text-sm px-4 py-2 rounded-xl font-semibold">
+            <Link
+              href="/auth/register"
+              className="bia-button-primary text-xs sm:text-sm px-3 sm:px-4 py-2 rounded-xl font-semibold whitespace-nowrap"
+            >
               Começar grátis
             </Link>
           </div>
@@ -239,6 +246,18 @@ export default function HomePage() {
 
                 <p className="text-[11px] text-gray-500 mt-4">
                   Pagamento seguro via Asaas · Boleto, Pix ou cartão · Liberação em 24h úteis
+                </p>
+
+                {/* R13.10.2: link explícito para quem já é aluno (bug reportado — não achavam login pelo mobile). */}
+                <p className="text-[11px] text-gray-400 mt-3 pt-3 border-t border-white/[0.06]">
+                  Já é aluno?{" "}
+                  <Link
+                    href="/auth/login"
+                    className="text-fuchsia-300 hover:text-fuchsia-200 font-semibold underline underline-offset-2"
+                    data-testid="home-academy-banner-login"
+                  >
+                    Entrar na plataforma →
+                  </Link>
                 </p>
               </div>
 

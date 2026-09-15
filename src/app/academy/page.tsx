@@ -171,11 +171,13 @@ export default function AcademyLandingPage() {
             <a href="#faq"        className="hover:text-white transition-colors">FAQ</a>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* R13.10.2 fix: "Já sou aluno" DEVE aparecer também no mobile
+                (bug reportado pela Janaina — só aparecia com sm:block). */}
             <Link
               href="/auth/login"
               onClick={() => trackEvent("cta_login_clicked")}
-              className="hidden sm:block text-sm text-gray-300 hover:text-white transition-colors px-3 py-2"
+              className="text-xs sm:text-sm text-violet-200 hover:text-white transition-colors px-2.5 sm:px-3 py-2 rounded-lg border border-violet-500/30 sm:border-transparent hover:border-violet-500/50 whitespace-nowrap"
               data-testid="academy-cta-login"
             >
               Já sou aluno
@@ -185,7 +187,7 @@ export default function AcademyLandingPage() {
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => trackEvent("cta_asaas_clicked", { location: "nav" })}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-sm font-semibold px-4 py-2 shadow-lg shadow-violet-500/20"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-xs sm:text-sm font-semibold px-3 sm:px-4 py-2 shadow-lg shadow-violet-500/20 whitespace-nowrap"
               data-testid="academy-cta-asaas-nav"
             >
               Inscreva-se
@@ -582,17 +584,33 @@ export default function AcademyLandingPage() {
           <p className="text-sm sm:text-base text-gray-400 mb-6">
             Inscreva-se hoje e comece pelo Módulo 1 · Introdução à Biofabricação — já disponível.
           </p>
-          <a
-            href={ASAAS_LINK}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => trackEvent("cta_asaas_clicked", { location: "footer_cta" })}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-base font-semibold px-8 py-4 shadow-xl shadow-violet-500/25"
-            data-testid="academy-cta-asaas-footer"
-          >
-            Inscreva-se no curso online
-            <ExternalLink className="w-4 h-4" />
-          </a>
+
+          {/* CTAs — inscrição + login lado-a-lado (R13.10.2: adicionado login também aqui). */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <a
+              href={ASAAS_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => trackEvent("cta_asaas_clicked", { location: "footer_cta" })}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-base font-semibold px-8 py-4 shadow-xl shadow-violet-500/25 w-full sm:w-auto"
+              data-testid="academy-cta-asaas-footer"
+            >
+              Inscreva-se no curso online
+              <ExternalLink className="w-4 h-4" />
+            </a>
+            <Link
+              href="/auth/login"
+              onClick={() => trackEvent("cta_login_clicked", { location: "footer_cta" })}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-violet-500/30 hover:border-violet-500/60 hover:bg-violet-500/10 text-violet-200 hover:text-white text-base font-semibold px-8 py-4 w-full sm:w-auto"
+              data-testid="academy-cta-login-footer"
+            >
+              Já sou aluno · Entrar
+            </Link>
+          </div>
+
+          <p className="text-[11px] text-gray-500 mt-4">
+            Já pagou pelo Asaas? Faça login com o email que usou na inscrição.
+          </p>
         </div>
       </section>
 
