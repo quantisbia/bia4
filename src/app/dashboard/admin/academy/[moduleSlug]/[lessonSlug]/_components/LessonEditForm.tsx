@@ -5,7 +5,7 @@
  */
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, Save, Trash2, AlertTriangle, Sparkles, Youtube } from "lucide-react"
+import { Loader2, Save, Trash2, AlertTriangle, Sparkles, Video } from "lucide-react"
 
 type BiaHook = { tool: string; label: string; params?: Record<string, unknown> } | null
 
@@ -152,7 +152,7 @@ export function LessonEditForm({ lesson, moduleSlug }: { lesson: LessonData; mod
       </div>
 
       <div>
-        <Label icon={<Youtube className="w-3 h-3 text-red-400" />}>URL do YouTube ou ID</Label>
+        <Label icon={<Video className="w-3 h-3 text-red-400" />}>URL do YouTube ou ID</Label>
         <input
           type="text"
           value={youtubeInput}

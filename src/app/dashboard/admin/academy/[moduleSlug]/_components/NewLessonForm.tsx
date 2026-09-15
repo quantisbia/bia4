@@ -8,7 +8,7 @@
  */
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, Plus, AlertTriangle, Youtube } from "lucide-react"
+import { Loader2, Plus, AlertTriangle, Video } from "lucide-react"
 
 function slugify(s: string): string {
   return s.toLowerCase()
@@ -128,7 +128,7 @@ export function NewLessonForm({
 
       <div>
         <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1.5 mb-1.5">
-          <Youtube className="w-3 h-3 text-red-400" />
+          <Video className="w-3 h-3 text-red-400" />
           URL do YouTube (ou ID de 11 caracteres)
         </label>
         <input
