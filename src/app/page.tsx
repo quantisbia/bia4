@@ -333,6 +333,121 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── R13.11 · Banner Plataforma BIA (Tecidos · Esferoides · Organoides) ──
+          Faixa visual que apresenta a plataforma completa em 1 cena e
+          conecta direto ao checkout de assinatura R$ 507/mês. Aparece
+          entre "O que é biofabricação" e "6 Mercados". */}
+      <section
+        id="platform-launch"
+        data-testid="home-platform-launch-section"
+        className="py-16 sm:py-24 px-4 sm:px-6 bg-gradient-to-b from-transparent via-violet-950/10 to-transparent"
+      >
+        <div className="max-w-6xl mx-auto">
+          <div className="rounded-2xl sm:rounded-3xl border border-violet-500/25 bg-gradient-to-br from-violet-950/40 via-black/60 to-fuchsia-950/30 overflow-hidden shadow-2xl shadow-violet-900/30">
+            <div className="grid md:grid-cols-2 items-stretch">
+              {/* Coluna imagem */}
+              <div
+                data-testid="home-platform-launch-image"
+                className="relative aspect-square md:aspect-auto md:min-h-[520px] bg-black overflow-hidden"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/marketing/plataforma-bia-launch.jpg"
+                  alt="Plataforma BIA — tecidos bioimpressos, esferoides e organoides em uma placa de Petri, com holograma da interface conectando os três especímenes"
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+                {/* Overlay sutil para integração visual com a coluna direita no dark theme */}
+                <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-black/40 via-transparent to-transparent pointer-events-none" />
+              </div>
+
+              {/* Coluna copy + CTA */}
+              <div className="p-6 sm:p-10 md:p-12 flex flex-col justify-center gap-5">
+                <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-fuchsia-300 self-start">
+                  <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-400 animate-pulse" />
+                  Plataforma completa BIA
+                </div>
+
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight text-white">
+                  Avance em <span className="bia-gradient-text">tecidos bioimpressos</span>,
+                  esferoides e organoides — com <span className="bia-gradient-text">IA científica</span>{" "}
+                  ao seu lado
+                </h2>
+
+                <p className="text-gray-300 text-sm sm:text-base leading-relaxed">
+                  A BIA reúne <strong className="text-white">tudo que um pesquisador em biofabricação
+                  precisa</strong> em uma única plataforma: formule biotintas com 807 biomateriais
+                  catalogados, desenhe scaffolds e vasos, fatie modelos 3D com 11 algoritmos
+                  biomédicos, cultive esferoides e organoides com protocolos QMicroNiche™, gere
+                  SOPs GLP/GMP em formato ANVISA e converse com uma IA treinada em bioimpressão.
+                </p>
+
+                {/* 3 pilares visuais */}
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                  {[
+                    { label: "Tecidos", desc: "Bioimpressão 3D · Scaffolds · Vasos", icon: "🫀" },
+                    { label: "Esferoides", desc: "3D scaffold-free · Building blocks", icon: "🔮" },
+                    { label: "Organoides", desc: "Intestinal · Hepático · Neural · Renal", icon: "🧬" },
+                  ].map((pillar) => (
+                    <div
+                      key={pillar.label}
+                      className="rounded-xl border border-violet-500/20 bg-violet-500/[0.06] p-2.5 sm:p-3 text-center"
+                    >
+                      <div className="text-lg sm:text-2xl mb-0.5">{pillar.icon}</div>
+                      <div className="text-[11px] sm:text-xs font-bold text-white">{pillar.label}</div>
+                      <div className="text-[9px] sm:text-[10px] text-gray-500 leading-tight mt-0.5">
+                        {pillar.desc}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Preço + CTA */}
+                <div className="rounded-2xl border border-fuchsia-500/30 bg-gradient-to-br from-violet-600/15 to-fuchsia-600/10 p-4 sm:p-5">
+                  <div className="flex items-baseline gap-2 flex-wrap mb-2">
+                    <span className="text-3xl sm:text-4xl font-bold text-white">R$ 507</span>
+                    <span className="text-sm text-gray-400 font-medium">/mês</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-fuchsia-500/20 text-fuchsia-200 border border-fuchsia-500/30 ml-auto">
+                      Assinatura
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-gray-300 mb-3 flex items-center gap-2">
+                    <Zap className="w-3.5 h-3.5 text-fuchsia-300" />
+                    <strong className="text-white">1.500 créditos</strong> renovados todo mês
+                    <span className="text-gray-600">·</span>
+                    <span className="text-fuchsia-300">Cancele quando quiser</span>
+                  </p>
+
+                  <Link
+                    href="https://www.asaas.com/c/qsnp08rvpuwlj8ip"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid="home-platform-launch-cta"
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-sm sm:text-base font-semibold px-5 py-3 shadow-lg shadow-fuchsia-500/20 transition-all"
+                  >
+                    Assinar Guia Inteligente
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+
+                  <p className="text-[10px] text-gray-500 mt-2 text-center">
+                    Pagamento recorrente seguro via Asaas · Boleto, Pix ou cartão
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Nota discreta sobre Academy separada */}
+          <p className="text-center text-xs text-gray-500 mt-6 max-w-2xl mx-auto">
+            💡 Procura formação completa? A{" "}
+            <Link href="/academy" className="text-fuchsia-300 hover:text-fuchsia-200 underline underline-offset-2">
+              BIA Academy
+            </Link>{" "}
+            é o programa de 12 módulos com plataforma integrada por 12 meses (R$ 2.375 · pagamento único).
+          </p>
+        </div>
+      </section>
+
       {/* ── 6 Mercados ──────────────────────────────────────────────────── */}
       <section id="markets" className="py-16 sm:py-24 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto">

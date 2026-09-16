@@ -295,6 +295,73 @@ describe("R13.11 · Script de renovação — helper existe e é idempotente", (
   })
 })
 
+describe("R13.11.1 · Banner Plataforma BIA (Tecidos · Esferoides · Organoides)", () => {
+
+  it("banner: seção #platform-launch presente na home", () => {
+    const src = read("src/app/page.tsx")
+    expect(src).toContain(`id="platform-launch"`)
+    expect(src).toContain(`data-testid="home-platform-launch-section"`)
+  })
+
+  it("banner: imagem em public/marketing/plataforma-bia-launch.jpg referenciada com alt textual completo", () => {
+    const src = read("src/app/page.tsx")
+    expect(src).toContain("/marketing/plataforma-bia-launch.jpg")
+    expect(src).toMatch(/alt="[^"]*tecidos[^"]*esferoides[^"]*organoides/i)
+  })
+
+  it("banner: título menciona os 3 pilares (tecidos + esferoides + organoides)", () => {
+    const src = read("src/app/page.tsx")
+    const idxSection = src.indexOf('id="platform-launch"')
+    expect(idxSection).toBeGreaterThan(-1)
+    const sectionBlock = src.slice(idxSection, idxSection + 6000)
+    expect(sectionBlock).toMatch(/tecidos bioimpressos/i)
+    expect(sectionBlock).toMatch(/esferoides/i)
+    expect(sectionBlock).toMatch(/organoides/i)
+  })
+
+  it("banner: 3 pilares visuais renderizados (Tecidos · Esferoides · Organoides)", () => {
+    const src = read("src/app/page.tsx")
+    const sectionBlock = src.slice(src.indexOf('id="platform-launch"'))
+    // Cada pilar deve aparecer como label distinto
+    expect(sectionBlock).toMatch(/label:\s*"Tecidos"/)
+    expect(sectionBlock).toMatch(/label:\s*"Esferoides"/)
+    expect(sectionBlock).toMatch(/label:\s*"Organoides"/)
+  })
+
+  it("banner: preço R$ 507/mês e CTA para Asaas correto", () => {
+    const src = read("src/app/page.tsx")
+    const sectionBlock = src.slice(src.indexOf('id="platform-launch"'))
+    expect(sectionBlock).toMatch(/R\$ 507/)
+    expect(sectionBlock).toContain(GUIDE_ASAAS)
+    expect(sectionBlock).toContain(`data-testid="home-platform-launch-cta"`)
+  })
+
+  it("banner: menciona 1.500 créditos renovados + cancele quando quiser", () => {
+    const src = read("src/app/page.tsx")
+    const sectionBlock = src.slice(src.indexOf('id="platform-launch"'))
+    expect(sectionBlock).toMatch(/1\.500 créditos/)
+    expect(sectionBlock).toMatch(/renovados todo mês/i)
+    expect(sectionBlock).toMatch(/Cancele quando quiser/i)
+  })
+
+  it("banner: nota discreta sobre BIA Academy como produto separado", () => {
+    const src = read("src/app/page.tsx")
+    const sectionBlock = src.slice(src.indexOf('id="platform-launch"'))
+    expect(sectionBlock).toMatch(/BIA Academy/i)
+    expect(sectionBlock).toMatch(/2\.375/)
+  })
+
+  it("banner: imagem física existe em public/marketing/ (não é 404)", () => {
+    // Verifica que o arquivo foi commitado no repo, não só referenciado
+    const { statSync } = require("node:fs")
+    const path = resolve(ROOT, "public/marketing/plataforma-bia-launch.jpg")
+    const stat = statSync(path)
+    expect(stat.isFile()).toBe(true)
+    // Sanity check: imagem deve ter tamanho razoável (>100KB — JPEG 2K)
+    expect(stat.size).toBeGreaterThan(100 * 1024)
+  })
+})
+
 describe("R13.11 · Regressão — links legados só em comentários", () => {
 
   it("Link Asaas antigo (ADVANCED kfvg9q66i3odmtsu) só existe em BillingClient como comentário", () => {
