@@ -74,11 +74,15 @@ interface StatsData {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const PLAN_META: Record<string, { label: string; color: string; bg: string; border: string; icon: string }> = {
-  FREE:       { label: "Free",       color: "text-gray-400",   bg: "bg-gray-500/10",    border: "border-gray-500/20",    icon: "⚪" },
-  DISCOVERY:  { label: "Discovery",  color: "text-blue-400",   bg: "bg-blue-500/10",    border: "border-blue-500/20",    icon: "🔵" },
-  ADVANCED:   { label: "Advanced",   color: "text-violet-400", bg: "bg-violet-500/10",  border: "border-violet-500/20",  icon: "🟣" },
-  ENTERPRISE: { label: "Enterprise", color: "text-amber-400",  bg: "bg-amber-500/10",   border: "border-amber-500/20",   icon: "🟡" },
-  ACADEMY:    { label: "Academy",    color: "text-emerald-400",bg: "bg-emerald-500/10", border: "border-emerald-500/20", icon: "🟢" },
+  FREE:       { label: "Free",             color: "text-gray-400",     bg: "bg-gray-500/10",     border: "border-gray-500/20",     icon: "⚪" },
+  // R13.11 · Plano vigente único (assinatura mensal)
+  GUIDE:      { label: "Guia Inteligente", color: "text-violet-300",   bg: "bg-violet-500/10",   border: "border-violet-500/30",   icon: "🧭" },
+  // Planos legados — mantidos p/ assinantes existentes
+  DISCOVERY:  { label: "Discovery",        color: "text-blue-400",     bg: "bg-blue-500/10",     border: "border-blue-500/20",     icon: "🔵" },
+  ADVANCED:   { label: "Advanced",         color: "text-violet-400",   bg: "bg-violet-500/10",   border: "border-violet-500/20",   icon: "🟣" },
+  ENTERPRISE: { label: "Enterprise",       color: "text-amber-400",    bg: "bg-amber-500/10",    border: "border-amber-500/20",    icon: "🟡" },
+  ACADEMY:    { label: "Academy",          color: "text-emerald-400",  bg: "bg-emerald-500/10",  border: "border-emerald-500/20",  icon: "🟢" },
+  ORGANOID_LAB: { label: "Organoid Lab",   color: "text-teal-400",     bg: "bg-teal-500/10",     border: "border-teal-500/20",     icon: "🔷" },
 }
 
 const STATUS_META: Record<string, { label: string; color: string; dot: string }> = {
@@ -552,8 +556,9 @@ export default function AdminDashboard() {
               <select value={planFilter} onChange={e => { setPlanFilter(e.target.value); }}
                 className="bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-amber-500/40 cursor-pointer">
                 <option value="">Todos os planos</option>
-                {["FREE","DISCOVERY","ADVANCED","ENTERPRISE","ACADEMY"].map(p => (
-                  <option key={p} value={p}>{PLAN_META[p].label}</option>
+                {/* R13.11 · GUIDE é o vigente; legacy planos ainda listáveis p/ filtrar assinantes antigos */}
+                {["FREE","GUIDE","DISCOVERY","ADVANCED","ENTERPRISE","ACADEMY","ORGANOID_LAB"].map(p => (
+                  <option key={p} value={p}>{PLAN_META[p]?.label ?? p}</option>
                 ))}
               </select>
               <select value={sortBy} onChange={e => setSortBy(e.target.value)}
@@ -889,7 +894,8 @@ function UserDetailPanel({
                 <div>
                   <label className="text-[11px] text-gray-400 mb-1 block">Novo plano</label>
                   <div className="grid grid-cols-2 gap-1.5">
-                    {["FREE","DISCOVERY","ADVANCED","ENTERPRISE","ACADEMY"].map(p => {
+                    {/* R13.11 · GUIDE em destaque; legacy planos preservados */}
+                    {["FREE","GUIDE","DISCOVERY","ADVANCED","ENTERPRISE","ACADEMY"].map(p => {
                       const m = PLAN_META[p]
                       return (
                         <button key={p}

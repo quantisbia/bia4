@@ -7,6 +7,10 @@ import { Prisma, SubscriptionPlan, SubscriptionStatus } from "@prisma/client"
 
 export const PLAN_CREDITS: Record<SubscriptionPlan, number> = {
   FREE:         10,
+  // R13.11 · GUIDE é o único plano vigente. 1.500 créditos que RESETAM todo mês
+  // (não acumulam) — o job scripts/renew-monthly-credits.ts força para 1500 no ciclo.
+  GUIDE:        1500,
+  // Planos legados — mantidos para assinantes ativos, não vendidos mais.
   ORGANOID_LAB: 300,
   DISCOVERY:    500,
   ADVANCED:     1500,
@@ -14,14 +18,17 @@ export const PLAN_CREDITS: Record<SubscriptionPlan, number> = {
   ACADEMY:      20000,
 }
 
-// Preços em BRL. Todos mensais EXCETO ACADEMY (pacote único 6 meses + curso presencial)
+// Preços em BRL. Todos mensais EXCETO ACADEMY (pacote único 12 meses + curso online).
 export const PLAN_PRICES: Record<SubscriptionPlan, number> = {
   FREE:         0,
+  // R13.11 · Guia Inteligente em Biofabricação 3D — R$ 507/mês (assinatura recorrente)
+  GUIDE:        507,
+  // Planos legados — valores históricos preservados para relatórios/analytics.
   ORGANOID_LAB: 150,
   DISCOVERY:    270,
   ADVANCED:     490,
   ENTERPRISE:   990,
-  ACADEMY:      4970, // R$ 4.970 · 6 meses (curso + certificação + 20k créditos)
+  ACADEMY:      2375, // R$ 2.375 · 12 meses (curso online + plataforma BIA integrada)
 }
 
 // ============================================

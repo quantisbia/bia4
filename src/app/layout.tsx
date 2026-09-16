@@ -118,14 +118,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 url: "https://quantis.bio",
               },
               offers: {
-                // R13.03.2 · Preço máximo visível atualizado: Academy R$ 4.970 (6m presencial)
-                // descontinuado → agora o topo é BIA Academy Online R$ 2.375 (12m + plataforma).
-                // offerCount ajustado de 6 → 5 (Free + Discovery + Advanced + Enterprise + Academy Online).
+                // R13.11 · Catálogo simplificado: 3 ofertas visíveis
+                //   1. FREE (R$ 0 · 10 créditos iniciais)
+                //   2. GUIDE (R$ 507/mês · Guia Inteligente em Biofabricação 3D · assinatura)
+                //   3. ACADEMY Online (R$ 2.375 · curso 12 meses + plataforma integrada)
+                // Planos legados (ADVANCED/ENTERPRISE/DISCOVERY/ORGANOID_LAB) mantidos
+                // no backend p/ assinantes existentes mas fora do catálogo público.
                 "@type": "AggregateOffer",
                 lowPrice: "0",
                 highPrice: "2375",
                 priceCurrency: "BRL",
-                offerCount: "5",
+                offerCount: "3",
               },
               aggregateRating: {
                 "@type": "AggregateRating",

@@ -14,84 +14,55 @@ import { useToast } from "@/components/ui/Toast"
 import { cn } from "@/lib/utils/helpers"
 
 /* ─────────────────────────────────────────────────────────────────────────
-   PLANOS — R12.25: catálogo enxuto (Biofabricação 3D + Biofab 3D Avançada
-   + Academy). Planos antigos (Organoid Lab, Discovery) descontinuados;
-   assinantes legados continuam tendo acesso via ids preservados no backend.
+   PLANOS — R13.11: PLANO ÚNICO "Guia Inteligente em Biofabricação 3D"
+   ─────────────────────────────────────────────────────────────────────
+   R$ 507/mês em modelo de ASSINATURA RECORRENTE (Asaas gerencia o billing).
+   1.500 créditos que RESETAM todo mês (não acumulam — job manual
+   scripts/renew-monthly-credits.ts força para 1500 no ciclo).
+   Cancelamento livre a qualquer momento: acesso permanece até o fim do
+   ciclo pago; créditos zeram junto com o fim do ciclo.
+
+   Planos antigos (ADVANCED/ENTERPRISE/DISCOVERY/ORGANOID_LAB) foram
+   removidos do CATÁLOGO PÚBLICO (opção "1a" da Janaina) mas continuam
+   no enum SubscriptionPlan e no PLAN_CREDITS/PLAN_PRICES para não
+   quebrar quem já assinou. Preços históricos abaixo são usados para
+   calcular custo/crédito retroativo desses usuários.
 ───────────────────────────────────────────────────────────────────────── */
-// Preços históricos para cálculo retroativo de custo/crédito de planos
-// descontinuados (usuários ainda assinantes verão valor correto).
 const LEGACY_PLAN_PRICES: Record<string, number> = {
   ORGANOID_LAB: 150,
   DISCOVERY:    270,
+  ADVANCED:     190,   // preço praticado no R12.26 (compra única de créditos)
+  ENTERPRISE:   375,   // preço praticado no R12.26
+  ACADEMY:      2375,  // pacote 12 meses + curso online (R13.03.1)
 }
-// R12.26: COMPRA DE CRÉDITOS (não é mais assinatura mensal).
-// Preços e nomes finais; ids preservados para compat. com backend.
-// Toggle mensal/anual removido — é uma compra única de pacote de créditos.
+
 const PLANS = [
   {
-    id: "ADVANCED",
-    name: "Biofabricação 3D",
-    price: 190,
+    id: "GUIDE",
+    name: "Guia Inteligente em Biofabricação 3D",
+    name_short: "Guia Inteligente",
+    price: 507,
     credits: 1500,
-    color: "blue",
-    badge: "POPULAR",
-    paymentUrl: "https://www.asaas.com/c/kfvg9q66i3odmtsu",
+    color: "violet",
+    badge: "ASSINATURA MENSAL",
+    paymentUrl: "https://www.asaas.com/c/qsnp08rvpuwlj8ip",
     features: [
-      "1.500 créditos",
-      "Todos os módulos",
-      "Formulador avançado",
-      "Organoid Builder",
-      "Protocolos ilimitados",
-      "20 projetos ativos",
-    ],
-  },
-  {
-    id: "ENTERPRISE",
-    name: "Biofabricação 3D Avançada",
-    name_short: "Biofab 3D Avançada",
-    price: 375,
-    credits: 5000,
-    color: "purple",
-    badge: null,
-    paymentUrl: "https://www.asaas.com/c/87510sceyl5as6n7",
-    features: [
-      "5.000 créditos",
-      "Tudo do Biofabricação 3D",
-      "807+ formulações validadas",
-      "RAG científico avançado",
-      "Acesso à API",
-      "Projetos ilimitados",
+      "1.500 créditos renovados todo mês",
+      "Acesso completo à plataforma BIA",
+      "Pipeline · Formulator Pro · Bioprinting · Organoid Builder",
+      "GLP/GMP · Chat IA · Knowledge Engine · Notebook",
+      "807+ biomateriais catalogados",
+      "Slicer 3D com 11 algoritmos",
+      "Cancele quando quiser — sem multa",
     ],
   },
   /*
-    R13.03.2 · Card ACADEMY (R$ 4.970 · 6 meses · presencial) REMOVIDO da UI.
-    Formato descontinuado — o novo curso Academy é online (R$ 2.375 · 12 meses ·
-    plataforma BIA integrada), vendido em /academy com Asaas iu7ym1dp93cei9zk.
-    O plano ACADEMY continua ATIVO no enum + no schema — usuários que compraram
-    antes mantêm acesso, e novos alunos do curso online ganham plan="ACADEMY"
-    automaticamente. Um card informativo próprio aparece abaixo da grade de
-    planos convidando os usuários a conhecer a Academy.
-    Bloco antigo preservado (comentado) para retomada se necessário:
-
-    {
-      id: "ACADEMY",
-      name: "BIA Academy",
-      price: 4970,
-      credits: 20000,
-      color: "amber",
-      badge: "6 MESES + CURSO",
-      paymentUrl: "https://www.asaas.com/c/9nvzkrlezi7ht2u5",
-      features: [
-        "6 meses de acesso completo",
-        "Curso presencial incluso",
-        "Turmas de até 10 alunos",
-        "Certificação oficial",
-        "Materiais personalizados",
-        "Aulas práticas em laboratório",
-        "20.000 créditos inclusos",
-        "Suporte pedagógico dedicado",
-      ],
-    },
+    Planos legados removidos do catálogo público em R13.11.
+    Assinantes de ADVANCED (R$ 190 · 1.500 créditos avulsos) e
+    ENTERPRISE (R$ 375 · 5.000 créditos avulsos) continuam ativos
+    até o fim do ciclo pago; renovação exige migração para GUIDE.
+    A BIA Academy (R$ 2.375 · 12 meses + curso) NÃO está inclusa
+    no GUIDE — continua sendo produto separado, vendido em /academy.
   */
 ]
 
@@ -222,7 +193,11 @@ const COLOR: Record<string, { border: string; bg: string; ring: string; text: st
 }
 
 const PLAN_CREDITS_MAX: Record<string, number> = {
-  FREE: 30, ORGANOID_LAB: 300, DISCOVERY: 500, ADVANCED: 1500, ENTERPRISE: 5000, ACADEMY: 20000,
+  FREE: 30,
+  // R13.11 · plano vigente único
+  GUIDE: 1500,
+  // Planos legados (assinantes existentes) — mantidos p/ retrocompatibilidade
+  ORGANOID_LAB: 300, DISCOVERY: 500, ADVANCED: 1500, ENTERPRISE: 5000, ACADEMY: 20000,
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -633,21 +608,34 @@ export function BillingClient({
                         <p className="text-2xl font-bold text-white">
                           R$ {price.toLocaleString("pt-BR")}
                         </p>
+                        {plan.id === "GUIDE" && (
+                          <span className="text-xs text-gray-500 font-normal">
+                            /mês
+                          </span>
+                        )}
                         {plan.id === "ACADEMY" && (
                           <span className="text-xs text-gray-500 font-normal">
-                            · 6 meses
+                            · 12 meses
                           </span>
                         )}
                       </div>
+                      {plan.id === "GUIDE" && (
+                        <p className="text-[10px] text-violet-400 mt-1 flex items-center gap-1">
+                          <RefreshCw className="w-3 h-3" />
+                          Assinatura recorrente · Cancele quando quiser
+                        </p>
+                      )}
                       {plan.id === "ACADEMY" && (
                         <p className="text-[10px] text-indigo-400 mt-1 flex items-center gap-1">
                           <GraduationCap className="w-3 h-3" />
-                          Curso presencial + certificação incluso
+                          Curso online + 12 meses de plataforma
                         </p>
                       )}
                       <p className={cn("text-xs mt-1 font-medium", c.text)}>
                         <Zap className="w-3 h-3 inline mr-0.5" />
-                        {`${plan.credits.toLocaleString("pt-BR")} créditos`}
+                        {plan.id === "GUIDE"
+                          ? "1.500 créditos renovados todo mês"
+                          : `${plan.credits.toLocaleString("pt-BR")} créditos`}
                       </p>
                     </div>
 
@@ -680,7 +668,7 @@ export function BillingClient({
                         )}>
                         {isUp
                           ? <><RefreshCw className="w-3 h-3 animate-spin" /> Processando...</>
-                          : <><ExternalLink className="w-3 h-3" /> Comprar agora</>
+                          : <><ExternalLink className="w-3 h-3" /> {plan.id === "GUIDE" ? "Assinar agora" : "Comprar agora"}</>
                         }
                       </button>
                     )}
@@ -774,7 +762,7 @@ export function BillingClient({
                           )}
                         >
                           <ExternalLink className="w-4 h-4" />
-                          Comprar {plan.name_short ?? plan.name} agora
+                          {plan.id === "GUIDE" ? "Assinar" : "Comprar"} {plan.name_short ?? plan.name} agora
                         </a>
                       )}
                     </div>
@@ -837,15 +825,18 @@ export function BillingClient({
             </a>
           )}
 
-          {/* Payment info notice */}
+          {/* Payment info notice — R13.11: assinatura recorrente Asaas */}
           <div className="bg-violet-500/[0.05] border border-violet-500/15 rounded-xl px-4 py-4 flex gap-3">
             <ShieldCheck className="w-5 h-5 text-violet-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm text-violet-300 font-semibold mb-1">Pagamento seguro via Asaas</p>
+              <p className="text-sm text-violet-300 font-semibold mb-1">Assinatura recorrente segura via Asaas</p>
               <p className="text-xs text-gray-400 leading-relaxed">
-                Ao clicar em &quot;Comprar agora&quot;, você será redirecionado para o checkout seguro do Asaas.
-                Após a confirmação do pagamento, seus créditos serão liberados automaticamente em até 24h.
-                {" "}Em caso de dúvidas, entre em contato pelo suporte.
+                Ao clicar em &quot;Assinar agora&quot;, você será redirecionado para o checkout seguro do Asaas.
+                A cobrança acontece <strong className="text-violet-300">todo mês</strong> automaticamente
+                (boleto, Pix ou cartão) e seus <strong className="text-violet-300">1.500 créditos são
+                renovados no início de cada ciclo</strong>. Você pode <strong className="text-violet-300">
+                cancelar quando quiser</strong> direto no seu painel Asaas — o acesso permanece ativo
+                até o fim do ciclo já pago, e nada mais é cobrado.
               </p>
             </div>
           </div>

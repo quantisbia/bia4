@@ -31,10 +31,14 @@ export default async function DashboardPage() {
 
   const planColors: Record<string, string> = {
     FREE:       "text-gray-400 bg-gray-500/10 border-gray-500/20",
+    // R13.11 · Plano vigente único
+    GUIDE:      "text-violet-300 bg-violet-500/10 border-violet-500/30",
+    // Planos legados — mantidos p/ assinantes existentes
     DISCOVERY:  "text-violet-400 bg-violet-500/10 border-violet-500/20",
     ADVANCED:   "text-blue-400 bg-blue-500/10 border-blue-500/20",
     ENTERPRISE: "text-purple-400 bg-purple-500/10 border-purple-500/20",
     ACADEMY:    "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
+    ORGANOID_LAB: "text-teal-400 bg-teal-500/10 border-teal-500/20",
   }
 
   const quickActions = [

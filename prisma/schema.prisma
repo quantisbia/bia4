@@ -748,6 +748,12 @@ enum SubscriptionPlan {
   ADVANCED
   ENTERPRISE
   ACADEMY
+  // R13.11 · Plano único vigente: "Guia Inteligente em Biofabricação 3D"
+  // Assinatura mensal R$ 507 · 1.500 créditos renovados todo mês
+  // (não acumula — reseta para 1500 no ciclo)
+  // Assinantes de planos legados (ADVANCED/ENTERPRISE/ORGANOID_LAB/DISCOVERY)
+  // continuam ativos com suas configurações antigas.
+  GUIDE
 }
 
 enum SubscriptionStatus {

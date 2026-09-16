@@ -81,11 +81,25 @@ const PLAN_CREDITS: Record<string, number> = {
 
 const PLAN_COLORS: Record<string, string> = {
   FREE:         "bg-gray-500/10 border-gray-500/20 text-gray-400",
+  // R13.11 · Plano vigente único
+  GUIDE:        "bg-violet-500/10 border-violet-500/30 text-violet-300",
+  // Planos legados
   ORGANOID_LAB: "bg-teal-500/10 border-teal-500/20 text-teal-400",
   DISCOVERY:    "bg-violet-500/10 border-violet-500/20 text-violet-400",
   ADVANCED:     "bg-blue-500/10 border-blue-500/20 text-blue-400",
   ENTERPRISE:   "bg-purple-500/10 border-purple-500/20 text-purple-400",
   ACADEMY:      "bg-amber-500/10 border-amber-500/20 text-amber-400",
+}
+
+// R13.11 · Nome curto exibido no badge (choice 4a — "Guia Inteligente")
+const PLAN_LABEL: Record<string, string> = {
+  FREE:         "Trial",
+  GUIDE:        "Guia Inteligente",
+  ORGANOID_LAB: "Organoid Lab",
+  DISCOVERY:    "Discovery",
+  ADVANCED:     "Advanced",
+  ENTERPRISE:   "Enterprise",
+  ACADEMY:      "Academy",
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -201,7 +215,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           PLAN_COLORS[plan] ?? PLAN_COLORS.DISCOVERY
         )}>
           <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-          {plan === "FREE" ? "Discovery (Trial)" : plan}
+          {PLAN_LABEL[plan] ?? plan}
         </div>
       </div>
 

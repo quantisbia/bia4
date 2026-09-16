@@ -174,6 +174,50 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R13.11 — Plano único "Guia Inteligente em Biofabricação 3D" (2026-09-15)
+
+**Decisão comercial (Janaina):** simplificar o catálogo de planos para **1 único plano** em modelo de **assinatura recorrente**, mantendo a **BIA Academy separada** como curso à parte.
+
+**Novo plano vigente:**
+
+| Item | Valor |
+|---|---|
+| Nome | Guia Inteligente em Biofabricação 3D |
+| Preço | **R$ 507/mês** (assinatura recorrente) |
+| Créditos | **1.500 renovados todo mês** (reset — não acumula) |
+| Cancelamento | Livre a qualquer momento · Sem multa · Acesso até o fim do ciclo pago |
+| Checkout Asaas | `https://www.asaas.com/c/qsnp08rvpuwlj8ip` |
+| Escopo | Plataforma BIA inteira (Pipeline, Formulator Pro, Bioprinting, Organoid, GLP/GMP, Chat IA, Knowledge Engine, Notebook) |
+
+**BIA Academy continua produto separado** (R$ 2.375 · curso 12 meses + plataforma integrada · pagamento único).
+
+**Planos antigos** (`ADVANCED` R$ 190, `ENTERPRISE` R$ 375, `DISCOVERY` R$ 270, `ORGANOID_LAB` R$ 150) foram **removidos do catálogo público** mas **mantidos no enum + PLAN_CREDITS/PRICES** para preservar assinantes existentes (opção 1a).
+
+**Renovação mensal de créditos:**
+- **Não há webhook Asaas ainda** — a renovação é MANUAL via script.
+- Job: `npx tsx scripts/renew-monthly-credits.ts` (roda uma vez por mês)
+- Reseta o saldo de todos os assinantes GUIDE ativos para **exatamente 1.500** (não acumula)
+- Se o assinante cancelou (status ≠ ACTIVE), o script não renova → créditos zeram naturalmente
+- Suporta `--dry-run` para preview + `--email x@y.com` para renovar 1 usuário só
+- Webhook automático será implementado em **R13.12** (chamará a mesma função `renewUserCredits`)
+
+**Arquivos modificados:**
+- `prisma/schema.prisma` — enum `SubscriptionPlan` ganha `GUIDE`
+- `prisma/migrations/20260915000001_r13_11_guide_plan/migration.sql` — aplicada no Neon
+- `src/lib/db/queries.ts` — `PLAN_CREDITS.GUIDE=1500`, `PLAN_PRICES.GUIDE=507`, `PLAN_PRICES.ACADEMY` corrigido para 2375
+- `src/app/dashboard/billing/BillingClient.tsx` — array `PLANS` reduzido a `GUIDE` único; CTA "Assinar agora"; explicação de "assinatura recorrente · cancele quando quiser"
+- `src/app/page.tsx` — 2 cards antigos substituídos por 1 card GUIDE centralizado
+- `src/app/dashboard/admin/page.tsx` — `PLAN_META` + filtro + modal Upgrade incluem GUIDE
+- `src/app/dashboard/settings/page.tsx` + `src/app/dashboard/page.tsx` — `PLAN_BADGE/planColors` incluem GUIDE
+- `src/components/layout/DashboardSidebar.tsx` — `PLAN_COLORS` + novo `PLAN_LABEL` (usa "Guia Inteligente" no badge)
+- `src/app/layout.tsx` — SEO `offerCount: 3` (Free + Guide + Academy)
+- `scripts/renew-monthly-credits.ts` — job manual mensal (idempotente, RESET absoluto)
+- `tests/r13_11_guide_subscription_plan.test.ts` — **32 testes** de regressão
+
+**Tests:** 1036/1036 ✅
+
+---
+
 ### R13.10.2b — Scripts admin: matrícula manual + reset de senha (2026-08-07)
 
 **Bug reportado (Janaina):** *"Não consigo ver os conteúdos, como posso verificar como um aluno que pagou ou como admin, não consigo entrar no sistema para adicionar os links de vídeos."*

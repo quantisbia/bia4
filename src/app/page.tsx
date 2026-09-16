@@ -502,9 +502,9 @@ export default function HomePage() {
               <div className="w-10 h-10 rounded-xl bg-gray-500/10 border border-gray-500/20 flex items-center justify-center mx-auto mb-3">
                 <Zap className="w-5 h-5 text-gray-400" />
               </div>
-              <h3 className="text-lg font-bold mb-1">Grátis</h3>
+              <h3 className="text-lg font-bold mb-1">Experimente grátis</h3>
               <div className="text-2xl font-bold mb-3">R$ 0</div>
-              <p className="text-xs text-gray-400 mb-4">Plano Discovery — acesso imediato</p>
+              <p className="text-xs text-gray-400 mb-4">10 créditos iniciais · Explore os módulos</p>
               <Link href="/auth/register"
                 className="block w-full text-center py-2.5 px-4 rounded-xl font-medium text-sm border border-white/10 text-gray-300 hover:bg-white/5 transition-all">
                 Criar conta grátis
@@ -512,89 +512,87 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* R12.25: Catálogo enxuto — 2 planos principais.
-              Organoid Lab e Discovery descontinuados (Organoid Builder
-              agora incluso no Biofabricação 3D).
-              R13.03.2: Card ACADEMY (R$ 4.970 · 6 meses · presencial) escondido
-              — não é mais oferecido nesse formato. O plano ACADEMY continua
-              existindo no enum e sendo atribuído a alunos que compram o novo
-              curso online (R$ 2.375 via Asaas iu7ym1dp93cei9zk).
-              A venda da Academy agora vive no banner destacado abaixo do hero
-              (section #academy) + landing dedicada /academy. */}
+          {/* R13.11 · PLANO ÚNICO: "Guia Inteligente em Biofabricação 3D"
+              R$ 507/mês em modelo de ASSINATURA. 1.500 créditos que RESETAM
+              todo mês (não acumulam). Cancele quando quiser.
+              Planos antigos (ADVANCED/ENTERPRISE) removidos do catálogo público;
+              assinantes existentes mantêm acesso via BillingClient legado.
+              A BIA Academy (R$ 2.375 · 12 meses + curso) continua separada
+              — vendida no banner do hero + landing /academy. */}
 
-          {/* Paid plans — grid responsivo (2 colunas — Academy R$ 4.970 removido do carrossel) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 max-w-4xl mx-auto">
-
-            {/* BIOFABRICAÇÃO 3D (era ADVANCED) — mais popular */}
-            <div className="relative rounded-xl sm:rounded-2xl border-2 border-blue-500/50 bg-blue-500/5 p-5 sm:p-6 flex flex-col">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold px-4 py-1 rounded-full whitespace-nowrap">
-                MAIS POPULAR
+          {/* Guia Inteligente — 1 card centralizado (assinatura) */}
+          <div className="max-w-lg mx-auto">
+            <div
+              data-testid="home-plan-guide-card"
+              className="relative rounded-2xl sm:rounded-3xl border-2 border-violet-500/50 bg-gradient-to-br from-violet-500/10 to-fuchsia-500/5 p-6 sm:p-8 flex flex-col shadow-2xl shadow-violet-900/20"
+            >
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-xs font-bold px-4 py-1 rounded-full whitespace-nowrap shadow-lg">
+                ASSINATURA MENSAL
               </div>
-              <div className="flex items-center gap-3 mb-4 mt-2">
-                <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                  <Brain className="w-4 h-4 text-blue-400" />
+
+              <div className="flex items-center gap-3 mb-5 mt-2">
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 border border-violet-500/30 flex items-center justify-center">
+                  <Brain className="w-5 h-5 text-violet-300" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold">Biofabricação 3D</h3>
-                  <span className="text-[10px] text-blue-400 uppercase tracking-wider">Profissional</span>
+                  <h3 className="text-lg font-bold text-white leading-tight">
+                    Guia Inteligente em Biofabricação 3D
+                  </h3>
+                  <span className="text-[10px] text-violet-300 uppercase tracking-wider">
+                    Plataforma BIA · Acesso completo
+                  </span>
                 </div>
               </div>
-              <div className="mb-4">
-                <span className="text-2xl sm:text-3xl font-bold">R$ 190</span>
-                <div className="credit-pill mt-2 w-fit text-xs bg-blue-500/10 border-blue-500/20 text-blue-400"><Zap className="w-3 h-3" />1.500 créditos</div>
+
+              <div className="mb-5">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl sm:text-4xl font-bold text-white">R$ 507</span>
+                  <span className="text-sm text-gray-400 font-medium">/mês</span>
+                </div>
+                <div className="credit-pill mt-3 w-fit text-xs bg-violet-500/10 border-violet-500/20 text-violet-300">
+                  <Zap className="w-3 h-3" />1.500 créditos renovados todo mês
+                </div>
+                <p className="text-[11px] text-violet-400/80 mt-2 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" />
+                  Cancele quando quiser · Sem multa
+                </p>
               </div>
-              <ul className="space-y-2 mb-6 flex-1 text-xs sm:text-sm text-gray-300">
-                {["1.500 créditos","Todos os módulos","Formulador avançado","Organoid Builder","Protocolos ilimitados","20 projetos ativos"].map((f) => (
+
+              <ul className="space-y-2.5 mb-6 flex-1 text-xs sm:text-sm text-gray-300">
+                {[
+                  "1.500 créditos renovados todo mês",
+                  "Acesso completo à plataforma BIA",
+                  "Pipeline · Formulator Pro · Bioprinting",
+                  "Organoid Builder · GLP/GMP · Chat IA",
+                  "Knowledge Engine · Notebook do Pesquisador",
+                  "807+ biomateriais catalogados",
+                  "Slicer 3D com 11 algoritmos biomédicos",
+                ].map((f) => (
                   <li key={f} className="flex items-start gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-violet-400 mt-0.5 shrink-0" />
                     <span>{f}</span>
                   </li>
                 ))}
               </ul>
-              <Link href="https://www.asaas.com/c/kfvg9q66i3odmtsu" target="_blank"
-                className="w-full text-center py-2.5 px-4 rounded-xl font-semibold text-sm bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-90 transition-opacity">
-                Comprar créditos Biofabricação 3D →
+
+              <Link
+                href="https://www.asaas.com/c/qsnp08rvpuwlj8ip"
+                target="_blank"
+                data-testid="home-plan-guide-cta"
+                className="w-full text-center py-3 px-4 rounded-xl font-semibold text-sm sm:text-base bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white hover:opacity-90 transition-opacity shadow-lg shadow-violet-500/30"
+              >
+                Assinar agora — R$ 507/mês →
               </Link>
+
+              <p className="text-[11px] text-gray-500 mt-3 text-center">
+                Pagamento recorrente seguro via Asaas · Boleto, Pix ou cartão
+              </p>
             </div>
 
-            {/* BIOFABRICAÇÃO 3D AVANÇADA (era ENTERPRISE) */}
-            <div className="rounded-xl sm:rounded-2xl border border-purple-500/30 bg-white/2 p-5 sm:p-6 flex flex-col hover:border-purple-500/50 transition-all">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-                  <Crown className="w-4 h-4 text-purple-400" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold">Biofabricação 3D Avançada</h3>
-                  <span className="text-[10px] text-purple-400 uppercase tracking-wider">Corporativo</span>
-                </div>
-              </div>
-              <div className="mb-4">
-                <span className="text-2xl sm:text-3xl font-bold">R$ 375</span>
-                <div className="credit-pill mt-2 w-fit text-xs bg-purple-500/10 border-purple-500/20 text-purple-400"><Zap className="w-3 h-3" />5.000 créditos</div>
-              </div>
-              <ul className="space-y-2 mb-6 flex-1 text-xs sm:text-sm text-gray-300">
-                {["5.000 créditos","Tudo do Biofabricação 3D","807+ formulações validadas","RAG científico avançado","Acesso à API","Projetos ilimitados"].map((f) => (
-                  <li key={f} className="flex items-start gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 mt-0.5 shrink-0" />
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <Link href="https://www.asaas.com/c/87510sceyl5as6n7" target="_blank"
-                className="w-full text-center py-2.5 px-4 rounded-xl font-semibold text-sm bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white hover:opacity-90 transition-opacity">
-                Comprar créditos Biofab 3D Avançada →
-              </Link>
-            </div>
-
-            {/*
-              R13.03.2 — Card ACADEMY (R$ 4.970 · 6 meses · presencial) ESCONDIDO.
-              Não é mais o formato oferecido. A venda da Academy agora acontece
-              pelo banner destacado abaixo do hero (section #academy) com o novo
-              formato online (R$ 2.375,00 · 12 meses · plataforma BIA integrada).
-              O plano ACADEMY continua ativo no enum e no schema — alunos que
-              pagam o curso online recebem plan="ACADEMY" automaticamente.
-              Bloco preservado (comentado) para retomada rápida se necessário.
-            */}
+            {/* Nota: BIA Academy é produto separado */}
+            <p className="text-center text-xs text-gray-500 mt-6">
+              💡 <Link href="/academy" className="text-fuchsia-300 hover:text-fuchsia-200 underline underline-offset-2">BIA Academy</Link> é um produto separado — curso online de 12 meses com plataforma integrada (R$ 2.375 · pagamento único).
+            </p>
           </div>
         </div>
       </section>
@@ -608,7 +606,7 @@ export default function HomePage() {
             Comece hoje mesmo
           </h2>
           <p className="text-gray-400 text-sm sm:text-base mb-8">
-            Comece agora com o plano Discovery e explore todos os módulos BIA
+            Crie sua conta grátis e explore todos os módulos BIA — assine o Guia Inteligente quando quiser mais créditos
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 px-4">
             <Link href="/auth/register"
