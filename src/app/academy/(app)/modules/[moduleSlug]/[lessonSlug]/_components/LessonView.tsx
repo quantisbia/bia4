@@ -25,8 +25,9 @@ import { useRouter } from "next/navigation"
 import {
   ArrowLeft, ArrowRight, CheckCircle2, Circle, Play,
   Sparkles, FileText, Link as LinkIcon, Box, Cog, Image as ImageIcon,
-  Loader2, Trophy, ChevronRight, HelpCircle,
+  Loader2, Trophy, ChevronRight, HelpCircle, Target,
 } from "lucide-react"
+import { RichLessonContent } from "./RichLessonContent"
 
 type BiaHook = { tool: string; label: string; params?: Record<string, unknown> } | null
 
@@ -185,19 +186,40 @@ export function LessonView({ lesson, module: mod, progress, navigation }: Lesson
       </nav>
 
       {/* Header da aula */}
-      <header className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-widest text-fuchsia-300/80">
-          Aula {mod.order}.{lesson.order} · {lesson.durationMin} min · <span className="capitalize">{lesson.level}</span>
-        </p>
-        <h1 className="text-3xl font-bold text-white leading-tight">{lesson.title}</h1>
+      <header className="space-y-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-fuchsia-500/15 border border-fuchsia-500/30 text-fuchsia-200">
+            <Sparkles className="w-3 h-3" />
+            Aula {mod.order}.{lesson.order}
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-violet-500/10 border border-violet-500/25 text-violet-200">
+            {lesson.durationMin} min
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.10] text-gray-300 capitalize">
+            {lesson.level}
+          </span>
+        </div>
+        <h1 className="text-3xl sm:text-4xl font-bold text-white leading-tight tracking-tight">
+          {lesson.title}
+        </h1>
         {lesson.objective && (
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-fuchsia-300/80 mb-1">
-              Objetivo
-            </p>
-            <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">
-              {lesson.objective}
-            </p>
+          <div
+            data-testid="lesson-objective-card"
+            className="rounded-2xl border border-violet-500/25 bg-gradient-to-br from-violet-500/[0.08] to-fuchsia-500/[0.04] p-5"
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-violet-500/20 border border-violet-500/40 flex items-center justify-center shrink-0">
+                <Target className="w-5 h-5 text-violet-200" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-violet-300 mb-1.5">
+                  Objetivo desta aula
+                </p>
+                <p className="text-[15px] text-gray-100 leading-relaxed whitespace-pre-line">
+                  {lesson.objective}
+                </p>
+              </div>
+            </div>
           </div>
         )}
       </header>
@@ -328,15 +350,13 @@ export function LessonView({ lesson, module: mod, progress, navigation }: Lesson
         </div>
       )}
 
-      {/* Resumo */}
+      {/* Conteúdo denso da aula — renderização educacional rica (R13.13) */}
       {lesson.summary && (
-        <section className="rounded-2xl border border-white/[0.06] bg-white/[0.01] p-5">
-          <h2 className="text-[10px] font-bold uppercase tracking-widest text-fuchsia-300/80 mb-2">
-            Resumo
-          </h2>
-          <div className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">
-            {lesson.summary}
-          </div>
+        <section
+          data-testid="lesson-rich-content-section"
+          className="rounded-2xl border border-white/[0.06] bg-white/[0.015] p-5 sm:p-8"
+        >
+          <RichLessonContent markdown={lesson.summary} />
         </section>
       )}
 
