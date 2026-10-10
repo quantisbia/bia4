@@ -36,13 +36,13 @@ export const ACADEMY_NAV_ITEMS = [
   { href: "/academy/modules",    label: "Módulos",       icon: BookOpen,        exact: false,
     info: "Lista completa dos módulos publicados. Cada módulo tem um conjunto de aulas em vídeo, quiz opcional e biaHook para abrir a BIA." },
   { href: "/academy/library",    label: "Biblioteca",    icon: Library,         exact: false,
-    info: "Todos os anexos das aulas (PDFs, protocolos, arquivos STL/G-code, links) reunidos e filtrados pela sua área de interesse. Chega em R13.05." },
+    info: "Materiais das aulas (PDFs, STL/G-code, links), 65 papers e patentes curados do Knowledge Engine e os white papers da Quantis — tudo em um só lugar, com busca e filtros." },
   { href: "/academy/project",    label: "Meu Projeto",   icon: FolderKanban,    exact: false,
     info: "Seu \"Projeto de Biofabricação\" — vive num NotebookEntry do R12.66, com versionamento V1/V2/V3 automático conforme você responde os desafios. Chega em R13.07." },
   { href: "/academy/live",       label: "Encontros",     icon: Video,           exact: false,
     info: "Os 3 encontros online ao vivo do programa. Datas, links do Zoom/YT Live e gravações depois. Chega em R13.10." },
   { href: "/academy/certificate",label: "Certificado",   icon: Award,           exact: false,
-    info: "Seu certificado de conclusão — desbloqueia quando você completa 100% das aulas E entrega o projeto final. Emissão em PDF (jspdf reusado do R12.67). Chega em R13.09." },
+    info: "Certificados em 3 formatos: por aula (a cada aula concluída), declaração parcial de progresso e certificado de conclusão (ao completar 100%). Todos em PDF A4 paisagem com código único e validação pública." },
 ]
 
 const BOTTOM_ITEMS = [

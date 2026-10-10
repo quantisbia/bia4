@@ -26,9 +26,10 @@ import {
   GraduationCap, PlayCircle, Wrench, Save, CheckCircle2,
   Sparkles, ArrowRight, Users, Building2, Flag, Award,
   MessageCircle, ExternalLink, ChevronDown, ChevronUp,
-  Zap,
+  Zap, Gift, FileText, Download,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
+import { getFeaturedWhitePaper } from "@/lib/academy/library-content"
 
 // ─── Constantes comerciais oficiais (LOCKED) ─────────────────────
 // Link Asaas do checkout individual online (verbatim, não alterar sem OK da Janaina).
@@ -38,6 +39,9 @@ const WHATSAPP_LINK = "https://wa.me/11968632231"
 // Valor do curso online individual (R$) — confirmado por Janaina em 2026-08-07.
 // Curso online individual com plataforma BIA integrada + 12 meses de acesso.
 const PRICE_BRL = 2375
+// Brinde público (open-access) — white paper em destaque na landing.
+// Resolvido fora do render porque esta página é "use client".
+const FEATURED_BRINDE = getFeaturedWhitePaper()
 const PRICE_BRL_FORMATTED = PRICE_BRL.toLocaleString("pt-BR", {
   style: "currency",
   currency: "BRL",
@@ -390,6 +394,85 @@ export default function AcademyLandingPage() {
           </div>
         </div>
       </section>
+
+      {/* ── Brinde: White Paper QMatrix (open access) ───────── */}
+      {FEATURED_BRINDE && (
+          <section
+            id="brinde"
+            className="py-16 sm:py-20 px-4 sm:px-6"
+            data-testid="academy-section-brinde"
+          >
+            <div className="max-w-5xl mx-auto">
+              <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/[0.08] via-fuchsia-500/[0.04] to-violet-500/[0.08] p-6 sm:p-10">
+                <div className="flex flex-col lg:flex-row gap-6 lg:gap-10 items-start">
+                  {/* Badge + ícone */}
+                  <div className="shrink-0">
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs font-semibold mb-4">
+                      <Gift className="w-3.5 h-3.5" />
+                      BRINDE · Acesso aberto, sem cadastro
+                    </div>
+                    <div className="w-28 h-36 sm:w-32 sm:h-40 rounded-xl bg-gradient-to-br from-fuchsia-600/40 to-violet-700/40 border border-white/10 flex items-center justify-center shadow-xl">
+                      <FileText className="w-14 h-14 text-white/80" />
+                    </div>
+                  </div>
+
+                  {/* Texto + CTA */}
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold leading-tight mb-2">
+                      {FEATURED_BRINDE.title}
+                    </h2>
+                    <p className="text-xs sm:text-sm text-gray-400 mb-4">
+                      {FEATURED_BRINDE.authors.join(" · ")} · {FEATURED_BRINDE.year} · {FEATURED_BRINDE.pages} páginas · {FEATURED_BRINDE.sizeMb} MB
+                    </p>
+                    <p className="text-sm sm:text-base text-gray-300 leading-relaxed mb-5">
+                      {FEATURED_BRINDE.abstract.slice(0, 420)}{FEATURED_BRINDE.abstract.length > 420 ? "…" : ""}
+                    </p>
+
+                    {/* Keywords */}
+                    <div className="flex flex-wrap gap-2 mb-6">
+                      {FEATURED_BRINDE.keywords.slice(0, 6).map((kw) => (
+                        <span
+                          key={kw}
+                          className="px-2.5 py-1 rounded-md bg-white/[0.04] border border-white/10 text-xs text-gray-300"
+                        >
+                          {kw}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* CTA download */}
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <a
+                        href={FEATURED_BRINDE.pdfUrl}
+                        download
+                        onClick={() => trackEvent("brinde_download_clicked", { id: FEATURED_BRINDE.id })}
+                        data-testid="academy-brinde-download"
+                        className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-semibold text-sm transition-all shadow-lg shadow-amber-500/20"
+                      >
+                        <Download className="w-4 h-4" />
+                        Baixar PDF gratuito
+                      </a>
+                      <Link
+                        href={ASAAS_LINK}
+                        onClick={() => trackEvent("cta_asaas_clicked", { location: "brinde_section" })}
+                        data-testid="academy-brinde-cta-asaas"
+                        className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-fuchsia-500/40 bg-fuchsia-500/[0.08] hover:bg-fuchsia-500/[0.15] text-fuchsia-100 font-semibold text-sm transition-all"
+                      >
+                        <GraduationCap className="w-4 h-4" />
+                        Quero me inscrever no curso completo
+                      </Link>
+                    </div>
+
+                    <p className="mt-4 text-[11px] text-gray-500 italic leading-relaxed">
+                      Este white paper é um dos materiais que você estuda na biblioteca da Academy.
+                      Material técnico produzido por {FEATURED_BRINDE.authors.join(" & ")}, publicado pela Quantis Biotechnology.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+      )}
 
       {/* ── Para quem é? ────────────────────────────────────── */}
       <section

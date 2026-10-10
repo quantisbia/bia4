@@ -174,6 +174,36 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R13.14 — BIA Academy: Biblioteca + Certificados (3 formatos) + Brinde QMatrix (2026-10-10)
+
+**Entrega consolidada** (atendendo à decisão "faça o (a)" da Janaina):
+
+**🎓 Certificados — 3 formatos distintos**
+- **Certificado por aula** (`BIA-AULA-YYYY-NNNNNN`) — emitido ao concluir cada aula, 2h de carga horária por padrão. Perfeito para LinkedIn progressivo.
+- **Declaração parcial de progresso** — gerada sob demanda enquanto o aluno não terminou o programa inteiro, lista as aulas já concluídas e a carga horária parcial.
+- **Certificado de conclusão** (`BIA-ACAD-YYYY-NNNN`) — desbloqueia ao completar 100% das aulas publicadas, com selo dourado "★ APROVADO ★" e carga horária total do programa (120h = 12 módulos × 10h).
+- PDFs A4 paisagem com decoração violet/fuchsia, código único + URL de verificação pública no rodapé.
+- Modelo lazy: linha em `AcademyLessonCertificate` só é criada no primeiro download (evita popular DB a cada clique em "concluir aula").
+- Nova rota pública `/verify/[code]` para empregadores/instituições validarem autenticidade (reconhece ambos os prefixos `BIA-AULA-` e `BIA-ACAD-`).
+
+**📚 Biblioteca educacional** (`/academy/library`)
+- Três abas: **Materiais das aulas** (todos os AcademyAttachments agregados), **Papers & Patentes** (65 itens do Knowledge Engine R12 — 30 artigos + 20 patentes + 15 metodologias), **White Papers Quantis** (institucionais).
+- Busca + filtros por tipo, totalmente acessível com teclado.
+- Novo módulo `src/lib/academy/library-content.ts` lista os white papers Quantis (fácil adicionar novos).
+
+**🎁 Brinde público — White Paper QMatrix** (sem login)
+- "QMatrix: Agregação de esferoides em células com baixa produção de matriz extracelular" (Dra. Kamila Leichtweis & Dr. Lucas Guarnier, Outubro/2026, 13p, 1.67MB).
+- Servido estaticamente em `/library/quantis-white-paper-qmatrix-esferoides-2026.pdf` (acesso aberto, sem cadastro).
+- CTA destacado na landing `/academy` com badge âmbar "BRINDE · Acesso aberto, sem cadastro" + botão "Baixar PDF gratuito" ao lado de "Quero me inscrever no curso completo" — estratégia comercial de atração para os cursos.
+
+**Mudanças técnicas:**
+- Novo model Prisma `AcademyLessonCertificate` + migração `20261010000001_r13_14_lesson_certificates` aplicada no Neon.
+- `src/lib/academy/certificate-generator.ts` com 3 funções de geração (jsPDF 4.2.1 reusado do R12.67).
+- APIs `/api/academy/certificates/lesson/[lessonId]` e `/api/academy/certificates/program?partial=1` com autenticação e verificação de progresso.
+- Sidebar da Academy atualizada: removidos placeholders "chega em R13.05/R13.09" dos itens Biblioteca e Certificado.
+- **41 novos testes** cobrindo PDF generation, metadados do brinde, códigos únicos, estrutura de arquivos.
+- **1179/1179 testes passando** no total.
+
 ### R13.11 — Plano único "Guia Inteligente em Biofabricação 3D" (2026-09-15)
 
 **Decisão comercial (Janaina):** simplificar o catálogo de planos para **1 único plano** em modelo de **assinatura recorrente**, mantendo a **BIA Academy separada** como curso à parte.

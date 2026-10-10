@@ -500,10 +500,11 @@ model AcademyEnrollment {
   //   Formato: { preferredArea?, experienceLevel?, mainGoal?, answeredAt? }
   onboarding     Json?
 
-  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  progress    AcademyProgress[]
-  project     AcademyProject?
-  certificate AcademyCertificate?
+  user                User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  progress            AcademyProgress[]
+  project             AcademyProject?
+  certificate         AcademyCertificate?
+  lessonCertificates  AcademyLessonCertificate[] // R13.14 · certificado por aula
 
   @@index([userId])
   @@index([accessUntil])
@@ -546,10 +547,11 @@ model AcademyLesson {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  module      AcademyModule       @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  attachments AcademyAttachment[]
-  quiz        AcademyQuiz?
-  progress    AcademyProgress[]
+  module       AcademyModule              @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  attachments  AcademyAttachment[]
+  quiz         AcademyQuiz?
+  progress     AcademyProgress[]
+  certificates AcademyLessonCertificate[] // R13.14 · certificado por aula
 
   @@unique([moduleId, slug])
   @@index([moduleId])
@@ -680,6 +682,35 @@ model AcademyCertificate {
 
   @@index([code])
   @@map("academy_certificates")
+}
+
+// R13.14 · Certificado individual por aula (microcredential).
+// Emitido automaticamente quando o aluno conclui UMA aula. Permite
+// que o aluno baixe um PDF de "certificado de aula" para colocar
+// no LinkedIn / RH enquanto não termina o programa inteiro.
+//
+// Diferente do AcademyCertificate (programa completo), este é
+// gerado on-the-fly (lazy): a linha só é criada quando o aluno
+// pede o download do PDF a primeira vez. Isso evita popular o
+// banco com certificados que ninguém vai baixar.
+//
+// Código formato: BIA-AULA-{YEAR}-{SEQ6}
+//   ex: BIA-AULA-2027-000001
+model AcademyLessonCertificate {
+  id             String   @id @default(cuid())
+  enrollmentId   String
+  lessonId       String
+  code           String   @unique // ex: "BIA-AULA-2027-000001"
+  issuedAt       DateTime @default(now())
+  pdfGeneratedAt DateTime? // última vez que o PDF foi re-gerado
+
+  enrollment AcademyEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson     AcademyLesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonId]) // 1 certificado por aula por aluno
+  @@index([code])
+  @@index([enrollmentId])
+  @@map("academy_lesson_certificates")
 }
 
 // R13.02 · Analytics mínimo do Academy (sem cookies, sem GA).
