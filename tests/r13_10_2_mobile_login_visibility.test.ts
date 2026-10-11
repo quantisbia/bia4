@@ -81,9 +81,12 @@ describe("R13.10.2.A · Nav de /academy: 'Já sou aluno' visível no mobile", ()
     expect(el).not.toMatch(/hidden\s+md:/)
   })
 
-  it("Link 'Já sou aluno' aponta para /auth/login", () => {
+  it("Link 'Já sou aluno' aponta para /auth/login (aceita ?callbackUrl=…)", () => {
     const el = extractElementByTestId(src, "academy-cta-login")
-    expect(el).toMatch(/href=["']\/auth\/login["']/)
+    // Aceita /auth/login puro ou com query string (R13.14.2 adicionou
+    // ?callbackUrl=/academy/dashboard para o aluno cair na Academy, não
+    // na BIA geral)
+    expect(el).toMatch(/href=["']\/auth\/login(\?[^"']*)?["']/)
   })
 })
 
@@ -129,9 +132,11 @@ describe("R13.10.2.C · CTA final de /academy tem link de login (fallback)", () 
     expect(el).not.toMatch(/hidden\s+md:/)
   })
 
-  it("Link do rodapé aponta para /auth/login", () => {
+  it("Link do rodapé aponta para /auth/login (aceita ?callbackUrl=…)", () => {
     const el = extractElementByTestId(src, "academy-cta-login-footer")
-    expect(el).toMatch(/href=["']\/auth\/login["']/)
+    // Aceita /auth/login puro ou com query string (R13.14.2 adicionou
+    // ?callbackUrl=/academy/dashboard)
+    expect(el).toMatch(/href=["']\/auth\/login(\?[^"']*)?["']/)
   })
 
   it("Tem mensagem explicativa mencionando \"pagou pelo Asaas\"", () => {

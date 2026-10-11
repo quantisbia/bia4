@@ -180,7 +180,7 @@ export default function AcademyLandingPage() {
             {/* R13.10.2 fix: "Já sou aluno" DEVE aparecer também no mobile
                 (bug reportado pela Janaina — só aparecia com sm:block). */}
             <Link
-              href="/auth/login"
+              href="/auth/login?callbackUrl=/academy/dashboard"
               onClick={() => trackEvent("cta_login_clicked")}
               className="text-xs sm:text-sm text-violet-200 hover:text-white transition-colors px-2.5 sm:px-3 py-2 rounded-lg border border-violet-500/30 sm:border-transparent hover:border-violet-500/50 whitespace-nowrap"
               data-testid="academy-cta-login"
@@ -685,7 +685,7 @@ export default function AcademyLandingPage() {
               <ExternalLink className="w-4 h-4" />
             </a>
             <Link
-              href="/auth/login"
+              href="/auth/login?callbackUrl=/academy/dashboard"
               onClick={() => trackEvent("cta_login_clicked", { location: "footer_cta" })}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-violet-500/30 hover:border-violet-500/60 hover:bg-violet-500/10 text-violet-200 hover:text-white text-base font-semibold px-8 py-4 w-full sm:w-auto"
               data-testid="academy-cta-login-footer"
