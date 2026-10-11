@@ -323,6 +323,13 @@ describe("R13.14.1 · página admin /dashboard/admin/academy/leads", () => {
     expect(src).toMatch(/\.libraryLead\.groupBy/)
     expect(src).toMatch(/by:\s*\[\s*"resourceId"/)
   })
+
+  it("regressão: orderBy do groupBy por recurso NÃO usa _count._all (Prisma 7 rejeita)", () => {
+    // Em Prisma 7, orderBy: { _count: { _all: "desc" } } quebra em runtime com
+    // "Unknown argument `_all`". Precisa ser um campo real do model.
+    const src = read(path)
+    expect(src).not.toMatch(/orderBy:\s*\{\s*_count:\s*\{\s*_all:/)
+  })
 })
 
 /* ═══════════════════════════════════════════════════════════════════════

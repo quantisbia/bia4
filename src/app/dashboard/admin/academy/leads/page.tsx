@@ -66,7 +66,9 @@ export default async function LibraryLeadsAdminPage({
         by: ["resourceId", "resourceTitle"],
         _count:  { _all: true },
         _sum:    { downloadCount: true },
-        orderBy: { _count: { _all: "desc" } },
+        // Prisma 7: orderBy._count aceita só nomes de campos reais,
+        // não "_all". Ordenamos pelo próprio campo agrupado.
+        orderBy: { _count: { resourceId: "desc" } },
       }),
       prisma.libraryLead.groupBy({
         by: ["institution"],
