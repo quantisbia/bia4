@@ -26,10 +26,11 @@ import {
   GraduationCap, PlayCircle, Wrench, Save, CheckCircle2,
   Sparkles, ArrowRight, Users, Building2, Flag, Award,
   MessageCircle, ExternalLink, ChevronDown, ChevronUp,
-  Zap, Gift, FileText, Download,
+  Zap, Gift, FileText,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { getFeaturedWhitePaper } from "@/lib/academy/library-content"
+import { BrindeDownloadGate } from "./_components/BrindeDownloadGate"
 
 // ─── Constantes comerciais oficiais (LOCKED) ─────────────────────
 // Link Asaas do checkout individual online (verbatim, não alterar sem OK da Janaina).
@@ -442,16 +443,18 @@ export default function AcademyLandingPage() {
 
                     {/* CTA download */}
                     <div className="flex flex-col sm:flex-row gap-3">
-                      <a
-                        href={FEATURED_BRINDE.pdfUrl}
-                        download
-                        onClick={() => trackEvent("brinde_download_clicked", { id: FEATURED_BRINDE.id })}
-                        data-testid="academy-brinde-download"
-                        className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-semibold text-sm transition-all shadow-lg shadow-amber-500/20"
-                      >
-                        <Download className="w-4 h-4" />
-                        Baixar PDF gratuito
-                      </a>
+                      <BrindeDownloadGate
+                        resourceId={FEATURED_BRINDE.id}
+                        resourceTitle={FEATURED_BRINDE.title}
+                        pdfUrl={FEATURED_BRINDE.pdfUrl}
+                        pages={FEATURED_BRINDE.pages}
+                        sizeMb={FEATURED_BRINDE.sizeMb}
+                        buttonLabel="Baixar PDF gratuito"
+                        testIdPrefix="academy-brinde"
+                        onDownloaded={() =>
+                          trackEvent("brinde_download_clicked", { id: FEATURED_BRINDE.id })
+                        }
+                      />
                       <Link
                         href={ASAAS_LINK}
                         onClick={() => trackEvent("cta_asaas_clicked", { location: "brinde_section" })}

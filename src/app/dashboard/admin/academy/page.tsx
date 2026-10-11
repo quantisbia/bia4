@@ -11,7 +11,7 @@ import { prisma } from "@/lib/db/prisma"
 import { checkAcademyAdminOrRedirect } from "@/lib/academy/admin-auth"
 import {
   GraduationCap, BookOpen, CheckCircle2, Circle, ArrowRight, ChevronLeft,
-  Sparkles, FileText, Video,
+  Sparkles, FileText, Video, Gift, Users,
 } from "lucide-react"
 
 export const dynamic = "force-dynamic"
@@ -20,15 +20,20 @@ export default async function AcademyAdminHomePage() {
   const redirectTo = await checkAcademyAdminOrRedirect()
   if (redirectTo) redirect(redirectTo)
 
-  const modules = await prisma.academyModule.findMany({
-    orderBy: { order: "asc" },
-    include: {
-      _count: { select: { lessons: true } },
-      lessons: {
-        select: { id: true, isPublished: true },
+  const [modules, totalLeads, totalDownloads] = await Promise.all([
+    prisma.academyModule.findMany({
+      orderBy: { order: "asc" },
+      include: {
+        _count: { select: { lessons: true } },
+        lessons: {
+          select: { id: true, isPublished: true },
+        },
       },
-    },
-  })
+    }),
+    prisma.libraryLead.count(),
+    prisma.libraryLead.aggregate({ _sum: { downloadCount: true } }),
+  ])
+  const totalDownloadsSum = totalDownloads._sum.downloadCount ?? 0
 
   // Total geral
   let totalLessons = 0
@@ -102,6 +107,39 @@ export default async function AcademyAdminHomePage() {
           </ol>
         </div>
       </div>
+
+      {/* Card: Leads da biblioteca (R13.14.1) */}
+      <Link
+        href="/dashboard/admin/academy/leads"
+        data-testid="admin-academy-leads-card"
+        className="group flex items-center gap-4 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/[0.06] to-fuchsia-500/[0.04] hover:border-amber-500/50 hover:from-amber-500/[0.1] p-4 transition-all"
+      >
+        <div className="w-12 h-12 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
+          <Gift className="w-6 h-6 text-amber-300" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <h2 className="text-base font-bold text-white">Leads da biblioteca</h2>
+            <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-200">
+              Novo
+            </span>
+          </div>
+          <p className="text-xs text-gray-400 line-clamp-1 mb-2">
+            Nome, e-mail e instituição de quem baixou os brindes (white papers open-access).
+          </p>
+          <div className="flex items-center gap-4 text-[11px] text-gray-500">
+            <span className="flex items-center gap-1">
+              <Users className="w-3 h-3" />
+              {totalLeads} {totalLeads === 1 ? "lead" : "leads"} únicos
+            </span>
+            <span className="flex items-center gap-1">
+              <FileText className="w-3 h-3 text-amber-400" />
+              {totalDownloadsSum} download{totalDownloadsSum === 1 ? "" : "s"}
+            </span>
+          </div>
+        </div>
+        <ArrowRight className="w-4 h-4 text-gray-500 group-hover:text-amber-300 group-hover:translate-x-0.5 transition-all shrink-0" />
+      </Link>
 
       {/* Lista de módulos */}
       <div className="space-y-3" data-testid="admin-academy-modules-list">

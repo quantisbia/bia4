@@ -734,6 +734,47 @@ model AcademyAnalytics {
   @@map("academy_analytics")
 }
 
+/// R13.14.1 · Captura de leads que baixam os brindes (white papers open-access)
+/// da biblioteca. Antes de servir o PDF, o visitante preenche nome + email +
+/// instituição. Os leads ficam visíveis no dashboard admin da Academy.
+///
+/// Design decisions:
+///   - resourceId = QuantisWhitePaper.id (ex: "qmatrix-esferoides-2026")
+///     NÃO FK, porque white papers são definidos em código (library-content.ts),
+///     não em DB. Permite trocar/renomear papers sem mexer em leads antigos.
+///   - Mesmo email pode baixar vários papers diferentes (@@unique composto).
+///   - downloadCount cresce em cada tentativa do mesmo (email, resourceId),
+///     para medir engajamento sem duplicar linhas.
+///   - consentMarketing é opt-in explícito (LGPD) — o form tem checkbox.
+///   - Opcional: userAgent/referrer/utm para o time comercial segmentar.
+model LibraryLead {
+  id              String   @id @default(cuid())
+  resourceId      String   // ex: "qmatrix-esferoides-2026"
+  resourceTitle   String   // snapshot do título no momento do download
+  name            String
+  email           String
+  institution     String
+  role            String?  // "pesquisador" | "docente" | "aluno" | "profissional" | "outro"
+  consentMarketing Boolean @default(false)
+  downloadCount   Int      @default(1)
+  firstDownloadAt DateTime @default(now())
+  lastDownloadAt  DateTime @default(now())
+  // Metadados leves (sem IP, por privacidade)
+  userAgent       String?
+  referrer        String?
+  utmSource       String?
+  utmMedium       String?
+  utmCampaign     String?
+  createdAt       DateTime @default(now())
+
+  @@unique([email, resourceId])
+  @@index([resourceId])
+  @@index([email])
+  @@index([lastDownloadAt])
+  @@index([createdAt])
+  @@map("library_leads")
+}
+
 enum NotebookEntryType {
   NOTE
   PROTOCOL
