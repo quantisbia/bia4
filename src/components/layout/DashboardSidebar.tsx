@@ -63,8 +63,8 @@ export const NAV_ITEMS = [
     info: "Converse com a BIA em linguagem natural. Tire dúvidas técnicas, valide hipóteses, peça revisão de protocolos. Treinada em biofabricação avançada. Custo: 2 créditos/mensagem." },
   { href: "/dashboard/notebook",           label: "Notebook",             icon: BookMarked,      exact: false,
     info: "Caderno digital do pesquisador: anote experimentos, gere papers e métodos científicos com IA, mantenha rastreabilidade GLP de cada decisão." },
-  { href: "/academy",                      label: "Academy",              icon: GraduationCap,   exact: false,
-    info: "BIA Academy — programa de formação em biofabricação e bioimpressão 3D com plataforma integrada. 12 módulos, 12 meses de acesso, 3 encontros online ao vivo. Já tem matrícula? Continue sua jornada. Novo por aqui? Conheça o programa.",
+  { href: "/academy/dashboard",            label: "Academy",              icon: GraduationCap,   exact: false,
+    info: "BIA Academy — sua plataforma de formação em biofabricação e bioimpressão 3D. 12 módulos, biblioteca com 65+ artigos, 3 encontros ao vivo e certificados. Clique para entrar direto no seu painel do aluno.",
     badge: "novo" },
   { href: "/dashboard/tools",              label: "Ferramentas",          icon: Wrench,          exact: false,
     info: "Caixa de ferramentas: comparador de até 4 biomateriais lado-a-lado, calculadora de custos do projeto e exportação PDF profissional." },
@@ -227,7 +227,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         {NAV_ITEMS.map(item => {
           const active = isActive(item.href, item.exact)
           const badge = (item as { badge?: string }).badge
-          const isAcademy = item.href === "/academy"
+          // R13.14.6: usuário logado vai direto para /academy/dashboard (área do aluno),
+          // não para /academy (landing pública de venda). O destaque visual continua.
+          const isAcademy = item.href === "/academy/dashboard"
           return (
             <div key={item.href} className="flex items-center gap-1">
               <Link

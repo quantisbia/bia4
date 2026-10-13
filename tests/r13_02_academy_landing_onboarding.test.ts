@@ -512,11 +512,12 @@ describe("R13.02.J · DashboardSidebar tem link Academy (para TODOS, com badge)"
     expect(src).toMatch(/GraduationCap[\s\S]*from\s+["']lucide-react["']|from\s+["']lucide-react["'][\s\S]*GraduationCap/)
   })
 
-  it("NAV_ITEMS tem item com href /academy + label Academy + icon GraduationCap", () => {
+  it("NAV_ITEMS tem item para a Academy (/academy ou /academy/dashboard) + label Academy + icon GraduationCap", () => {
     const src = readSrc(sidebarPath)
     const navBlock = src.match(/NAV_ITEMS\s*=\s*\[[\s\S]*?\n\]/)?.[0] ?? ""
     expect(navBlock, "NAV_ITEMS não encontrado").not.toBe("")
-    expect(navBlock).toMatch(/href:\s*["']\/academy["']/)
+    // R13.14.6: aceita /academy (antigo) ou /academy/dashboard (novo — vai direto pro aluno)
+    expect(navBlock).toMatch(/href:\s*["']\/academy(\/dashboard)?["']/)
     expect(navBlock).toMatch(/label:\s*["']Academy["']/)
     expect(navBlock).toMatch(/icon:\s*GraduationCap/)
   })
