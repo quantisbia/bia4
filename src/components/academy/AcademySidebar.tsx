@@ -40,7 +40,7 @@ export const ACADEMY_NAV_ITEMS = [
   { href: "/academy/project",    label: "Meu Projeto",   icon: FolderKanban,    exact: false,
     info: "Seu \"Projeto de Biofabricação\" — vive num NotebookEntry do R12.66, com versionamento V1/V2/V3 automático conforme você responde os desafios. Chega em R13.07." },
   { href: "/academy/live",       label: "Encontros",     icon: Video,           exact: false,
-    info: "Os 3 encontros online ao vivo do programa. Datas, links do Zoom/YT Live e gravações depois. Chega em R13.10." },
+    info: "Os 3 encontros online ao vivo com a Dra. Kamila: abertura, discussão de projetos e fechamento. Datas confirmadas (podem sofrer alterações), link do Zoom aparece 48h antes + e-mail. Gravações ficam disponíveis depois. Inclui feed de atualizações da área (protocolos, artigos, aulas extras)." },
   { href: "/academy/certificate",label: "Certificado",   icon: Award,           exact: false,
     info: "Certificados em 3 formatos: por aula (a cada aula concluída), declaração parcial de progresso e certificado de conclusão (ao completar 100%). Todos em PDF A4 paisagem com código único e validação pública." },
 ]
