@@ -64,11 +64,14 @@ export default async function AcademyModulesListPage() {
     }),
   ])
 
+  // computeStudentJourney retorna um objeto StudentJourney com .modules
+  // (não um array direto — bug corrigido em R13.14.3b)
   const journey = computeStudentJourney(modules, progress)
-  const publishedModules = journey.filter((m) => m.isPublished)
+  const journeyModules = journey.modules
+  const publishedModules = journeyModules.filter((m) => m.isPublished)
 
   // KPIs
-  const totalModules = journey.length
+  const totalModules = journeyModules.length
   const totalPublished = publishedModules.length
   const totalLessons = publishedModules.reduce((s, m) => s + m.lessons.length, 0)
   const totalCompleted = publishedModules.reduce(
@@ -127,7 +130,7 @@ export default async function AcademyModulesListPage() {
 
       {/* Grid de módulos */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-4" data-testid="academy-modules-grid">
-        {journey.map((mod) => {
+        {journeyModules.map((mod) => {
           const totalLessonsMod = mod.lessons.length
           const completedMod = mod.lessons.filter((l) => l.status === "COMPLETED").length
           const inProgressMod = mod.lessons.filter((l) => l.status === "IN_PROGRESS").length

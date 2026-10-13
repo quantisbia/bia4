@@ -87,6 +87,17 @@ describe("R13.14.3 · /academy/modules (lista de módulos)", () => {
     expect(src).toMatch(/computeStudentJourney/)
   })
 
+  it("regressão (R13.14.3b): usa journey.modules (não trata o retorno como array)", () => {
+    // Bug reportado por Janaina (2026-10-11): página crashava com
+    // 'Application error' porque chamávamos journey.filter(...)
+    // em vez de journey.modules.filter(...). computeStudentJourney
+    // retorna um objeto StudentJourney, não um array.
+    expect(src).toMatch(/journey\.modules/)
+    // E NÃO pode ter chamadas inválidas como journey.filter/journey.map
+    expect(src).not.toMatch(/\bjourney\.filter\b/)
+    expect(src).not.toMatch(/\bjourney\.map\b/)
+  })
+
   it("renderiza grid de cards de módulos com data-testid por módulo", () => {
     expect(src).toMatch(/data-testid="academy-modules-grid"/)
     expect(src).toMatch(/data-testid=\{?`module-card-\$\{mod\.order\}`\}?/)
