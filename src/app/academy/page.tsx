@@ -76,19 +76,22 @@ function trackEvent(event: string, metadata?: Record<string, unknown>) {
 }
 
 // ─── 12 módulos oficiais (do doc R13) ───────────────────────────
+// Todos marcados como "disponíveis" na landing — vão sendo abertos
+// progressivamente ao longo dos 12 meses. Alunos têm acesso completo
+// a partir do dia 1.
 const MODULES = [
-  { n:  1, title: "Introdução à Biofabricação",   description: "Engenharia tecidual · Bioimpressão · Aplicações · Limitações",              available: true  },
-  { n:  2, title: "Biomateriais",                 description: "Polímeros naturais/sintéticos · Hidrogéis · MEC · Biocompatibilidade",     available: false },
-  { n:  3, title: "Biotintas",                    description: "Formulação · Viscosidade · Reologia · Reticulação · Printabilidade",       available: false },
-  { n:  4, title: "Bioimpressão 3D",              description: "Extrusão · Pressão · Velocidade · Altura de camada · Bicos · Temperatura", available: false },
-  { n:  5, title: "Arquitetura 3D",               description: "Scaffold · Porosidade · Infill · STL · G-code · Geometria",                available: false },
-  { n:  6, title: "Células",                      description: "Tipos celulares · Densidade · Viabilidade · Cultura pós-impressão",         available: false },
-  { n:  7, title: "Tecidos",                      description: "Pele · Osso · Cartilagem · Tecidos moles · Vasos",                          available: false },
-  { n:  8, title: "Esferoides e organoides",      description: "Building blocks · Scaffold-free · Organoides · Modelos de doença",         available: false },
-  { n:  9, title: "Avaliação pós-impressão",      description: "Viabilidade · Morfologia · Mecânica · Histologia · Marcadores",             available: false },
-  { n: 10, title: "Translação",                   description: "Escalabilidade · Reprodutibilidade · Qualidade · Regulação",                available: false },
-  { n: 11, title: "Desenvolvimento de projeto",   description: "Estruture o seu projeto de biofabricação próprio",                          available: false },
-  { n: 12, title: "Projeto final",                description: "Da ideia ao protocolo experimental exportável em PDF/DOCX",                 available: false },
+  { n:  1, title: "Introdução à Biofabricação",   description: "Engenharia tecidual · Bioimpressão · Aplicações · Limitações",              available: true },
+  { n:  2, title: "Biomateriais",                 description: "Polímeros naturais/sintéticos · Hidrogéis · MEC · Biocompatibilidade",     available: true },
+  { n:  3, title: "Biotintas",                    description: "Formulação · Viscosidade · Reologia · Reticulação · Printabilidade",       available: true },
+  { n:  4, title: "Bioimpressão 3D",              description: "Extrusão · Pressão · Velocidade · Altura de camada · Bicos · Temperatura", available: true },
+  { n:  5, title: "Arquitetura 3D",               description: "Scaffold · Porosidade · Infill · STL · G-code · Geometria",                available: true },
+  { n:  6, title: "Células",                      description: "Tipos celulares · Densidade · Viabilidade · Cultura pós-impressão",         available: true },
+  { n:  7, title: "Tecidos",                      description: "Pele · Osso · Cartilagem · Tecidos moles · Vasos",                          available: true },
+  { n:  8, title: "Esferoides e organoides",      description: "Building blocks · Scaffold-free · Organoides · Modelos de doença",         available: true },
+  { n:  9, title: "Avaliação pós-impressão",      description: "Viabilidade · Morfologia · Mecânica · Histologia · Marcadores",             available: true },
+  { n: 10, title: "Translação",                   description: "Escalabilidade · Reprodutibilidade · Qualidade · Regulação",                available: true },
+  { n: 11, title: "Desenvolvimento de projeto",   description: "Estruture o seu projeto de biofabricação próprio",                          available: true },
+  { n: 12, title: "Projeto final",                description: "Da ideia ao protocolo experimental exportável em PDF/DOCX",                 available: true },
 ]
 
 // ─── Público-alvo ────────────────────────────────────────────────
@@ -109,31 +112,39 @@ const AUDIENCES = [
 const FAQ = [
   {
     q: "Preciso ter experiência prévia em biofabricação?",
-    a: "Não. O programa começa do zero (Módulo 1: Introdução) e avança até projeto final. Alunos iniciantes e pesquisadores experientes acompanham no seu ritmo — o acesso é de 12 meses.",
+    a: "Não. O programa começa do zero (Módulo 1: Introdução) e avança até projeto final. Alunos iniciantes e pesquisadores experientes acompanham no seu ritmo — o acesso é de 12 meses e você pode voltar nos módulos quantas vezes quiser.",
+  },
+  {
+    q: "Os 12 módulos estão disponíveis desde o 1º dia?",
+    a: "Sim. **Você tem acesso completo aos 12 módulos** assim que a matrícula é confirmada, sem liberação progressiva. Assista na ordem recomendada ou pule direto para o módulo que mais precisa — a estrutura é feita para quem quer aprender e aplicar no seu ritmo.",
   },
   {
     q: "As aulas são ao vivo ou gravadas?",
-    a: "As 12 aulas dos módulos são **gravadas** (você assiste no seu ritmo dentro dos 12 meses). Existem 3 encontros online ao vivo com a equipe científica Quantis ao longo do programa — datas divulgadas na plataforma.",
+    a: "O conteúdo dos 12 módulos é **100% gravado** (você assiste no seu ritmo dentro dos 12 meses de acesso). Além disso, existem **3 encontros online ao vivo** com a Dra. Kamila Leichtweis e o time Quantis — você vê as datas confirmadas no seu dashboard assim que entra na plataforma.",
   },
   {
     q: "Como funciona a integração com a plataforma BIA?",
-    a: "Dentro de cada aula, você tem um botão que abre a ferramenta correspondente da BIA (Formulador Pro, Bioimpressão, Organoid Builder, etc). O que você criar lá fica salvo no seu Notebook com versionamento automático — completamente rastreável.",
+    a: "Dentro de cada aula, você tem um botão que abre a ferramenta correspondente da BIA (Formulador Pro para biotintas, Bioimpressão 3D para fatiar modelos, Organoid Builder para design 3D, etc). Tudo o que você criar fica salvo no seu Notebook com versionamento automático V1/V2/V3 — totalmente rastreável para publicação acadêmica.",
   },
   {
     q: "Existem práticas presenciais?",
-    a: "Práticas presenciais são oferecidas apenas para cursos corporativos, institucionais ou grupos fechados. Para o curso online individual, não há prática presencial — mas você pode aplicar tudo na plataforma BIA.",
+    a: "Práticas presenciais são oferecidas apenas para cursos corporativos, institucionais ou grupos fechados (fale com o time comercial pelo WhatsApp). Para o curso online individual, não há prática presencial — mas você aplica TUDO na plataforma BIA, que é a mesma ferramenta usada por laboratórios parceiros da Quantis.",
   },
   {
     q: "Recebo certificado?",
-    a: "Sim. Ao concluir os 12 módulos + entregar o Projeto Final (protocolo próprio criado ao longo do curso), você recebe o certificado da BIA Academy com código de verificação único.",
+    a: "Sim — e são **3 formatos de certificado**: por aula (a cada aula concluída, perfeito para LinkedIn progressivo), declaração parcial de progresso (enquanto estiver no meio do caminho) e o certificado final de conclusão (ao completar 100% + entregar o Projeto Final). Todos em PDF com código único de verificação pública.",
   },
   {
     q: "O que acontece depois dos 12 meses?",
-    a: "Você continua tendo acesso ao Notebook com todos os seus protocolos e formulações (permanente). O acesso a novas atualizações do Academy e à BIA precisa ser renovado — entre em contato com o time comercial.",
+    a: "Você continua tendo acesso ao Notebook com todos os seus protocolos e formulações (permanente). O acesso a novas atualizações do Academy e à BIA precisa ser renovado — entre em contato com o time comercial via WhatsApp quando se aproximar do fim.",
   },
   {
     q: "Quais são as formas de pagamento?",
-    a: "R$ 2.375,00 à vista via Pix ou boleto, OU até 12x de R$ 197,92 no cartão de crédito (sem juros). Pagamento processado com segurança pela Asaas. A liberação do acesso à plataforma acontece em até 24 horas úteis após confirmação.",
+    a: "R$ 2.375,00 à vista via Pix ou boleto, OU **até 12x de R$ 197,92 no cartão de crédito** (sem juros). Pagamento processado com segurança pela Asaas. A liberação do acesso à plataforma acontece em até 24 horas úteis após confirmação.",
+  },
+  {
+    q: "E se eu não gostar do curso?",
+    a: "Oferecemos **7 dias de garantia incondicional**. Se nos primeiros 7 dias você sentir que o curso não é para você, basta nos avisar por e-mail que devolvemos 100% do valor pago, sem perguntas. Depois dos 7 dias, o acesso segue válido pelos 12 meses contratados.",
   },
 ]
 
@@ -210,27 +221,27 @@ export default function AcademyLandingPage() {
         </div>
 
         <div className="max-w-4xl mx-auto text-center relative z-10">
-          <div className="inline-flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 mb-6 text-xs text-violet-200">
-            <Sparkles className="w-3.5 h-3.5" />
-            Formação profissional em biofabricação
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 mb-6 text-xs text-emerald-200">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            Turma aberta · Todos os 12 módulos disponíveis desde o 1º dia
           </div>
 
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
-            A única formação em biofabricação onde a{" "}
+            Saia do papel e{" "}
             <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
-              ferramenta abre junto com a aula
-            </span>
-            .
+              bioimprima o seu primeiro tecido
+            </span>{" "}
+            em 12 semanas.
           </h1>
 
           <p className="text-base sm:text-xl text-gray-300 max-w-2xl mx-auto mb-3 leading-relaxed">
-            Aprenda biofabricação e bioimpressão 3D com uma plataforma de IA científica integrada.
-            Cada aula tem 1 clique para aplicar o conteúdo direto na BIA.
+            A única formação em biofabricação onde a <strong className="text-white">plataforma de IA científica</strong> abre junto com a aula.
+            Formule biotintas, fatie modelos 3D e gere protocolos de bancada no mesmo clique.
           </p>
 
           <p className="text-sm sm:text-base text-gray-400 max-w-xl mx-auto mb-10">
             <strong className="text-white">12 módulos</strong> · <strong className="text-white">12 meses de acesso</strong> ·
-            {" "}<strong className="text-white">3 encontros ao vivo</strong> · certificado.
+            {" "}<strong className="text-white">3 encontros ao vivo</strong> · <strong className="text-white">certificado reconhecido</strong>
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center items-stretch max-w-xl mx-auto">
@@ -242,7 +253,7 @@ export default function AcademyLandingPage() {
               className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-base font-semibold px-6 py-4 shadow-xl shadow-violet-500/25"
               data-testid="academy-cta-asaas-hero"
             >
-              Inscreva-se no curso online
+              Garantir minha vaga
               <ArrowRight className="w-4 h-4" />
             </a>
             <a
@@ -254,13 +265,29 @@ export default function AcademyLandingPage() {
               data-testid="academy-cta-whatsapp-hero"
             >
               <MessageCircle className="w-4 h-4" />
-              Curso corporativo
+              Falar sobre curso corporativo
             </a>
           </div>
 
           <p className="text-xs text-gray-500 mt-4">
-            Pagamento único via Asaas. Grupos fechados / in-company via time comercial.
+            Pagamento à vista ou em até 12x sem juros · acesso liberado em 24h · certificado ao concluir
           </p>
+
+          {/* Mini-prova social / destaques */}
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-xs text-gray-400">
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              Curadoria científica <strong className="text-white">Quantis Biotechnology</strong>
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              <strong className="text-white">65+ artigos</strong> curados e citáveis
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              Projeto final <strong className="text-white">rastreável e versionado</strong>
+            </span>
+          </div>
         </div>
       </section>
 
@@ -272,25 +299,27 @@ export default function AcademyLandingPage() {
       >
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-10">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-3">O programa oficial</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-3">O que está incluído na sua matrícula</h2>
             <p className="text-sm sm:text-base text-gray-400 max-w-2xl mx-auto">
-              Um único programa. Sem letras miúdas. Verbatim do que a Quantis entrega.
+              Um pacote completo. Sem letras miúdas. Tudo o que a Quantis entrega para você sair do curso aplicando.
             </p>
           </div>
 
           <div className="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-6 sm:p-8">
             <ul className="space-y-3">
               {[
-                "12 módulos de conteúdo (aulas gravadas, liberação progressiva)",
-                "12 meses de acesso completo à plataforma e atualizações",
-                "3 encontros online ao vivo com a equipe científica Quantis",
-                "Acesso à BIA (Biofabrication Intelligent Assistant) durante os 12 meses",
-                "Meu Projeto de Biofabricação — protocolo experimental próprio, exportável em PDF/DOCX",
-                "Certificado ao completar os 12 módulos + projeto final",
+                "12 módulos completos de conteúdo técnico (aulas gravadas, assista no seu ritmo)",
+                "12 meses de acesso completo à plataforma — mesmo depois do fim do curso",
+                "3 encontros online ao vivo com a Dra. Kamila Leichtweis e o time científico Quantis",
+                "Acesso ilimitado à BIA — a mesma IA científica usada por laboratórios parceiros",
+                "Biblioteca com 65+ artigos, 20 patentes e 15 protocolos curados pela nossa equipe",
+                "Meu Projeto de Biofabricação — seu protocolo próprio, versionado automaticamente e exportável em PDF/DOCX",
+                "Certificado por aula + certificado final de conclusão com código único de verificação pública",
+                "White papers institucionais da Quantis (QMatrix, biotintas, etc) incluídos como material de apoio",
                 "Práticas presenciais disponíveis apenas para cursos corporativos, institucionais ou grupos fechados",
               ].map((item, i) => (
                 <li key={i} className="flex items-start gap-2.5 text-sm sm:text-base text-gray-200">
-                  <CheckCircle2 className="w-5 h-5 text-violet-400 flex-shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
                   <span>{item}</span>
                 </li>
               ))}
@@ -357,9 +386,13 @@ export default function AcademyLandingPage() {
       >
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-10">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-3">12 módulos · 1 jornada</h2>
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 mb-4 text-xs text-emerald-200">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Todos os módulos liberados no 1º dia
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-3">12 módulos · 1 jornada completa</h2>
             <p className="text-sm sm:text-base text-gray-400 max-w-2xl mx-auto">
-              Módulo 1 já disponível — demais módulos liberados progressivamente durante os 12 meses.
+              Do fundamento ao projeto final. Assista no seu ritmo, revise quando quiser — o acesso é seu por 12 meses.
             </p>
           </div>
 
@@ -554,11 +587,13 @@ export default function AcademyLandingPage() {
               </div>
 
               <ul className="space-y-2 mb-6 text-sm text-gray-300">
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-violet-400 flex-shrink-0" />12 módulos + 12 meses de acesso</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-violet-400 flex-shrink-0" />3 encontros online ao vivo</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-violet-400 flex-shrink-0" />Acesso completo à plataforma BIA</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-violet-400 flex-shrink-0" />Notebook eletrônico com versionamento</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-violet-400 flex-shrink-0" />Certificado ao final</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span><strong className="text-white">Todos os 12 módulos</strong> liberados no 1º dia</span></li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span><strong className="text-white">12 meses</strong> de acesso completo</span></li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span>3 encontros ao vivo com a Dra. Kamila</span></li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span>Plataforma BIA integrada em todas as aulas</span></li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span>Biblioteca com 65+ artigos e white papers</span></li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span>Certificado por aula + certificado final</span></li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span><strong className="text-white">7 dias de garantia</strong> incondicional</span></li>
               </ul>
               <a
                 href={ASAAS_LINK}
@@ -666,9 +701,13 @@ export default function AcademyLandingPage() {
       {/* ── CTA final ───────────────────────────────────────── */}
       <section className="py-16 sm:py-20 px-4 sm:px-6">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-2xl sm:text-3xl font-bold mb-4">Pronto para começar?</h2>
-          <p className="text-sm sm:text-base text-gray-400 mb-6">
-            Inscreva-se hoje e comece pelo Módulo 1 · Introdução à Biofabricação — já disponível.
+          <h2 className="text-2xl sm:text-3xl font-bold mb-4">
+            Pronto para sair da teoria e <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">colocar a mão na massa</span>?
+          </h2>
+          <p className="text-sm sm:text-base text-gray-300 mb-6 leading-relaxed">
+            Inscreva-se agora e, em até 24h, você já estará dentro da plataforma com
+            os <strong className="text-white">12 módulos liberados</strong>, a BIA pronta para formular
+            sua primeira biotinta e o calendário dos encontros ao vivo com a Dra. Kamila.
           </p>
 
           {/* CTAs — inscrição + login lado-a-lado (R13.10.2: adicionado login também aqui). */}
