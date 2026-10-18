@@ -29,6 +29,9 @@ export const SUPERADMIN_EMAILS = [
   "lucas.guarnier@quantis.bio",
   "kamila.leichtweis@quantis.bio",
   "thais.amaral@quantis.bio",
+  // R13.15.5 · Equipe expandida da Academy (colaboradores)
+  "paula.elbl@quantis.bio",
+  "suporte@quantis.bio",
 ]
 
 export function isSuperAdmin(email?: string | null): boolean {
