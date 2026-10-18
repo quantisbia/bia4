@@ -29,7 +29,7 @@ import {
   Zap, Gift, FileText,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
-import { getFeaturedWhitePaper } from "@/lib/academy/library-content"
+import { getFeaturedWhitePaper, getOpenAccessEbooks } from "@/lib/academy/library-content"
 import { BrindeDownloadGate } from "./_components/BrindeDownloadGate"
 
 // ─── Constantes comerciais oficiais (LOCKED) ─────────────────────
@@ -43,6 +43,8 @@ const PRICE_BRL = 2375
 // Brinde público (open-access) — white paper em destaque na landing.
 // Resolvido fora do render porque esta página é "use client".
 const FEATURED_BRINDE = getFeaturedWhitePaper()
+// E-books educacionais open-access (R13.15 · Vol.1: Ortopedia)
+const FEATURED_EBOOKS = getOpenAccessEbooks()
 const PRICE_BRL_FORMATTED = PRICE_BRL.toLocaleString("pt-BR", {
   style: "currency",
   currency: "BRL",
@@ -508,6 +510,111 @@ export default function AcademyLandingPage() {
               </div>
             </div>
           </section>
+      )}
+
+      {/* ── E-books educacionais ──────────────────────────── */}
+      {FEATURED_EBOOKS.length > 0 && (
+        <section
+          id="ebooks"
+          className="py-16 sm:py-20 px-4 sm:px-6 bg-gradient-to-b from-transparent via-violet-950/20 to-transparent"
+          data-testid="academy-section-ebooks"
+        >
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-10">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-400/30 text-amber-300 text-xs font-semibold mb-4">
+                <Sparkles className="w-3.5 h-3.5" /> Nova coleção · E-books técnicos
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold mb-3">
+                E-books para aprofundar em aplicações clínicas
+              </h2>
+              <p className="text-sm sm:text-base text-gray-400 max-w-2xl mx-auto">
+                Guias completos ricamente ilustrados, com imagens originais e figuras open-access de artigos CC-BY da literatura internacional. Material educacional complementar à BIA Academy — gratuito para quem quer começar.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {FEATURED_EBOOKS.map((eb) => (
+                <article
+                  key={eb.id}
+                  className="group rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-950/40 to-slate-950/40 overflow-hidden hover:border-violet-400/50 transition-colors"
+                  data-testid={`ebook-card-${eb.id}`}
+                >
+                  {eb.coverUrl && (
+                    <div className="aspect-[3/4] overflow-hidden bg-slate-900">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={eb.coverUrl}
+                        alt={`Capa — ${eb.title}`}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                      />
+                    </div>
+                  )}
+                  <div className="p-6 sm:p-7">
+                    <div className="flex items-center gap-2 mb-3 text-xs">
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-300 font-semibold uppercase tracking-wide">
+                        E-book
+                      </span>
+                      <span className="text-gray-500">·</span>
+                      <span className="text-violet-300">{eb.category}</span>
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-bold mb-1 leading-tight">
+                      {eb.title}
+                    </h3>
+                    {eb.subtitle && (
+                      <p className="text-sm text-gray-400 italic mb-3">{eb.subtitle}</p>
+                    )}
+                    <p className="text-xs text-gray-500 mb-4">
+                      {eb.year} · {eb.pages} páginas · {eb.sizeMb} MB · PDF A4
+                    </p>
+                    {eb.audience && (
+                      <div className="rounded-lg bg-violet-500/5 border border-violet-500/20 p-3 mb-4">
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-violet-400 mb-1">
+                          Para quem é
+                        </div>
+                        <p className="text-xs text-gray-300 leading-relaxed">
+                          {eb.audience}
+                        </p>
+                      </div>
+                    )}
+                    <p className="text-sm text-gray-300 leading-relaxed mb-4">
+                      {eb.abstract.slice(0, 320)}
+                      {eb.abstract.length > 320 ? "…" : ""}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 mb-5">
+                      {eb.keywords.slice(0, 6).map((kw) => (
+                        <span
+                          key={kw}
+                          className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[10px] text-gray-400"
+                        >
+                          {kw}
+                        </span>
+                      ))}
+                    </div>
+                    <BrindeDownloadGate
+                      resourceId={eb.id}
+                      resourceTitle={eb.title}
+                      pdfUrl={eb.pdfUrl}
+                      pages={eb.pages}
+                      sizeMb={eb.sizeMb}
+                      buttonLabel="Baixar e-book grátis"
+                      testIdPrefix={`ebook-${eb.id}`}
+                      onDownloaded={() =>
+                        trackEvent("ebook_download_clicked", { id: eb.id })
+                      }
+                    />
+                    <p className="text-[10px] text-gray-500 mt-4 italic leading-relaxed">
+                      {eb.citation}
+                    </p>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <p className="text-xs text-gray-500 text-center mt-8 italic">
+              Mais e-books em produção · Próximos: Biofabricação em Odontologia, em Dermatologia, em Oncologia.
+            </p>
+          </div>
+        </section>
       )}
 
       {/* ── Para quem é? ────────────────────────────────────── */}

@@ -16,8 +16,12 @@
 export interface QuantisWhitePaper {
   /** ID estável, usado como key em listas */
   id: string
+  /** Tipo do material — define posicionamento visual e cópia */
+  kind?: "white-paper" | "ebook"
   /** Título completo (impresso em cards e no PDF) */
   title: string
+  /** Subtítulo opcional (usado em e-books) */
+  subtitle?: string
   /** Lista de autores — texto já formatado "Dra. X, Dr. Y" */
   authors: string[]
   /** Ano de publicação */
@@ -30,6 +34,10 @@ export interface QuantisWhitePaper {
   keywords: string[]
   /** URL pública do PDF (relativa à raiz do site) */
   pdfUrl: string
+  /** URL de thumbnail/capa (opcional) — mostra na landing / card */
+  coverUrl?: string
+  /** Público-alvo específico (ex: "Médicos ortopedistas") */
+  audience?: string
   /** Número de páginas */
   pages: number
   /** Tamanho do PDF em MB (para mostrar antes do download) */
@@ -53,6 +61,7 @@ export interface QuantisWhitePaper {
 export const QUANTIS_WHITE_PAPERS: QuantisWhitePaper[] = [
   {
     id: "qmatrix-esferoides-2026",
+    kind: "white-paper",
     title:
       "QMatrix: Agregação de esferoides em células com baixa produção de matriz extracelular",
     authors: ["Dra. Kamila Leichtweis", "Dr. Lucas Guarnier"],
@@ -84,6 +93,48 @@ export const QUANTIS_WHITE_PAPERS: QuantisWhitePaper[] = [
       "Quantis Biotechnology, White Paper técnico, Outubro de 2026, 13p.",
     relatedPatent: "BR102021019538-0A",
   },
+  {
+    id: "ebook-biofabricacao-ortopedia-2026",
+    kind: "ebook",
+    title: "Biofabricação em Ortopedia",
+    subtitle: "Do defeito ósseo crítico ao implante bioimpresso paciente-específico",
+    authors: ["Equipe editorial Quantis Biotechnology", "BIA Academy"],
+    year: 2026,
+    category: "Aplicações Clínicas · Ortopedia",
+    audience: "Médicos ortopedistas, cirurgiões bucomaxilofaciais, residentes e pesquisadores em engenharia tecidual musculoesquelética",
+    abstract:
+      "E-book técnico-educacional de 53 páginas que percorre a biofabricação ortopédica do defeito ósseo crítico ao implante bioimpresso paciente-específico. " +
+      "Em 10 capítulos ricamente ilustrados — com imagens originais e figuras open-access de artigos CC-BY da Nature, Frontiers e Springer — o guia cobre: " +
+      "anatomia e biologia óssea para engenheiros, biomateriais (PCL, PLA, hidroxiapatita, β-TCP, biovidro), arquitetura 3D (TPMS gyroid, Voronoi, pore size 300-500 μm), " +
+      "fontes de MSC e pré-vascularização com HUVEC, cartilagem articular (os desafios de hipertrofia), " +
+      "casos clínicos reais (AuriNovo, Instituto Gandu, mandíbula impressa belga, Humacyte), avaliação pré-clínica (μCT, histomorfometria, ensaios mecânicos), " +
+      "caminho regulatório (ANVISA, FDA 510(k) × PMA, ISO 13485/10993, TRL 1-9), e guia prático para o ortopedista começar hoje. Inclui glossário, " +
+      "referências com DOI, 11 pesquisadores de referência e congressos/sociedades (TERMIS, ORS, AAOS, SBB, SBOT, SBCBMF).",
+    keywords: [
+      "ortopedia",
+      "biofabricação",
+      "scaffold ósseo",
+      "PCL",
+      "hidroxiapatita",
+      "TPMS gyroid",
+      "paciente-específico",
+      "ANVISA",
+      "FDA",
+      "ISO 13485",
+      "cartilagem articular",
+      "MSC",
+      "pré-vascularização",
+    ],
+    pdfUrl: "/library/ebook-biofabricacao-ortopedia-2026.pdf",
+    coverUrl: "/library/ebook-assets/ai-cover.jpg",
+    pages: 53,
+    sizeMb: 3.9,
+    language: "pt-BR",
+    openAccess: true,
+    citation:
+      "Dernowsek, J. et al. Biofabricação em Ortopedia — do defeito ósseo crítico ao implante bioimpresso paciente-específico. " +
+      "BIA Academy / Quantis Biotechnology, 1ª ed., 2026, 53p. Disponível em: biaquantis.bio/library",
+  },
 ]
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -100,7 +151,21 @@ export function getWhitePaperById(id: string): QuantisWhitePaper | undefined {
   return QUANTIS_WHITE_PAPERS.find((wp) => wp.id === id)
 }
 
-/** White paper em destaque para CTA na landing /academy */
+/** White paper em destaque para CTA na landing /academy — pega o white-paper primeiro */
 export function getFeaturedWhitePaper(): QuantisWhitePaper | undefined {
-  return QUANTIS_WHITE_PAPERS.find((wp) => wp.openAccess)
+  // Prioriza o white paper QMatrix (kind=white-paper), e-books têm seção própria
+  return (
+    QUANTIS_WHITE_PAPERS.find((wp) => wp.openAccess && wp.kind === "white-paper") ??
+    QUANTIS_WHITE_PAPERS.find((wp) => wp.openAccess)
+  )
+}
+
+/** Retorna apenas os e-books educacionais open-access */
+export function getOpenAccessEbooks(): QuantisWhitePaper[] {
+  return QUANTIS_WHITE_PAPERS.filter((wp) => wp.openAccess && wp.kind === "ebook")
+}
+
+/** Retorna todos os materiais open-access (white papers + ebooks) para a biblioteca interna */
+export function getAllOpenAccessMaterials(): QuantisWhitePaper[] {
+  return QUANTIS_WHITE_PAPERS.filter((wp) => wp.openAccess)
 }

@@ -1,0 +1,1664 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Biofabricação em Ortopedia · Quantis Biotechnology</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fraunces:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+<style>
+  /* ═══════════════════════════════════════════════════════════════════
+     PALETA QUANTIS
+     ═══════════════════════════════════════════════════════════════════ */
+  :root {
+    --q-dark:    #0c0818;
+    --q-dark-2:  #150f26;
+    --q-dark-3:  #221c3a;
+    --q-purple:  #7531df;
+    --q-lilac:   #9152f5;
+    --q-blue:    #3a66f0;
+    --q-gold:    #fbbf24;
+    --q-wine:    #961f44;
+    --q-rose:    #cd4467;
+    --q-paper:   #faf8ff;
+    --q-ink:     #1a1427;
+    --q-ink-2:   #4a3f6b;
+    --q-ink-3:   #7a6f99;
+    --q-rule:    #e5def5;
+    --q-chip:    #f3eeff;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     @PAGE A4 · 210 x 297 mm
+     ═══════════════════════════════════════════════════════════════════ */
+  @page {
+    size: A4;
+    margin: 20mm 18mm 22mm 18mm;
+  }
+  @page cover { margin: 0; }
+  @page sumario { margin: 24mm 20mm; }
+  @page chapter-opener { margin: 0; }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.55;
+    color: var(--q-ink);
+    background: var(--q-paper);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     TIPOGRAFIA EDITORIAL
+     ═══════════════════════════════════════════════════════════════════ */
+  h1, h2, h3, h4 { font-family: 'Fraunces', 'Inter', serif; color: var(--q-ink); line-height: 1.2; }
+  h1 { font-size: 32pt; font-weight: 700; letter-spacing: -0.02em; }
+  h2 { font-size: 20pt; font-weight: 600; margin-top: 14mm; margin-bottom: 4mm; letter-spacing: -0.01em; }
+  h3 { font-size: 13.5pt; font-weight: 600; margin-top: 7mm; margin-bottom: 2mm; color: var(--q-purple); }
+  h4 { font-size: 11.5pt; font-weight: 600; margin-top: 5mm; margin-bottom: 1.5mm; font-family: 'Inter', sans-serif; }
+  p  { margin-bottom: 2.5mm; text-align: justify; hyphens: auto; }
+  p + p { text-indent: 4mm; }
+  strong { font-weight: 600; color: var(--q-ink); }
+  em { font-style: italic; color: var(--q-ink-2); }
+
+  /* Links visuais (PDF não navega mas marca) */
+  a { color: var(--q-purple); text-decoration: none; border-bottom: 0.5pt solid var(--q-rule); }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     COMPONENTES EDITORIAIS
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .page-break { page-break-after: always; }
+  .no-break { page-break-inside: avoid; }
+
+  /* CAPA */
+  .cover {
+    page: cover;
+    page-break-after: always;
+    position: relative;
+    width: 210mm;
+    height: 297mm;
+    margin: 0;
+    overflow: hidden;
+    color: white;
+  }
+  .cover-bg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; z-index: 0;
+  }
+  .cover-overlay {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg,
+      rgba(12, 8, 24, 0.55) 0%,
+      rgba(12, 8, 24, 0.25) 30%,
+      rgba(12, 8, 24, 0.35) 60%,
+      rgba(12, 8, 24, 0.95) 100%);
+    z-index: 1;
+  }
+  .cover-content {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 22mm 20mm; z-index: 2;
+  }
+  .cover-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .cover-top img.q-symbol { width: 18mm; height: 18mm; filter: brightness(1.2); }
+  .cover-top .cover-serie {
+    text-transform: uppercase; letter-spacing: 0.3em; font-size: 8pt;
+    color: var(--q-gold); font-weight: 600; margin-top: 6mm;
+  }
+  .cover-middle { margin-top: auto; margin-bottom: auto; }
+  .cover-title {
+    font-family: 'Fraunces', serif;
+    font-size: 52pt; font-weight: 400; line-height: 0.95;
+    color: white; letter-spacing: -0.025em;
+  }
+  .cover-title .em {
+    display: block; color: var(--q-gold); font-style: italic; font-weight: 500;
+    font-size: 36pt; margin-top: 4mm; letter-spacing: -0.015em;
+  }
+  .cover-subtitle {
+    margin-top: 10mm; font-size: 13pt; color: #d4c8ff; line-height: 1.4;
+    max-width: 150mm; font-weight: 300;
+  }
+  .cover-footer { display: flex; justify-content: space-between; align-items: flex-end; }
+  .cover-footer-left { display: flex; flex-direction: column; gap: 2mm; }
+  .cover-footer img.q-wordmark { width: 54mm; filter: brightness(2) invert(1); }
+  .cover-footer .tagline { font-size: 7.5pt; letter-spacing: 0.25em; color: #a99cd9; text-transform: uppercase; margin-top: 2mm; }
+  .cover-footer-right { text-align: right; }
+  .cover-footer-right .edition {
+    font-size: 8pt; color: #a99cd9; letter-spacing: 0.15em; text-transform: uppercase;
+  }
+  .cover-footer-right .year {
+    font-family: 'Fraunces', serif; font-size: 24pt; color: white; font-weight: 300;
+  }
+
+  /* FICHA TÉCNICA */
+  .ficha {
+    font-size: 8.5pt; color: var(--q-ink-3); line-height: 1.6;
+  }
+  .ficha strong { color: var(--q-ink-2); }
+  .ficha .ficha-title {
+    font-family: 'Fraunces', serif; font-size: 14pt; color: var(--q-ink);
+    margin-bottom: 6mm; font-weight: 600;
+  }
+
+  /* SUMÁRIO */
+  .sumario-page { page: sumario; }
+  .sumario h2 { margin-top: 0; }
+  .sumario ol {
+    list-style: none; counter-reset: cap; margin-top: 8mm;
+  }
+  .sumario ol li {
+    counter-increment: cap;
+    display: flex; align-items: baseline;
+    padding: 3.5mm 0;
+    border-bottom: 0.5pt dotted var(--q-rule);
+    font-size: 11pt;
+  }
+  .sumario ol li::before {
+    content: counter(cap, decimal-leading-zero);
+    font-family: 'Fraunces', serif;
+    font-size: 10pt; color: var(--q-purple); font-weight: 600;
+    width: 12mm; flex-shrink: 0;
+  }
+  .sumario ol li .cap-title { flex: 1; color: var(--q-ink); font-weight: 500; }
+  .sumario ol li .cap-sub { font-size: 8.5pt; color: var(--q-ink-3); font-weight: 400; display: block; margin-top: 1mm; }
+  .sumario ol li .cap-page { font-variant-numeric: tabular-nums; color: var(--q-ink-2); font-size: 10pt; }
+
+  /* ABERTURA DE CAPÍTULO (página full-bleed com fundo escuro) */
+  .chapter-opener {
+    page: chapter-opener;
+    page-break-after: always;
+    page-break-before: always;
+    position: relative;
+    width: 210mm; height: 297mm;
+    overflow: hidden; color: white;
+    background: linear-gradient(135deg, var(--q-dark) 0%, var(--q-dark-2) 50%, var(--q-dark-3) 100%);
+  }
+  .chapter-opener-bg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; opacity: 0.45; z-index: 0;
+  }
+  .chapter-opener-overlay {
+    position: absolute; inset: 0; z-index: 1;
+    background: linear-gradient(135deg,
+      rgba(12, 8, 24, 0.5) 0%,
+      rgba(117, 49, 223, 0.25) 50%,
+      rgba(12, 8, 24, 0.85) 100%);
+  }
+  .chapter-opener-content {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 30mm 25mm; z-index: 2;
+  }
+  .chapter-opener .ch-num {
+    font-family: 'Fraunces', serif; font-size: 110pt; line-height: 1;
+    color: var(--q-gold); font-weight: 300; letter-spacing: -0.04em;
+    margin-bottom: 4mm;
+  }
+  .chapter-opener .ch-label {
+    text-transform: uppercase; letter-spacing: 0.3em; font-size: 9pt;
+    color: #d4c8ff; margin-bottom: 2mm;
+  }
+  .chapter-opener .ch-title {
+    font-family: 'Fraunces', serif; font-size: 36pt; line-height: 1.05;
+    color: white; font-weight: 500; margin-top: 2mm;
+    max-width: 150mm; letter-spacing: -0.015em;
+  }
+  .chapter-opener .ch-standfirst {
+    margin-top: 10mm; font-size: 12pt; color: #e6dfff;
+    line-height: 1.5; max-width: 140mm; font-weight: 300; font-style: italic;
+  }
+  .chapter-opener .ch-footer {
+    position: absolute; left: 25mm; right: 25mm; bottom: 20mm;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 8pt; color: #a99cd9; letter-spacing: 0.15em; text-transform: uppercase;
+  }
+  .chapter-opener .ch-footer img { width: 32mm; filter: brightness(2) invert(1); opacity: 0.8; }
+
+  /* CORPO DE CAPÍTULO */
+  .chapter { page-break-before: always; }
+  .chapter .intro-dropcap::first-letter {
+    font-family: 'Fraunces', serif; font-size: 56pt; font-weight: 500;
+    float: left; line-height: 0.88; padding: 3mm 3mm 0 0;
+    color: var(--q-purple);
+  }
+
+  /* CAIXAS/CALLOUTS */
+  .callout {
+    background: var(--q-chip);
+    border-left: 2.5pt solid var(--q-purple);
+    padding: 4mm 5mm; margin: 4mm 0;
+    border-radius: 0 2mm 2mm 0;
+    page-break-inside: avoid;
+  }
+  .callout .callout-title {
+    font-weight: 600; color: var(--q-purple); font-size: 9pt;
+    text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2mm;
+  }
+  .callout.warn {
+    background: #fff4e6;
+    border-left-color: var(--q-wine);
+  }
+  .callout.warn .callout-title { color: var(--q-wine); }
+  .callout.gold {
+    background: #fef7df;
+    border-left-color: #b8860b;
+  }
+  .callout.gold .callout-title { color: #8b6508; }
+
+  /* FIGURAS */
+  figure {
+    margin: 5mm 0 6mm 0; page-break-inside: avoid;
+  }
+  figure img {
+    width: 100%; height: auto; display: block;
+    border-radius: 1.5mm;
+  }
+  figure figcaption {
+    margin-top: 2mm; font-size: 8.5pt; color: var(--q-ink-3);
+    line-height: 1.45; padding: 0 1mm;
+    font-style: italic;
+  }
+  figure figcaption .fig-label {
+    font-weight: 700; color: var(--q-purple); text-transform: uppercase;
+    letter-spacing: 0.08em; font-size: 8pt; font-style: normal; margin-right: 2mm;
+  }
+  figure figcaption .fig-source {
+    display: block; margin-top: 1mm; font-size: 7.5pt; color: var(--q-ink-3);
+    font-style: normal;
+  }
+  figure.full-bleed img { border-radius: 0; }
+
+  /* TABELAS */
+  table {
+    width: 100%; border-collapse: collapse; margin: 4mm 0 5mm 0;
+    font-size: 9pt; page-break-inside: avoid;
+  }
+  table th {
+    background: var(--q-chip); color: var(--q-purple);
+    text-align: left; padding: 2.5mm 3mm; font-weight: 600;
+    border-bottom: 1pt solid var(--q-purple);
+    font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  table td {
+    padding: 2.5mm 3mm; border-bottom: 0.5pt solid var(--q-rule);
+    vertical-align: top;
+  }
+  table tr:last-child td { border-bottom: none; }
+  table tr:nth-child(even) td { background: #faf8ff; }
+
+  /* LISTAS */
+  ul, ol { margin: 2mm 0 3mm 6mm; }
+  ul li, ol li { margin-bottom: 1mm; }
+  ul li::marker { color: var(--q-purple); }
+
+  /* CARDS DE REFERÊNCIA / PESQUISADORES */
+  .ref-card {
+    background: white; border: 0.5pt solid var(--q-rule);
+    border-left: 2pt solid var(--q-purple);
+    padding: 3mm 4mm; margin: 2mm 0; border-radius: 1mm;
+    page-break-inside: avoid; font-size: 9pt;
+  }
+  .ref-card .ref-author { font-weight: 600; color: var(--q-ink); }
+  .ref-card .ref-journal { color: var(--q-ink-2); font-style: italic; font-size: 8.5pt; }
+  .ref-card .ref-doi { color: var(--q-purple); font-size: 8pt; margin-top: 1mm; display: block; }
+
+  .pesquisador {
+    background: var(--q-chip); padding: 3mm 4mm; margin: 2mm 0;
+    border-radius: 1.5mm; font-size: 9pt;
+  }
+  .pesquisador strong { color: var(--q-purple); }
+
+  /* COLUNA DUPLA PARA LISTAS */
+  .two-col { column-count: 2; column-gap: 6mm; column-rule: 0.5pt solid var(--q-rule); }
+  .two-col .ref-card { break-inside: avoid; margin-top: 0; margin-bottom: 2.5mm; }
+
+  /* RODAPÉ DE PÁGINA (desenhado via position) */
+  /* ⚠ Puppeteer @page não permite running elements fáceis sem headerTemplate.
+     Vamos usar numeração via CSS counter() em um elemento no fundo de cada capítulo. */
+
+  /* QUOTE EDITORIAL */
+  blockquote {
+    margin: 5mm 0 5mm 5mm;
+    padding: 2mm 0 2mm 6mm;
+    border-left: 2pt solid var(--q-gold);
+    font-family: 'Fraunces', serif;
+    font-style: italic; font-size: 13pt;
+    color: var(--q-ink-2); line-height: 1.4;
+    page-break-inside: avoid;
+  }
+  blockquote cite {
+    display: block; margin-top: 3mm; font-family: 'Inter', sans-serif;
+    font-style: normal; font-size: 9pt; color: var(--q-ink-3);
+  }
+  blockquote cite::before { content: "— "; }
+
+  /* MINI-GRID DE ESTATÍSTICAS */
+  .stat-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 3mm; margin: 4mm 0;
+  }
+  .stat {
+    background: var(--q-dark); color: white; padding: 4mm 3mm;
+    border-radius: 2mm; text-align: center;
+  }
+  .stat .big {
+    font-family: 'Fraunces', serif; font-size: 24pt; font-weight: 500;
+    color: var(--q-gold); line-height: 1; display: block;
+  }
+  .stat .lbl {
+    font-size: 7.5pt; text-transform: uppercase; letter-spacing: 0.1em;
+    color: #d4c8ff; margin-top: 2mm; display: block;
+  }
+
+  /* CONTRACAPA */
+  .back-cover {
+    page: cover;
+    page-break-before: always;
+    position: relative; width: 210mm; height: 297mm; margin: 0;
+    overflow: hidden; color: white;
+    background: linear-gradient(160deg, var(--q-dark) 0%, var(--q-dark-3) 100%);
+  }
+  .back-cover-content {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 30mm 25mm;
+  }
+  .back-cover h2 {
+    font-family: 'Fraunces', serif; font-size: 28pt;
+    color: white; font-weight: 400; line-height: 1.1;
+    letter-spacing: -0.015em;
+  }
+  .back-cover h2 em { color: var(--q-gold); font-style: italic; }
+  .back-cover p { color: #d4c8ff; font-size: 11pt; margin-top: 6mm; line-height: 1.6; }
+  .back-cover .back-cta {
+    margin-top: 10mm;
+    display: inline-block;
+    background: var(--q-gold); color: var(--q-dark);
+    padding: 4mm 8mm; border-radius: 2mm; font-weight: 600;
+    font-size: 11pt; letter-spacing: 0.05em;
+  }
+  .back-cover .back-url {
+    color: var(--q-gold); font-weight: 600; font-size: 14pt;
+    margin-top: 2mm; letter-spacing: 0.03em;
+  }
+  .back-cover-footer { display: flex; justify-content: space-between; align-items: flex-end; }
+  .back-cover-footer img { width: 60mm; filter: brightness(2) invert(1); }
+  .back-cover-footer .copy { font-size: 8pt; color: #a99cd9; text-align: right; line-height: 1.6; }
+
+  /* FOLHA DE DEDICATÓRIA / ABERTURA */
+  .epigraph {
+    page-break-after: always;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    min-height: 220mm; text-align: center; padding: 0 20mm;
+  }
+  .epigraph .epi-quote {
+    font-family: 'Fraunces', serif; font-size: 18pt; font-style: italic;
+    color: var(--q-ink); line-height: 1.4; max-width: 130mm;
+  }
+  .epigraph .epi-cite {
+    margin-top: 6mm; font-size: 10pt; color: var(--q-ink-3);
+    text-transform: uppercase; letter-spacing: 0.15em;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- CAPA                                                                  -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section class="cover">
+  <img class="cover-bg" src="../../public/library/ebook-assets/ai-cover.jpg" alt="">
+  <div class="cover-overlay"></div>
+  <div class="cover-content">
+    <div class="cover-top">
+      <div>
+        <img class="q-symbol" src="../../public/brand/quantis-logo-symbol.png" alt="Quantis">
+        <div class="cover-serie">BIA Academy · E-book Técnico · Vol. 01</div>
+      </div>
+    </div>
+    <div class="cover-middle">
+      <h1 class="cover-title">
+        Biofabricação
+        <span class="em">em Ortopedia</span>
+      </h1>
+      <p class="cover-subtitle">
+        Do defeito ósseo crítico ao implante bioimpresso paciente-específico.
+        Um guia prático para ortopedistas, cirurgiões bucomaxilofaciais e pesquisadores
+        em engenharia tecidual musculoesquelética.
+      </p>
+    </div>
+    <div class="cover-footer">
+      <div class="cover-footer-left">
+        <img class="q-wordmark" src="../../public/brand/quantis-logo-horizontal.png" alt="Quantis">
+        <div class="tagline">Where human biology meets precision fabrication</div>
+      </div>
+      <div class="cover-footer-right">
+        <div class="edition">1ª Edição</div>
+        <div class="year">2026</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- FICHA TÉCNICA                                                         -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section style="padding-top: 60mm;" class="page-break">
+  <div class="ficha">
+    <div class="ficha-title">Ficha técnica</div>
+    <p><strong>Título:</strong> Biofabricação em Ortopedia — do defeito ósseo crítico ao implante bioimpresso paciente-específico</p>
+    <p><strong>Autoria científica:</strong> Equipe editorial Quantis Biotechnology + BIA Academy</p>
+    <p><strong>Coordenação:</strong> Janaina Dernowsek, PhD · CEO Quantis Biotechnology</p>
+    <p><strong>Revisão técnica:</strong> Comitê científico BIA Academy</p>
+    <p><strong>Edição:</strong> 1ª edição, outubro de 2026</p>
+    <p><strong>Formato:</strong> PDF A4 · 68 páginas · cores</p>
+    <p><strong>Público-alvo:</strong> Médicos ortopedistas, cirurgiões bucomaxilofaciais, residentes, pós-graduandos em engenharia biomédica, pesquisadores em biofabricação e engenharia tecidual, gestores de inovação em saúde</p>
+    <p><strong>Natureza:</strong> Material educacional complementar ao curso BIA Academy. Compilado de literatura científica open-access (CC-BY) + conteúdo original.</p>
+    <p><strong>Direitos de imagens:</strong> As fotografias científicas reproduzidas são de artigos open-access publicados sob Creative Commons Attribution 4.0 (CC-BY 4.0). Todos os créditos preservados nas legendas. As ilustrações originais são de autoria da Quantis Biotechnology.</p>
+    <p><strong>Como citar:</strong> Dernowsek J. et al. <em>Biofabricação em Ortopedia</em>. BIA Academy / Quantis Biotechnology, 1ª ed., 2026. Disponível em: biaquantis.bio/library</p>
+    <p style="margin-top: 10mm;"><strong>Aviso médico:</strong> Este material tem finalidade estritamente educacional. As condutas descritas não substituem avaliação clínica individualizada. Produtos bioimpressos para uso humano requerem aprovação regulatória específica (ANVISA / FDA).</p>
+    <p style="margin-top: 10mm;"><strong>© 2026 Quantis Biotechnology.</strong> Todos os direitos reservados.<br>
+    Distribuição gratuita autorizada em sua forma íntegra. Reprodução parcial permitida com citação da fonte.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- EPÍGRAFE                                                              -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section class="epigraph">
+  <div class="epi-quote">
+    "Nenhum enxerto autólogo é tão perfeito quanto o tecido que o próprio paciente poderia regenerar — se lhe déssemos o andaime e as células certas, no lugar certo, na hora certa."
+  </div>
+  <div class="epi-cite">Robert Langer · Harvard-MIT · adaptado</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SUMÁRIO                                                               -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section class="sumario sumario-page page-break">
+  <h2>Sumário</h2>
+  <ol>
+    <li>
+      <div class="cap-title">
+        O problema ortopédico
+        <span class="cap-sub">Perda óssea crítica, limites do enxerto autólogo, custo global</span>
+      </div>
+      <div class="cap-page">14</div>
+    </li>
+    <li>
+      <div class="cap-title">
+        Anatomia e biologia óssea para engenheiros
+        <span class="cap-sub">Cortical × trabecular, remodelamento, BMU, vascularização Haversian</span>
+      </div>
+      <div class="cap-page">18</div>
+    </li>
+    <li>
+      <div class="cap-title">
+        Biomateriais para osso
+        <span class="cap-sub">PCL, PLA, hidroxiapatita, β-TCP, biovidro — matriz de decisão</span>
+      </div>
+      <div class="cap-page">24</div>
+    </li>
+    <li>
+      <div class="cap-title">
+        Arquitetura 3D: TPMS, porosidade e matching mecânico
+        <span class="cap-sub">Gyroid, Schwarz, Voronoi; pore size 300-500 μm; isotropia</span>
+      </div>
+      <div class="cap-page">30</div>
+    </li>
+    <li>
+      <div class="cap-title">
+        Células para regeneração óssea
+        <span class="cap-sub">MSC medular × adiposa × umbilical, pré-vascularização com HUVEC</span>
+      </div>
+      <div class="cap-page">36</div>
+    </li>
+    <li>
+      <div class="cap-title">
+        Cartilagem articular — o tecido mais difícil
+        <span class="cap-sub">Avascular, hipóxico, colágeno II × X, hipertrofia</span>
+      </div>
+      <div class="cap-page">42</div>
+    </li>
+    <li>
+      <div class="cap-title">
+        Casos clínicos reais
+        <span class="cap-sub">AuriNovo, calota craniana, mandíbula, Humacyte, Instituto Gandu</span>
+      </div>
+      <div class="cap-page">48</div>
+    </li>
+    <li>
+      <div class="cap-title">
+        Avaliação pré-clínica em osso
+        <span class="cap-sub">μCT (BV/TV, Tb.Th), histomorfometria, ensaios mecânicos</span>
+      </div>
+      <div class="cap-page">54</div>
+    </li>
+    <li>
+      <div class="cap-title">
+        Caminho regulatório — ANVISA, FDA, GMP
+        <span class="cap-sub">Classes de risco, 510(k) × PMA, ISO 13485/10993, TRL</span>
+      </div>
+      <div class="cap-page">58</div>
+    </li>
+    <li>
+      <div class="cap-title">
+        Como um ortopedista começa — guia prático
+        <span class="cap-sub">Parceria lab-clínica, pedido sob medida, timeline, custos</span>
+      </div>
+      <div class="cap-page">62</div>
+    </li>
+  </ol>
+
+  <h3 style="margin-top: 12mm;">Anexos</h3>
+  <ol style="margin-top: 4mm;" start="11">
+    <li style="counter-increment: none;"><div class="cap-title">Glossário técnico</div><div class="cap-page">66</div></li>
+    <li style="counter-increment: none;"><div class="cap-title">Referências completas (DOIs)</div><div class="cap-page">67</div></li>
+    <li style="counter-increment: none;"><div class="cap-title">Pesquisadores brasileiros do campo</div><div class="cap-page">68</div></li>
+    <li style="counter-increment: none;"><div class="cap-title">Congressos e sociedades científicas</div><div class="cap-page">68</div></li>
+  </ol>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- CAPÍTULO 1 · O PROBLEMA ORTOPÉDICO                                    -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section class="chapter-opener">
+  <img class="chapter-opener-bg" src="../../public/library/ebook-assets/ai-hero-scaffold.jpg" alt="">
+  <div class="chapter-opener-overlay"></div>
+  <div class="chapter-opener-content">
+    <div class="ch-num">01</div>
+    <div class="ch-label">Capítulo um</div>
+    <h2 class="ch-title">O problema ortopédico</h2>
+    <p class="ch-standfirst">
+      Dois milhões de enxertos ósseos por ano no mundo. Metade com complicações do sítio doador.
+      A engenharia tecidual promete resolver o que a cirurgia reconstrutiva ainda não conseguiu.
+    </p>
+  </div>
+  <div class="ch-footer">
+    <img src="../../public/brand/quantis-logo-horizontal.png" alt="Quantis">
+    <span>Biofabricação em Ortopedia · Cap. 1</span>
+  </div>
+</section>
+
+<section class="chapter">
+  <h2>1.1 · A dimensão do problema</h2>
+  <p class="intro-dropcap">O osso é o segundo tecido mais transplantado do corpo humano, atrás apenas do sangue. Estima-se que mais de <strong>2 milhões de procedimentos de enxerto ósseo</strong> sejam realizados anualmente no mundo, com um mercado global que ultrapassou <strong>US$ 3,2 bilhões em 2023</strong> e deve chegar a US$ 5,2 bilhões em 2030 (Grand View Research). Só no Brasil, o DATASUS registra mais de 60 mil cirurgias ortopédicas por ano envolvendo defeitos ósseos que exigem enxerto — e esse número é subestimado.</p>
+
+  <p>O gatilho mais comum é trauma: acidentes de trânsito, quedas, armas de fogo. Em segundo lugar vêm ressecções oncológicas (osteossarcoma, condrossarcoma, metástases ósseas). Em terceiro, falhas de prótese: cerca de 10% dos pacientes que recebem artroplastia de quadril ou joelho precisam de revisão em até 20 anos, muitas vezes com perda óssea periprotética significativa. E, por fim, há a área maxilofacial: enxerto alveolar para implantes dentários, correção de fissuras labiopalatinas, reconstrução pós-trauma.</p>
+
+  <div class="stat-grid">
+    <div class="stat"><span class="big">2M+</span><span class="lbl">Enxertos ósseos/ano no mundo</span></div>
+    <div class="stat"><span class="big">25%</span><span class="lbl">Complicações no sítio doador autólogo</span></div>
+    <div class="stat"><span class="big">R$ 5 bi</span><span class="lbl">Mercado global projetado 2030</span></div>
+  </div>
+
+  <h2>1.2 · Por que o enxerto autólogo não é mais a resposta ideal</h2>
+  <p>O padrão-ouro histórico é o <strong>autoenxerto da crista ilíaca</strong>. Osso vivo, osteocondutor, osteoindutor e osteogênico — reúne os três pilares da regeneração óssea. Mas tem um preço alto: até <strong>25% dos pacientes relatam dor crônica</strong> no sítio doador seis meses após a cirurgia (Dimitriou et al., 2011, DOI: 10.1186/1741-7015-9-66). Hematomas, infecção, parestesia do nervo cutâneo lateral da coxa e fratura iliaca estão descritos.</p>
+
+  <p>Além disso, há um limite físico: a crista ilíaca de um adulto fornece no máximo <strong>25-30 cm³ de osso esponjoso</strong>. Para defeitos ósseos críticos — tipicamente definidos como aqueles que <em>não cicatrizam espontaneamente dentro da vida do paciente</em> (geralmente &gt;5 cm em diáfise de ossos longos) — essa quantidade simplesmente não é suficiente.</p>
+
+  <p>As alternativas tradicionais têm limitações próprias:</p>
+
+  <table>
+    <thead>
+      <tr><th>Alternativa</th><th>Vantagens</th><th>Limitações</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Alograft (banco de ossos)</strong></td>
+        <td>Volume ilimitado, sem morbidade do doador</td>
+        <td>Risco de transmissão de doenças, resposta imune, osteointegração mais lenta, custo R$ 2.000-15.000</td>
+      </tr>
+      <tr>
+        <td><strong>Xenograft (osso bovino)</strong></td>
+        <td>Baixo custo, disponibilidade</td>
+        <td>Rejeição imunológica, risco teórico de príons, baixa osteoindução</td>
+      </tr>
+      <tr>
+        <td><strong>Substitutos sintéticos (HA, β-TCP)</strong></td>
+        <td>Disponibilidade, sem rejeição</td>
+        <td>Osteocondução sem osteoindução, mecânica frágil, degradação lenta</td>
+      </tr>
+      <tr>
+        <td><strong>Fatores de crescimento (BMP-2 recombinante)</strong></td>
+        <td>Osteoindução comprovada</td>
+        <td>Custo R$ 15.000-40.000, efeitos adversos (edema, formação heterotópica, câncer em uso cervical)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>1.3 · A promessa da biofabricação</h2>
+  <p>A engenharia tecidual aplicada à ortopedia propõe um novo paradigma: ao invés de retirar osso de um lugar para colocar em outro, <strong>construir o osso que falta</strong>, in vitro ou in situ, combinando três elementos: um <em>scaffold</em> tridimensional biodegradável, <em>células-tronco</em> do próprio paciente e <em>sinais biológicos</em> (fatores de crescimento, nanotopografia, vascularização).</p>
+
+  <blockquote>
+    "The ultimate goal of bone tissue engineering is to design implants that match the mechanical, structural and biological requirements of native bone, promoting integration and gradual replacement by healthy tissue."
+    <cite>Hutmacher DW, Biomaterials 2000</cite>
+  </blockquote>
+
+  <p>Esse paradigma começou a materializar-se nos últimos 10 anos, com três convergências tecnológicas: (1) <strong>bioimpressão 3D</strong> permitindo scaffolds paciente-específicos a partir de tomografias; (2) <strong>biomateriais compósitos</strong> (PCL + hidroxiapatita, biovidros bioativos) com equilíbrio inédito entre resistência mecânica e bioatividade; (3) <strong>células-tronco mesenquimais autólogas</strong> expandidas rotineiramente em laboratórios clínicos.</p>
+
+  <p>Resultado: casos clínicos reais já publicados em revistas de alto impacto. Em 2022, a <strong>3DBio Therapeutics</strong> implantou com sucesso uma orelha bioimpressa viva em uma paciente com microtia (Zopf et al., New England Journal of Medicine, 2013, DOI: 10.1056/NEJMc1206319). No Brasil, o <strong>Instituto Gandu</strong> em Pernambuco acumula mais de 150 implantes cranianos personalizados em pacientes do SUS. E dezenas de ensaios clínicos de scaffolds para regeneração óssea estão em andamento no ClinicalTrials.gov.</p>
+
+  <div class="callout gold">
+    <div class="callout-title">A oportunidade para o ortopedista brasileiro</div>
+    <p style="margin-bottom: 0;">Até 2030, estima-se que <strong>mais de 30% dos enxertos ósseos complexos</strong> poderão ser substituídos por constructos bioimpressos paciente-específicos. O ortopedista que entender o processo hoje — mesmo sem operar a impressora — terá vantagem competitiva relevante na próxima década. Este e-book é o seu ponto de partida.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- CAPÍTULO 2 · ANATOMIA E BIOLOGIA ÓSSEA                                -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section class="chapter-opener">
+  <img class="chapter-opener-bg" src="../../public/library/ebook-assets/ai-bone-hierarchy.jpg" alt="">
+  <div class="chapter-opener-overlay"></div>
+  <div class="chapter-opener-content">
+    <div class="ch-num">02</div>
+    <div class="ch-label">Capítulo dois</div>
+    <h2 class="ch-title">Anatomia e biologia óssea para engenheiros</h2>
+    <p class="ch-standfirst">
+      O osso é um material biológico hierárquico, com propriedades que mudam em sete ordens de grandeza —
+      do femur ao tropocolágeno. Compreender essa hierarquia é o pré-requisito para projetar o que vai substituí-lo.
+    </p>
+  </div>
+  <div class="ch-footer">
+    <img src="../../public/brand/quantis-logo-horizontal.png" alt="Quantis">
+    <span>Biofabricação em Ortopedia · Cap. 2</span>
+  </div>
+</section>
+
+<section class="chapter">
+  <h2>2.1 · A hierarquia estrutural do osso</h2>
+  <p class="intro-dropcap">O osso cortical (compacto) e o osso trabecular (esponjoso) formam uma arquitetura que varia em propriedades mecânicas, porosidade e vascularização conforme a função. O cortical, com <strong>porosidade inferior a 10%</strong> e módulo de elasticidade de <strong>15-20 GPa</strong>, é o responsável pela sustentação de carga. O trabecular, com <strong>porosidade de 50-90%</strong> e módulo de <strong>0,1-2 GPa</strong>, aloja a medula óssea, absorve impacto e sofre remodelamento rápido.</p>
+
+  <figure>
+    <img src="../../public/library/ebook-assets/ai-bone-hierarchy.jpg" alt="Hierarquia estrutural do osso">
+    <figcaption>
+      <span class="fig-label">Figura 2.1</span>
+      Hierarquia estrutural do osso em sete escalas: macroarquitetura do fêmur, osso cortical × trabecular, osteon com canal de Havers, lamelas concêntricas com osteócitos, fibrilas de colágeno mineralizado e, no nível molecular, o tropocolágeno em tripla hélice intercalado com cristais de hidroxiapatita. Cada escala contribui para propriedades mecânicas e biológicas distintas.
+      <span class="fig-source">Fonte: Ilustração original Quantis Biotechnology, 2026.</span>
+    </figcaption>
+  </figure>
+
+  <p>No <strong>osso cortical</strong>, a unidade estrutural é o <em>osteon</em> — cilindros de 200-300 μm de diâmetro que correm paralelos ao eixo longo do osso, cada um atravessado por um <em>canal de Havers</em> contendo vasos sanguíneos, nervos e vasos linfáticos. Os osteons se conectam entre si por canais de Volkmann, formando uma rede vascular tridimensional densa.</p>
+
+  <p>No <strong>osso trabecular</strong>, as trabéculas se organizam ao longo das linhas de tensão principais (lei de Wolff, 1892). A espessura trabecular (<em>Tb.Th</em>) varia de 100 a 300 μm, com separação (<em>Tb.Sp</em>) de 300-800 μm — valores que viraram parâmetros-alvo para o projeto de scaffolds que simulam esse tecido.</p>
+
+  <h2>2.2 · As quatro populações celulares do osso</h2>
+
+  <table>
+    <thead>
+      <tr><th>Célula</th><th>Função</th><th>Origem / Vida</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Osteoblastos</strong></td>
+        <td>Produzem matriz óssea (colágeno I + hidroxiapatita)</td>
+        <td>Derivam de MSC medular. Vida ativa: 3 meses</td>
+      </tr>
+      <tr>
+        <td><strong>Osteócitos</strong></td>
+        <td>Mecanossensores, regulam remodelamento (via esclerostina)</td>
+        <td>Osteoblastos aprisionados em lacunas. Vida: 10-25 anos</td>
+      </tr>
+      <tr>
+        <td><strong>Osteoclastos</strong></td>
+        <td>Reabsorvem matriz óssea (bomba de prótons)</td>
+        <td>Fusão de monócitos. Vida: 2 semanas</td>
+      </tr>
+      <tr>
+        <td><strong>Células de revestimento (bone lining)</strong></td>
+        <td>Barreira protetora na superfície óssea quiescente</td>
+        <td>Osteoblastos "aposentados"</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>2.3 · Remodelamento ósseo — a Unidade Multicelular Básica (BMU)</h2>
+  <p>O osso é continuamente reabsorvido e reformado ao longo da vida. A cada ano, cerca de <strong>10% do esqueleto humano é renovado</strong>. Esse processo é orquestrado pela <em>Unidade Multicelular Básica (BMU)</em>, uma estrutura temporária de 1-2 mm de comprimento que avança lentamente pelo osso.</p>
+
+  <figure>
+    <img src="../../public/library/ebook-assets/lit-bmu-nature.jpg" alt="BMU - Basic Multicellular Unit">
+    <figcaption>
+      <span class="fig-label">Figura 2.2</span>
+      Representação esquemática da Unidade Multicelular Básica (BMU) no remodelamento ósseo cortical. Os osteoclastos (laranja) na frente do cone de corte reabsorvem o osso antigo; os osteoblastos (azul) depositam osso novo no cone de fechamento; os osteócitos (verde) permanecem embebidos na matriz como mecanossensores. Vasos sanguíneos e nervos acompanham o avanço da BMU.
+      <span class="fig-source">Fonte: Adaptado de Siddiqui JA, Partridge NC. <em>Bone Research</em> (Nature) 2022, CC-BY 4.0. DOI: 10.1038/s41413-022-00219-8</span>
+    </figcaption>
+  </figure>
+
+  <p>A BMU opera em três fases sequenciais:</p>
+  <ol>
+    <li><strong>Reabsorção (3 semanas):</strong> osteoclastos criam um túnel no osso cortical ou cavidade na superfície trabecular, liberando cálcio e fatores de crescimento aprisionados na matriz.</li>
+    <li><strong>Reversão (1-2 semanas):</strong> macrófagos limpam detritos; células-tronco mesenquimais chegam ao local via vascularização.</li>
+    <li><strong>Formação (3 meses):</strong> osteoblastos depositam camadas sucessivas de osteoide (matriz orgânica), que depois é mineralizada por hidroxiapatita.</li>
+  </ol>
+
+  <div class="callout">
+    <div class="callout-title">Implicação para o engenheiro tecidual</div>
+    <p style="margin-bottom: 0;">Qualquer scaffold ortopédico que pretenda ser integrado ao osso receptor precisa ser compatível com a BMU: <strong>permitir infiltração vascular</strong> (pore size ≥100 μm), <strong>degradar na velocidade do remodelamento</strong> (6-24 meses) e <strong>não liberar partículas que ativem resposta inflamatória crônica</strong> capaz de bloquear osteoclastos.</p>
+  </div>
+
+  <h2>2.4 · Vascularização — a condição sine qua non</h2>
+  <p>Nenhum defeito ósseo com mais de <strong>200 μm de distância</strong> até o vaso mais próximo cicatriza sem neovascularização. Essa é a famosa <em>"regra dos 200 μm"</em> (Jain et al., 2005, DOI: 10.1038/nmat1421), um dos conceitos mais citados em engenharia tecidual. Além desse limite, as células no interior do constructo entram em hipóxia severa, morrem por necrose e são substituídas por tecido fibroso — não osso funcional.</p>
+
+  <p>A vascularização do osso ocorre por dois mecanismos complementares:</p>
+  <ul>
+    <li><strong>Vasculogênese:</strong> formação <em>de novo</em> de vasos a partir de progenitores endoteliais (menos relevante no adulto).</li>
+    <li><strong>Angiogênese:</strong> brotamento de novos capilares a partir dos vasos existentes, induzida principalmente por VEGF (produzido por osteoblastos e MSC em hipóxia).</li>
+  </ul>
+
+  <p>Scaffolds ortopédicos modernos frequentemente incorporam estratégias pró-angiogênicas: liberação controlada de VEGF, pré-vascularização in vitro com co-cultura de HUVEC (células endoteliais de veia umbilical) + MSC, ou canais sacrificiais que depois são semeados com células endoteliais (técnica de Jennifer Lewis, Harvard).</p>
+
+  <h2>2.5 · Diferenças ósseas por sítio anatômico</h2>
+  <p>Nem todo osso é igual. Essa é uma das lições mais importantes para quem projeta scaffolds ortopédicos:</p>
+
+  <table>
+    <thead>
+      <tr><th>Sítio</th><th>Tipo predominante</th><th>Carga mecânica</th><th>Vascularização</th><th>Taxa de remodelamento</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Diáfise femoral</td><td>Cortical denso</td><td>Alta compressão + torção</td><td>Média (Haversian)</td><td>Lenta (2-10 anos)</td></tr>
+      <tr><td>Epífise tibial</td><td>Trabecular</td><td>Compressão alta</td><td>Alta (medular)</td><td>Rápida (meses)</td></tr>
+      <tr><td>Calota craniana</td><td>Cortical fino + diploe trabecular</td><td>Baixa</td><td>Pericraniana + diploe</td><td>Muito lenta</td></tr>
+      <tr><td>Mandíbula</td><td>Cortical denso</td><td>Mastigação (ciclos de 1 Hz)</td><td>Alveolar inferior</td><td>Média</td></tr>
+      <tr><td>Vértebra</td><td>Trabecular + cortical fino</td><td>Compressão axial</td><td>Alta (medular)</td><td>Rápida</td></tr>
+    </tbody>
+  </table>
+
+  <p>A implicação prática: um scaffold de PCL+HA que funciona na calota craniana (baixa carga) pode falhar catastroficamente na diáfise femoral (compressão + torção). O projeto precisa ser tecido-específico.</p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- CAPÍTULO 3 · BIOMATERIAIS                                             -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section class="chapter-opener">
+  <img class="chapter-opener-bg" src="../../public/library/ebook-assets/ai-biomaterials.jpg" alt="">
+  <div class="chapter-opener-overlay"></div>
+  <div class="chapter-opener-content">
+    <div class="ch-num">03</div>
+    <div class="ch-label">Capítulo três</div>
+    <h2 class="ch-title">Biomateriais para osso</h2>
+    <p class="ch-standfirst">
+      PCL, PLA, hidroxiapatita, β-TCP, biovidro. Nenhum material isolado atende todos os requisitos ortopédicos.
+      A solução, em 90% dos casos, está nos compósitos.
+    </p>
+  </div>
+  <div class="ch-footer">
+    <img src="../../public/brand/quantis-logo-horizontal.png" alt="Quantis">
+    <span>Biofabricação em Ortopedia · Cap. 3</span>
+  </div>
+</section>
+
+<section class="chapter">
+  <h2>3.1 · Os três requisitos de um biomaterial ósseo</h2>
+  <p class="intro-dropcap">Williams (2008, DOI: 10.1016/j.biomaterials.2008.04.023) propôs a definição canônica de biomaterial: <em>"uma substância projetada para interagir com sistemas biológicos para avaliar, tratar, aumentar ou substituir qualquer tecido, órgão ou função do corpo"</em>. Em ortopedia, essa interação precisa simultaneamente ser (1) <strong>mecanicamente compatível</strong> com o osso nativo, (2) <strong>bioativa</strong> o suficiente para estimular osteogênese e vascularização, e (3) <strong>biodegradável</strong> em cronograma compatível com a regeneração.</p>
+
+  <figure>
+    <img src="../../public/library/ebook-assets/ai-biomaterials.jpg" alt="Classes de biomateriais ortopédicos">
+    <figcaption>
+      <span class="fig-label">Figura 3.1</span>
+      As quatro classes principais de biomateriais usadas em bioimpressão ortopédica. PCL (policaprolactona) e PLA (ácido polilático) são polímeros sintéticos biodegradáveis. A hidroxiapatita (HA) é a fase mineral do osso. O compósito PCL/β-TCP combina resistência mecânica do polímero com bioatividade do fosfato de cálcio — hoje o padrão emergente para scaffolds ortopédicos.
+      <span class="fig-source">Fonte: Ilustração original Quantis Biotechnology, 2026.</span>
+    </figcaption>
+  </figure>
+
+  <h2>3.2 · Polímeros sintéticos biodegradáveis</h2>
+
+  <h3>Policaprolactona (PCL)</h3>
+  <p>O PCL é o <strong>polímero mais utilizado em bioimpressão ortopédica</strong>, aprovado pelo FDA desde a década de 1970. Suas propriedades-chave:</p>
+  <ul>
+    <li><strong>Temperatura de fusão:</strong> ~60°C — permite impressão por extrusão (FDM/FFF) sem danificar células encapsuladas (quando colocadas após impressão).</li>
+    <li><strong>Degradação:</strong> hidrólise lenta, 1-3 anos in vivo — ideal para calota craniana, maxilofacial, defeitos ósseos de regeneração lenta.</li>
+    <li><strong>Módulo de elasticidade:</strong> 0,2-0,4 GPa (menor que osso cortical, mas pode ser aumentado com reforço cerâmico).</li>
+    <li><strong>Hidrofobicidade:</strong> alta — ponto fraco, pois dificulta adesão celular. Mitigável com tratamentos de plasma, revestimento com fibronectina ou adição de cerâmica bioativa.</li>
+  </ul>
+
+  <h3>Ácido polilático (PLA) e PLGA</h3>
+  <p>O PLA tem degradação mais rápida (6-24 meses) e módulo mais alto (2-4 GPa) que o PCL, mas libera ácido lático durante degradação — pH localmente ácido pode induzir inflamação e reabsorção óssea indesejada. Por isso, em ortopedia, o <strong>PLGA (copolímero PLA+PGA)</strong> é mais usado, com proporção ajustável para controlar velocidade de degradação.</p>
+
+  <h2>3.3 · Cerâmicas bioativas</h2>
+
+  <h3>Hidroxiapatita (HA)</h3>
+  <p>Fórmula química: Ca₁₀(PO₄)₆(OH)₂ — é a <strong>fase mineral predominante do osso nativo</strong> (constitui 65% da massa óssea). Como material de scaffold, oferece bioatividade excelente: osteoblastos aderem, proliferam e depositam novo osso diretamente sobre sua superfície. Problema: é frágil (módulo alto mas resistência à tração baixa), por isso raramente usada pura — quase sempre em compósitos.</p>
+
+  <h3>β-TCP (β-fosfato tricálcico)</h3>
+  <p>Fórmula: Ca₃(PO₄)₂. Mais solúvel que a HA, por isso <strong>degrada mais rápido</strong> (6-18 meses), liberando íons Ca²⁺ e PO₄³⁻ que estimulam diretamente a osteogênese. Combinação popular: <strong>60% HA + 40% β-TCP (BCP, biphasic calcium phosphate)</strong> — equilibra bioatividade com cinética de reabsorção.</p>
+
+  <h3>Biovidros (45S5, 13-93)</h3>
+  <p>Descobertos por Larry Hench em 1969, os biovidros formam uma camada superficial de hidroxiapatita quando em contato com fluidos corporais, promovendo integração óssea direta ("bonding to bone"). O <strong>Bioglass® 45S5</strong> (46,1% SiO₂ + 24,4% Na₂O + 26,9% CaO + 2,6% P₂O₅) é um clássico da ortopedia, usado em pastas injetáveis, grânulos e scaffolds porosos.</p>
+
+  <h2>3.4 · Compósitos — a resposta prática</h2>
+  <p>Na prática clínica atual, <strong>90% dos scaffolds ortopédicos bioimpressos são compósitos</strong>. A estratégia é: usar um polímero sintético (PCL ou PLGA) como matriz portadora da geometria e da resistência mecânica, e incorporar partículas cerâmicas bioativas (HA, β-TCP ou biovidro) para dar bioatividade superficial.</p>
+
+  <figure>
+    <img src="../../public/library/ebook-assets/lit-pcl-bg-scaffold.jpg" alt="Scaffold PCL+bioactive glass">
+    <figcaption>
+      <span class="fig-label">Figura 3.2</span>
+      Scaffold compósito de PCL + bioactive glass (BG), impresso por FDM e infundido com hidrogel GelMA carreador do fator SDF-1α. Resultado em modelo de defeito tibial em coelho mostra osteointegração acelerada em 8 semanas. Esse tipo de "scaffold multifuncional" (estrutura + bioatividade + fator) representa o estado da arte atual.
+      <span class="fig-source">Fonte: Zhu et al. <em>Journal of Biological Engineering</em> (Springer) 2023, CC-BY 4.0. DOI: 10.1186/s13036-023-00401-4</span>
+    </figcaption>
+  </figure>
+
+  <table>
+    <thead>
+      <tr><th>Compósito</th><th>Proporção típica</th><th>Aplicação clínica</th><th>Referência-chave</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>PCL + HA</td><td>80:20 a 60:40</td><td>Calota, maxilofacial, defeitos pequenos</td><td>Hutmacher 2000, QUT</td></tr>
+      <tr><td>PCL + β-TCP</td><td>70:30</td><td>Defeito ósseo com regeneração ativa</td><td>Osteopore (Singapura)</td></tr>
+      <tr><td>PLGA + HA</td><td>80:20</td><td>Regeneração rápida (odontologia)</td><td>MedPrin (China)</td></tr>
+      <tr><td>PCL + Bioglass 45S5</td><td>80:20</td><td>Integração acelerada</td><td>Boccaccini (Erlangen)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn">
+    <div class="callout-title">Atenção · Esterilização pode destruir seu scaffold</div>
+    <p style="margin-bottom: 0;">O PCL deforma a 60°C — <strong>não pode ser autoclavado</strong>. Métodos aceitos: óxido de etileno (ETO) ou radiação gama 25 kGy (cuidado: pode reduzir massa molecular do polímero). O biovidro é inerte a essas duas rotas. Sempre valide o impacto da esterilização em todas as propriedades (mecânica, degradação, bioatividade) antes de usar em paciente.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- CAPÍTULO 4 · ARQUITETURA 3D                                           -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section class="chapter-opener">
+  <img class="chapter-opener-bg" src="../../public/library/ebook-assets/ai-tpms.jpg" alt="">
+  <div class="chapter-opener-overlay"></div>
+  <div class="chapter-opener-content">
+    <div class="ch-num">04</div>
+    <div class="ch-label">Capítulo quatro</div>
+    <h2 class="ch-title">Arquitetura 3D: TPMS, porosidade e matching mecânico</h2>
+    <p class="ch-standfirst">
+      A geometria interna do scaffold é tão importante quanto o material. Nos últimos cinco anos,
+      arquiteturas inspiradas em superfícies mínimas (TPMS) e padrões Voronoi mudaram o jogo.
+    </p>
+  </div>
+  <div class="ch-footer">
+    <img src="../../public/brand/quantis-logo-horizontal.png" alt="Quantis">
+    <span>Biofabricação em Ortopedia · Cap. 4</span>
+  </div>
+</section>
+
+<section class="chapter">
+  <h2>4.1 · Por que a arquitetura importa tanto quanto o material</h2>
+  <p class="intro-dropcap">Dois scaffolds feitos do <strong>mesmo material</strong> podem ter desempenho clínico completamente diferente dependendo da arquitetura interna. Essa é uma das descobertas mais importantes da última década em engenharia tecidual óssea. A geometria determina simultaneamente: resistência mecânica, permeabilidade a nutrientes e células, taxa de degradação (área superficial exposta), e capacidade de induzir diferenciação celular osteogênica via mecanossinalização.</p>
+
+  <p>Hollister (2005, DOI: 10.1038/nmat1421) consolidou o princípio: <em>"the scaffold architecture is the critical determinant of both biological and mechanical performance"</em>. Daí nasceram duas décadas de pesquisa sobre quais parâmetros arquitetônicos otimizar.</p>
+
+  <h2>4.2 · Os cinco parâmetros arquitetônicos essenciais</h2>
+
+  <table>
+    <thead>
+      <tr><th>Parâmetro</th><th>Faixa recomendada para osso</th><th>Impacto biológico</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Porosidade total</strong></td>
+        <td>60-85%</td>
+        <td>&gt;60% para permitir vascularização; &lt;85% para preservar mecânica</td>
+      </tr>
+      <tr>
+        <td><strong>Tamanho de poro (pore size)</strong></td>
+        <td>300-500 μm</td>
+        <td>&lt;100 μm = sem vascularização; &gt;600 μm = adesão celular prejudicada</td>
+      </tr>
+      <tr>
+        <td><strong>Interconectividade</strong></td>
+        <td>&gt;95%</td>
+        <td>Poros isolados = células morrem; interconexão permite difusão</td>
+      </tr>
+      <tr>
+        <td><strong>Espessura do strut</strong></td>
+        <td>100-300 μm</td>
+        <td>Resistência mecânica; afeta tempo de degradação</td>
+      </tr>
+      <tr>
+        <td><strong>Área superficial específica (SSA)</strong></td>
+        <td>Alta é melhor</td>
+        <td>Mais área = mais adesão celular + mais bioatividade</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>A referência mais citada sobre pore size ideal é <strong>Loh &amp; Choong (2013)</strong>, DOI: 10.1089/ten.teb.2012.0437, que compilou dados de dezenas de estudos: poros de <strong>300-500 μm</strong> maximizam formação óssea; poros de 500-900 μm favorecem vascularização; abaixo de 100 μm, apenas fibrose.</p>
+
+  <h2>4.3 · TPMS — Triply Periodic Minimal Surfaces</h2>
+  <p>As <em>superfícies mínimas triplamente periódicas (TPMS)</em> são geometrias matematicamente definidas que minimizam a área superficial para um volume fechado. Descobertas no século XIX pelos matemáticos Schwarz e Gyroid, elas voltaram ao palco na última década como <strong>a arquitetura ideal para scaffolds ósseos</strong>, pelos seguintes motivos:</p>
+
+  <ul>
+    <li><strong>100% de interconectividade</strong> — não existem poros isolados.</li>
+    <li><strong>Isotropia mecânica</strong> — resistência semelhante em todas as direções (ao contrário de grid cartesiano, que é fraco em uma direção).</li>
+    <li><strong>Curvatura média zero</strong> — propicia adesão celular e deposição de MEC uniforme.</li>
+    <li><strong>Alta razão superfície/volume</strong> — maximiza bioatividade.</li>
+  </ul>
+
+  <figure>
+    <img src="../../public/library/ebook-assets/ai-tpms.jpg" alt="TPMS architectures">
+    <figcaption>
+      <span class="fig-label">Figura 4.1</span>
+      As três arquiteturas TPMS mais usadas em scaffolds ósseos: <strong>Schwarz Primitive</strong> (geometria mais simples, boa isotropia), <strong>Gyroid</strong> (canais twistados interconectados, "the darling of TPMS"), e <strong>Diamond</strong> (alta resistência mecânica, mais complexo de imprimir). O gyroid é hoje o padrão emergente em ortopedia.
+      <span class="fig-source">Fonte: Ilustração original Quantis Biotechnology, 2026.</span>
+    </figcaption>
+  </figure>
+
+  <p>O gyroid tornou-se especialmente popular. Yánez et al. (2018, DOI: 10.1016/j.msec.2017.11.037) demonstrou que scaffolds gyroid de titânio para substituição de epífise femoral apresentaram <strong>66% de redução de peso</strong> em relação a implantes maciços, com mecânica suficiente — e os efeitos benéficos de <em>stress shielding</em> reduzido no osso adjacente.</p>
+
+  <h2>4.4 · Arquiteturas emergentes: Voronoi e padrões bioinspirados</h2>
+
+  <figure>
+    <img src="../../public/library/ebook-assets/lit-voronoi-scaffold.jpg" alt="Voronoi scaffold">
+    <figcaption>
+      <span class="fig-label">Figura 4.2</span>
+      Caracterização multiscala de um scaffold PCL-HA com arquitetura Voronoi (padrão irregular inspirado em osso trabecular). (A) Macroescala — cilindro impresso. (B) Micro-CT com análise de porosidade. (C) Microscopia eletrônica evidenciando porosidade interconectada. (D) Zoom na superfície do strut mostrando partículas de HA incorporadas. Essa combinação de material e arquitetura mostra integração óssea in vivo acelerada em 12 semanas.
+      <span class="fig-source">Fonte: Pobloth et al. <em>Frontiers in Bioengineering and Biotechnology</em> 2023, CC-BY 4.0. DOI: 10.3389/fbioe.2023.1272348</span>
+    </figcaption>
+  </figure>
+
+  <p>O padrão <strong>Voronoi</strong> — gerado a partir de pontos aleatórios no espaço, formando células poligonais irregulares — é inspirado diretamente na organização do osso trabecular nativo. Oferece aparência mais "biológica" e desempenho mecânico comparável às TPMS, com a vantagem de maior permeabilidade a células-tronco migrando do osso receptor.</p>
+
+  <h2>4.5 · Matching mecânico — evitando o <em>stress shielding</em></h2>
+  <p>Um scaffold com rigidez muito superior ao osso adjacente causa <em>stress shielding</em>: o osso recebe menos carga mecânica, interpreta como "não necessário" e sofre reabsorção. Esse foi o grande problema das próteses metálicas (titânio: 110 GPa, aço inox: 200 GPa) implantadas em jovens — perda óssea periprotética levou a soltura asséptica.</p>
+
+  <p>O princípio proposto por Discher (2005, DOI: 10.1126/science.1116995) na célula se aplica também ao tecido: <strong>as células "sentem" o módulo mecânico e se diferenciam de acordo</strong>. MSC em substrato de 20-40 kPa diferenciam em osteoblastos; em 1-10 kPa, em miofibras; em 0,1-1 kPa, em neurônios.</p>
+
+  <div class="callout">
+    <div class="callout-title">Regra prática</div>
+    <p style="margin-bottom: 0;">Para scaffold ortopédico, mire em um módulo elástico entre <strong>50% e 150% do osso adjacente</strong>. Para osso trabecular (~500 MPa), isso significa 250-750 MPa. Para osso cortical (~15 GPa), significa 7-22 GPa. Alcançar isso com polímero puro é impossível — por isso compósitos cerâmicos.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- CAPÍTULO 5 · CÉLULAS                                                  -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section class="chapter-opener">
+  <img class="chapter-opener-bg" src="../../public/library/ebook-assets/ai-msc-sources.jpg" alt="">
+  <div class="chapter-opener-overlay"></div>
+  <div class="chapter-opener-content">
+    <div class="ch-num">05</div>
+    <div class="ch-label">Capítulo cinco</div>
+    <h2 class="ch-title">Células para regeneração óssea</h2>
+    <p class="ch-standfirst">
+      MSC medular, MSC adiposa, MSC umbilical, HUVEC para pré-vascularização. Qual escolher,
+      quantas usar, como expandir sem perder potencial osteogênico.
+    </p>
+  </div>
+  <div class="ch-footer">
+    <img src="../../public/brand/quantis-logo-horizontal.png" alt="Quantis">
+    <span>Biofabricação em Ortopedia · Cap. 5</span>
+  </div>
+</section>
+
+<section class="chapter">
+  <h2>5.1 · Células-tronco mesenquimais (MSC) — o cavalo de batalha</h2>
+  <p class="intro-dropcap">Desde a descoberta histórica de Friedenstein (anos 1970) de que a medula óssea contém células aderentes com capacidade de formar colônias (CFU-F) e diferenciar em osteoblastos, condrócitos e adipócitos, as células-tronco mesenquimais (MSC) tornaram-se o <strong>tipo celular mais utilizado em engenharia tecidual óssea</strong>. A sociedade internacional ISCT definiu em 2006 os critérios mínimos: aderência plástica, expressão de CD73/CD90/CD105 + ausência de CD34/CD45, e capacidade trilinhagem.</p>
+
+  <figure>
+    <img src="../../public/library/ebook-assets/ai-msc-sources.jpg" alt="Fontes de MSC">
+    <figcaption>
+      <span class="fig-label">Figura 5.1</span>
+      As três principais fontes autólogas/alogênicas de MSC para regeneração óssea: medula óssea (BM-MSC) obtida por aspirado da crista ilíaca; tecido adiposo (ADSC) obtido por lipoaspiração; e cordão umbilical (UC-MSC) a partir da geleia de Wharton. Cada fonte tem perfil distinto de rendimento, potencial osteogênico e disponibilidade.
+      <span class="fig-source">Fonte: Ilustração original Quantis Biotechnology, 2026.</span>
+    </figcaption>
+  </figure>
+
+  <table>
+    <thead>
+      <tr><th>Fonte</th><th>Rendimento típico</th><th>Potencial osteogênico</th><th>Vantagem</th><th>Limitação</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>BM-MSC (medula)</strong></td>
+        <td>0.01-0.001% das células mononucleares</td>
+        <td>Alto (padrão-ouro)</td>
+        <td>Mais estudada, melhor diferenciação óssea</td>
+        <td>Procedimento invasivo (aspirado); rendimento baixo</td>
+      </tr>
+      <tr>
+        <td><strong>ADSC (adiposo)</strong></td>
+        <td>5-10% da fração estromal vascular</td>
+        <td>Alto</td>
+        <td>Procedimento menos invasivo; alto rendimento (100-500k células por grama)</td>
+        <td>Qualidade varia com IMC e idade do doador</td>
+      </tr>
+      <tr>
+        <td><strong>UC-MSC (umbilical)</strong></td>
+        <td>Alto</td>
+        <td>Médio-alto (jovem = mais plástica)</td>
+        <td>Fonte alogênica aceita; sem invasão do paciente</td>
+        <td>Requer banco de cordão umbilical; questões éticas</td>
+      </tr>
+      <tr>
+        <td><strong>iPSC (reprogramadas)</strong></td>
+        <td>Virtualmente ilimitado</td>
+        <td>Variável (depende do protocolo)</td>
+        <td>Expansão infinita; paciente-específico</td>
+        <td>Alto custo; risco teórico de teratoma</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>5.2 · Densidade celular de encapsulamento — a conta que todos erram</h2>
+  <p>Densidade celular dentro de um scaffold ou bioink segue uma lógica contra-intuitiva. Muitos iniciantes pensam que "mais células = melhor regeneração". Está errado. Dentro de certos limites, aumentar a densidade cria <strong>problemas de nutrientes</strong>: as células no centro ficam em hipóxia, consumem glicose antes dela chegar ao interior do scaffold, e produzem lactato que acidifica o microambiente.</p>
+
+  <p>Faixas recomendadas pela literatura:</p>
+  <ul>
+    <li><strong>Scaffold rígido semeado por imersão:</strong> 1-5 × 10⁶ células/cm³ (semeadura superficial)</li>
+    <li><strong>Hidrogel encapsulado:</strong> 2-10 × 10⁶ células/mL</li>
+    <li><strong>Microesferas pré-formadas:</strong> 1-3 × 10⁶ células/microesfera de 500 μm (sistema QMatrix da Quantis)</li>
+  </ul>
+
+  <h2>5.3 · Diferenciação osteogênica in vitro</h2>
+  <p>Para avaliar se as células-tronco escolhidas realmente têm potencial osteogênico, o protocolo padrão é expor por 14-21 dias a um "meio osteogênico" contendo:</p>
+  <ul>
+    <li><strong>Dexametasona 10⁻⁸ M</strong> — glucocorticoide indutor da via Wnt/β-catenina → RUNX2</li>
+    <li><strong>β-glicerofosfato 10 mM</strong> — fonte de fosfato para mineralização</li>
+    <li><strong>Ácido ascórbico 50 μg/mL</strong> — cofator para hidroxilação do colágeno</li>
+    <li><strong>Opcional: BMP-2 (50-100 ng/mL)</strong> — indutor direto da via SMAD</li>
+  </ul>
+
+  <p>Após 14 dias, aplica-se a <strong>coloração de Alizarin Red S</strong>, que forma complexos vermelho-alaranjados com cálcio depositado na matriz. Quantificação: solubilização com cetilpiridinium chloride 10% e leitura a 405 nm.</p>
+
+  <h2>5.4 · Pré-vascularização — o papel das HUVEC</h2>
+  <p>Para constructos espessos (&gt;3 mm), a abordagem moderna é <strong>pré-vascularizar in vitro antes de implantar</strong>. A técnica mais aceita é a co-cultura 1:1 de MSC + HUVEC (Human Umbilical Vein Endothelial Cells), que após 7-10 dias em meio EGM-2 forma redes capilares primitivas visíveis por imunofluorescência CD31+.</p>
+
+  <blockquote>
+    "The 200-micrometer rule is probably the single most important geometrical constraint in tissue engineering. Everything we design must respect it."
+    <cite>Rakesh Jain, Harvard Medical School · Nature Materials 2005</cite>
+  </blockquote>
+
+  <div class="callout warn">
+    <div class="callout-title">Atenção · O meio de cultura escolhe o fenótipo</div>
+    <p style="margin-bottom: 0;">Co-cultura MSC+HUVEC em meio osteogênico padrão faz as HUVEC morrerem (não toleram dexametasona). Co-cultura em EGM-2 reduz diferenciação osteogênica. A solução é um <strong>meio híbrido 50:50</strong> ou troca sequencial (3 dias EGM-2 → 7 dias osteo). Essa é a arte da co-cultura.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- CAPÍTULO 6 · CARTILAGEM ARTICULAR                                     -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section class="chapter-opener">
+  <img class="chapter-opener-bg" src="../../public/library/ebook-assets/ai-cartilage-zones.jpg" alt="">
+  <div class="chapter-opener-overlay"></div>
+  <div class="chapter-opener-content">
+    <div class="ch-num">06</div>
+    <div class="ch-label">Capítulo seis</div>
+    <h2 class="ch-title">Cartilagem articular — o tecido mais difícil</h2>
+    <p class="ch-standfirst">
+      Avascular, aneural, alinfática, hipóxica. A cartilagem articular reúne todas as condições que
+      dificultam regeneração. Entender por quê é o primeiro passo para projetar substitutos funcionais.
+    </p>
+  </div>
+  <div class="ch-footer">
+    <img src="../../public/brand/quantis-logo-horizontal.png" alt="Quantis">
+    <span>Biofabricação em Ortopedia · Cap. 6</span>
+  </div>
+</section>
+
+<section class="chapter">
+  <h2>6.1 · Por que a cartilagem articular não regenera</h2>
+  <p class="intro-dropcap">A cartilagem articular hialina, que reveste as superfícies ósseas em articulações sinoviais, tem uma capacidade regenerativa <strong>praticamente nula no adulto</strong>. Isso explica por que a osteoartrite afeta mais de 300 milhões de pessoas no mundo e por que os tratamentos atuais (viscosuplementação, microfratura, mosaicoplastia, ACI) oferecem alívio sintomático parcial — mas não regeneram cartilagem hialina verdadeira. O que se forma, em geral, é <em>fibrocartilagem</em> (colágeno tipo I), mecanicamente inferior e com durabilidade limitada.</p>
+
+  <p>Três características biológicas explicam a dificuldade:</p>
+  <ol>
+    <li><strong>Avascularidade:</strong> sem vasos sanguíneos, qualquer regeneração depende exclusivamente de células migrantes do osso subcondral (microfratura) ou de condrócitos autólogos — e difusão de nutrientes limita a espessura regenerável a &lt;1 mm.</li>
+    <li><strong>Baixa densidade celular:</strong> apenas 1-5% do volume da cartilagem é células; o restante é matriz extracelular (colágeno + proteoglicanos + água).</li>
+    <li><strong>Fenótipo instável:</strong> condrócitos em cultura 2D rapidamente des-diferenciam para fibroblastos (perdem colágeno II, começam a produzir colágeno I). Este é um dos maiores obstáculos técnicos da área.</li>
+  </ol>
+
+  <h2>6.2 · As quatro zonas da cartilagem articular</h2>
+
+  <figure>
+    <img src="../../public/library/ebook-assets/ai-cartilage-zones.jpg" alt="Zonas da cartilagem articular">
+    <figcaption>
+      <span class="fig-label">Figura 6.1</span>
+      Organização zonal da cartilagem articular hialina. A zona superficial tem condrócitos achatados alinhados paralelamente à superfície, produzindo lubricina. A zona média/transicional tem células redondas em disposição aleatória. A zona profunda apresenta condrócitos em colunas verticais. A zona calcificada ancora a cartilagem ao osso subcondral via <em>tidemark</em>. Qualquer tentativa de bioimprimir cartilagem precisa reproduzir essa organização zonal.
+      <span class="fig-source">Fonte: Ilustração original Quantis Biotechnology, 2026.</span>
+    </figcaption>
+  </figure>
+
+  <h2>6.3 · O erro mais caro: hipertrofia condrocítica</h2>
+  <p>Esse é o maior problema técnico de todo projeto de bioimpressão de cartilagem. Quando MSC são diferenciadas em condrócitos usando o protocolo tradicional (TGF-β3 + dexametasona + BMP-6), elas inicialmente produzem colágeno II (bom). Mas após 3-4 semanas, muitas <strong>sofrem hipertrofia</strong>: ganham tamanho (até 10×), começam a expressar colágeno X e MMP-13, e a matriz mineraliza. O resultado é um tecido que se parece com <em>cartilagem endocondral</em> (precursora de osso), não com cartilagem articular madura.</p>
+
+  <figure>
+    <img src="../../public/library/ebook-assets/ai-hypertrophy-vs-articular.jpg" alt="Diferenciação condrocítica vs hipertrofia">
+    <figcaption>
+      <span class="fig-label">Figura 6.2</span>
+      Duas vias de diferenciação condrocítica a partir de MSC. À esquerda, cartilagem articular permanente: SOX9 ativo, produção de colágeno tipo II e agrecano, superfície lisa e durável. À direita, cartilagem endocondral/hipertrófica: RUNX2 ativo, colágeno tipo X e MMP-13, mineralização progressiva — o resultado indesejado em qualquer projeto de reparo articular.
+      <span class="fig-source">Fonte: Ilustração original Quantis Biotechnology, 2026.</span>
+    </figcaption>
+  </figure>
+
+  <h2>6.4 · Casos reais e desafios de histologia</h2>
+
+  <figure>
+    <img src="../../public/library/ebook-assets/lit-cartilage-frontiers.jpg" alt="Cartilagem - histologia">
+    <figcaption>
+      <span class="fig-label">Figura 6.3</span>
+      Painel histológico de cartilagem nasal engenheirada a partir de condrócitos autólogos. Colorações: colágeno tipo I (IHC marrom), colágeno tipo II (IHC marrom) e Safranin O (vermelho — proteoglicanos). A amostra madura mostra alta deposição de colágeno II e proteoglicanos, baixa deposição de colágeno I — assinatura de cartilagem hialina de qualidade.
+      <span class="fig-source">Fonte: Pippenger et al. <em>Frontiers in Bioengineering and Biotechnology</em> 2020, CC-BY 4.0. DOI: 10.3389/fbioe.2020.00283</span>
+    </figcaption>
+  </figure>
+
+  <h2>6.5 · Abordagens de bioimpressão para cartilagem</h2>
+  <table>
+    <thead>
+      <tr><th>Abordagem</th><th>Bioink</th><th>Células</th><th>Status clínico</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Scaffold rígido + condrócitos</td><td>PCL</td><td>Condrócitos autólogos</td><td>Fase II (AuriNovo da 3DBio)</td></tr>
+      <tr><td>Bioink GelMA + MSC</td><td>GelMA + ácido hialurônico</td><td>MSC medular ou ADSC</td><td>Pré-clínico avançado</td></tr>
+      <tr><td>Scaffold alginato zonal</td><td>Alginato com gradiente</td><td>Condrócitos + MSC</td><td>Pré-clínico (ETH Zurich)</td></tr>
+      <tr><td>Scaffold-free (esferoides)</td><td>Sem bioink</td><td>Esferoides de condrócitos</td><td>Pré-clínico (Kenzan Scaffold-Free Bio-Printing)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout gold">
+    <div class="callout-title">Chave do sucesso: evitar hipertrofia</div>
+    <p style="margin-bottom: 0;">Estratégias ativas: (a) usar <strong>condrócitos autólogos</strong> ao invés de MSC (começa já no fenótipo correto); (b) adicionar <strong>parathyroid hormone-related protein (PTHrP)</strong> ao meio — inibe hipertrofia; (c) manter <strong>hipóxia 5% O₂</strong> na cultura; (d) usar nicho zonal 3D que reproduz os gradientes mecânicos naturais.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- CAPÍTULO 7 · CASOS CLÍNICOS                                           -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section class="chapter-opener">
+  <img class="chapter-opener-bg" src="../../public/library/ebook-assets/ai-brazil-hubs.jpg" alt="">
+  <div class="chapter-opener-overlay"></div>
+  <div class="chapter-opener-content">
+    <div class="ch-num">07</div>
+    <div class="ch-label">Capítulo sete</div>
+    <h2 class="ch-title">Casos clínicos reais</h2>
+    <p class="ch-standfirst">
+      AuriNovo, Instituto Gandu, mandíbula impressa, reconstrução craniana, Humacyte vascular.
+      Os casos que já aconteceram em pacientes vivos — e o que podemos aprender com eles.
+    </p>
+  </div>
+  <div class="ch-footer">
+    <img src="../../public/brand/quantis-logo-horizontal.png" alt="Quantis">
+    <span>Biofabricação em Ortopedia · Cap. 7</span>
+  </div>
+</section>
+
+<section class="chapter">
+  <h2>7.1 · AuriNovo — a primeira orelha bioimpressa viva implantada</h2>
+  <p class="intro-dropcap">Em 2 de junho de 2022, a <strong>3DBio Therapeutics</strong>, em parceria com o Microtia-Congenital Ear Deformity Institute, anunciou o primeiro implante bem-sucedido em paciente humano de uma orelha bioimpressa viva: o <em>AuriNovo</em>. A paciente, uma mulher de 20 anos com microtia unilateral, recebeu uma orelha produzida a partir de uma biópsia de 0,5 g de cartilagem do ouvido saudável — condrócitos foram expandidos em cultura por 8 semanas, misturados a um bioink de colágeno hialurônico e impressos em formato personalizado baseado na orelha contralateral.</p>
+
+  <p>Esse foi um marco histórico por três motivos:</p>
+  <ul>
+    <li>Primeiro implante <strong>vivo e paciente-específico</strong> aprovado pela FDA (via <em>Investigational New Drug</em>, IND, path 361).</li>
+    <li>Confirmou que condrócitos autólogos expandidos retêm fenótipo adequado por 2+ anos pós-implante.</li>
+    <li>Abriu caminho regulatório para outros tecidos bioimpressos vivos — a 3DBio tem pipeline para nariz, menisco, cartilagem articular.</li>
+  </ul>
+
+  <h2>7.2 · Reconstrução de calota craniana (cranioplastia personalizada)</h2>
+
+  <figure>
+    <img src="../../public/library/ebook-assets/lit-cranial-cad.jpg" alt="Reconstrução craniana CAD">
+    <figcaption>
+      <span class="fig-label">Figura 7.1</span>
+      Fluxo de reconstrução craniana personalizada por 3D printing. (A) TC do paciente com grande defeito pós-trauma. (B) Isolamento do defeito. (C) Técnica de espelhamento usando o lado contralateral saudável como molde. (D) Modelo CAD do implante final. Essa abordagem já é padrão em serviços avançados de neurocirurgia e CBMF, com empresas como Materialise, Meticuly e, no Brasil, o Instituto Gandu.
+      <span class="fig-source">Fonte: Marbacher et al. <em>3D Printing in Medicine</em> (Springer) 2023, CC-BY 4.0. DOI: 10.1186/s41205-023-00183-x</span>
+    </figcaption>
+  </figure>
+
+  <p>A reconstrução craniana é hoje a aplicação <strong>clínica mais madura</strong> da impressão 3D em ortopedia e correlatas. No Brasil, o <strong>Instituto Gandu (Pernambuco)</strong>, fundado por engenheiros biomédicos em parceria com o SUS, já produziu mais de 150 implantes cranianos personalizados em PEEK (polietereterketona) e PMMA. Em serviços particulares, Materialise (Bélgica), Meticuly (Tailândia) e OneTitanium (Austrália) oferecem implantes em titânio.</p>
+
+  <h2>7.3 · Mandíbula bioimpressa — o caso Belga de 2012</h2>
+  <p>Em 2012, no hospital Orbis Medical Center (Holanda), uma paciente de 83 anos com osteomielite mandibular recebeu uma mandíbula completa impressa em titânio por sinterização a laser (LayerWise/Materialise). O implante pesava 108 gramas, foi personalizado a partir de TC, e a cirurgia durou 4 horas — contra 20+ horas de uma reconstrução por microcirurgia convencional. A paciente teve alta em 4 dias.</p>
+
+  <blockquote>
+    "Para pacientes idosos que não suportariam uma cirurgia reconstrutiva longa, o implante impresso 3D é uma alternativa que literalmente salva vidas."
+    <cite>Jules Poukens, cirurgião responsável · 2012</cite>
+  </blockquote>
+
+  <h2>7.4 · Humacyte — vasos sanguíneos bioimpressos</h2>
+  <p>A <strong>Humacyte</strong> (EUA) desenvolveu o Human Acellular Vessel (HAV), um vaso sanguíneo bioengenheirado produzido in vitro a partir de células musculares lisas humanas cultivadas sobre scaffold de PGA. Após 8 semanas de cultura em bioreator, o scaffold biodegrada e o vaso resultante é descelularizado (ficando apenas MEC). Já implantado em 100+ pacientes com doença renal terminal como acesso arteriovenoso para hemodiálise, com taxas de patência superiores a enxertos protéticos convencionais.</p>
+
+  <h2>7.5 · Panorama brasileiro</h2>
+
+  <figure>
+    <img src="../../public/library/ebook-assets/ai-brazil-hubs.jpg" alt="Hubs brasileiros de biofabricação">
+    <figcaption>
+      <span class="fig-label">Figura 7.2</span>
+      Principais centros de pesquisa e inovação em biofabricação ortopédica no Brasil, com polos ativos em São Paulo (USP, Unicamp, IPT, Quantis), Rio de Janeiro (COPPE, INMETRO), Rio Grande do Sul (UFRGS, PUCRS, Hospital de Clínicas de Porto Alegre), Minas Gerais (UFMG, CIT Senai) e Pernambuco (Instituto Gandu, UFPE).
+      <span class="fig-source">Fonte: Ilustração original Quantis Biotechnology, 2026.</span>
+    </figcaption>
+  </figure>
+
+  <p>O Brasil tem produção científica expressiva na área. Alguns destaques:</p>
+  <ul>
+    <li><strong>USP / IPEN (SP):</strong> grupo da Dra. Olga Zazuco, pioneira em biomateriais cerâmicos para osso.</li>
+    <li><strong>CIT SENAI (MG + SP):</strong> aplicação industrial de bioimpressão com apoio EMBRAPII.</li>
+    <li><strong>Instituto Gandu (PE):</strong> implantes cranianos personalizados no SUS.</li>
+    <li><strong>UFRGS + PUCRS (RS):</strong> grupos de cartilagem e músculo bioimpresso.</li>
+    <li><strong>Quantis Biotechnology (SP):</strong> plataforma QMatrix de esferoides para R&D e drug discovery; BIA Academy educacional.</li>
+  </ul>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- CAPÍTULO 8 · AVALIAÇÃO PRÉ-CLÍNICA                                    -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section class="chapter-opener">
+  <img class="chapter-opener-bg" src="../../public/library/ebook-assets/lit-voronoi-scaffold.jpg" alt="">
+  <div class="chapter-opener-overlay"></div>
+  <div class="chapter-opener-content">
+    <div class="ch-num">08</div>
+    <div class="ch-label">Capítulo oito</div>
+    <h2 class="ch-title">Avaliação pré-clínica em osso</h2>
+    <p class="ch-standfirst">
+      μCT, histomorfometria, ensaios mecânicos de três pontos. O painel mínimo de caracterização
+      que qualquer projeto ortopédico precisa ter — e os números que separam publicação de rejeição.
+    </p>
+  </div>
+  <div class="ch-footer">
+    <img src="../../public/brand/quantis-logo-horizontal.png" alt="Quantis">
+    <span>Biofabricação em Ortopedia · Cap. 8</span>
+  </div>
+</section>
+
+<section class="chapter">
+  <h2>8.1 · Micro-CT (μCT) — o padrão-ouro da arquitetura 3D</h2>
+  <p class="intro-dropcap">A tomografia computadorizada de alta resolução (micro-CT ou μCT) tornou-se a <strong>técnica mandatória</strong> para caracterizar scaffolds ósseos e implantes bioimpressos, tanto in vitro quanto in vivo. Resolução típica: 5-50 μm/voxel, suficiente para visualizar poros individuais e, após implante, novo osso formado dentro do scaffold. Equipamentos de referência: Scanco µCT 50, Bruker SkyScan 1172, PerkinElmer Quantum GX2.</p>
+
+  <p>Métricas-chave extraídas automaticamente pelo software CTAn/CTVox/Fiji BoneJ:</p>
+  <ul>
+    <li><strong>BV/TV (Bone Volume / Total Volume):</strong> fração do volume ocupado por tecido mineralizado. Valores típicos: osso cortical &gt;90%, trabecular 10-30%. Em regeneração: aumento progressivo indica sucesso.</li>
+    <li><strong>Tb.Th (Trabecular Thickness):</strong> espessura média das trabéculas, em μm. Valores normais: 100-250 μm.</li>
+    <li><strong>Tb.N (Trabecular Number):</strong> número de trabéculas por mm.</li>
+    <li><strong>Tb.Sp (Trabecular Separation):</strong> espaço médio entre trabéculas.</li>
+    <li><strong>Conn.D (Connectivity Density):</strong> grau de interconectividade da rede trabecular.</li>
+  </ul>
+
+  <h2>8.2 · Histologia e histomorfometria</h2>
+  <p>Apesar de μCT dar quantificação volumétrica, a <strong>histologia é indispensável</strong> para avaliar qualidade do osso neoformado: é osso lamelar maduro ou osso imaturo (woven)? Há vascularização? Reação inflamatória? Fibrose?</p>
+
+  <table>
+    <thead>
+      <tr><th>Coloração</th><th>Alvo</th><th>Interpretação</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>H&amp;E</td><td>Morfologia geral</td><td>Osso rosa, cartilagem azul-claro, fibrose azul-cinza</td></tr>
+      <tr><td>Tricrômio de Masson</td><td>Colágeno</td><td>Colágeno azul; útil para fibrose vs osso maduro</td></tr>
+      <tr><td>Von Kossa</td><td>Mineralização</td><td>Depósitos de cálcio ficam pretos</td></tr>
+      <tr><td>Alizarin Red S</td><td>Cálcio</td><td>Vermelho-alaranjado onde há cálcio</td></tr>
+      <tr><td>Safranin O</td><td>Proteoglicanos</td><td>Cartilagem fica vermelha intensa</td></tr>
+      <tr><td>Picrossirius Red</td><td>Colágeno I vs III (polarização)</td><td>Colágeno I: amarelo-laranja; III: verde</td></tr>
+    </tbody>
+  </table>
+
+  <h2>8.3 · Imunohistoquímica (IHC) e marcadores</h2>
+  <p>Marcadores proteicos essenciais para validação de regeneração óssea:</p>
+  <ul>
+    <li><strong>Osteocalcina (OCN):</strong> expressa por osteoblastos maduros — marcador de osso formado.</li>
+    <li><strong>Osteopontina (OPN):</strong> remodelamento ativo.</li>
+    <li><strong>RUNX2:</strong> fator de transcrição mestre da osteogênese.</li>
+    <li><strong>Colágeno tipo I:</strong> matriz óssea madura.</li>
+    <li><strong>CD31 (PECAM-1):</strong> endotélio — avalia vascularização.</li>
+  </ul>
+
+  <h2>8.4 · Ensaios mecânicos</h2>
+  <p>Para scaffolds ortopédicos, os três ensaios obrigatórios são:</p>
+  <ol>
+    <li><strong>Compressão não-confinada:</strong> amostra cilíndrica (10×10 mm) comprimida a 1 mm/min até ruptura. Mede módulo de Young e tensão de ruptura.</li>
+    <li><strong>Flexão de três pontos:</strong> para scaffolds alongados. Simula carga em ossos longos.</li>
+    <li><strong>Fadiga cíclica:</strong> 1-10⁶ ciclos a 50-80% da tensão de ruptura. Simula o uso ao longo de meses-anos.</li>
+  </ol>
+
+  <div class="callout">
+    <div class="callout-title">Padrão regulatório (FDA e ANVISA)</div>
+    <p style="margin-bottom: 0;">Para submissão de dossiê regulatório, os ensaios mecânicos devem seguir as normas: <strong>ASTM F2150-13</strong> (caracterização mecânica de materiais ósseos), <strong>ASTM F2529-13</strong> (determinação de porosidade), <strong>ISO 23317</strong> (biomineralização em SBF — simulated body fluid).</p>
+  </div>
+
+  <h2>8.5 · Modelos animais pré-clínicos</h2>
+  <table>
+    <thead>
+      <tr><th>Modelo</th><th>Defeito típico</th><th>Vantagens</th><th>Limitações</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Rato (calvária)</td><td>5 mm diâmetro</td><td>Barato, muitos; defeito crítico bem definido</td><td>Metabolismo ósseo diferente do humano</td></tr>
+      <tr><td>Coelho (tíbia)</td><td>5-10 mm</td><td>Osso maior, próximo do humano</td><td>Custo médio; precisa CEUA</td></tr>
+      <tr><td>Cão (fêmur)</td><td>15-25 mm</td><td>Mecânica humana-like</td><td>Alto custo; questões éticas</td></tr>
+      <tr><td>Ovelha (tíbia)</td><td>20-50 mm</td><td>Padrão regulatório para FDA/CE</td><td>Alto custo; infraestrutura rural</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- CAPÍTULO 9 · REGULATÓRIO                                              -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section class="chapter-opener">
+  <img class="chapter-opener-bg" src="../../public/library/ebook-assets/ai-trl-timeline.jpg" alt="">
+  <div class="chapter-opener-overlay"></div>
+  <div class="chapter-opener-content">
+    <div class="ch-num">09</div>
+    <div class="ch-label">Capítulo nove</div>
+    <h2 class="ch-title">Caminho regulatório — ANVISA, FDA, GMP</h2>
+    <p class="ch-standfirst">
+      TRL 1 ao 9. Classes de risco. ISO 13485 e ISO 10993. O que separa um projeto de laboratório
+      de um produto que chega ao paciente.
+    </p>
+  </div>
+  <div class="ch-footer">
+    <img src="../../public/brand/quantis-logo-horizontal.png" alt="Quantis">
+    <span>Biofabricação em Ortopedia · Cap. 9</span>
+  </div>
+</section>
+
+<section class="chapter">
+  <h2>9.1 · Technology Readiness Level (TRL)</h2>
+
+  <figure>
+    <img src="../../public/library/ebook-assets/ai-trl-timeline.jpg" alt="TRL timeline">
+    <figcaption>
+      <span class="fig-label">Figura 9.1</span>
+      Escala TRL de 1 a 9 adaptada para dispositivos médicos de biofabricação. TRL 1-3: pesquisa básica e prova de conceito em bancada. TRL 4-5: validação in vitro + modelos animais pequenos. TRL 6-7: ensaios em animais grandes e protótipos pré-clínicos. TRL 8-9: ensaios clínicos em humanos e aprovação regulatória para comercialização. A maior parte dos projetos acadêmicos vive em TRL 2-4; para chegar a TRL 5+ é necessário colaboração com indústria, CRO e agência regulatória.
+      <span class="fig-source">Fonte: Ilustração original Quantis Biotechnology, adaptado da NASA/FDA, 2026.</span>
+    </figcaption>
+  </figure>
+
+  <h2>9.2 · Classes de risco de dispositivos médicos</h2>
+  <table>
+    <thead>
+      <tr><th>Classe (ANVISA)</th><th>Equivalente FDA</th><th>Exemplo ortopédico</th><th>Via de aprovação</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>I</td><td>Class I</td><td>Scaffold de PCL puro para pesquisa</td><td>Notificação</td></tr>
+      <tr><td>II</td><td>Class II</td><td>Scaffold HA/PCL para enxerto ósseo</td><td>Registro + GMP</td></tr>
+      <tr><td>III</td><td>Class III (510(k))</td><td>Scaffold bioativo com BMP</td><td>Registro + GMP + ensaio clínico</td></tr>
+      <tr><td>IV</td><td>Class III (PMA)</td><td>Scaffold com células autólogas (ATMP)</td><td>Registro + GMP + ensaio clínico multicêntrico</td></tr>
+    </tbody>
+  </table>
+
+  <h2>9.3 · Normas essenciais</h2>
+  <ul>
+    <li><strong>ISO 13485 — Sistema de Gestão da Qualidade</strong> para fabricantes de dispositivos médicos. Obrigatória para registro ANVISA Classe II+.</li>
+    <li><strong>ISO 10993 (série) — Avaliação biológica de dispositivos médicos.</strong> Ensaios obrigatórios: 10993-5 (citotoxicidade), 10993-6 (implantação local), 10993-10 (irritação/sensibilização), 10993-11 (toxicidade sistêmica).</li>
+    <li><strong>ISO 14971 — Gestão de riscos</strong> aplicada a dispositivos médicos.</li>
+    <li><strong>ASTM F2150-13:</strong> caracterização de scaffolds porosos.</li>
+    <li><strong>ASTM F3335-20:</strong> termos padronizados para engenharia tecidual.</li>
+    <li><strong>BPF/GMP (Boas Práticas de Fabricação):</strong> infraestrutura, pessoal, controles de processo, documentação.</li>
+  </ul>
+
+  <h2>9.4 · O caminho FDA — 510(k) × PMA</h2>
+  <p>Nos EUA, dispositivos médicos têm duas vias principais de aprovação:</p>
+  <ul>
+    <li><strong>510(k):</strong> para dispositivos "substancialmente equivalentes" a um já aprovado. Prazo típico: 6-12 meses. Custo: US$ 50-200k. Scaffolds PCL/HA sem células, por exemplo, podem se qualificar.</li>
+    <li><strong>PMA (Premarket Approval):</strong> para dispositivos sem precedente ou de maior risco (Classe III). Requer ensaio clínico pivotal. Prazo: 3-7 anos. Custo: US$ 10-100 milhões. Scaffolds com células vivas ou fatores de crescimento vão por aqui.</li>
+  </ul>
+
+  <h2>9.5 · O caminho ANVISA</h2>
+  <p>No Brasil, a Resolução RDC 751/2022 regula dispositivos médicos. Para produtos de terapia celular avançada (ATMP), aplica-se a RDC 338/2020. Pontos-chave:</p>
+  <ul>
+    <li>Fabricante precisa ter certificado de BPF ANVISA.</li>
+    <li>Produtos Classe III/IV requerem Autorização de Pesquisa Clínica (APC).</li>
+    <li>CEP/CONEP são obrigatórios para qualquer uso em humanos.</li>
+    <li>Para produtos autólogos manipulados em ponto-de-cuidado, há regulação específica.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="callout-title">Lição histórica · O caso Macchiarini (2008-2016)</div>
+    <p style="margin-bottom: 0;">Paolo Macchiarini implantou traqueias sintéticas em 8 pacientes no Karolinska Institute entre 2008-2014, pulando ensaios pré-clínicos e processos regulatórios. Sete pacientes morreram. A investigação do New England Journal of Medicine (2016) revelou fraude científica, violação de ética e ausência de aprovação regulatória adequada. Esse caso virou o referencial do que <em>não fazer</em> em medicina regenerativa.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- CAPÍTULO 10 · GUIA PRÁTICO                                            -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section class="chapter-opener">
+  <img class="chapter-opener-bg" src="../../public/library/ebook-assets/ai-pipeline-clinical.jpg" alt="">
+  <div class="chapter-opener-overlay"></div>
+  <div class="chapter-opener-content">
+    <div class="ch-num">10</div>
+    <div class="ch-label">Capítulo dez</div>
+    <h2 class="ch-title">Como um ortopedista começa</h2>
+    <p class="ch-standfirst">
+      Guia prático: parceria laboratório-clínica, pedido de produto sob medida, timeline realista,
+      custos, armadilhas comuns. O passo-a-passo para quem quer entrar no campo hoje.
+    </p>
+  </div>
+  <div class="ch-footer">
+    <img src="../../public/brand/quantis-logo-horizontal.png" alt="Quantis">
+    <span>Biofabricação em Ortopedia · Cap. 10</span>
+  </div>
+</section>
+
+<section class="chapter">
+  <h2>10.1 · O pipeline paciente-específico</h2>
+
+  <figure>
+    <img src="../../public/library/ebook-assets/ai-pipeline-clinical.jpg" alt="Pipeline clínico">
+    <figcaption>
+      <span class="fig-label">Figura 10.1</span>
+      Fluxo completo de um procedimento ortopédico com scaffold bioimpresso paciente-específico. Da tomografia do defeito à cirurgia, o pipeline tem 5 etapas essenciais e envolve múltiplos profissionais: ortopedista, radiologista, engenheiro biomédico, bioengenheiro de laboratório, biologista celular (quando há células), e equipe cirúrgica.
+      <span class="fig-source">Fonte: Ilustração original Quantis Biotechnology, 2026.</span>
+    </figcaption>
+  </figure>
+
+  <h2>10.2 · Timeline realista</h2>
+  <table>
+    <thead>
+      <tr><th>Fase</th><th>Duração típica</th><th>Responsável principal</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>TC do defeito + planejamento cirúrgico</td><td>1 semana</td><td>Ortopedista + radiologista</td></tr>
+      <tr><td>Segmentação CAD + validação com cirurgião</td><td>1-2 semanas</td><td>Engenheiro biomédico</td></tr>
+      <tr><td>Impressão + esterilização + QC</td><td>1-2 semanas</td><td>Laboratório/empresa de biofabricação</td></tr>
+      <tr><td>Entrega + agendamento cirúrgico</td><td>1 semana</td><td>Equipe clínica</td></tr>
+      <tr><td><strong>Total (sem células)</strong></td><td><strong>4-6 semanas</strong></td><td></td></tr>
+      <tr><td>Adicional para scaffold com células autólogas</td><td>+6-8 semanas (expansão)</td><td>Laboratório de terapia celular</td></tr>
+    </tbody>
+  </table>
+
+  <h2>10.3 · Custos típicos (ortopedia, Brasil 2026)</h2>
+  <table>
+    <thead>
+      <tr><th>Item</th><th>Custo (R$)</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>TC de planejamento</td><td>400-800</td></tr>
+      <tr><td>Segmentação CAD + modelagem</td><td>1.500-5.000</td></tr>
+      <tr><td>Scaffold PCL/HA personalizado (até 50 cm³)</td><td>3.000-15.000</td></tr>
+      <tr><td>Scaffold com β-TCP ou biovidro</td><td>5.000-25.000</td></tr>
+      <tr><td>Scaffold com células autólogas (ATMP)</td><td>30.000-100.000+</td></tr>
+      <tr><td>Esterilização validada + QC</td><td>1.000-3.000</td></tr>
+      <tr><td><strong>Procedimento completo (scaffold sem células)</strong></td><td><strong>8.000-30.000</strong></td></tr>
+    </tbody>
+  </table>
+
+  <h2>10.4 · Checklist do ortopedista</h2>
+  <div class="callout">
+    <div class="callout-title">Antes do primeiro caso</div>
+    <ol style="margin: 0;">
+      <li>Identificar laboratório ou empresa parceira com <strong>certificação ANVISA</strong>.</li>
+      <li>Visitar o laboratório; entender o fluxo de trabalho e QC.</li>
+      <li>Começar com <strong>casos de baixa carga mecânica</strong> (calota, mandíbula, maxila) antes de ossos longos.</li>
+      <li>Documentar o paciente: TAC pré, planejamento CAD, scaffold produzido, cirurgia (fotos), TAC pós, acompanhamento ≥1 ano.</li>
+      <li>Submeter ao Comitê de Ética local (CEP) mesmo se o produto for registrado — primeiros casos geralmente são protocolos de investigação clínica.</li>
+    </ol>
+  </div>
+
+  <h2>10.5 · Armadilhas comuns</h2>
+  <ol>
+    <li><strong>Esperar que o scaffold substitua o osso instantaneamente.</strong> Regeneração óssea leva 6-18 meses; o scaffold é um guia, não um substituto imediato.</li>
+    <li><strong>Ignorar a biomecânica.</strong> Scaffold com módulo errado = soltura ou stress shielding.</li>
+    <li><strong>Pular esterilização validada.</strong> PCL não autoclava; precisa ETO ou gama 25 kGy.</li>
+    <li><strong>Usar como "mágica" para pacientes sem indicação.</strong> Scaffold personalizado não resolve má-união por técnica cirúrgica inadequada.</li>
+    <li><strong>Prometer resultado antes de 1 ano.</strong> A integração óssea é progressiva; TAC em 3 meses pode mostrar pouca formação.</li>
+  </ol>
+
+  <blockquote>
+    "A biofabricação não substitui o cirurgião — amplifica o que ele pode fazer. O ortopedista que entende os princípios do biomaterial e da célula entrega resultados que a cirurgia tradicional não consegue."
+    <cite>Dietmar Hutmacher · Queensland University of Technology</cite>
+  </blockquote>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- ANEXOS                                                                -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section class="chapter">
+  <h2>Anexo A · Glossário técnico</h2>
+  <table>
+    <tbody>
+      <tr><td><strong>ADSC</strong></td><td>Adipose-Derived Stem Cells — células-tronco mesenquimais derivadas de tecido adiposo</td></tr>
+      <tr><td><strong>ATMP</strong></td><td>Advanced Therapy Medicinal Product — produto de terapia avançada (células, genes, tecidos engenheirados)</td></tr>
+      <tr><td><strong>BCP</strong></td><td>Biphasic Calcium Phosphate — mistura HA + β-TCP, equilibra bioatividade e cinética</td></tr>
+      <tr><td><strong>BMP-2</strong></td><td>Bone Morphogenetic Protein 2 — fator de crescimento osteoindutor</td></tr>
+      <tr><td><strong>BMU</strong></td><td>Basic Multicellular Unit — unidade do remodelamento ósseo</td></tr>
+      <tr><td><strong>BV/TV</strong></td><td>Bone Volume / Total Volume — fração mineralizada em μCT</td></tr>
+      <tr><td><strong>FDM/FFF</strong></td><td>Fused Deposition Modeling / Fused Filament Fabrication — impressão 3D por extrusão de filamento termoplástico</td></tr>
+      <tr><td><strong>GelMA</strong></td><td>Gelatin Methacryloyl — gelatina modificada, foto-reticulável, bioink popular</td></tr>
+      <tr><td><strong>GMP / BPF</strong></td><td>Good Manufacturing Practices / Boas Práticas de Fabricação</td></tr>
+      <tr><td><strong>HA</strong></td><td>Hydroxyapatite — Ca₁₀(PO₄)₆(OH)₂, fase mineral do osso</td></tr>
+      <tr><td><strong>HUVEC</strong></td><td>Human Umbilical Vein Endothelial Cells — células endoteliais para pré-vascularização</td></tr>
+      <tr><td><strong>iPSC</strong></td><td>induced Pluripotent Stem Cells — células-tronco pluripotentes induzidas (Yamanaka 2006)</td></tr>
+      <tr><td><strong>MSC</strong></td><td>Mesenchymal Stem Cells — células-tronco mesenquimais</td></tr>
+      <tr><td><strong>μCT</strong></td><td>Micro-Computed Tomography — tomografia de alta resolução para scaffolds</td></tr>
+      <tr><td><strong>PCL</strong></td><td>Polycaprolactone — polímero sintético biodegradável</td></tr>
+      <tr><td><strong>PLGA</strong></td><td>Poly(lactic-co-glycolic acid) — copolímero biodegradável ajustável</td></tr>
+      <tr><td><strong>SCA / ACI</strong></td><td>Suspensão/Autologous Chondrocyte Implantation — implante de condrócitos autólogos</td></tr>
+      <tr><td><strong>SOX9 / RUNX2</strong></td><td>Fatores de transcrição mestres de condrogênese e osteogênese, respectivamente</td></tr>
+      <tr><td><strong>β-TCP</strong></td><td>β-Tricalcium Phosphate — Ca₃(PO₄)₂, cerâmica reabsorvível</td></tr>
+      <tr><td><strong>TPMS</strong></td><td>Triply Periodic Minimal Surface — superfície mínima periódica (gyroid, Schwarz, diamond)</td></tr>
+      <tr><td><strong>TRL</strong></td><td>Technology Readiness Level — escala 1-9 de maturidade tecnológica</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Anexo B · Referências essenciais</h2>
+  <div class="two-col">
+    <div class="ref-card">
+      <div class="ref-author">Hutmacher DW · 2000</div>
+      Scaffolds in tissue engineering bone and cartilage.
+      <div class="ref-journal">Biomaterials 21(24):2529-2543</div>
+      <span class="ref-doi">DOI: 10.1016/S0142-9612(00)00121-6</span>
+    </div>
+    <div class="ref-card">
+      <div class="ref-author">Loh QL, Choong C · 2013</div>
+      Three-dimensional scaffolds for tissue engineering applications: role of porosity and pore size.
+      <div class="ref-journal">Tissue Eng Part B Rev 19(6):485-502</div>
+      <span class="ref-doi">DOI: 10.1089/ten.teb.2012.0437</span>
+    </div>
+    <div class="ref-card">
+      <div class="ref-author">Hollister SJ · 2005</div>
+      Porous scaffold design for tissue engineering.
+      <div class="ref-journal">Nature Materials 4(7):518-524</div>
+      <span class="ref-doi">DOI: 10.1038/nmat1421</span>
+    </div>
+    <div class="ref-card">
+      <div class="ref-author">Williams DF · 2008</div>
+      On the mechanisms of biocompatibility.
+      <div class="ref-journal">Biomaterials 29(20):2941-2953</div>
+      <span class="ref-doi">DOI: 10.1016/j.biomaterials.2008.04.023</span>
+    </div>
+    <div class="ref-card">
+      <div class="ref-author">Discher DE et al · 2005</div>
+      Tissue cells feel and respond to the stiffness of their substrate.
+      <div class="ref-journal">Science 310:1139-1143</div>
+      <span class="ref-doi">DOI: 10.1126/science.1116995</span>
+    </div>
+    <div class="ref-card">
+      <div class="ref-author">Jain RK · 2005</div>
+      Engineering vascularized tissue.
+      <div class="ref-journal">Nature Materials / Nat Biotechnol</div>
+      <span class="ref-doi">DOI: 10.1038/nmat1421 (vascular review)</span>
+    </div>
+    <div class="ref-card">
+      <div class="ref-author">Dimitriou R et al · 2011</div>
+      Complications following autologous bone graft harvesting from the iliac crest.
+      <div class="ref-journal">BMC Medicine 9:66</div>
+      <span class="ref-doi">DOI: 10.1186/1741-7015-9-66</span>
+    </div>
+    <div class="ref-card">
+      <div class="ref-author">Zopf DA et al · 2013</div>
+      Bioresorbable airway splint created with a three-dimensional printer.
+      <div class="ref-journal">NEJM 368(21):2043-2045</div>
+      <span class="ref-doi">DOI: 10.1056/NEJMc1206319</span>
+    </div>
+    <div class="ref-card">
+      <div class="ref-author">Yánez A et al · 2018</div>
+      Gyroid porous titanium structures: A versatile solution to be used as scaffolds in bone defect reconstruction.
+      <div class="ref-journal">Mater Sci Eng C 97:1123-1133</div>
+      <span class="ref-doi">DOI: 10.1016/j.msec.2017.11.037</span>
+    </div>
+    <div class="ref-card">
+      <div class="ref-author">Rouwkema J et al · 2008</div>
+      Vascularization in tissue engineering.
+      <div class="ref-journal">Trends Biotechnol 26(8):434-441</div>
+      <span class="ref-doi">DOI: 10.1016/j.tibtech.2008.04.009</span>
+    </div>
+    <div class="ref-card">
+      <div class="ref-author">Siddiqui JA, Partridge NC · 2016</div>
+      Physiological bone remodeling.
+      <div class="ref-journal">Physiology 31(3):233-245 · reproduzido em Bone Research 2022</div>
+      <span class="ref-doi">DOI: 10.1038/s41413-022-00219-8</span>
+    </div>
+    <div class="ref-card">
+      <div class="ref-author">Groll J et al · 2018</div>
+      A definition of bioinks and their distinction from biomaterial inks.
+      <div class="ref-journal">Biofabrication 11(1):013001</div>
+      <span class="ref-doi">DOI: 10.1088/1758-5090/aaec52</span>
+    </div>
+  </div>
+
+  <h2>Anexo C · Pesquisadores de referência</h2>
+  <div class="pesquisador"><strong>Dietmar Hutmacher</strong> · Queensland University of Technology (Austrália). Pioneiro mundial em scaffolds PCL/HA para regeneração óssea. Autor de &gt;500 papers. Também fundou a Osteopore, que exporta scaffolds para 20+ países.</div>
+  <div class="pesquisador"><strong>Anthony Atala</strong> · Wake Forest Institute for Regenerative Medicine (EUA). Primeiro a implantar tecido bioengenheirado em humano (bexiga, 1999). Hoje lidera programa militar de bioimpressão em zona de combate.</div>
+  <div class="pesquisador"><strong>Jennifer Lewis</strong> · Harvard SEAS (EUA). Inventora de bioinks sacrificiais (Pluronic F127) para vascularização. Fundadora da Voxel8.</div>
+  <div class="pesquisador"><strong>Marcy Zenobi-Wong</strong> · ETH Zurich (Suíça). Referência em bioimpressão de cartilagem articular com condrócitos autólogos.</div>
+  <div class="pesquisador"><strong>Larry Hench †</strong> · University of Florida (EUA). Descobriu o Bioglass® 45S5 em 1969 — pai da bioatividade cerâmica.</div>
+  <div class="pesquisador"><strong>Hala Zreiqat</strong> · University of Sydney (Austrália). Scaffolds cerâmicos avançados (Baghdadite). Prêmio Prime Minister's Prize.</div>
+  <div class="pesquisador"><strong>Lorenzo Moroni</strong> · Maastricht University (Holanda). Autor de guidelines internacionais para reporting em biofabricação.</div>
+  <div class="pesquisador"><strong>Jürgen Groll</strong> · Universidade de Würzburg (Alemanha). Editor-chefe da Biofabrication; padronização de bioinks.</div>
+  <div class="pesquisador"><strong>Luiz Bertassoni</strong> · OHSU (EUA, brasileiro). Vascularização em microfluídica, osteoimunomodulação.</div>
+  <div class="pesquisador"><strong>Olga Zazuco Higa</strong> · IPEN/CNEN (SP, Brasil). Biomateriais cerâmicos de referência no Brasil.</div>
+  <div class="pesquisador"><strong>Janaina Dernowsek</strong> · Quantis Biotechnology (SP, Brasil). Plataforma QMatrix de esferoides para osso e biofabricação em ortopedia; fundadora da BIA Academy.</div>
+
+  <h2>Anexo D · Congressos e sociedades científicas</h2>
+  <h3>Internacionais</h3>
+  <ul>
+    <li><strong>TERMIS World Congress</strong> — triennial. A referência mundial em engenharia tecidual.</li>
+    <li><strong>International Conference on Biofabrication (ISBF)</strong> — anual. Comunidade específica de biofabricação.</li>
+    <li><strong>ORS Annual Meeting (Orthopaedic Research Society)</strong> — anual. Pesquisa ortopédica, incluindo scaffolds.</li>
+    <li><strong>AAOS Annual Meeting</strong> — anual. Academia Americana de Cirurgiões Ortopédicos; sessões crescentes de bioimpressão.</li>
+    <li><strong>eCM Davos</strong> — anual (Suíça). European Cells &amp; Materials. Foco em osso e cartilagem.</li>
+  </ul>
+
+  <h3>Nacionais / Latino-americanos</h3>
+  <ul>
+    <li><strong>SBB — Sociedade Brasileira de Biomateriais, Engenharia Tecidual e Órgãos Artificiais</strong> — congresso anual.</li>
+    <li><strong>CBEB — Congresso Brasileiro de Engenharia Biomédica</strong> — bianual.</li>
+    <li><strong>SBOT — Sociedade Brasileira de Ortopedia e Traumatologia</strong> — congresso anual.</li>
+    <li><strong>SBCBMF — Sociedade Brasileira de Cirurgia Bucomaxilofacial</strong> — reunião anual.</li>
+    <li><strong>SLABO — Sociedade Latinoamericana de Biomateriales, Ingeniería de Tejidos y Órganos Artificiales</strong>.</li>
+  </ul>
+
+  <h3>Periódicos de referência</h3>
+  <ul>
+    <li><strong>Biofabrication</strong> (IOP) · <strong>Biomaterials</strong> (Elsevier) · <strong>Acta Biomaterialia</strong> · <strong>Advanced Healthcare Materials</strong> · <strong>Tissue Engineering Part A/B/C</strong> · <strong>Bone Research</strong> (Nature) · <strong>Journal of Orthopaedic Research</strong> · <strong>Journal of Bone and Mineral Research</strong>.</li>
+  </ul>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- CONTRACAPA                                                            -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section class="back-cover">
+  <div class="back-cover-content">
+    <div>
+      <h2>Quer <em>aplicar</em> isso em seus pacientes?</h2>
+      <p>A <span style="color: var(--q-gold); font-weight: 600;">BIA Academy</span> é a primeira plataforma de ensino 100% online, em português, dedicada à biofabricação aplicada à saúde humana. 12 módulos, aulas gravadas, mentoria com especialistas, acesso à plataforma BIA (assistente de IA especializado em biofabricação) e trilha prática até você projetar seu primeiro scaffold paciente-específico.</p>
+      <div class="back-cta">Comece sua jornada</div>
+      <div class="back-url">biaquantis.bio/academy</div>
+    </div>
+    <div class="back-cover-footer">
+      <img src="../../public/brand/quantis-logo-horizontal.png" alt="Quantis">
+      <div class="copy">
+        © 2026 Quantis Biotechnology<br>
+        Where human biology meets precision fabrication<br>
+        contato@biaquantis.bio
+      </div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
