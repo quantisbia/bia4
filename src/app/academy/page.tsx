@@ -45,6 +45,7 @@ const PRICE_BRL = 2375
 const FEATURED_BRINDE = getFeaturedWhitePaper()
 // R13.15.2 · E-books agora são EXCLUSIVOS para alunos matriculados — viram
 // atrativo da matrícula. Também mantemos os open-access caso existam no futuro.
+// R13.15.3 · Force rebuild — e-book continuava aparecendo como gratuito em prod.
 const FEATURED_EBOOKS = getOpenAccessEbooks()
 const STUDENT_ONLY_EBOOKS = getStudentOnlyEbooks()
 const PRICE_BRL_FORMATTED = PRICE_BRL.toLocaleString("pt-BR", {

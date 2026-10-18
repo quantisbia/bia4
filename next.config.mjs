@@ -81,6 +81,14 @@ const nextConfig = {
         destination: "/dashboard/bioprint",
         permanent: true,
       },
+      // R13.15.3 · PDF do e-book saiu de /public/library/ e virou protegido.
+      // Qualquer link antigo (compartilhado, cacheado em CDN, etc.) é
+      // redirecionado para a rota autenticada /api/library/download/[id].
+      {
+        source: "/library/ebook-biofabricacao-ortopedia-2026.pdf",
+        destination: "/api/library/download/ebook-biofabricacao-ortopedia-2026",
+        permanent: true,
+      },
     ]
   },
 
