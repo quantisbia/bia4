@@ -37,10 +37,12 @@ import { isSuperAdmin } from "@/lib/auth/admin"
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 
-type RouteParams = { params: Promise<{ id: string }> }
+// R13.15.6 · Next 14.2: params é objeto síncrono, não Promise.
+// (A assinatura Promise só vale em Next 15+)
+type RouteParams = { params: { id: string } }
 
 export async function GET(req: NextRequest, { params }: RouteParams) {
-  const { id } = await params
+  const { id } = params
 
   // ── (1) Autenticação ─────────────────────────────────────────
   const session = await auth()
