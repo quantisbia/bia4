@@ -6,6 +6,13 @@ const nextConfig = {
     // Sandbox com RAM limitada (~1GB): desliga workers paralelos do webpack/build
     workerThreads: false,
     cpus: 1,
+    // R13.15.2 · Inclui /private-library/ no bundle serverless da Vercel.
+    // Esses arquivos ficam FORA de /public (não são servidos como estáticos)
+    // e são lidos via fs.readFile() pela rota /api/library/download/[id].
+    // Sem este include, o Vercel não copia o PDF para o bundle da função.
+    outputFileTracingIncludes: {
+      "/api/library/download/**": ["./private-library/**/*"],
+    },
   },
 
   // Build em sandbox com RAM limitada (~1GB): pulamos lint/typecheck no build
