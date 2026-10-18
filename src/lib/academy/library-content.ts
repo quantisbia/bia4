@@ -32,9 +32,23 @@ export interface QuantisWhitePaper {
   abstract: string
   /** Palavras-chave (chips coloridos no card) */
   keywords: string[]
-  /** URL pública do PDF (relativa à raiz do site) */
+  /**
+   * URL pública do PDF (relativa à raiz do site).
+   * Para materiais `restrictedToStudents=true`, este path NUNCA deve existir
+   * em /public/library — o arquivo real fica em `/private-library/` e é
+   * servido via /api/library/download/[id] após checar matrícula.
+   * Para materiais open-access, pode apontar direto para /public/library/*.pdf.
+   */
   pdfUrl: string
-  /** URL de thumbnail/capa (opcional) — mostra na landing / card */
+  /**
+   * Path do arquivo PDF relativo à raiz do REPO (fora de /public).
+   * Obrigatório para materiais `restrictedToStudents=true`.
+   * Ex: "private-library/ebook-biofabricacao-ortopedia-2026.pdf"
+   * O servidor usa isso para ler o arquivo via fs.readFile e stream pro cliente.
+   */
+  privateFilePath?: string
+  /** URL de thumbnail/capa (opcional) — mostra na landing / card.
+   *  Capas PODEM ficar em /public (são só preview, não o conteúdo protegido). */
   coverUrl?: string
   /** Público-alvo específico (ex: "Médicos ortopedistas") */
   audience?: string
@@ -44,8 +58,19 @@ export interface QuantisWhitePaper {
   sizeMb: number
   /** Idioma — "pt-BR", "en-US" */
   language: "pt-BR" | "en-US" | "es-ES"
-  /** Se true, acessível sem login (brinde público) */
+  /**
+   * Se true, acessível sem login (brinde público via /library/*.pdf direto
+   * ou via /api/library/lead → redirect ao PDF após captura de lead).
+   */
   openAccess: boolean
+  /**
+   * Se true, SÓ é liberado para alunos BIA Academy com matrícula ACTIVE ou
+   * COMPLETED. É mutuamente exclusivo com `openAccess` — se um e-book é
+   * restricted, não pode ser open-access ao mesmo tempo.
+   * Enforcement: rota /api/library/download/[id] faz o check server-side,
+   * e o arquivo físico NÃO fica em /public (fica em /private-library).
+   */
+  restrictedToStudents?: boolean
   /** Citação formatada no padrão da Quantis */
   citation: string
   /** Patente relacionada (opcional) — ex: "BR102021019538-0A" */
@@ -125,15 +150,20 @@ export const QUANTIS_WHITE_PAPERS: QuantisWhitePaper[] = [
       "MSC",
       "pré-vascularização",
     ],
-    pdfUrl: "/library/ebook-biofabricacao-ortopedia-2026.pdf",
+    // pdfUrl aqui é o PATH PÚBLICO da rota protegida — NÃO é o arquivo real.
+    // A rota /api/library/download/ebook-biofabricacao-ortopedia-2026 autentica
+    // e serve o arquivo de /private-library/.
+    pdfUrl: "/api/library/download/ebook-biofabricacao-ortopedia-2026",
+    privateFilePath: "private-library/ebook-biofabricacao-ortopedia-2026.pdf",
     coverUrl: "/library/ebook-assets/ai-cover.jpg",
     pages: 53,
     sizeMb: 3.9,
     language: "pt-BR",
-    openAccess: true,
+    openAccess: false,         // ⬅ PRIVADO
+    restrictedToStudents: true, // ⬅ só alunos BIA Academy ACTIVE/COMPLETED
     citation:
       "Dernowsek, J. et al. Biofabricação em Ortopedia — do defeito ósseo crítico ao implante bioimpresso paciente-específico. " +
-      "BIA Academy / Quantis Biotechnology, 1ª ed., 2026, 53p. Disponível em: biaquantis.bio/library",
+      "BIA Academy / Quantis Biotechnology, 1ª ed., 2026, 53p. Exclusivo para alunos da BIA Academy — biaquantis.bio/academy",
   },
 ]
 
@@ -160,12 +190,50 @@ export function getFeaturedWhitePaper(): QuantisWhitePaper | undefined {
   )
 }
 
-/** Retorna apenas os e-books educacionais open-access */
+/** Retorna apenas os e-books educacionais open-access (sem a flag restrictedToStudents). */
 export function getOpenAccessEbooks(): QuantisWhitePaper[] {
-  return QUANTIS_WHITE_PAPERS.filter((wp) => wp.openAccess && wp.kind === "ebook")
+  return QUANTIS_WHITE_PAPERS.filter(
+    (wp) => wp.openAccess && wp.kind === "ebook" && !wp.restrictedToStudents,
+  )
 }
 
 /** Retorna todos os materiais open-access (white papers + ebooks) para a biblioteca interna */
 export function getAllOpenAccessMaterials(): QuantisWhitePaper[] {
   return QUANTIS_WHITE_PAPERS.filter((wp) => wp.openAccess)
+}
+
+/**
+ * R13.15.2 · Retorna e-books EXCLUSIVOS para alunos matriculados.
+ * Esses aparecem como "brinde da matrícula" na landing /academy (teaser) e
+ * como material completo na biblioteca interna /academy/(app)/library.
+ */
+export function getStudentOnlyEbooks(): QuantisWhitePaper[] {
+  return QUANTIS_WHITE_PAPERS.filter(
+    (wp) => wp.kind === "ebook" && wp.restrictedToStudents === true,
+  )
+}
+
+/**
+ * R13.15.2 · Busca material protegido por ID para a rota de download.
+ * Garante que só retorna se for restrictedToStudents=true E tiver privateFilePath.
+ * Rejeita se o material é open-access (deve usar o fluxo normal /library/*.pdf).
+ */
+export function getStudentOnlyMaterialById(id: string): QuantisWhitePaper | undefined {
+  const wp = QUANTIS_WHITE_PAPERS.find((m) => m.id === id)
+  if (!wp) return undefined
+  if (!wp.restrictedToStudents) return undefined
+  if (!wp.privateFilePath) return undefined
+  return wp
+}
+
+/**
+ * R13.15.2 · Lista TODOS os materiais acessíveis a quem tem matrícula ativa:
+ * - Open-access (white papers e e-books públicos)
+ * - Restritos a alunos (brindes da matrícula)
+ * Usado em /academy/(app)/library para alunos logados.
+ */
+export function getAllStudentAccessibleMaterials(): QuantisWhitePaper[] {
+  return QUANTIS_WHITE_PAPERS.filter(
+    (wp) => wp.openAccess || wp.restrictedToStudents === true,
+  )
 }

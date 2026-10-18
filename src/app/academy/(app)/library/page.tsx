@@ -342,6 +342,19 @@ export default async function LibraryPage({
                             Open Access
                           </span>
                         )}
+                        {wp.restrictedToStudents && (
+                          <span
+                            className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                            data-testid={`library-badge-student-only-${wp.id}`}
+                          >
+                            🎁 Brinde da matrícula
+                          </span>
+                        )}
+                        {wp.kind === "ebook" && (
+                          <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-300 border border-violet-500/30">
+                            E-book
+                          </span>
+                        )}
                       </div>
                       <h3 className="text-xl sm:text-2xl font-bold text-white leading-tight">
                         {wp.title}

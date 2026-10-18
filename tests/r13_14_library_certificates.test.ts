@@ -246,10 +246,20 @@ describe("R13.14 · library-content · QUANTIS_WHITE_PAPERS", () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
-  it("todos os pdfUrl apontam para /library/*.pdf", () => {
+  it("todos os pdfUrl apontam para /library/*.pdf (open-access) OU /api/library/download/ (restrito)", () => {
+    // R13.15.2 · Materiais restritos a alunos vão por rota autenticada
     for (const wp of QUANTIS_WHITE_PAPERS) {
-      expect(wp.pdfUrl.startsWith("/library/")).toBe(true)
-      expect(wp.pdfUrl.endsWith(".pdf")).toBe(true)
+      const isOpenAccessPath = wp.pdfUrl.startsWith("/library/") && wp.pdfUrl.endsWith(".pdf")
+      const isProtectedPath = wp.pdfUrl.startsWith("/api/library/download/")
+      expect(
+        isOpenAccessPath || isProtectedPath,
+        `Material ${wp.id} tem pdfUrl inválido: ${wp.pdfUrl}`,
+      ).toBe(true)
+      // Materiais restritos DEVEM ter privateFilePath
+      if (wp.restrictedToStudents) {
+        expect(wp.privateFilePath, `${wp.id} é restricted mas sem privateFilePath`).toBeTruthy()
+        expect(wp.privateFilePath!.startsWith("private-library/")).toBe(true)
+      }
     }
   })
 })

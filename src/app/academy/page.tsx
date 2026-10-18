@@ -43,8 +43,10 @@ const PRICE_BRL = 2375
 // Brinde público (open-access) — white paper em destaque na landing.
 // Resolvido fora do render porque esta página é "use client".
 const FEATURED_BRINDE = getFeaturedWhitePaper()
-// E-books educacionais open-access (R13.15 · Vol.1: Ortopedia)
+// R13.15.2 · E-books agora são EXCLUSIVOS para alunos matriculados — viram
+// atrativo da matrícula. Também mantemos os open-access caso existam no futuro.
 const FEATURED_EBOOKS = getOpenAccessEbooks()
+const STUDENT_ONLY_EBOOKS = getStudentOnlyEbooks()
 const PRICE_BRL_FORMATTED = PRICE_BRL.toLocaleString("pt-BR", {
   style: "currency",
   currency: "BRL",
@@ -512,8 +514,8 @@ export default function AcademyLandingPage() {
           </section>
       )}
 
-      {/* ── E-books educacionais ──────────────────────────── */}
-      {FEATURED_EBOOKS.length > 0 && (
+      {/* ── E-books exclusivos para alunos BIA Academy (R13.15.2) ── */}
+      {STUDENT_ONLY_EBOOKS.length > 0 && (
         <section
           id="ebooks"
           className="py-16 sm:py-20 px-4 sm:px-6 bg-gradient-to-b from-transparent via-violet-950/20 to-transparent"
@@ -522,31 +524,35 @@ export default function AcademyLandingPage() {
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-10">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-400/30 text-amber-300 text-xs font-semibold mb-4">
-                <Sparkles className="w-3.5 h-3.5" /> Nova coleção · E-books técnicos
+                <Award className="w-3.5 h-3.5" /> Brindes exclusivos da matrícula
               </div>
               <h2 className="text-2xl sm:text-3xl font-bold mb-3">
-                E-books para aprofundar em aplicações clínicas
+                E-books técnicos — exclusivos para alunos
               </h2>
               <p className="text-sm sm:text-base text-gray-400 max-w-2xl mx-auto">
-                Guias completos ricamente ilustrados, com imagens originais e figuras open-access de artigos CC-BY da literatura internacional. Material educacional complementar à BIA Academy — gratuito para quem quer começar.
+                Guias ricamente ilustrados por aplicação clínica, com conteúdo denso de 50+ páginas, imagens originais da Quantis e figuras reais da literatura CC-BY. <strong className="text-violet-300">Liberados automaticamente para quem se matricula na BIA Academy.</strong>
               </p>
             </div>
 
             <div className="grid md:grid-cols-2 gap-6">
-              {FEATURED_EBOOKS.map((eb) => (
+              {STUDENT_ONLY_EBOOKS.map((eb) => (
                 <article
                   key={eb.id}
-                  className="group rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-950/40 to-slate-950/40 overflow-hidden hover:border-violet-400/50 transition-colors"
+                  className="group relative rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-950/40 to-slate-950/40 overflow-hidden hover:border-violet-400/50 transition-colors"
                   data-testid={`ebook-card-${eb.id}`}
                 >
                   {eb.coverUrl && (
-                    <div className="aspect-[3/4] overflow-hidden bg-slate-900">
+                    <div className="relative aspect-[3/4] overflow-hidden bg-slate-900">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={eb.coverUrl}
                         alt={`Capa — ${eb.title}`}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                       />
+                      {/* Badge "Exclusivo alunos" sobreposto */}
+                      <div className="absolute top-4 right-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/90 text-black text-xs font-bold uppercase tracking-wide shadow-lg backdrop-blur-sm">
+                        <span>🔒</span> Exclusivo alunos
+                      </div>
                     </div>
                   )}
                   <div className="p-6 sm:p-7">
@@ -577,8 +583,8 @@ export default function AcademyLandingPage() {
                       </div>
                     )}
                     <p className="text-sm text-gray-300 leading-relaxed mb-4">
-                      {eb.abstract.slice(0, 320)}
-                      {eb.abstract.length > 320 ? "…" : ""}
+                      {eb.abstract.slice(0, 280)}
+                      {eb.abstract.length > 280 ? "…" : ""}
                     </p>
                     <div className="flex flex-wrap gap-1.5 mb-5">
                       {eb.keywords.slice(0, 6).map((kw) => (
@@ -590,18 +596,44 @@ export default function AcademyLandingPage() {
                         </span>
                       ))}
                     </div>
-                    <BrindeDownloadGate
-                      resourceId={eb.id}
-                      resourceTitle={eb.title}
-                      pdfUrl={eb.pdfUrl}
-                      pages={eb.pages}
-                      sizeMb={eb.sizeMb}
-                      buttonLabel="Baixar e-book grátis"
-                      testIdPrefix={`ebook-${eb.id}`}
-                      onDownloaded={() =>
-                        trackEvent("ebook_download_clicked", { id: eb.id })
-                      }
-                    />
+
+                    {/* ── Gate: 2 CTAs — matricular OU já sou aluno ── */}
+                    <div
+                      className="rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-violet-500/5 p-4 space-y-3"
+                      data-testid={`ebook-gate-${eb.id}`}
+                    >
+                      <p className="text-sm text-amber-200/90 leading-snug">
+                        <span className="font-semibold text-amber-200">
+                          Este e-book é um brinde da matrícula.
+                        </span>{" "}
+                        Faça parte da BIA Academy e desbloqueie este e os próximos lançamentos.
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Link
+                          href={ASAAS_LINK}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() =>
+                            trackEvent("ebook_gate_enroll_clicked", { id: eb.id })
+                          }
+                          className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-semibold text-sm transition-all shadow-lg shadow-amber-500/20"
+                          data-testid={`ebook-cta-enroll-${eb.id}`}
+                        >
+                          Matricular e desbloquear <ArrowRight className="w-4 h-4" />
+                        </Link>
+                        <Link
+                          href={`/login?callbackUrl=${encodeURIComponent(eb.pdfUrl)}&intent=download-ebook`}
+                          onClick={() =>
+                            trackEvent("ebook_gate_login_clicked", { id: eb.id })
+                          }
+                          className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-violet-400/40 text-violet-200 hover:bg-violet-500/10 font-medium text-sm transition-colors"
+                          data-testid={`ebook-cta-login-${eb.id}`}
+                        >
+                          Já sou aluno · Baixar
+                        </Link>
+                      </div>
+                    </div>
+
                     <p className="text-[10px] text-gray-500 mt-4 italic leading-relaxed">
                       {eb.citation}
                     </p>
@@ -613,6 +645,43 @@ export default function AcademyLandingPage() {
             <p className="text-xs text-gray-500 text-center mt-8 italic">
               Mais e-books em produção · Próximos: Biofabricação em Odontologia, em Dermatologia, em Oncologia.
             </p>
+          </div>
+        </section>
+      )}
+
+      {/* ── E-books open-access (se houver no futuro) ──────────── */}
+      {FEATURED_EBOOKS.length > 0 && (
+        <section
+          id="ebooks-open"
+          className="py-10 px-4 sm:px-6"
+          data-testid="academy-section-ebooks-open"
+        >
+          <div className="max-w-5xl mx-auto">
+            <h3 className="text-lg font-semibold text-center text-gray-300 mb-6">
+              Materiais gratuitos
+            </h3>
+            <div className="grid md:grid-cols-2 gap-4">
+              {FEATURED_EBOOKS.map((eb) => (
+                <div
+                  key={eb.id}
+                  className="rounded-xl border border-white/10 p-4 bg-white/[0.02]"
+                >
+                  <h4 className="font-semibold mb-2">{eb.title}</h4>
+                  <BrindeDownloadGate
+                    resourceId={eb.id}
+                    resourceTitle={eb.title}
+                    pdfUrl={eb.pdfUrl}
+                    pages={eb.pages}
+                    sizeMb={eb.sizeMb}
+                    buttonLabel="Baixar grátis"
+                    testIdPrefix={`ebook-${eb.id}`}
+                    onDownloaded={() =>
+                      trackEvent("ebook_download_clicked", { id: eb.id })
+                    }
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         </section>
       )}

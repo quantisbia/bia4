@@ -1,11 +1,14 @@
 /**
  * R13.15.1 · Gera o PDF do e-book "Biofabricação em Ortopedia" via Puppeteer
+ * R13.15.2 · Output movido para /private-library/ (fora de /public)
  *
  * Fluxo:
  *   1. Lê o HTML template em scripts/ebooks/ortopedia.html
  *   2. Abre via Chromium headless (puppeteer-core + chrome via puppeteer bundled)
  *   3. Gera PDF A4 com @page CSS respeitado (margens, quebras, numeração)
- *   4. Salva em public/library/ebook-biofabricacao-ortopedia-2026.pdf
+ *   4. Salva em /private-library/ebook-biofabricacao-ortopedia-2026.pdf
+ *      (NÃO em /public — o Next.js não serve diretamente)
+ *   5. Download real passa pela rota autenticada /api/library/download/[id]
  *
  * Dependências: puppeteer (já vem com Chromium headless)
  */
@@ -16,7 +19,10 @@ import { pathToFileURL } from "node:url"
 
 async function main() {
   const htmlPath = resolve(__dirname, "ortopedia.html")
-  const outPath = resolve(__dirname, "../../public/library/ebook-biofabricacao-ortopedia-2026.pdf")
+  // R13.15.2 · PDF vai para /private-library/ (fora de /public).
+  // Isso impede que o Next.js sirva o arquivo diretamente — só a rota
+  // autenticada /api/library/download/[id] consegue acessá-lo.
+  const outPath = resolve(__dirname, "../../private-library/ebook-biofabricacao-ortopedia-2026.pdf")
 
   console.log("→ Carregando HTML:", htmlPath)
   statSync(htmlPath) // garante existência

@@ -39,22 +39,18 @@ describe("R13.15.1 · E-books na biblioteca BIA Academy", () => {
       expect(typeof getAllOpenAccessMaterials).toBe("function")
     })
 
-    it("tem ao menos 1 e-book cadastrado", () => {
-      const ebooks = getOpenAccessEbooks()
-      expect(ebooks.length).toBeGreaterThanOrEqual(1)
+    it("tem ao menos 1 e-book cadastrado (open-access OU restrito)", () => {
+      // R13.15.2 · e-books podem ser restritos a alunos; não só os open-access contam.
+      const openEbooks = QUANTIS_WHITE_PAPERS.filter((wp) => wp.kind === "ebook")
+      expect(openEbooks.length).toBeGreaterThanOrEqual(1)
     })
 
-    it("todos os e-books têm kind='ebook'", () => {
+    it("getOpenAccessEbooks SÓ retorna e-books openAccess=true E não restritos", () => {
       const ebooks = getOpenAccessEbooks()
       for (const eb of ebooks) {
         expect(eb.kind).toBe("ebook")
-      }
-    })
-
-    it("todos os e-books são openAccess=true", () => {
-      const ebooks = getOpenAccessEbooks()
-      for (const eb of ebooks) {
         expect(eb.openAccess).toBe(true)
+        expect(eb.restrictedToStudents).not.toBe(true)
       }
     })
 
@@ -64,13 +60,12 @@ describe("R13.15.1 · E-books na biblioteca BIA Academy", () => {
       expect(featured!.kind).toBe("white-paper")
     })
 
-    it("getAllOpenAccessMaterials retorna white papers + e-books combinados", () => {
+    it("getAllOpenAccessMaterials retorna APENAS materiais openAccess (não os restritos)", () => {
       const all = getAllOpenAccessMaterials()
-      const ebooks = getOpenAccessEbooks()
-      // Deve ter pelo menos: 1 white-paper (QMatrix) + N ebooks
-      expect(all.length).toBeGreaterThanOrEqual(1 + ebooks.length - (ebooks.length > 0 ? 0 : 0))
-      // Todos openAccess
-      expect(all.every((m) => m.openAccess)).toBe(true)
+      // Deve ter pelo menos o white-paper QMatrix
+      expect(all.length).toBeGreaterThanOrEqual(1)
+      // Todos têm openAccess=true
+      expect(all.every((m) => m.openAccess === true)).toBe(true)
     })
   })
 
@@ -114,13 +109,23 @@ describe("R13.15.1 · E-books na biblioteca BIA Academy", () => {
       (wp) => wp.id === "ebook-biofabricacao-ortopedia-2026",
     )
 
-    it("o PDF existe em public/library/", () => {
-      const pdfPath = resolve(ROOT, "public", ebook!.pdfUrl.replace(/^\//, ""))
+    // R13.15.2 · O PDF agora fica em /private-library/ (não em /public/library/)
+    // porque o acesso é protegido. Para open-access, o path físico pode ficar
+    // em /public (fallback coberto pelos testes do QMatrix em outros arquivos).
+    function physicalPath(ebook: NonNullable<typeof ebook>): string {
+      if (ebook.privateFilePath) {
+        return resolve(ROOT, ebook.privateFilePath)
+      }
+      return resolve(ROOT, "public", ebook.pdfUrl.replace(/^\//, ""))
+    }
+
+    it("o PDF existe no filesystem (private-library/ para restritos)", () => {
+      const pdfPath = physicalPath(ebook!)
       expect(existsSync(pdfPath)).toBe(true)
     })
 
     it("o PDF tem tamanho razoável (<=10 MB) para e-mail/download", () => {
-      const pdfPath = resolve(ROOT, "public", ebook!.pdfUrl.replace(/^\//, ""))
+      const pdfPath = physicalPath(ebook!)
       const stat = statSync(pdfPath)
       const sizeMb = stat.size / 1024 / 1024
       expect(sizeMb).toBeLessThanOrEqual(10)
@@ -128,7 +133,7 @@ describe("R13.15.1 · E-books na biblioteca BIA Academy", () => {
     })
 
     it("o PDF é um arquivo PDF válido (header %PDF-)", () => {
-      const pdfPath = resolve(ROOT, "public", ebook!.pdfUrl.replace(/^\//, ""))
+      const pdfPath = physicalPath(ebook!)
       const buf = readFileSync(pdfPath).slice(0, 8)
       expect(buf.toString("ascii")).toMatch(/^%PDF-/)
     })
