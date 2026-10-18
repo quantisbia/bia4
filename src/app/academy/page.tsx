@@ -29,7 +29,11 @@ import {
   Zap, Gift, FileText,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
-import { getFeaturedWhitePaper, getOpenAccessEbooks } from "@/lib/academy/library-content"
+import {
+  getFeaturedWhitePaper,
+  getOpenAccessEbooks,
+  getStudentOnlyEbooks,
+} from "@/lib/academy/library-content"
 import { BrindeDownloadGate } from "./_components/BrindeDownloadGate"
 
 // ─── Constantes comerciais oficiais (LOCKED) ─────────────────────

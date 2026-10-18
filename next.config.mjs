@@ -6,18 +6,16 @@ const nextConfig = {
     // Sandbox com RAM limitada (~1GB): desliga workers paralelos do webpack/build
     workerThreads: false,
     cpus: 1,
-  },
-
-  // R13.15.6 · Inclui /src/content/ebooks/ no bundle serverless da Vercel.
-  // Esses PDFs são lidos via fs.readFile() pela rota /api/library/download/[id].
-  // Embora /src seja normalmente trackeado, arquivos binários (PDF) não são
-  // detectados automaticamente como dependência estática — por isso explicit.
-  //
-  // IMPORTANTE: Em Next 14 este campo vai no TOP-LEVEL do config
-  // (não em `experimental`). Em Next 15+ ele se move para experimental.
-  // Documentação: https://nextjs.org/docs/pages/api-reference/next-config-js/output
-  outputFileTracingIncludes: {
-    "/api/library/download/**/*": ["./src/content/ebooks/**/*"],
+    // R13.15.7 · Inclui /src/content/ebooks/ no bundle serverless da Vercel.
+    // Esses PDFs são lidos via fs.readFile() pela rota /api/library/download/[id].
+    //
+    // IMPORTANTE: em Next 14.2.35, outputFileTracingIncludes vai DENTRO de
+    // `experimental` (schema validado em node_modules/next/dist/server/config-schema.js).
+    // Em Next 15+ ele sai de experimental para o top-level.
+    // Chave usa o padrão do route handler: /api/library/download/[id]/route
+    outputFileTracingIncludes: {
+      "/api/library/download/[id]/route": ["./src/content/ebooks/**/*"],
+    },
   },
 
   // Build em sandbox com RAM limitada (~1GB): pulamos lint/typecheck no build
