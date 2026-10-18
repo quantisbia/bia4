@@ -258,7 +258,13 @@ describe("R13.14 · library-content · QUANTIS_WHITE_PAPERS", () => {
       // Materiais restritos DEVEM ter privateFilePath
       if (wp.restrictedToStudents) {
         expect(wp.privateFilePath, `${wp.id} é restricted mas sem privateFilePath`).toBeTruthy()
-        expect(wp.privateFilePath!.startsWith("private-library/")).toBe(true)
+        // R13.15.4 · Aceita tanto o path antigo (/private-library/) quanto o
+        // novo (/src/content/ebooks/) — ambos ficam fora de /public.
+        const privatePath = wp.privateFilePath!
+        const isValid =
+          privatePath.startsWith("private-library/") ||
+          privatePath.startsWith("src/content/ebooks/")
+        expect(isValid, `${wp.id} privateFilePath inválido: ${privatePath}`).toBe(true)
       }
     }
   })

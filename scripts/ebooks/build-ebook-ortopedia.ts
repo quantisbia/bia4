@@ -19,10 +19,11 @@ import { pathToFileURL } from "node:url"
 
 async function main() {
   const htmlPath = resolve(__dirname, "ortopedia.html")
-  // R13.15.2 · PDF vai para /private-library/ (fora de /public).
+  // R13.15.4 · PDF vai para /src/content/ebooks/ (dentro de /src, sempre
+  // incluído no bundle Vercel por padrão — não depende de outputFileTracingIncludes).
   // Isso impede que o Next.js sirva o arquivo diretamente — só a rota
   // autenticada /api/library/download/[id] consegue acessá-lo.
-  const outPath = resolve(__dirname, "../../private-library/ebook-biofabricacao-ortopedia-2026.pdf")
+  const outPath = resolve(__dirname, "../../src/content/ebooks/ebook-biofabricacao-ortopedia-2026.pdf")
 
   console.log("→ Carregando HTML:", htmlPath)
   statSync(htmlPath) // garante existência

@@ -89,10 +89,10 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     }
   }
 
-  // ── (5) Lê o arquivo do /private-library/ ───────────────────
-  // process.cwd() na Vercel é a raiz do bundle. O /private-library/ é
-  // incluído automaticamente no deploy (não está em .vercelignore nem no
-  // .gitignore).
+  // ── (5) Lê o arquivo do diretório privado ───────────────────
+  // R13.15.4: PDFs agora ficam em /src/content/ebooks/ (dentro de /src),
+  // o que garante inclusão no bundle Vercel sem depender de configuração
+  // específica. process.cwd() na Vercel é a raiz do bundle.
   const absPath = resolve(process.cwd(), material.privateFilePath!)
   let fileBuf: Buffer
   try {

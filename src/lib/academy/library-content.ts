@@ -154,7 +154,7 @@ export const QUANTIS_WHITE_PAPERS: QuantisWhitePaper[] = [
     // A rota /api/library/download/ebook-biofabricacao-ortopedia-2026 autentica
     // e serve o arquivo de /private-library/.
     pdfUrl: "/api/library/download/ebook-biofabricacao-ortopedia-2026",
-    privateFilePath: "private-library/ebook-biofabricacao-ortopedia-2026.pdf",
+    privateFilePath: "src/content/ebooks/ebook-biofabricacao-ortopedia-2026.pdf",
     coverUrl: "/library/ebook-assets/ai-cover.jpg",
     pages: 53,
     sizeMb: 3.9,

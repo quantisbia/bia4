@@ -56,9 +56,12 @@ describe("R13.15.2 · Gate de acesso do e-book de Ortopedia", () => {
       expect(ebook!.openAccess).toBe(false)
     })
 
-    it("tem privateFilePath apontando para /private-library/", () => {
+    it("tem privateFilePath apontando para diretório privado (/private-library ou /src/content/ebooks)", () => {
       expect(ebook!.privateFilePath).toBeDefined()
-      expect(ebook!.privateFilePath).toMatch(/^private-library\//)
+      // R13.15.4 · aceita ambos os paths (migração de /private-library/ → /src/content/ebooks/)
+      expect(ebook!.privateFilePath).toMatch(
+        /^(private-library|src\/content\/ebooks)\//,
+      )
     })
 
     it("pdfUrl aponta para a rota autenticada /api/library/download/", () => {
@@ -71,7 +74,7 @@ describe("R13.15.2 · Gate de acesso do e-book de Ortopedia", () => {
     })
   })
 
-  describe("(B/C) Arquivo físico está em /private-library/ e NÃO em /public/library/", () => {
+  describe("(B/C) Arquivo físico fora de /public/library/ e no path privado", () => {
     it("o PDF NÃO existe em public/library/ebook-biofabricacao-ortopedia-2026.pdf", () => {
       const publicPath = resolve(
         ROOT,
@@ -80,7 +83,7 @@ describe("R13.15.2 · Gate de acesso do e-book de Ortopedia", () => {
       expect(existsSync(publicPath)).toBe(false)
     })
 
-    it("o PDF EXISTE em private-library/ebook-biofabricacao-ortopedia-2026.pdf", () => {
+    it("o PDF EXISTE no privateFilePath declarado (sem bater path hardcoded)", () => {
       const privatePath = resolve(ROOT, ebook!.privateFilePath!)
       expect(existsSync(privatePath)).toBe(true)
     })
@@ -268,18 +271,24 @@ describe("R13.15.2 · Gate de acesso do e-book de Ortopedia", () => {
     })
   })
 
-  describe("Build script atualizado para /private-library/", () => {
+  describe("Build script escreve PDF fora de /public/library/", () => {
     const buildScriptPath = resolve(
       ROOT,
       "scripts/ebooks/build-ebook-ortopedia.ts",
     )
     const buildSrc = readFileSync(buildScriptPath, "utf8")
 
-    it("o output path aponta para /private-library/, não /public/library/", () => {
-      expect(buildSrc).toContain("private-library/ebook-biofabricacao-ortopedia-2026.pdf")
+    it("o output path NÃO aponta para /public/library/", () => {
+      // O arquivo pode estar em /private-library/ (R13.15.2) ou
+      // /src/content/ebooks/ (R13.15.4). O que NÃO pode é estar em /public.
       expect(buildSrc).not.toContain(
         "public/library/ebook-biofabricacao-ortopedia-2026.pdf",
       )
+      // Deve estar em algum path privado reconhecido
+      const temPathPrivado =
+        buildSrc.includes("private-library/ebook-biofabricacao-ortopedia-2026.pdf") ||
+        buildSrc.includes("src/content/ebooks/ebook-biofabricacao-ortopedia-2026.pdf")
+      expect(temPathPrivado).toBe(true)
     })
   })
 })

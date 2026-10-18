@@ -6,12 +6,12 @@ const nextConfig = {
     // Sandbox com RAM limitada (~1GB): desliga workers paralelos do webpack/build
     workerThreads: false,
     cpus: 1,
-    // R13.15.2 · Inclui /private-library/ no bundle serverless da Vercel.
-    // Esses arquivos ficam FORA de /public (não são servidos como estáticos)
-    // e são lidos via fs.readFile() pela rota /api/library/download/[id].
-    // Sem este include, o Vercel não copia o PDF para o bundle da função.
+    // R13.15.4 · Inclui /src/content/ebooks/ no bundle serverless da Vercel.
+    // Esses PDFs são lidos via fs.readFile() pela rota /api/library/download/[id].
+    // Embora /src seja normalmente trackeado, arquivos binários (PDF) não são
+    // detectados automaticamente como dependência estática — por isso explicit.
     outputFileTracingIncludes: {
-      "/api/library/download/**": ["./private-library/**/*"],
+      "/api/library/download/**": ["./src/content/ebooks/**/*"],
     },
   },
 
