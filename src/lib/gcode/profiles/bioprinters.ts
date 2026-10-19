@@ -8,6 +8,82 @@
 import type { BioprinterProfile } from "../core/types"
 
 export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
+  // ═══════════════════════════════════════════════════════════════════
+  // R14.1 · NACIONAIS 🇧🇷 — primeiros do catálogo (destaque)
+  // ═══════════════════════════════════════════════════════════════════
+
+  bioender_bioedtech: {
+    id: "bioender_bioedtech",
+    name: "BioEnder (BIOEDTECH)",
+    manufacturer: "BIOEDTECH 🇧🇷",
+    flavor: "marlin",
+    technology: "extrusion",
+    heads: 1,
+    buildVolume: {
+      min: { x: 0, y: 0, z: 0 },
+      max: { x: 200, y: 200, z: 200 },
+    },
+    bedShape: "rectangular",
+    extrusionMode: "pressure_kpa",
+    maxFeedrate: { xy: 4800, z: 600, e: 600 },
+    minFeedrate: { xy: 60, z: 30, e: 30 },
+    maxAcceleration: 500,
+    minNozzleUm: 200,
+    maxNozzleUm: 1200,
+    hasHeatedBed: true,
+    hasUV: false,
+    hasCamera: false,
+    hasAutoLeveling: false,
+    hasWellPlateSupport: false,
+    mcodes: {
+      // Marlin padrão da Ender 3 adaptado para extrusão pneumática.
+      // SEM G28 — adaptação da BIOEDTECH não deve dar home.
+      startPrint: "; BIOEDTECH BioEnder start (Marlin, no home)",
+    },
+    notes: [
+      "🇧🇷 Produzida no Brasil pela BIOEDTECH",
+      "Firmware Marlin aberto — totalmente customizável",
+      "G-code RepRap/Marlin padrão (compat. Cura, Pronterface, OctoPrint)",
+      "Conexão USB Web Serial a 115200 baud (chip CH340/CP210x/FT232)",
+      "~10× mais barata que bioimpressoras importadas equivalentes",
+      "Suporte técnico em português",
+    ],
+  },
+
+  octopus_3dbs: {
+    id: "octopus_3dbs",
+    name: "Octopus (3DBS)",
+    manufacturer: "3D Biotechnology Solutions 🇧🇷",
+    flavor: "marlin",
+    technology: "extrusion",
+    heads: 3,
+    buildVolume: {
+      min: { x: 0, y: 0, z: 0 },
+      max: { x: 130, y: 90, z: 60 },
+    },
+    bedShape: "rectangular",
+    extrusionMode: "pressure_kpa",
+    maxFeedrate: { xy: 3000, z: 600, e: 600 },
+    minFeedrate: { xy: 60, z: 30, e: 30 },
+    maxAcceleration: 500,
+    minNozzleUm: 100,
+    maxNozzleUm: 840,
+    hasHeatedBed: true,
+    hasUV: true,
+    hasCamera: false,
+    hasAutoLeveling: false,
+    hasWellPlateSupport: false,
+    mcodes: {
+      startPrint: "; 3DBS Octopus start",
+    },
+    notes: [
+      "🇧🇷 Produzida no Brasil pela 3D Biotechnology Solutions",
+      "Até 3 cabeçotes simultâneos com pressão independente",
+      "UV integrado para crosslinking (GelMA)",
+      "Resolução XY 10 µm — alta precisão para pesquisa",
+    ],
+  },
+
   cellink_biox: {
     id: "cellink_biox",
     name: "BIO X",

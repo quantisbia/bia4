@@ -37,32 +37,65 @@ const LEGACY_PLAN_PRICES: Record<string, number> = {
 }
 
 const PLANS = [
+  // ────────────────────────────────────────────────────────────────
+  // R14.1 · CLINICO — primeiro tier pago (R$ 507/mês)
+  //   Perfeito para médicos (ortopedia, dermato, odonto) que querem
+  //   usar a BIA sem precisar do laboratório completo de pesquisa.
+  // ────────────────────────────────────────────────────────────────
   {
-    id: "GUIDE",
-    name: "Guia Inteligente em Biofabricação 3D",
-    name_short: "Guia Inteligente",
+    id: "CLINICO",
+    name: "BIA Clínico",
+    name_short: "Clínico",
     price: 507,
+    period: "mês" as const,
     credits: 1500,
-    color: "violet",
-    badge: "ASSINATURA MENSAL",
+    color: "blue",
+    badge: "PRIMEIRO PASSO PAGO",
     paymentUrl: "https://www.asaas.com/c/qsnp08rvpuwlj8ip",
     features: [
       "1.500 créditos renovados todo mês",
-      "Acesso completo à plataforma BIA",
-      "Pipeline · Formulator Pro · Bioprinting · Organoid Builder",
-      "GLP/GMP · Chat IA · Knowledge Engine · Notebook",
-      "807+ biomateriais catalogados",
-      "Slicer 3D com 11 algoritmos",
+      "Modo Clínico ativo (linguagem simplificada)",
+      "Modelos 3D (STL) + G-code ilimitados",
+      "Chat IA especializado em biofabricação",
+      "Biblioteca científica + templates clínicos",
+      "Protocolos GLP/GMP essenciais",
+      "Suporte técnico em português",
       "Cancele quando quiser — sem multa",
     ],
   },
+  // ────────────────────────────────────────────────────────────────
+  // R14.1 · LAB_PRO — plano pesquisa (R$ 2.375/ano)
+  //   Formulador Pro, Pipeline completo, Organoid Builder, análises
+  //   avançadas, dossiês regulatórios — para labs e pesquisadores.
+  // ────────────────────────────────────────────────────────────────
+  {
+    id: "LAB_PRO",
+    name: "BIA Lab Pro",
+    name_short: "Lab Pro",
+    price: 2375,
+    period: "ano" as const,
+    credits: 1500,
+    color: "violet",
+    badge: "LABORATÓRIOS & PESQUISA",
+    paymentUrl: "https://www.asaas.com/c/qsnp08rvpuwlj8ip",
+    features: [
+      "1.500 créditos renovados todo mês (12 meses pré-pagos)",
+      "Formulador Pro (biotintas até 8 componentes)",
+      "Pipeline completo em 12 etapas",
+      "Organoid Builder + Protocolos GLP/GMP avançados",
+      "Modo Pesquisador (jargão técnico completo)",
+      "Notebook versionado + exportação para dissertação",
+      "807+ biomateriais catalogados",
+      "Slicer 3D com 11 algoritmos",
+      "Dossiês regulatórios (ANVISA/ABNT)",
+    ],
+  },
   /*
-    Planos legados removidos do catálogo público em R13.11.
-    Assinantes de ADVANCED (R$ 190 · 1.500 créditos avulsos) e
-    ENTERPRISE (R$ 375 · 5.000 créditos avulsos) continuam ativos
-    até o fim do ciclo pago; renovação exige migração para GUIDE.
-    A BIA Academy (R$ 2.375 · 12 meses + curso) NÃO está inclusa
-    no GUIDE — continua sendo produto separado, vendido em /academy.
+    Planos legados removidos do catálogo público em R13.11/R14.1.
+    GUIDE (antigo R$ 507 mensal) continua ativo pros assinantes atuais;
+    novas assinaturas devem usar CLINICO (R$ 507/mês) ou LAB_PRO (R$ 2.375/ano).
+    ADVANCED, ENTERPRISE, DISCOVERY, ORGANOID_LAB continuam ativos
+    até fim do ciclo pago. BIA Academy segue vendida separadamente em /academy.
   */
 ]
 
@@ -193,8 +226,13 @@ const COLOR: Record<string, { border: string; bg: string; ring: string; text: st
 }
 
 const PLAN_CREDITS_MAX: Record<string, number> = {
+  // R14.1 · FREE agora traz quota minimalista: 1 STL + 1 G-code
+  // (créditos continuam limitados a 30 para experimentar o Chat/Knowledge)
   FREE: 30,
-  // R13.11 · plano vigente único
+  // R14.1 · Novos tiers pagos
+  CLINICO: 1500,
+  LAB_PRO: 1500,
+  // R13.11 · plano legado (assinantes atuais continuam)
   GUIDE: 1500,
   // Planos legados (assinantes existentes) — mantidos p/ retrocompatibilidade
   ORGANOID_LAB: 300, DISCOVERY: 500, ADVANCED: 1500, ENTERPRISE: 5000, ACADEMY: 20000,

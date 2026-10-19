@@ -392,3 +392,110 @@ export function supportsWebSerial(printer: BioprinterSpec): boolean {
       printer.firmwareCompatibility.includes("GCODE-standard"))
   )
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  R14.1 · Agrupamento por país de origem (Brasil em DESTAQUE)
+ *  ─────────────────────────────────────────────────────────────────────
+ *  Mantém a struct existente e deriva "country" a partir da brand.
+ *  Útil pros componentes de UI que mostram o catálogo organizado:
+ *    1. 🇧🇷 Brasil (destaque — início da lista)
+ *    2. 🌎 Importadas (Europa, EUA, etc.)
+ *    3. ⚙️ Genéricas / DIY
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+export type BioprinterCountry = "BR" | "US" | "SE" | "ES" | "DE" | "CZ" | "GENERIC"
+
+export interface BioprinterCountryInfo {
+  code: BioprinterCountry
+  name: string
+  flag: string
+  isNational: boolean
+}
+
+/** Mapeamento brand → país. Edite aqui se adicionar nova marca ao catálogo. */
+const BRAND_TO_COUNTRY: Record<string, BioprinterCountry> = {
+  "BIOEDTECH": "BR",
+  "3D Biotechnology Solutions": "BR",
+  "CELLINK": "SE",
+  "Allevi": "US",
+  "REGEMAT 3D": "ES",
+  "EnvisionTEC": "DE",
+  "Creality": "GENERIC",
+  "Prusa Research": "CZ",
+  "Genérica / DIY": "GENERIC",
+}
+
+export const BIOPRINTER_COUNTRIES: Record<BioprinterCountry, BioprinterCountryInfo> = {
+  BR:      { code: "BR",      name: "Brasil",         flag: "🇧🇷", isNational: true  },
+  US:      { code: "US",      name: "Estados Unidos", flag: "🇺🇸", isNational: false },
+  SE:      { code: "SE",      name: "Suécia",         flag: "🇸🇪", isNational: false },
+  ES:      { code: "ES",      name: "Espanha",        flag: "🇪🇸", isNational: false },
+  DE:      { code: "DE",      name: "Alemanha",       flag: "🇩🇪", isNational: false },
+  CZ:      { code: "CZ",      name: "Rep. Tcheca",    flag: "🇨🇿", isNational: false },
+  GENERIC: { code: "GENERIC", name: "DIY / Genérica", flag: "⚙️",  isNational: false },
+}
+
+/** Retorna o país de uma bioimpressora (deriva da brand). */
+export function getBioprinterCountry(printer: BioprinterSpec): BioprinterCountryInfo {
+  const code = BRAND_TO_COUNTRY[printer.brand] ?? "GENERIC"
+  return BIOPRINTER_COUNTRIES[code]
+}
+
+/** Retorna true se a bioimpressora é brasileira (destaque na UI). */
+export function isNationalBioprinter(printer: BioprinterSpec): boolean {
+  return getBioprinterCountry(printer).isNational
+}
+
+export interface BioprinterGroup {
+  key: "national" | "international" | "generic"
+  label: string
+  flag: string
+  description: string
+  printers: BioprinterSpec[]
+}
+
+/**
+ * Agrupa o catálogo em 3 blocos pra UI "Clean & Clareza":
+ *   - national (BR, em destaque)
+ *   - international (importadas)
+ *   - generic (DIY / RepRap)
+ */
+export function getGroupedBioprinters(): BioprinterGroup[] {
+  const national: BioprinterSpec[] = []
+  const international: BioprinterSpec[] = []
+  const generic: BioprinterSpec[] = []
+
+  for (const p of BIOPRINTERS) {
+    const country = getBioprinterCountry(p)
+    if (country.isNational) national.push(p)
+    else if (country.code === "GENERIC") generic.push(p)
+    else international.push(p)
+  }
+
+  return [
+    {
+      key: "national",
+      label: "🇧🇷 Bioimpressoras Nacionais",
+      flag: "🇧🇷",
+      description:
+        "Produzidas no Brasil — melhor custo-benefício, suporte técnico em português e integração nativa com a BIA.",
+      printers: national,
+    },
+    {
+      key: "international",
+      label: "🌎 Bioimpressoras Importadas",
+      flag: "🌎",
+      description:
+        "Equipamentos de pesquisa internacional — alto desempenho, custo elevado e importação sob demanda.",
+      printers: international,
+    },
+    {
+      key: "generic",
+      label: "⚙️ Impressoras Genéricas / DIY",
+      flag: "⚙️",
+      description:
+        "Adaptações caseiras de impressoras FDM/RepRap para bioimpressão de baixo custo.",
+      printers: generic,
+    },
+  ]
+}

@@ -1,12 +1,15 @@
 import { auth } from "@/lib/auth/config"
 import { getUserStats } from "@/lib/db/queries"
+import { prisma } from "@/lib/db/prisma"
 import { redirect } from "next/navigation"
 import {
   TrendingUp, Zap, GitBranch, FlaskConical,
   MessageSquare, BookOpen, ArrowRight, Activity,
-  Clock, CheckCircle2, AlertCircle, CircleDot, FileText, Printer, Microscope, Wrench
+  Clock, CheckCircle2, AlertCircle,
 } from "lucide-react"
 import Link from "next/link"
+import { ProfileWelcomeBanner } from "@/components/dashboard/ProfileWelcomeBanner"
+import { PersonalizedQuickActions } from "@/components/dashboard/PersonalizedQuickActions"
 
 export default async function DashboardPage() {
   const session = await auth()
@@ -26,12 +29,25 @@ export default async function DashboardPage() {
     stats.credits = session.user.credits ?? stats.credits
   } catch { /* fallback */ }
 
+  // R14.1 · Buscar researchArea para personalizar o dashboard
+  let researchArea: string | null = null
+  try {
+    const u = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { researchArea: true },
+    })
+    researchArea = u?.researchArea ?? null
+  } catch { /* fallback — sem personalização, usa perfil padrão */ }
+
   const userName = session.user.name?.split(" ")[0] ?? "Pesquisador"
   const plan = (session.user.plan as string) ?? "FREE"
 
   const planColors: Record<string, string> = {
     FREE:       "text-gray-400 bg-gray-500/10 border-gray-500/20",
-    // R13.11 · Plano vigente único
+    // R14.1 · Novos tiers
+    CLINICO:    "text-sky-300 bg-sky-500/10 border-sky-500/30",
+    LAB_PRO:    "text-violet-300 bg-violet-500/10 border-violet-500/30",
+    // R13.11 · Plano legado
     GUIDE:      "text-violet-300 bg-violet-500/10 border-violet-500/30",
     // Planos legados — mantidos p/ assinantes existentes
     DISCOVERY:  "text-violet-400 bg-violet-500/10 border-violet-500/20",
@@ -41,30 +57,14 @@ export default async function DashboardPage() {
     ORGANOID_LAB: "text-teal-400 bg-teal-500/10 border-teal-500/20",
   }
 
-  const quickActions = [
-    { title: "Novo Pipeline",        desc: "Design de tecido",       href: "/dashboard/pipeline",      icon: GitBranch,    color: "violet" },
-    { title: "Bioimpressão",         desc: "Modelo · Tinta · G-code · Print", href: "/dashboard/bioprint",      icon: Printer,      color: "indigo" },
-    { title: "Organoid Builder",     desc: "Design de organoide",    href: "/dashboard/organoids",     icon: CircleDot,    color: "purple" },
-    { title: "Protocolos GLP/GMP",   desc: "Protocolo laboratorial", href: "/dashboard/protocols",     icon: FileText,     color: "violet" },
-    { title: "Análises & Dossiês",   desc: "Molecular, celular, FDA",href: "/dashboard/analyses",      icon: Microscope,   color: "rose"   },
-    { title: "Chat com IA",          desc: "Dúvidas científicas",    href: "/dashboard/chat",          icon: MessageSquare,color: "indigo" },
-    { title: "Base de Conhecimento", desc: "Pesquisar artigos",      href: "/dashboard/knowledge",     icon: BookOpen,     color: "blue"   },
-    { title: "Ferramentas BIA",     desc: "Comparador · Custos · PDF", href: "/dashboard/tools",         icon: Wrench,       color: "amber"  },
-  ]
-
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 max-w-6xl mx-auto w-full">
 
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white mb-1">
-            Olá, {userName}! 👋
-          </h1>
-          <p className="text-gray-400 text-xs sm:text-sm">
-            Bem-vindo à plataforma BIA v4
-          </p>
-        </div>
+      {/* R14.1 · Banner personalizado por perfil (substitui o header antigo) */}
+      <ProfileWelcomeBanner userName={userName} researchArea={researchArea} />
+
+      {/* Plan badge discreto no topo direito */}
+      <div className="flex items-center justify-end">
         <div className={`flex items-center gap-1.5 border rounded-xl px-3 py-1.5 text-xs font-semibold shrink-0 ${planColors[plan] ?? planColors.FREE}`}>
           <div className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
           {plan}
@@ -94,27 +94,8 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      {/* Quick Actions grid — scrollable horizontal on small mobile, grid on larger */}
-      <div>
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-          Ações Rápidas
-        </h2>
-        {/* Mobile: horizontal scroll for first row visibility */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 stagger-children">
-          {quickActions.map((action) => (
-            <Link key={action.title} href={action.href}
-              className="flex items-center gap-3 p-3.5 sm:p-4 rounded-xl bg-white/[0.02] border border-white/[0.08] hover:border-violet-500/20 hover:bg-violet-500/[0.03] transition-all group active:scale-[0.97]">
-              <div className={`w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-${action.color}-500/10 border border-${action.color}-500/20 flex items-center justify-center shrink-0`}>
-                <action.icon className={`w-4.5 h-4.5 sm:w-4 sm:h-4 text-${action.color}-400`} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-white leading-tight truncate">{action.title}</p>
-                <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 truncate">{action.desc}</p>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </div>
+      {/* R14.1 · QuickActions reorganizadas por perfil + modo UI */}
+      <PersonalizedQuickActions researchArea={researchArea} />
 
       {/* Mini-Lessons — Quick learning tips */}
       <div>

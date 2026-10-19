@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { cn } from "@/lib/utils/helpers"
+import { UIModeToggle } from "@/components/layout/UIModeToggle"
 
 const PRIMARY_TABS = [
   { href: "/dashboard",              label: "Home",      icon: LayoutDashboard, exact: true },
@@ -74,6 +75,12 @@ export function MobileBottomNav() {
                 className="w-7 h-7 rounded-lg bg-white/[0.06] border border-white/10 flex items-center justify-center text-gray-500 active:scale-95">
                 <X className="w-3.5 h-3.5" />
               </button>
+            </div>
+
+            {/* R14.1 · Toggle Clínico ↔ Pesquisador */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
+              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Modo da Interface</span>
+              <UIModeToggle compact />
             </div>
 
             {/* Grid of modules */}

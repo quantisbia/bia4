@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
@@ -10,11 +10,16 @@ import {
   FileText, BookOpen, MessageSquare, CreditCard, Settings,
   LogOut, Zap, ChevronRight, Menu, X, Printer, ClipboardCheck, BookMarked,
   Crown, Wrench, Info, Map, Atom, Library, GraduationCap,
+  Lightbulb, Beaker, ShieldCheck, UserCircle, ChevronDown,
+  Microscope,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { isSuperAdmin } from "@/lib/auth/admin-shared"
 import { ThemeToggle } from "@/components/ui/ThemeToggle"
 import { LocaleSwitcher } from "@/components/ui/LocaleSwitcher"
+import { useUIMode } from "@/lib/user/use-ui-mode"
+import { t as translateTerm } from "@/lib/user/ui-mode"
+import { UIModeToggle } from "@/components/layout/UIModeToggle"
 
 export function BiaLogoIcon({ size = 22 }: { size?: number }) {
   return (
@@ -38,6 +43,10 @@ export function BiaLogoIcon({ size = 22 }: { size?: number }) {
   )
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+ * R14.1 · NAV_ITEMS mantido para backward compat (grep: muitos arquivos
+ * importam de outros lugares). A NOVA estrutura é NAV_GROUPS abaixo.
+ * ────────────────────────────────────────────────────────────────────────── */
 export const NAV_ITEMS = [
   { href: "/dashboard",                    label: "Visão Geral",          icon: LayoutDashboard, exact: true,
     info: "Painel inicial da BIA: resumo dos seus projetos, créditos e atalhos rápidos para os módulos principais. Comece sempre por aqui." },
@@ -70,10 +79,126 @@ export const NAV_ITEMS = [
     info: "Caixa de ferramentas: comparador de até 4 biomateriais lado-a-lado, calculadora de custos do projeto e exportação PDF profissional." },
 ]
 
-const BOTTOM_ITEMS = [
-  { href: "/dashboard/billing",  label: "Créditos",   icon: CreditCard,  exact: false },
-  { href: "/dashboard/settings", label: "Configurações", icon: Settings, exact: false },
+/* ──────────────────────────────────────────────────────────────────────────
+ * R14.1 · Nova estrutura por VERBO (5 grupos funcionais colapsáveis)
+ * Reduz a sidebar de 15 itens visíveis → 1 destaque (Visão Geral) + 5 grupos
+ * que o usuário expande sob demanda. Mantém TODOS os links atuais —
+ * nenhuma rota removida, só reorganizada.
+ *
+ * Chaves `labelKey` são lidas via t(key, uiMode) para traduzir p/ modo clínico.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+export type NavItem = {
+  href: string
+  label: string
+  labelKey?: string           // chave em UI_TERMS (modo clínico substitui o label)
+  icon: typeof LayoutDashboard
+  exact?: boolean
+  info?: string
+  badge?: string
+}
+
+export type NavGroup = {
+  id: string
+  label: string
+  icon: typeof LayoutDashboard
+  /** Cor temática do grupo (classe tailwind) */
+  accent: string
+  items: NavItem[]
+}
+
+export const NAV_HOME: NavItem = {
+  href: "/dashboard",
+  label: "Visão Geral",
+  icon: LayoutDashboard,
+  exact: true,
+  info: "Painel inicial personalizado conforme seu perfil (ortopedista, dermatologista, dentista, pós-grad, graduação ou pesquisador).",
+}
+
+export const NAV_GROUPS: NavGroup[] = [
+  {
+    id: "project",
+    label: "Projetar",
+    icon: Lightbulb,
+    accent: "text-sky-400",
+    items: [
+      { href: "/dashboard/pipeline",       label: "Pipeline",         labelKey: "nav_pipeline",   icon: GitBranch,
+        info: "Fluxo guiado em 12 etapas: do problema clínico ao protocolo validado." },
+      { href: "/dashboard/formulator-pro", label: "Formulador Pro",   labelKey: "nav_formulator", icon: Atom,
+        info: "Monte formulações de biotintas com até 8 componentes. 807 biomateriais + reologia em tempo real." },
+      { href: "/dashboard/organoids",      label: "Organoid Builder", labelKey: "nav_organoids",  icon: CircleDot,
+        info: "Esferoides e organoides (intestinal, hepático, neural, cardíaco, renal) com QMicroNiche™ + QMatrix™." },
+    ],
+  },
+  {
+    id: "bioprint",
+    label: "Bioimprimir",
+    icon: Printer,
+    accent: "text-violet-400",
+    items: [
+      { href: "/dashboard/bioprint",       label: "Bioimpressão",     labelKey: "nav_bioprint", icon: Printer,
+        info: "Fluxo completo em 4 etapas: Modelo → Biotinta → Fatiamento → Execução.", badge: "principal" },
+      { href: "/dashboard/bioprint/model", label: "Modelos 3D (STL)", labelKey: "step_model",   icon: CircleDot,
+        info: "Upload de STL ou geração a partir de 20+ geometrias prontas (biomiméticas + testes)." },
+      { href: "/dashboard/bioprint/quick-gcode", label: "G-code Rápido", labelKey: "term_gcode", icon: Zap,
+        info: "Atalho: gera G-code otimizado em 60 segundos a partir de um modelo + biotinta." },
+    ],
+  },
+  {
+    id: "validate",
+    label: "Validar",
+    icon: ShieldCheck,
+    accent: "text-emerald-400",
+    items: [
+      { href: "/dashboard/protocols",      label: "Protocolos GLP/GMP", labelKey: "nav_protocols", icon: FileText,
+        info: "POPs em formato ABNT ISO/IEC 17025 e ANVISA RDC. Exporta PDF assinável." },
+      { href: "/dashboard/protocol-total", label: "Protocolo Total",    icon: ClipboardCheck,
+        info: "Dossiê executivo consolidando todas as etapas do seu pipeline." },
+      { href: "/dashboard/analyses",       label: "Análises & Dossiês", icon: Microscope,
+        info: "Análises moleculares, celulares e dossiês regulatórios." },
+      { href: "/dashboard/tools",          label: "Ferramentas",        icon: Wrench,
+        info: "Comparador de biomateriais, calculadora de custos, exportação PDF." },
+    ],
+  },
+  {
+    id: "learn",
+    label: "Aprender",
+    icon: GraduationCap,
+    accent: "text-fuchsia-400",
+    items: [
+      { href: "/academy/dashboard",       label: "BIA Academy",         icon: GraduationCap,
+        info: "12 módulos de formação em biofabricação, biblioteca com 65+ artigos, e-books clínicos, encontros ao vivo.",
+        badge: "destaque" },
+      { href: "/dashboard/chat",          label: "Chat IA",             icon: MessageSquare,
+        info: "Converse com a BIA em linguagem natural. 2 créditos/mensagem." },
+      { href: "/dashboard/knowledge",     label: "Motor de Conhecimento", labelKey: "nav_knowledge", icon: BookOpen,
+        info: "65+ artigos curados com DOI, 20+ patentes, 15+ metodologias." },
+      { href: "/dashboard/manual",        label: "Manual do Usuário",    icon: Library,
+        info: "Tutoriais passo-a-passo. Comece por aqui se for sua primeira vez." },
+      { href: "/dashboard/roadmap",       label: "Roteiro Profissional", labelKey: "nav_roadmap", icon: Map,
+        info: "Caminho sugerido pela equipe Quantis — do problema clínico ao tecido impresso." },
+    ],
+  },
+  {
+    id: "account",
+    label: "Minha Conta",
+    icon: UserCircle,
+    accent: "text-amber-400",
+    items: [
+      { href: "/dashboard/notebook",      label: "Notebook",      labelKey: "nav_notebook",   icon: BookMarked,
+        info: "Caderno digital versionado com rastreabilidade GLP." },
+      { href: "/dashboard/billing",       label: "Créditos",      icon: CreditCard,
+        info: "Saldo, histórico e recarga de créditos." },
+      { href: "/dashboard/settings",      label: "Configurações", icon: Settings,
+        info: "Perfil, segurança, preferências." },
+    ],
+  },
 ]
+
+/* R14.1 · BOTTOM_ITEMS removido — Créditos e Configurações agora vivem
+ * dentro do grupo "Minha Conta". Mantido como stub vazio só para não
+ * quebrar referências legadas que possam ter sido feitas. */
+const BOTTOM_ITEMS: Array<{ href: string; label: string; icon: typeof CreditCard; exact?: boolean }> = []
 
 const PLAN_CREDITS: Record<string, number> = {
   FREE: 30, ORGANOID_LAB: 300, DISCOVERY: 500, ADVANCED: 1500, ENTERPRISE: 5000, ACADEMY: 20000,
@@ -81,7 +206,11 @@ const PLAN_CREDITS: Record<string, number> = {
 
 const PLAN_COLORS: Record<string, string> = {
   FREE:         "bg-gray-500/10 border-gray-500/20 text-gray-400",
-  // R13.11 · Plano vigente único
+  // R14.1 · Novo tier CLINICO (primeiro pago, R$ 507/mês)
+  CLINICO:      "bg-sky-500/10 border-sky-500/30 text-sky-300",
+  // R14.1 · LAB_PRO (anual R$ 2.375 — equivalente ao antigo GUIDE para labs)
+  LAB_PRO:      "bg-violet-500/10 border-violet-500/30 text-violet-300",
+  // R13.11 · Plano legado (continua ativo pros atuais assinantes)
   GUIDE:        "bg-violet-500/10 border-violet-500/30 text-violet-300",
   // Planos legados
   ORGANOID_LAB: "bg-teal-500/10 border-teal-500/20 text-teal-400",
@@ -91,9 +220,11 @@ const PLAN_COLORS: Record<string, string> = {
   ACADEMY:      "bg-amber-500/10 border-amber-500/20 text-amber-400",
 }
 
-// R13.11 · Nome curto exibido no badge (choice 4a — "Guia Inteligente")
+// R14.1 · Nome curto exibido no badge
 const PLAN_LABEL: Record<string, string> = {
-  FREE:         "Trial",
+  FREE:         "Grátis",
+  CLINICO:      "Clínico",
+  LAB_PRO:      "Lab Pro",
   GUIDE:        "Guia Inteligente",
   ORGANOID_LAB: "Organoid Lab",
   DISCOVERY:    "Discovery",
@@ -167,6 +298,217 @@ function InfoTooltip({ label, text }: { label: string; text: string }) {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
+   R14.1 · SidebarGroupedNav — 5 grupos funcionais colapsáveis
+   ────────────────────────────────────────────────────────────────────────
+   Estado por grupo (aberto/fechado) salvo em localStorage para persistir
+   entre páginas. Grupo cujo item está ativo abre automaticamente.
+────────────────────────────────────────────────────────────────────────── */
+
+const SIDEBAR_GROUP_STATE_KEY = "bia:sidebar-groups-v14"
+
+function readGroupState(): Record<string, boolean> {
+  if (typeof window === "undefined") return {}
+  try {
+    const raw = window.localStorage.getItem(SIDEBAR_GROUP_STATE_KEY)
+    if (!raw) return {}
+    return JSON.parse(raw) as Record<string, boolean>
+  } catch {
+    return {}
+  }
+}
+
+function writeGroupState(state: Record<string, boolean>) {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(SIDEBAR_GROUP_STATE_KEY, JSON.stringify(state))
+  } catch {
+    /* localStorage pode falhar em modo privado */
+  }
+}
+
+/** Grupos que começam abertos por padrão (primeiro acesso). */
+const DEFAULT_OPEN_GROUPS = new Set(["bioprint", "learn"])
+
+function SidebarGroupedNav({
+  onNavigate,
+  pathname,
+}: {
+  onNavigate?: () => void
+  pathname: string
+}) {
+  const { mode, hydrated: modeHydrated } = useUIMode()
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
+  const [hydrated, setHydrated] = useState(false)
+
+  // Hidrata estado dos grupos a partir do localStorage
+  useEffect(() => {
+    const stored = readGroupState()
+    const initial: Record<string, boolean> = {}
+    for (const g of NAV_GROUPS) {
+      // Grupo com item ativo abre automaticamente (sobrepõe o localStorage)
+      const hasActive = g.items.some((it) => pathname.startsWith(it.href))
+      if (hasActive) {
+        initial[g.id] = true
+      } else if (g.id in stored) {
+        initial[g.id] = stored[g.id]
+      } else {
+        initial[g.id] = DEFAULT_OPEN_GROUPS.has(g.id)
+      }
+    }
+    setOpenGroups(initial)
+    setHydrated(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Quando pathname muda, re-abre o grupo que contém o item ativo
+  useEffect(() => {
+    if (!hydrated) return
+    setOpenGroups((prev) => {
+      let changed = false
+      const next = { ...prev }
+      for (const g of NAV_GROUPS) {
+        const hasActive = g.items.some((it) => pathname.startsWith(it.href))
+        if (hasActive && !next[g.id]) {
+          next[g.id] = true
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [pathname, hydrated])
+
+  const toggleGroup = (id: string) => {
+    setOpenGroups((prev) => {
+      const next = { ...prev, [id]: !prev[id] }
+      writeGroupState(next)
+      return next
+    })
+  }
+
+  const resolveLabel = (item: NavItem): string => {
+    if (!modeHydrated || !item.labelKey) return item.label
+    // t() do helper puro para não precisar re-renderizar via hook em cada item
+    return translateTerm(item.labelKey, mode)
+  }
+
+  const isItemActive = (href: string, exact?: boolean) => {
+    if (exact) return pathname === href
+    if (href === "/dashboard") return false
+    return pathname.startsWith(href)
+  }
+
+  return (
+    <nav className="flex-1 px-2 pb-2 space-y-1 overflow-y-auto">
+      {/* Home — sempre fora de grupo, destaque visual */}
+      <Link
+        href={NAV_HOME.href}
+        onClick={onNavigate}
+        data-testid="sidebar-home-link"
+        className={cn(
+          "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all mb-2 border",
+          isItemActive(NAV_HOME.href, NAV_HOME.exact)
+            ? "bg-violet-500/15 text-violet-200 border-violet-500/30 shadow-sm shadow-violet-900/30"
+            : "text-gray-300 bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.06] hover:text-white",
+        )}
+      >
+        <NAV_HOME.icon className="w-4 h-4 shrink-0" />
+        <span className="flex-1 truncate font-semibold">{NAV_HOME.label}</span>
+      </Link>
+
+      {/* 5 grupos colapsáveis */}
+      {NAV_GROUPS.map((group) => {
+        const isOpen = openGroups[group.id] ?? DEFAULT_OPEN_GROUPS.has(group.id)
+        const activeInGroup = group.items.some((it) =>
+          isItemActive(it.href, it.exact),
+        )
+        return (
+          <div key={group.id} data-testid={`sidebar-group-${group.id}`}>
+            <button
+              type="button"
+              onClick={() => toggleGroup(group.id)}
+              aria-expanded={isOpen}
+              className={cn(
+                "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-colors",
+                activeInGroup ? "text-white" : "text-gray-500 hover:text-gray-300",
+              )}
+            >
+              <group.icon className={cn("w-3.5 h-3.5 shrink-0", group.accent)} />
+              <span className="flex-1 text-left">{group.label}</span>
+              <ChevronDown
+                className={cn(
+                  "w-3 h-3 shrink-0 transition-transform duration-200",
+                  isOpen ? "rotate-0" : "-rotate-90",
+                )}
+              />
+            </button>
+
+            {isOpen && (
+              <div className="mt-0.5 mb-1.5 space-y-0.5 pl-1">
+                {group.items.map((item) => {
+                  const active = isItemActive(item.href, item.exact)
+                  const isAcademy = item.href === "/academy/dashboard"
+                  const label = resolveLabel(item)
+                  return (
+                    <div key={item.href} className="flex items-center gap-1">
+                      <Link
+                        href={item.href}
+                        onClick={onNavigate}
+                        data-testid={isAcademy ? "sidebar-academy-link" : `sidebar-item-${item.href.replace(/\//g, "-")}`}
+                        className={cn(
+                          "flex-1 flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all group min-w-0",
+                          active
+                            ? isAcademy
+                              ? "bg-gradient-to-r from-violet-500/15 to-fuchsia-500/15 text-fuchsia-200 border border-fuchsia-500/25"
+                              : "bg-violet-500/12 text-violet-300 border border-violet-500/20"
+                            : isAcademy
+                              ? "text-fuchsia-300 hover:bg-gradient-to-r hover:from-violet-500/10 hover:to-fuchsia-500/10"
+                              : "text-gray-400 hover:bg-white/[0.05] hover:text-gray-200",
+                        )}
+                      >
+                        <item.icon
+                          className={cn(
+                            "w-4 h-4 shrink-0 transition-colors",
+                            active
+                              ? isAcademy
+                                ? "text-fuchsia-300"
+                                : "text-violet-400"
+                              : isAcademy
+                                ? "text-fuchsia-400"
+                                : "text-gray-500 group-hover:text-gray-300",
+                          )}
+                        />
+                        <span className="flex-1 truncate">{label}</span>
+                        {item.badge && (
+                          <span
+                            data-testid={isAcademy ? "sidebar-academy-badge" : undefined}
+                            className={cn(
+                              "text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full shrink-0",
+                              item.badge === "destaque" || item.badge === "novo"
+                                ? "bg-gradient-to-r from-violet-500/30 to-fuchsia-500/30 text-fuchsia-200 border border-fuchsia-500/30"
+                                : item.badge === "principal"
+                                  ? "bg-violet-500/30 text-violet-200 border border-violet-500/30"
+                                  : "bg-amber-500/20 text-amber-300 border border-amber-500/30",
+                            )}
+                          >
+                            {item.badge}
+                          </span>
+                        )}
+                        {active && !item.badge && <ChevronRight className="w-3 h-3 text-violet-400/50 shrink-0" />}
+                      </Link>
+                      {item.info && <InfoTooltip label={label} text={item.info} />}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </nav>
+  )
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
    Sidebar Content (shared desktop + drawer)
 ────────────────────────────────────────────────────────────────────────── */
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
@@ -208,8 +550,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </Link>
       </div>
 
-      {/* ── Plan badge ── */}
-      <div className="px-4 pt-3 pb-2">
+      {/* ── Plan badge + Modo Clínico/Pesquisador (R14.1) ── */}
+      <div className="px-4 pt-3 pb-2 flex items-center justify-between gap-2 flex-wrap">
         <div className={cn(
           "inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border",
           PLAN_COLORS[plan] ?? PLAN_COLORS.DISCOVERY
@@ -217,58 +559,11 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
           {PLAN_LABEL[plan] ?? plan}
         </div>
+        <UIModeToggle compact />
       </div>
 
-      {/* ── Main nav ── */}
-      <nav className="flex-1 px-2 pb-2 space-y-0.5 overflow-y-auto">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-600/80 px-3 pt-1 pb-2">
-          Módulos
-        </p>
-        {NAV_ITEMS.map(item => {
-          const active = isActive(item.href, item.exact)
-          const badge = (item as { badge?: string }).badge
-          // R13.14.6: usuário logado vai direto para /academy/dashboard (área do aluno),
-          // não para /academy (landing pública de venda). O destaque visual continua.
-          const isAcademy = item.href === "/academy/dashboard"
-          return (
-            <div key={item.href} className="flex items-center gap-1">
-              <Link
-                href={item.href}
-                onClick={onNavigate}
-                data-testid={isAcademy ? "sidebar-academy-link" : undefined}
-                className={cn(
-                  "flex-1 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group min-w-0",
-                  active
-                    ? isAcademy
-                      ? "bg-gradient-to-r from-violet-500/15 to-fuchsia-500/15 text-fuchsia-200 border border-fuchsia-500/25"
-                      : "bg-violet-500/12 text-violet-300 border border-violet-500/20"
-                    : isAcademy
-                      ? "text-fuchsia-300 hover:bg-gradient-to-r hover:from-violet-500/10 hover:to-fuchsia-500/10"
-                      : "text-gray-400 hover:bg-white/[0.05] hover:text-gray-200"
-                )}>
-                <item.icon className={cn("w-4 h-4 shrink-0 transition-colors",
-                  active
-                    ? isAcademy ? "text-fuchsia-300" : "text-violet-400"
-                    : isAcademy ? "text-fuchsia-400" : "text-gray-500 group-hover:text-gray-300"
-                )} />
-                <span className="flex-1 truncate">{item.label}</span>
-                {badge && (
-                  <span
-                    data-testid={isAcademy ? "sidebar-academy-badge" : undefined}
-                    className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-gradient-to-r from-violet-500/30 to-fuchsia-500/30 text-fuchsia-200 border border-fuchsia-500/30 shrink-0"
-                  >
-                    {badge}
-                  </span>
-                )}
-                {active && !badge && <ChevronRight className="w-3 h-3 text-violet-400/50 shrink-0" />}
-              </Link>
-              {item.info && (
-                <InfoTooltip label={item.label} text={item.info} />
-              )}
-            </div>
-          )
-        })}
-      </nav>
+      {/* ── Main nav · R14.1 em 5 grupos colapsáveis ── */}
+      <SidebarGroupedNav onNavigate={onNavigate} pathname={pathname} />
 
       {/* ── Bottom section ── */}
       <div className="px-2 pb-3 border-t border-white/[0.06] pt-2 space-y-0.5">
