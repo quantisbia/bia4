@@ -52,3 +52,6 @@ logs/
 *.log
 core
 ecosystem.config.cjs.bak
+# R14.1 · backups de refactor nunca vão pro git
+*.bak
+*.r14_1.bak

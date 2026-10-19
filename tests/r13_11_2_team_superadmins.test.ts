@@ -1,21 +1,26 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
  *  R13.11.2 — Time interno Quantis como superadmins
+ *  R13.15.5 — Paula Elbl + Suporte adicionados
  *  ─────────────────────────────────────────────────────────────────────
- *  DECISÃO (Janaina, 2026-09-16):
- *   Dar acesso admin + Academy (sem pagar) para 4 pessoas do time interno.
+ *  DECISÃO (Janaina, 2026-09-16 → 2026-10-18 R13.15.5):
+ *   Dar acesso admin + Academy (sem pagar) para o time interno Quantis.
  *   Cada um recebeu:
  *     1. Entrada em SUPERADMIN_EMAILS (bypass hardcoded no código)
  *     2. role=ADMIN no banco (via scripts/promote-team-admins.ts)
  *     3. Subscription.plan=ACADEMY, status=ACTIVE (créditos altos)
  *     4. AcademyEnrollment manual até 2027-09-16
  *
+ *  TIME ATUAL (6 pessoas):
+ *   - Vitor Mattos, Lucas Guarnier, Kamila Leichtweis, Thais Amaral (R13.11.2)
+ *   - Paula Elbl, Suporte (R13.15.5)
+ *
  *  ESTE ARQUIVO TRAVA:
- *   A) SUPERADMIN_EMAILS contém Janaina + os 4 novos emails
+ *   A) SUPERADMIN_EMAILS contém Janaina + o time interno
  *   B) isSuperAdmin() reconhece todos eles (case-insensitive)
  *   C) isSuperAdmin() ainda rejeita emails aleatórios
  *   D) Script promote-team-admins.ts existe e é idempotente
- *   E) Script promote-team-admins.ts filtra pelos 4 emails corretos
+ *   E) Script promote-team-admins.ts filtra pelos emails do time original
  *   F) Regressão: Janaina não pode ser removida da lista
  * ═══════════════════════════════════════════════════════════════════════
  */
@@ -27,11 +32,18 @@ import { SUPERADMIN_EMAILS, isSuperAdmin } from "../src/lib/auth/admin-shared"
 const ROOT = resolve(__dirname, "..")
 const read = (rel: string) => readFileSync(resolve(ROOT, rel), "utf8")
 
+// R13.11.2 — Time original promovido pelo script promote-team-admins.ts
 const TEAM_EMAILS = [
   "vitor.mattos@quantis.bio",
   "lucas.guarnier@quantis.bio",
   "kamila.leichtweis@quantis.bio",
   "thais.amaral@quantis.bio",
+]
+
+// R13.15.5 — Adições posteriores diretamente em SUPERADMIN_EMAILS
+const EXTRA_SUPERADMINS = [
+  "paula.elbl@quantis.bio",
+  "suporte@quantis.bio",
 ]
 
 describe("R13.11.2 · SUPERADMIN_EMAILS contém time interno Quantis", () => {
@@ -41,7 +53,7 @@ describe("R13.11.2 · SUPERADMIN_EMAILS contém time interno Quantis", () => {
     expect(SUPERADMIN_EMAILS).toContain("janaina@quantis.bio")
   })
 
-  it("A.2) Os 4 emails do time interno estão em SUPERADMIN_EMAILS", () => {
+  it("A.2) Os 4 emails do time original estão em SUPERADMIN_EMAILS", () => {
     for (const email of TEAM_EMAILS) {
       expect(SUPERADMIN_EMAILS).toContain(email)
     }
@@ -52,15 +64,29 @@ describe("R13.11.2 · SUPERADMIN_EMAILS contém time interno Quantis", () => {
     expect(SUPERADMIN_EMAILS).not.toContain("vitor.matos@quantis.bio")
   })
 
-  it("A.4) Total: 6 superadmins (2 Janaina + 4 time)", () => {
-    expect(SUPERADMIN_EMAILS.length).toBe(6)
+  it("A.4) R13.15.5 · Paula Elbl + Suporte adicionados", () => {
+    for (const email of EXTRA_SUPERADMINS) {
+      expect(SUPERADMIN_EMAILS).toContain(email)
+    }
+  })
+
+  it("A.5) Total: 8 superadmins (2 Janaina + 4 time original + 2 R13.15.5)", () => {
+    // 2 Janaina (dernowsek + alias curto) + 4 time + 2 extras = 8
+    expect(SUPERADMIN_EMAILS.length).toBe(2 + TEAM_EMAILS.length + EXTRA_SUPERADMINS.length)
+    expect(SUPERADMIN_EMAILS.length).toBe(8)
   })
 })
 
 describe("R13.11.2 · isSuperAdmin() reconhece corretamente", () => {
 
-  it("B) reconhece todos os 4 emails do time", () => {
+  it("B) reconhece todos os 4 emails do time original", () => {
     for (const email of TEAM_EMAILS) {
+      expect(isSuperAdmin(email)).toBe(true)
+    }
+  })
+
+  it("B.1b) R13.15.5 · reconhece Paula Elbl + Suporte", () => {
+    for (const email of EXTRA_SUPERADMINS) {
       expect(isSuperAdmin(email)).toBe(true)
     }
   })

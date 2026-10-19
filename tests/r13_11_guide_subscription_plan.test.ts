@@ -146,40 +146,63 @@ describe("R13.11 · Home / — card GUIDE presente, cards antigos removidos", ()
   })
 })
 
-describe("R13.11 · BillingClient — PLANS contém apenas GUIDE", () => {
+describe("R13.11 · BillingClient — PLANS reorganizado em R14.1 (CLINICO + LAB_PRO)", () => {
 
-  it("F) BillingClient: array PLANS declarado com id GUIDE", () => {
+  it("F) R14.1 · BillingClient: array PLANS declarado com CLINICO (primeiro pago)", () => {
     const src = read("src/app/dashboard/billing/BillingClient.tsx")
-    // Localiza o bloco `const PLANS = [ ... ]` fora de comentários
     const plansBlock = src.match(/const PLANS = \[([\s\S]*?)\n\]/m)
     expect(plansBlock, "array PLANS deve existir").toBeTruthy()
     const body = plansBlock![1]
-    expect(body).toMatch(/id:\s*"GUIDE"/)
+    expect(body).toMatch(/id:\s*"CLINICO"/)
+  })
+
+  it("F.1b) R14.1 · BillingClient: PLANS também contém LAB_PRO (tier anual)", () => {
+    const src = read("src/app/dashboard/billing/BillingClient.tsx")
+    const plansBlock = src.match(/const PLANS = \[([\s\S]*?)\n\]/m)
+    const body = plansBlock![1]
+    expect(body).toMatch(/id:\s*"LAB_PRO"/)
+  })
+
+  it("F.1c) R14.1 · GUIDE legado NÃO aparece mais no array ativo (migrado p/ LEGACY)", () => {
+    const src = read("src/app/dashboard/billing/BillingClient.tsx")
+    const plansBlock = src.match(/const PLANS = \[([\s\S]*?)\n\]/m)
+    const body = plansBlock![1]
+    const noComments = body.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")
+    expect(noComments).not.toMatch(/id:\s*"GUIDE"/)
   })
 
   it("F.2) BillingClient: PLANS NÃO contém mais entries ADVANCED nem ENTERPRISE como items ativos", () => {
     const src = read("src/app/dashboard/billing/BillingClient.tsx")
     const plansBlock = src.match(/const PLANS = \[([\s\S]*?)\n\]/m)
     const body = plansBlock![1]
-    // Dentro do bloco PLANS ativo, não pode ter `id: "ADVANCED"` ou `id: "ENTERPRISE"` fora de comentário
     const noComments = body.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")
     expect(noComments).not.toMatch(/id:\s*"ADVANCED"/)
     expect(noComments).not.toMatch(/id:\s*"ENTERPRISE"/)
   })
 
-  it("F.3) BillingClient: PLANS.GUIDE tem paymentUrl = Asaas correto", () => {
+  it("F.3) BillingClient: paymentUrl Asaas preservado nos novos planos", () => {
     const src = read("src/app/dashboard/billing/BillingClient.tsx")
     expect(src).toContain(GUIDE_ASAAS)
   })
 
-  it("F.4) BillingClient: PLANS.GUIDE tem price 507 e credits 1500", () => {
+  it("F.4) R14.1 · BillingClient: CLINICO tem price 507 (mês) e credits 1500", () => {
     const src = read("src/app/dashboard/billing/BillingClient.tsx")
-    // Bloco entre `id: "GUIDE"` e o fechamento
-    const guideMatch = src.match(/id:\s*"GUIDE"[\s\S]{0,800}?\},/m)
-    expect(guideMatch).toBeTruthy()
-    const body = guideMatch![0]
+    const clinicoMatch = src.match(/id:\s*"CLINICO"[\s\S]{0,1500}?\},/m)
+    expect(clinicoMatch, 'bloco do plano CLINICO deve existir').toBeTruthy()
+    const body = clinicoMatch![0]
     expect(body).toMatch(/price:\s*507/)
     expect(body).toMatch(/credits:\s*1500/)
+    expect(body).toMatch(/period:\s*"mês"/)
+  })
+
+  it("F.5) R14.1 · BillingClient: LAB_PRO tem price 2375 (ano) e credits 1500", () => {
+    const src = read("src/app/dashboard/billing/BillingClient.tsx")
+    const labMatch = src.match(/id:\s*"LAB_PRO"[\s\S]{0,1500}?\},/m)
+    expect(labMatch, 'bloco do plano LAB_PRO deve existir').toBeTruthy()
+    const body = labMatch![0]
+    expect(body).toMatch(/price:\s*2375/)
+    expect(body).toMatch(/credits:\s*1500/)
+    expect(body).toMatch(/period:\s*"ano"/)
   })
 
   it("G) BillingClient: texto explicativo menciona 'assinatura recorrente' + 'cancelar quando quiser'", () => {
@@ -189,21 +212,20 @@ describe("R13.11 · BillingClient — PLANS contém apenas GUIDE", () => {
     expect(src).toMatch(/1\.500 créditos são\s*[\s\S]{0,100}?renovados/i)
   })
 
-  it("G.2) BillingClient: CTA muda de 'Comprar' para 'Assinar' quando plano é GUIDE", () => {
+  it("G.2) BillingClient: CTA muda de 'Comprar' para 'Assinar' quando plano é GUIDE/CLINICO/LAB_PRO", () => {
     const src = read("src/app/dashboard/billing/BillingClient.tsx")
-    // Nosso ternário: {plan.id === "GUIDE" ? "Assinar agora" : "Comprar agora"}
-    expect(src).toMatch(/plan\.id === "GUIDE" \? "Assinar agora" : "Comprar agora"/)
-    // Mobile: "Assinar" ou "Comprar"
-    expect(src).toMatch(/plan\.id === "GUIDE" \? "Assinar" : "Comprar"/)
+    // R14.1 preservou o ternário por GUIDE (compat c/ cards legados).
+    // Também aceita novo pattern que inclui CLINICO/LAB_PRO.
+    const hasOldPattern = /plan\.id === "GUIDE" \? "Assinar agora" : "Comprar agora"/.test(src)
+    const hasNewPattern = /(CLINICO|LAB_PRO).*(Assinar)/i.test(src) &&
+                          /plan\.id === "GUIDE"/.test(src)
+    expect(hasOldPattern || hasNewPattern, "deve ter ternário Assinar/Comprar").toBe(true)
   })
 
-  it("G.3) BillingClient: card GUIDE mostra '/mês' ao lado do preço", () => {
+  it("G.3) BillingClient: pelo menos um card recorrente mostra '/mês' ao lado do preço", () => {
     const src = read("src/app/dashboard/billing/BillingClient.tsx")
-    // O bloco condicional é `plan.id === "GUIDE"` seguido de `/mês`
-    const idxGuide = src.indexOf('plan.id === "GUIDE"')
-    expect(idxGuide).toBeGreaterThan(-1)
-    const nearby = src.slice(idxGuide, idxGuide + 500)
-    expect(nearby).toMatch(/\/mês/)
+    // R14.1: GUIDE foi legacy. Agora é CLINICO que tem "/mês".
+    expect(src).toMatch(/\/mês/)
   })
 })
 

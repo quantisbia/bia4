@@ -1,19 +1,25 @@
 "use client"
 
-import { useState } from "react"
-import { Settings, User, Bell, Shield, Key, Save, Loader2, ChevronRight } from "lucide-react"
+import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
+import { Settings, User, Bell, Shield, Key, Save, Loader2, ChevronRight, Sparkles } from "lucide-react"
 import { useSession } from "next-auth/react"
 import { cn } from "@/lib/utils/helpers"
+import { ProfilePicker } from "@/components/settings/ProfilePicker"
 
 const TABS = [
-  { key: "profile",       label: "Perfil",         icon: User   },
-  { key: "notifications", label: "Notificações",    icon: Bell   },
-  { key: "security",      label: "Segurança",       icon: Shield },
-  { key: "api",           label: "API Keys",        icon: Key    },
+  { key: "profile",       label: "Perfil",            icon: User     },
+  { key: "specialty",     label: "Minha Área",        icon: Sparkles },  // R14.2 · nova aba
+  { key: "notifications", label: "Notificações",      icon: Bell     },
+  { key: "security",      label: "Segurança",         icon: Shield   },
+  { key: "api",           label: "API Keys",          icon: Key      },
 ]
 
 const PLAN_BADGE: Record<string, string> = {
-  // R13.11 · Plano vigente único
+  // R14.1 · Novos tiers
+  CLINICO:    "text-sky-300 bg-sky-500/10 border-sky-500/30",
+  LAB_PRO:    "text-violet-300 bg-violet-500/10 border-violet-500/30",
+  // R13.11 · Plano legado
   GUIDE:      "text-violet-300 bg-violet-500/10 border-violet-500/30",
   // Planos legados — mantidos p/ assinantes existentes
   ACADEMY:    "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
@@ -26,7 +32,14 @@ const PLAN_BADGE: Record<string, string> = {
 
 export default function SettingsPage() {
   const { data: session, update } = useSession()
-  const [activeTab, setActiveTab] = useState("profile")
+  const searchParams = useSearchParams()
+  // R14.2 · suporta ?tab=specialty vindo do ProfileWelcomeBanner
+  const initialTab = (() => {
+    const t = searchParams?.get("tab")
+    if (t && TABS.some(x => x.key === t)) return t
+    return "profile"
+  })()
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [saving, setSaving]       = useState(false)
   const [saved, setSaved]         = useState(false)
   const [form, setForm] = useState({
@@ -37,6 +50,21 @@ export default function SettingsPage() {
     notifications:   true,
     marketingEmails: false,
   })
+
+  // R14.2 · Carrega researchArea atual para o ProfilePicker
+  const [currentResearchArea, setCurrentResearchArea] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/user/profile")
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!cancelled && data?.researchArea !== undefined) {
+          setCurrentResearchArea(data.researchArea)
+        }
+      })
+      .catch(() => { /* fallback: null */ })
+    return () => { cancelled = true }
+  }, [])
 
   async function saveProfile() {
     setSaving(true)
@@ -88,7 +116,11 @@ export default function SettingsPage() {
 
       {/* ── Content ── */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-        <div className="max-w-md mx-auto sm:mx-0">
+        <div className={cn(
+          "mx-auto sm:mx-0",
+          // R14.2 · specialty precisa de mais largura pro grid de 2 colunas
+          activeTab === "specialty" ? "max-w-3xl" : "max-w-md",
+        )}>
 
           {/* ── PROFILE ── */}
           {activeTab === "profile" && (
@@ -148,6 +180,11 @@ export default function SettingsPage() {
                 </button>
               </div>
             </div>
+          )}
+
+          {/* ── R14.2 · SPECIALTY (perfil clínico/pesquisa) ── */}
+          {activeTab === "specialty" && (
+            <ProfilePicker initialProfile={currentResearchArea} />
           )}
 
           {/* ── NOTIFICATIONS ── */}

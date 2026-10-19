@@ -45,6 +45,34 @@ export const ACADEMY_NAV_ITEMS = [
     info: "Certificados em 3 formatos: por aula (a cada aula concluída), declaração parcial de progresso e certificado de conclusão (ao completar 100%). Todos em PDF A4 paisagem com código único e validação pública." },
 ]
 
+/* ──────────────────────────────────────────────────────────────────
+ *  R14.2 · Agrupamento visual (Clean & Clareza — espelha BIA sidebar)
+ *  3 grupos lógicos sem mudar os itens já existentes.
+ * ──────────────────────────────────────────────────────────────── */
+export interface AcademyNavGroup {
+  id: string
+  label: string
+  itemHrefs: string[]  // referências para ACADEMY_NAV_ITEMS
+}
+
+export const ACADEMY_NAV_GROUPS: AcademyNavGroup[] = [
+  {
+    id: "learn",
+    label: "Aprender",
+    itemHrefs: ["/academy/dashboard", "/academy/journey", "/academy/modules"],
+  },
+  {
+    id: "practice",
+    label: "Praticar",
+    itemHrefs: ["/academy/library", "/academy/project", "/academy/live"],
+  },
+  {
+    id: "celebrate",
+    label: "Celebrar",
+    itemHrefs: ["/academy/certificate"],
+  },
+]
+
 const BOTTOM_ITEMS = [
   { href: "/academy/profile", label: "Perfil", icon: User, exact: false },
 ]
@@ -154,33 +182,44 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </Link>
       </div>
 
-      {/* ── Nav Academy ── */}
-      <nav className="flex-1 px-2 pb-2 space-y-0.5 overflow-y-auto">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-600/80 px-3 pt-1 pb-2">
-          Programa
-        </p>
-        {ACADEMY_NAV_ITEMS.map(item => {
-          const active = isActive(item.href, item.exact)
+      {/* ── R14.2 · Nav Academy em 3 grupos lógicos (Clean & Clareza) ── */}
+      <nav className="flex-1 px-2 pb-2 space-y-3 overflow-y-auto" data-testid="academy-sidebar-grouped-nav">
+        {ACADEMY_NAV_GROUPS.map(group => {
+          const items = group.itemHrefs
+            .map(href => ACADEMY_NAV_ITEMS.find(i => i.href === href))
+            .filter((x): x is typeof ACADEMY_NAV_ITEMS[number] => Boolean(x))
           return (
-            <div key={item.href} className="flex items-center gap-1">
-              <Link
-                href={item.href}
-                onClick={onNavigate}
-                data-testid={`academy-sidebar-link-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
-                className={cn(
-                  "flex-1 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group min-w-0",
-                  active
-                    ? "bg-gradient-to-r from-violet-500/15 to-fuchsia-500/15 text-fuchsia-200 border border-fuchsia-500/25"
-                    : "text-gray-400 hover:bg-white/[0.05] hover:text-gray-200"
-                )}
-              >
-                <item.icon className={cn("w-4 h-4 shrink-0 transition-colors",
-                  active ? "text-fuchsia-300" : "text-gray-500 group-hover:text-gray-300"
-                )} />
-                <span className="flex-1 truncate">{item.label}</span>
-                {active && <ChevronRight className="w-3 h-3 text-fuchsia-400/50 shrink-0" />}
-              </Link>
-              {item.info && <InfoTooltip label={item.label} text={item.info} />}
+            <div key={group.id} data-testid={`academy-sidebar-group-${group.id}`}>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-fuchsia-300/60 px-3 pt-1 pb-1.5">
+                {group.label}
+              </p>
+              <div className="space-y-0.5">
+                {items.map(item => {
+                  const active = isActive(item.href, item.exact)
+                  return (
+                    <div key={item.href} className="flex items-center gap-1">
+                      <Link
+                        href={item.href}
+                        onClick={onNavigate}
+                        data-testid={`academy-sidebar-link-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                        className={cn(
+                          "flex-1 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group min-w-0",
+                          active
+                            ? "bg-gradient-to-r from-violet-500/15 to-fuchsia-500/15 text-fuchsia-200 border border-fuchsia-500/25"
+                            : "text-gray-400 hover:bg-white/[0.05] hover:text-gray-200"
+                        )}
+                      >
+                        <item.icon className={cn("w-4 h-4 shrink-0 transition-colors",
+                          active ? "text-fuchsia-300" : "text-gray-500 group-hover:text-gray-300"
+                        )} />
+                        <span className="flex-1 truncate">{item.label}</span>
+                        {active && <ChevronRight className="w-3 h-3 text-fuchsia-400/50 shrink-0" />}
+                      </Link>
+                      {item.info && <InfoTooltip label={item.label} text={item.info} />}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )
         })}

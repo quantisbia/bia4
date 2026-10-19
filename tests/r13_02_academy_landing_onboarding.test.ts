@@ -538,8 +538,9 @@ describe("R13.02.J · DashboardSidebar tem link Academy (para TODOS, com badge)"
   it("Render loop suporta exibir badge quando presente", () => {
     const src = readSrc(sidebarPath)
     expect(src).toMatch(/badge/)
-    // deve renderizar badge no JSX
-    expect(src).toMatch(/\{badge/)
+    // R14.1 · O SidebarGroupedNav lê o campo .badge do item.
+    // Aceita ambos os padrões: `{badge}` (antigo) ou `{item.badge}` (novo R14.1).
+    expect(src).toMatch(/\{\s*(item\.)?badge\s*[}&]/)
   })
 
   it("Não tem gate de role (visível para TODOS os usuários — decisão #4 Opção A)", () => {

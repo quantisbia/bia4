@@ -23,7 +23,10 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
       min: { x: 0, y: 0, z: 0 },
       max: { x: 200, y: 200, z: 200 },
     },
-    bedShape: "rectangular",
+    // R12.64 · Mesa REDONDA (petri/wells circulares) — reutilizamos o adapter
+    // da Ender 3 com uma bandeja circular de 180 mm (<= 200 do buildVolume XY).
+    bedShape: "circular",
+    bedDiameter_mm: 180,
     extrusionMode: "pressure_kpa",
     maxFeedrate: { xy: 4800, z: 600, e: 600 },
     minFeedrate: { xy: 60, z: 30, e: 30 },
@@ -61,7 +64,10 @@ export const BIOPRINTER_PROFILES: Record<string, BioprinterProfile> = {
       min: { x: 0, y: 0, z: 0 },
       max: { x: 130, y: 90, z: 60 },
     },
-    bedShape: "rectangular",
+    // R12.64 · Mesa REDONDA (compatível com Petri/wells circulares).
+    // Diâmetro = menor dimensão XY (90 mm).
+    bedShape: "circular",
+    bedDiameter_mm: 90,
     extrusionMode: "pressure_kpa",
     maxFeedrate: { xy: 3000, z: 600, e: 600 },
     minFeedrate: { xy: 60, z: 30, e: 30 },

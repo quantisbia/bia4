@@ -23,6 +23,7 @@ import {
   Play, ArrowRight, Trophy, Clock, Video, BookOpen,
   Sparkles, ChevronRight, Calendar, Rss,
 } from "lucide-react"
+import { AcademyWelcomeBanner } from "@/components/academy/AcademyWelcomeBanner"
 
 export const dynamic = "force-dynamic"
 
@@ -78,23 +79,30 @@ export default async function AcademyDashboardPage() {
     journey.continueFrom && journey.nextRecommendedLesson &&
     journey.continueFrom.id !== journey.nextRecommendedLesson.id
 
+  // R14.2 · CTA primário do banner — "Continuar" ou "Começar primeira aula"
+  const primaryLesson = journey.continueFrom ?? journey.nextRecommendedLesson
+  const primaryCta = primaryLesson
+    ? {
+        label: journey.continueFrom?.status === "IN_PROGRESS"
+          ? "Continuar de onde parei"
+          : journey.completedLessons === 0
+            ? "Começar primeira aula"
+            : "Próxima aula",
+        href: `/academy/modules/${primaryLesson.moduleSlug}/${primaryLesson.slug}`,
+      }
+    : { label: "Ver minha jornada", href: "/academy/journey" }
+
   return (
     <div className="max-w-6xl mx-auto px-6 py-8 space-y-8" data-testid="academy-dashboard-root">
 
-      {/* ── Header ── */}
-      <header className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-widest text-fuchsia-300/80">
-          BIA Academy · Dashboard do aluno
-        </p>
-        <h1 className="text-3xl font-bold text-white">
-          Bem-vindo(a), {userName} 👋
-        </h1>
-        <p className="text-sm text-gray-400">
-          {journey.completedLessons === 0
-            ? "Comece pela primeira aula do Módulo 1 — a jornada é sua."
-            : `Você já concluiu ${journey.completedLessons} de ${journey.totalLessons} aulas publicadas.`}
-        </p>
-      </header>
+      {/* ── R14.2 · Hero visual Clean & Clareza (mesmo padrão da plataforma BIA) ── */}
+      <AcademyWelcomeBanner
+        userName={userName}
+        completedLessons={journey.completedLessons}
+        totalLessons={journey.totalLessons}
+        daysLeft={days ?? null}
+        primaryCta={primaryCta}
+      />
 
       {/* ── Cards principais ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

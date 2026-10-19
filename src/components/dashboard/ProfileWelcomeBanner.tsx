@@ -207,7 +207,7 @@ export function ProfileWelcomeBanner({ userName, researchArea }: ProfileWelcomeB
             👆 Esse é um perfil sugerido. <strong>Personalize</strong> para a BIA destacar as ferramentas certas pra você.
           </p>
           <Link
-            href="/dashboard/settings"
+            href="/dashboard/settings?tab=specialty"
             data-testid="profile-onboarding-cta"
             className="text-[11px] sm:text-xs font-semibold text-amber-300 hover:text-amber-200 underline underline-offset-2 shrink-0"
           >
