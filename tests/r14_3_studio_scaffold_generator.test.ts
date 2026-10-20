@@ -330,56 +330,60 @@ describe("R14.3 · F) STL exporter · ASCII", () => {
  * ══════════════════════════════════════════════════════════════════════ */
 describe("R14.3 · G) Parser · dimensões", () => {
 
-  it("extrai 3D em mm: '20x15x10 mm'", () => {
+  it("extrai 3D em mm: '20x15x10 mm' (dimensões vão em anatomy)", () => {
     const r = parseScaffoldPrompt("Scaffold 20x15x10 mm gyroid")
-    expect(r.params.sizeX).toBe(20)
-    expect(r.params.sizeY).toBe(15)
-    expect(r.params.sizeZ).toBe(10)
+    expect(r.anatomy.sizeX).toBe(20)
+    expect(r.anatomy.sizeY).toBe(15)
+    expect(r.anatomy.sizeZ).toBe(10)
   })
 
   it("extrai 3D em cm: '2x1.5x1 cm' → 20x15x10 mm", () => {
     const r = parseScaffoldPrompt("Scaffold 2x1.5x1 cm")
-    expect(r.params.sizeX).toBe(20)
-    expect(r.params.sizeY).toBe(15)
-    expect(r.params.sizeZ).toBe(10)
+    expect(r.anatomy.sizeX).toBe(20)
+    expect(r.anatomy.sizeY).toBe(15)
+    expect(r.anatomy.sizeZ).toBe(10)
   })
 
   it("aceita vírgula decimal pt-BR: '1,5 cm'", () => {
     const r = parseScaffoldPrompt("Scaffold 1,5 cm cubo gyroid")
-    expect(r.params.sizeX).toBe(15)
+    expect(r.anatomy.sizeX).toBe(15)
   })
 
   it("fallback 2D: assume espessura 3 mm e warning", () => {
     const r = parseScaffoldPrompt("Scaffold 20x15 mm")
-    expect(r.params.sizeX).toBe(20)
-    expect(r.params.sizeY).toBe(15)
-    expect(r.params.sizeZ).toBe(3)
+    expect(r.anatomy.sizeX).toBe(20)
+    expect(r.anatomy.sizeY).toBe(15)
+    expect(r.anatomy.sizeZ).toBe(3)
     expect(r.warnings.some(w => w.toLowerCase().includes("espessura"))).toBe(true)
   })
 
   it("fallback 1D: gera cubo e warning", () => {
     const r = parseScaffoldPrompt("Scaffold 15 mm gyroid")
-    expect(r.params.sizeX).toBe(15)
-    expect(r.params.sizeY).toBe(15)
-    expect(r.params.sizeZ).toBe(15)
+    expect(r.anatomy.sizeX).toBe(15)
+    expect(r.anatomy.sizeY).toBe(15)
+    expect(r.anatomy.sizeZ).toBe(15)
     expect(r.warnings.some(w => w.toLowerCase().includes("cubo"))).toBe(true)
   })
 
-  it("sem dimensões + sem preset: usa default 20×20×10 + warning 'default'", () => {
-    // Prompt vago, sem keyword de preset, sem dimensões
+  it("R14.4 · sem dimensões + sem preset + sem forma: fallback block + warning", () => {
+    // Prompt vago → forma anatômica default = block (bloco)
     const r = parseScaffoldPrompt("Quero gerar um scaffold básico")
-    expect(r.params.sizeX).toBe(20)
-    expect(r.params.sizeY).toBe(20)
-    expect(r.params.sizeZ).toBe(10)
-    expect(r.warnings.some(w => w.toLowerCase().includes("default"))).toBe(true)
+    // Block tem dimensões típicas 20×20×10
+    expect(r.anatomy.kind).toBe("block")
+    expect(r.anatomy.sizeX).toBe(20)
+    expect(r.anatomy.sizeY).toBe(20)
+    expect(r.anatomy.sizeZ).toBe(10)
+    // Warning avisa que caiu no fallback (sem forma OU sem dimensões)
+    const hasAnyWarn = r.warnings.some(w => /anat[ôo]mica|bloco|default|dimens/i.test(w))
+    expect(hasAnyWarn).toBe(true)
   })
 
-  it("sem dimensões MAS com preset: usa defaults do preset (sem warning)", () => {
-    // Com preset identificado, o parser usa os defaults do PRESET, não precisa warning
+  it("R14.4 · sem dimensões MAS com preset: infere forma + dimensões típicas", () => {
+    // Com preset identificado → forma anatômica inferida (ex: ósseo esponjoso → femur_seg)
     const r = parseScaffoldPrompt("Quero um scaffold ósseo")
     expect(r.presetId).toBe("scaffold_ossea_esponjosa")
-    // dimensões default do preset path
-    expect(r.params.sizeX).toBeGreaterThan(0)
+    expect(r.anatomy.sizeX).toBeGreaterThan(0)
+    expect(r.anatomy.kind).toBe("femur_seg") // inferido do preset
   })
 })
 
@@ -403,24 +407,25 @@ describe("R14.3 · H) Parser · porosidade/TPMS/preset", () => {
     expect(r.extracted.porosity).toBeCloseTo(0.75, 2)
   })
 
-  it("identifica gyroid (3 grafias): gyroid, giroide, giroid", () => {
+  it("identifica gyroid (3 grafias): gyroid, giroide, giroid — vai em tpmsParams (infill, não STL)", () => {
     for (const kw of ["gyroid", "giroide", "giroid"]) {
       const r = parseScaffoldPrompt(`Scaffold 10 mm ${kw}`)
-      expect(r.params.kind).toBe("gyroid")
+      expect(r.tpmsParams.kind).toBe("gyroid")
+      expect(r.infillSuggestion.pattern).toBe("gyroid")
     }
   })
 
   it("identifica schwarz_p (variantes): 'schwarz', 'schwarz-p'", () => {
     for (const kw of ["schwarz", "schwarz-p"]) {
       const r = parseScaffoldPrompt(`Scaffold 10 mm ${kw}`)
-      expect(r.params.kind).toBe("schwarz_p")
+      expect(r.tpmsParams.kind).toBe("schwarz_p")
     }
   })
 
   it("identifica diamond (pt+en): 'diamond', 'diamante'", () => {
     for (const kw of ["diamond", "diamante"]) {
       const r = parseScaffoldPrompt(`Scaffold 10 mm ${kw}`)
-      expect(r.params.kind).toBe("diamond")
+      expect(r.tpmsParams.kind).toBe("diamond")
     }
   })
 
@@ -481,7 +486,10 @@ describe("R14.3 · I) Parser · robustez e confidence", () => {
     ]
     for (const s of samples) {
       const r = parseScaffoldPrompt(s)
-      expect(() => validateTPMSParams(r.params), s).not.toThrow()
+      // R14.4: TPMS vira infill (tpmsParams); anatomy é forma sólida.
+      // Ambos devem ser válidos.
+      expect(() => validateTPMSParams(r.tpmsParams), `tpms ${s}`).not.toThrow()
+      expect(r.anatomy.sizeX, `anatomy ${s}`).toBeGreaterThan(0)
     }
   })
 
@@ -616,15 +624,19 @@ describe("R14.3 · K) Arquivos de UI/API presentes", () => {
  * ══════════════════════════════════════════════════════════════════════ */
 describe("R14.3 · L) Integração end-to-end (parser → mesh → STL)", () => {
 
-  it("prompt completo gera STL válido no fim", () => {
+  it("R14.4 · prompt completo gera STL ANATÔMICO válido (sólido, não TPMS)", async () => {
+    const { generateAnatomyMesh } = await import("../src/lib/studio/anatomy")
     const prompt = "Scaffold ósseo esponjoso gyroid 15x15x8 mm porosidade 75%"
     const parsed = parseScaffoldPrompt(prompt)
 
-    // Força resolução baixa pros testes serem rápidos
-    const params = { ...parsed.params, resolution: 24 }
-    const mesh = generateTPMSMesh(params)
-
+    // Agora é anatomy mesh, não TPMS mesh
+    const mesh = generateAnatomyMesh(parsed.anatomy)
     expect(mesh.stats.triangleCount).toBeGreaterThan(0)
+    // Mesh anatômica é SÓLIDA — porosidade sempre 0 no STL
+    expect(mesh.stats.porosity).toBe(0)
+    // Infill ainda está disponível como metadado (pro slicer)
+    expect(parsed.infillSuggestion.pattern).toBe("gyroid")
+    expect(parsed.infillSuggestion.porosity).toBeCloseTo(0.75, 1)
 
     const stl = meshToSTLBinary(mesh)
     const r = validateSTLBinary(stl)
@@ -632,11 +644,10 @@ describe("R14.3 · L) Integração end-to-end (parser → mesh → STL)", () => 
     if (r.ok) expect(r.triangleCount).toBe(mesh.stats.triangleCount)
   })
 
-  it("porosidade do mesh gerado está próxima da requisitada (±15%)", () => {
+  it("R14.4 · infillSuggestion carrega porosidade requisitada (±5%)", () => {
     const parsed = parseScaffoldPrompt("Scaffold gyroid 20x20x20 mm 70% porosidade")
-    const mesh = generateTPMSMesh({ ...parsed.params, resolution: 32 })
-    // Tolerância ±15% (TPMS exato é difícil, mas a direção tem que estar certa)
-    expect(mesh.stats.porosity).toBeGreaterThan(0.55)
-    expect(mesh.stats.porosity).toBeLessThan(0.85)
+    // Porosidade agora é metadado do infill (não do mesh STL)
+    expect(parsed.infillSuggestion.porosity).toBeCloseTo(0.70, 1)
+    expect(parsed.infillSuggestion.pattern).toBe("gyroid")
   })
 })

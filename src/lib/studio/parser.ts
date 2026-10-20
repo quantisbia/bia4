@@ -32,14 +32,29 @@
 
 import type { TPMSKind, TPMSParams } from "./tpms"
 import { CLINICAL_PRESETS, presetToTPMSParams, porosityToWallThickness } from "./tpms"
+import type { AnatomyKind, AnatomyParams } from "./anatomy"
+import { ANATOMY_CATALOG, getAnatomyMeta } from "./anatomy"
 
 export interface ParseResult {
-  /** Parâmetros TPMS prontos para generateTPMSMesh(). */
-  params: TPMSParams
+  /** ★ R14.4 · Parâmetros da FORMA ANATÔMICA sólida (o que vai no STL). */
+  anatomy: AnatomyParams
+  /**
+   * Padrão de INFILL sugerido (gyroid/schwarz-p/diamond) — NÃO faz parte
+   * do STL. É um metadado que a BIA passa pro slicer na próxima etapa
+   * (geração do G-code). O STL exportado é sempre o sólido anatômico.
+   */
+  infillSuggestion: {
+    pattern: TPMSKind
+    porosity: number
+    cellsPerAxis: number
+  }
+  /** Params TPMS prontos (caso o usuário queira ver o PADRÃO de infill isolado). */
+  tpmsParams: TPMSParams
   /** Preset clínico detectado (se houver). */
   presetId: keyof typeof CLINICAL_PRESETS | null
   /** Lista de "fatos" extraídos do texto, pra feedback ao usuário. */
   extracted: {
+    anatomyKind?: AnatomyKind
     dimensions?: { x: number; y: number; z: number; unit: "mm" }
     porosity?: number
     kind?: TPMSKind
@@ -51,6 +66,69 @@ export interface ParseResult {
   /** Score 0-1 de confiança (quanto mais específico, maior). */
   confidence: number
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  R14.4 · Keywords de FORMA ANATÔMICA (prioridade sobre preset clínico)
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+const ANATOMY_KEYWORDS: Array<{ patterns: RegExp[]; kind: AnatomyKind }> = [
+  {
+    patterns: [
+      /\bmenisco\b/i, /\bmeia[- ]lua\b/i, /\bmeia lua\b/i, /\bsemi[- ]lunar\b/i,
+      /\bcrescent/i,
+    ],
+    kind: "crescent",
+  },
+  {
+    patterns: [
+      /\bcalota\b/i, /\bcrani[aáâ]/i, /\bcran[eê]/i, /\bcraniotomia\b/i,
+      /\bcranioplastia\b/i, /\bdefeito craniano\b/i,
+    ],
+    kind: "cranial_cap",
+  },
+  {
+    patterns: [
+      /\bmand[íi]bula\b/i, /\bmandibular\b/i,
+      /\barco mandibular\b/i, /\bramo mandibular\b/i,
+    ],
+    kind: "mandible_seg",
+  },
+  {
+    patterns: [
+      /\bf[êe]mur\b/i, /\bt[íi]bia\b/i, /\b[úu]mero\b/i, /\br[áa]dio\b/i,
+      /\bdi[áa]fise\b/i, /\bdiafis[áa]rio\b/i, /\bosso longo\b/i,
+      /\bbone plug\b/i,
+    ],
+    kind: "femur_seg",
+  },
+  {
+    patterns: [
+      /\borelha\b/i, /\baurícula\b/i, /\bauricula\b/i, /\bauricular\b/i,
+      /\bmicrotia\b/i, /\bpavilhão\b/i, /\bpavilhao\b/i,
+    ],
+    kind: "ear_auricle",
+  },
+  {
+    patterns: [
+      /\bdisco intervertebral\b/i, /\bdisco cervical\b/i, /\bdisco lombar\b/i,
+      /\bannulus\b/i, /\bher[nñ]i[aá] de disco\b/i,
+    ],
+    kind: "disc",
+  },
+  {
+    patterns: [
+      /\bcilindro\b/i, /\btubo\b/i, /\btubular\b/i,
+    ],
+    kind: "cylinder",
+  },
+  {
+    patterns: [
+      /\bbloco\b/i, /\bret[âa]ngular\b/i, /\bparalelepípedo\b/i, /\bparalelepipedo\b/i,
+      /\bcubo\b/i,
+    ],
+    kind: "block",
+  },
+]
 
 /* ═══════════════════════════════════════════════════════════════════════
  *  Catálogo de keywords pt-BR
@@ -228,7 +306,7 @@ export function parseScaffoldPrompt(input: string, opts: ParseOptions = {}): Par
     extracted.porosity = porosity
   }
 
-  // ── 3. Tipo de TPMS ──
+  // ── 3. Tipo de TPMS (infill pattern, não parte do STL) ──
   let kind: TPMSKind | undefined
   for (const [kw, k] of Object.entries(KIND_KEYWORDS)) {
     if (normalized.includes(kw)) {
@@ -238,7 +316,7 @@ export function parseScaffoldPrompt(input: string, opts: ParseOptions = {}): Par
     }
   }
 
-  // ── 4. Preset clínico ──
+  // ── 4. Preset clínico (define infill padrão + sugere forma) ──
   let presetId: keyof typeof CLINICAL_PRESETS | null = null
   for (const { patterns, preset } of PRESET_KEYWORDS) {
     if (patterns.some(p => p.test(normalized))) {
@@ -247,7 +325,6 @@ export function parseScaffoldPrompt(input: string, opts: ParseOptions = {}): Par
       break
     }
   }
-  // Fallback: "osso" sem especificar → esponjoso (mais comum em pesquisa)
   if (!presetId && BONE_FALLBACK.test(normalized)) {
     presetId = "scaffold_ossea_esponjosa"
     extracted.preset = presetId
@@ -261,62 +338,113 @@ export function parseScaffoldPrompt(input: string, opts: ParseOptions = {}): Par
     extracted.cellsPerAxis = cellsPerAxis
   }
 
-  // ── 6. Montagem final dos parâmetros ──
+  // ★ R14.4 · 6. FORMA ANATÔMICA (prioridade sobre preset na escolha do mesh)
+  let anatomyKind: AnatomyKind | undefined
+  for (const { patterns, kind: k } of ANATOMY_KEYWORDS) {
+    if (patterns.some(p => p.test(normalized))) {
+      anatomyKind = k
+      extracted.anatomyKind = k
+      break
+    }
+  }
+  if (!anatomyKind && presetId) {
+    anatomyKind = inferAnatomyFromPreset(presetId)
+  }
+  if (!anatomyKind) {
+    anatomyKind = "block"
+    warnings.push("Forma anatômica não especificada — gerando bloco retangular. Diga 'menisco', 'calota', 'orelha', etc. pra formas específicas.")
+  }
+
+  // ── 7. Montagem final dos parâmetros ──
   const defaults = { ...BIA_DEFAULTS, ...opts.defaults }
 
-  let params: TPMSParams
+  // Dimensões: se o usuário não disse, usa dimensões típicas da forma anatômica
+  const anatomyMeta = getAnatomyMeta(anatomyKind)
+  const finalDims = dimensions ?? {
+    x: anatomyMeta.typicalDims.x,
+    y: anatomyMeta.typicalDims.y,
+    z: anatomyMeta.typicalDims.z,
+    unit: "mm" as const,
+  }
+  if (!dimensions) {
+    warnings.push(`Dimensões não especificadas — usando defaults típicos de ${anatomyMeta.shortLabel.toLowerCase()}: ${finalDims.x}×${finalDims.y}×${finalDims.z} mm.`)
+  }
+
+  const anatomy: AnatomyParams = {
+    kind: anatomyKind,
+    sizeX: finalDims.x,
+    sizeY: finalDims.y,
+    sizeZ: finalDims.z,
+    resolution: defaults.resolution,
+  }
+
+  // TPMS params (padrão de infill — metadados pro slicer)
+  let tpmsParams: TPMSParams
   if (presetId) {
-    // Preset dá kind + porosityTarget + cellsPerAxis
-    const sx = dimensions?.x ?? defaults.sizeX
-    const sy = dimensions?.y ?? defaults.sizeY
-    const sz = dimensions?.z ?? defaults.sizeZ
-    params = presetToTPMSParams(presetId, sx, sy, sz, defaults.resolution)
-    // Overrides manuais vindos do prompt
-    if (kind) params.kind = kind
-    if (porosity !== undefined) {
-      params.wallThickness = porosityToWallThickness(porosity, params.kind)
-    }
-    if (cellsPerAxis !== undefined) params.cellsPerAxis = cellsPerAxis
+    tpmsParams = presetToTPMSParams(presetId, finalDims.x, finalDims.y, finalDims.z, defaults.resolution)
+    if (kind) tpmsParams.kind = kind
+    if (porosity !== undefined) tpmsParams.wallThickness = porosityToWallThickness(porosity, tpmsParams.kind)
+    if (cellsPerAxis !== undefined) tpmsParams.cellsPerAxis = cellsPerAxis
   } else {
-    // Sem preset — monta do zero com defaults
     const finalKind = kind ?? defaults.kind
-    params = {
+    tpmsParams = {
       kind: finalKind,
-      sizeX: dimensions?.x ?? defaults.sizeX,
-      sizeY: dimensions?.y ?? defaults.sizeY,
-      sizeZ: dimensions?.z ?? defaults.sizeZ,
+      sizeX: finalDims.x, sizeY: finalDims.y, sizeZ: finalDims.z,
       resolution: defaults.resolution,
       cellsPerAxis: cellsPerAxis ?? defaults.cellsPerAxis,
       wallThickness: porosity !== undefined
         ? porosityToWallThickness(porosity, finalKind)
         : defaults.wallThickness,
     }
-    if (!dimensions) {
-      warnings.push("Dimensões não especificadas — usando default 20×20×10 mm.")
-    }
-    if (!kind) {
-      warnings.push("Tipo de estrutura não especificado — usando gyroid (melhor pra vascularização).")
-    }
-    if (porosity === undefined) {
-      warnings.push("Porosidade não especificada — usando default 70%.")
-    }
   }
 
-  // ── 7. Confiança ──
-  let confidence = 0.3 // base
-  if (dimensions) confidence += 0.25
-  if (porosity !== undefined) confidence += 0.15
-  if (kind) confidence += 0.15
+  // Infill suggestion derivada
+  const inferredPorosity = porosity ?? inferPorosityFromWall(tpmsParams.wallThickness, tpmsParams.kind)
+  const infillSuggestion = {
+    pattern: tpmsParams.kind,
+    porosity: inferredPorosity,
+    cellsPerAxis: tpmsParams.cellsPerAxis,
+  }
+
+  // ── 8. Confiança ──
+  let confidence = 0.3
+  if (dimensions) confidence += 0.20
+  if (porosity !== undefined) confidence += 0.10
+  if (kind) confidence += 0.10
   if (presetId) confidence += 0.15
+  if (anatomyKind && anatomyKind !== "block") confidence += 0.15
   confidence = Math.min(1, confidence)
 
   return {
-    params,
+    anatomy,
+    infillSuggestion,
+    tpmsParams,
     presetId,
     extracted,
     warnings,
     confidence,
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  Mapeamento preset clínico → forma anatômica padrão sugerida
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+function inferAnatomyFromPreset(preset: keyof typeof CLINICAL_PRESETS): AnatomyKind {
+  switch (preset) {
+    case "scaffold_ossea_cortical":  return "cranial_cap"
+    case "scaffold_ossea_esponjosa": return "femur_seg"
+    case "scaffold_cartilagem":      return "crescent"
+    case "scaffold_pele":            return "block"
+    case "scaffold_alveolar":        return "mandible_seg"
+    case "scaffold_tecido_mole":     return "block"
+    default:                         return "block"
+  }
+}
+
+function inferPorosityFromWall(wall: number, kind: TPMSKind): number {
+  const factor = kind === "gyroid" ? 1.5 : kind === "diamond" ? 1.3 : 1.2
+  return Math.max(0.1, Math.min(0.95, 1 - wall / factor))
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -339,7 +467,7 @@ function parseFloatBR(s: string): number {
  * ═══════════════════════════════════════════════════════════════════════ */
 
 export function describeParseResult(result: ParseResult): string {
-  const { params, presetId, extracted } = result
+  const { anatomy, infillSuggestion, presetId } = result
   const parts: string[] = []
 
   if (presetId) {
@@ -347,16 +475,13 @@ export function describeParseResult(result: ParseResult): string {
     parts.push(`🎯 ${label}`)
   }
 
-  const kindLabel = params.kind === "gyroid" ? "Gyroid" : params.kind === "schwarz_p" ? "Schwarz-P" : "Diamond"
-  parts.push(`Estrutura: ${kindLabel}`)
+  const anatomyMeta = getAnatomyMeta(anatomy.kind)
+  parts.push(`${anatomyMeta.emoji} ${anatomyMeta.shortLabel}`)
+  parts.push(`${anatomy.sizeX}×${anatomy.sizeY}×${anatomy.sizeZ} mm`)
 
-  parts.push(`Dimensões: ${params.sizeX}×${params.sizeY}×${params.sizeZ} mm`)
-
-  // Porosidade estimada: 1 - wallThickness/factor (reversível)
-  const porosityEst = extracted.porosity ?? (1 - params.wallThickness / 1.4)
-  parts.push(`Porosidade alvo: ~${(porosityEst * 100).toFixed(0)}%`)
-
-  parts.push(`${params.cellsPerAxis} células/eixo`)
+  const patternLabel = infillSuggestion.pattern === "gyroid" ? "Gyroid" :
+                       infillSuggestion.pattern === "schwarz_p" ? "Schwarz-P" : "Diamond"
+  parts.push(`Infill sugerido: ${patternLabel} ~${(infillSuggestion.porosity * 100).toFixed(0)}%`)
 
   return parts.join(" · ")
 }

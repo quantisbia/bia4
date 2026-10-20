@@ -22,7 +22,13 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { prisma } from "@/lib/db/prisma"
 import { parseScaffoldPrompt } from "@/lib/studio/parser"
-import { generateTPMSMesh, type TPMSParams, validateTPMSParams } from "@/lib/studio/tpms"
+import { type TPMSParams, validateTPMSParams } from "@/lib/studio/tpms"
+import {
+  generateAnatomyMesh,
+  validateAnatomyParams,
+  type AnatomyParams,
+  getAnatomyMeta,
+} from "@/lib/studio/anatomy"
 import { meshToSTLBinary } from "@/lib/studio/stl-exporter"
 import { canUseFeature, buildQuotaExhaustedMessage } from "@/lib/plan/quotas"
 
@@ -35,21 +41,51 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 })
   }
 
-  let body: { prompt?: string; params?: TPMSParams; filename?: string }
+  let body: {
+    prompt?: string
+    anatomy?: AnatomyParams
+    tpms?: TPMSParams
+    infill?: { pattern: TPMSParams["kind"]; porosity: number; cellsPerAxis: number }
+    filename?: string
+  }
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 })
   }
 
-  // ── Resolve TPMSParams ──
-  let params: TPMSParams
+  // ★ R14.4 · Resolve o que vai no STL (SÓLIDO anatômico, não TPMS)
+  let anatomyParams: AnatomyParams
+  let infillMeta: { pattern: TPMSParams["kind"]; porosity: number; cellsPerAxis: number } | null = null
   let parseInfo: ReturnType<typeof parseScaffoldPrompt> | null = null
 
-  if (body.params) {
+  if (body.anatomy) {
     try {
-      validateTPMSParams(body.params)
-      params = body.params
+      validateAnatomyParams(body.anatomy)
+      anatomyParams = body.anatomy
+      if (body.infill) infillMeta = body.infill
+    } catch (err) {
+      return NextResponse.json(
+        { error: "invalid_params", message: err instanceof Error ? err.message : "parâmetros inválidos" },
+        { status: 400 },
+      )
+    }
+  } else if (body.tpms) {
+    // Compat R14.3: aceita TPMS direto, mas gera BLOCK com dimensões TPMS
+    // (o TPMS vira só o metadata do infill, não vai no STL).
+    try {
+      validateTPMSParams(body.tpms)
+      anatomyParams = {
+        kind: "block",
+        sizeX: body.tpms.sizeX,
+        sizeY: body.tpms.sizeY,
+        sizeZ: body.tpms.sizeZ,
+      }
+      infillMeta = {
+        pattern: body.tpms.kind,
+        porosity: 1 - body.tpms.wallThickness / 1.4,
+        cellsPerAxis: body.tpms.cellsPerAxis,
+      }
     } catch (err) {
       return NextResponse.json(
         { error: "invalid_params", message: err instanceof Error ? err.message : "parâmetros inválidos" },
@@ -59,7 +95,8 @@ export async function POST(req: Request) {
   } else if (body.prompt) {
     try {
       parseInfo = parseScaffoldPrompt(body.prompt)
-      params = parseInfo.params
+      anatomyParams = parseInfo.anatomy
+      infillMeta = parseInfo.infillSuggestion
     } catch (err) {
       return NextResponse.json(
         { error: "parse_error", message: err instanceof Error ? err.message : "não entendi o prompt" },
@@ -68,7 +105,7 @@ export async function POST(req: Request) {
     }
   } else {
     return NextResponse.json(
-      { error: "missing_input", message: "Envie 'prompt' (texto) ou 'params' (TPMSParams)." },
+      { error: "missing_input", message: "Envie 'prompt' (texto) OU 'anatomy' (forma + dims) OU 'tpms' (compat R14.3)." },
       { status: 400 },
     )
   }
@@ -109,11 +146,12 @@ export async function POST(req: Request) {
     )
   }
 
-  // ── Geração do mesh (CPU-bound, pode levar 5-20s) ──
+  // ★ R14.4 · Geração do mesh SÓLIDO ANATÔMICO (zero porosidade no STL)
+  // Infill é metadado — vai no header pro slicer usar depois.
   const t0 = Date.now()
   let mesh
   try {
-    mesh = generateTPMSMesh(params)
+    mesh = generateAnatomyMesh(anatomyParams)
   } catch (err) {
     return NextResponse.json(
       { error: "generation_failed", message: err instanceof Error ? err.message : "falha interna" },
@@ -122,22 +160,21 @@ export async function POST(req: Request) {
   }
   const genMs = Date.now() - t0
 
-  // Mesh vazio? Para TPMS, isso pode indicar porosidade extrema (0 ou 1)
   if (mesh.indices.length === 0) {
     return NextResponse.json(
       {
         error: "empty_mesh",
-        message: "A superfície gerada ficou vazia. Ajuste a porosidade ou o número de células.",
+        message: "Mesh anatômica vazia (dimensões degeneradas). Verifique os valores.",
       },
       { status: 422 },
     )
   }
 
   // ── Export STL binário ──
-  const stlBuf = meshToSTLBinary(
-    mesh,
-    `BIA v4 Studio | ${params.kind} | ${params.sizeX}x${params.sizeY}x${params.sizeZ}mm | poros ${(mesh.stats.porosity * 100).toFixed(1)}%`,
-  )
+  const anatomyMeta = getAnatomyMeta(anatomyParams.kind)
+  const headerComment = `BIA v4 Studio | ${anatomyMeta.label} | ${anatomyParams.sizeX}x${anatomyParams.sizeY}x${anatomyParams.sizeZ}mm` +
+    (infillMeta ? ` | infill ${infillMeta.pattern} ${(infillMeta.porosity * 100).toFixed(0)}%` : "")
+  const stlBuf = meshToSTLBinary(mesh, headerComment)
 
   // ── Audit trail: registra o CreditTransaction (créditos consumidos) ──
   // Lógica: scaffold TPMS custa 50 créditos (CPU-only, sem GPU).
@@ -155,15 +192,17 @@ export async function POST(req: Request) {
         type: "DEBIT",
         amount: STUDIO_COST,
         balance: newBalance,
-        description: `BIA Studio · scaffold ${params.kind} ${params.sizeX}×${params.sizeY}×${params.sizeZ}mm (${mesh.stats.triangleCount} tri)`,
+        description: `BIA Studio · ${anatomyMeta.shortLabel} ${anatomyParams.sizeX}×${anatomyParams.sizeY}×${anatomyParams.sizeZ}mm (${mesh.stats.triangleCount} tri)`,
         metadata: {
           feature: "studio_scaffold_stl",
-          kind: params.kind,
-          sizeX: params.sizeX,
-          sizeY: params.sizeY,
-          sizeZ: params.sizeZ,
-          porosity: Number(mesh.stats.porosity.toFixed(4)),
+          anatomyKind: anatomyParams.kind,
+          sizeX: anatomyParams.sizeX,
+          sizeY: anatomyParams.sizeY,
+          sizeZ: anatomyParams.sizeZ,
+          infillPattern: infillMeta?.pattern ?? null,
+          infillPorosity: infillMeta ? Number(infillMeta.porosity.toFixed(4)) : null,
           triangles: mesh.stats.triangleCount,
+          volume_mm3: Number(mesh.stats.volume_mm3.toFixed(2)),
           genMs,
         },
       },
@@ -184,7 +223,7 @@ export async function POST(req: Request) {
   }
 
   // ── Resposta: STL + metadados em headers ──
-  const filename = (body.filename ?? `bia-scaffold-${params.kind}-${Date.now()}`).replace(/[^a-zA-Z0-9_-]/g, "_")
+  const filename = (body.filename ?? `bia-${anatomyParams.kind}-${Date.now()}`).replace(/[^a-zA-Z0-9_-]/g, "_")
   const headers = new Headers()
   headers.set("Content-Type", "model/stl")
   headers.set("Content-Length", String(stlBuf.byteLength))
@@ -193,18 +232,30 @@ export async function POST(req: Request) {
   // Metadados para a UI (JS pode ler via Response.headers)
   headers.set("x-bia-triangles", String(mesh.stats.triangleCount))
   headers.set("x-bia-vertices", String(mesh.stats.vertexCount))
-  headers.set("x-bia-porosity", mesh.stats.porosity.toFixed(4))
   headers.set("x-bia-volume-mm3", mesh.stats.volume_mm3.toFixed(2))
   headers.set("x-bia-gen-ms", String(genMs))
-  headers.set("x-bia-kind", params.kind)
-  headers.set("x-bia-size", `${params.sizeX}x${params.sizeY}x${params.sizeZ}`)
+  headers.set("x-bia-anatomy", anatomyParams.kind)
+  headers.set("x-bia-anatomy-label", anatomyMeta.shortLabel)
+  headers.set("x-bia-size", `${anatomyParams.sizeX}x${anatomyParams.sizeY}x${anatomyParams.sizeZ}`)
   headers.set("x-bia-cost-credits", String(STUDIO_COST))
+  // Infill é METADADO (não parte do STL) — o slicer usará isso
+  if (infillMeta) {
+    headers.set("x-bia-infill-pattern", infillMeta.pattern)
+    headers.set("x-bia-infill-porosity", infillMeta.porosity.toFixed(4))
+    headers.set("x-bia-infill-cells", String(infillMeta.cellsPerAxis))
+  }
   if (parseInfo) {
     headers.set("x-bia-parse-confidence", parseInfo.confidence.toFixed(2))
     headers.set("x-bia-parse-preset", parseInfo.presetId ?? "none")
+    if (parseInfo.warnings.length > 0) {
+      // headers só aceitam ASCII seguro; encodeURIComponent evita 500 em acentos
+      headers.set("x-bia-warnings", encodeURIComponent(parseInfo.warnings.join(" | ")))
+    }
   }
-  // Permite JS ler os headers x-bia-*
-  headers.set("Access-Control-Expose-Headers", "x-bia-triangles,x-bia-vertices,x-bia-porosity,x-bia-volume-mm3,x-bia-gen-ms,x-bia-kind,x-bia-size,x-bia-cost-credits,x-bia-parse-confidence,x-bia-parse-preset")
+  headers.set(
+    "Access-Control-Expose-Headers",
+    "x-bia-triangles,x-bia-vertices,x-bia-volume-mm3,x-bia-gen-ms,x-bia-anatomy,x-bia-anatomy-label,x-bia-size,x-bia-cost-credits,x-bia-infill-pattern,x-bia-infill-porosity,x-bia-infill-cells,x-bia-parse-confidence,x-bia-parse-preset,x-bia-warnings",
+  )
 
   return new Response(stlBuf, { status: 200, headers })
 }
