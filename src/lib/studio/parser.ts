@@ -95,7 +95,10 @@ const ANATOMY_KEYWORDS: Array<{ patterns: RegExp[]; kind: AnatomyKind }> = [
   },
   {
     patterns: [
-      /\bf[êe]mur\b/i, /\bt[íi]bia\b/i, /\b[úu]mero\b/i, /\br[áa]dio\b/i,
+      /\bf[êe]mur\b/i, /\bt[íi]bia\b/i,
+      // "úmero" / "umero" — \b não funciona com acentos, lookahead manual
+      /(?:^|[\s.,;:!?])(úmero|umero)(?=[\s.,;:!?]|$)/i,
+      /\br[áa]dio\b/i,
       /\bdi[áa]fise\b/i, /\bdiafis[áa]rio\b/i, /\bosso longo\b/i,
       /\bbone plug\b/i,
     ],
