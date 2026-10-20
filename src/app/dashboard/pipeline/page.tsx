@@ -443,29 +443,24 @@ function ProjectsPanel({
           </div>
         ) : (
           projects.map((p) => (
-            <button key={p.id} onClick={() => onSelect(p)}
-              className={`w-full text-left p-3 rounded-xl transition-all active:scale-[0.98] ${
-                selectedProject?.id === p.id
-                  ? "bg-emerald-500/10 border border-emerald-500/15"
-                  : "hover:bg-white/3 border border-transparent"
-              }`}>
-              <p className="text-xs sm:text-sm font-medium text-white truncate">{p.name}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{p.tissueType}</p>
-              <div className="flex items-center gap-2 mt-2">
-                <div className="flex-1 h-1 bg-white/8 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full"
-                    style={{ width: `${p.completionRate}%` }} />
+            <div key={p.id} className="group relative">
+              <button onClick={() => onSelect(p)}
+                className={`w-full text-left p-3 pr-10 rounded-xl transition-all active:scale-[0.98] ${
+                  selectedProject?.id === p.id
+                    ? "bg-emerald-500/10 border border-emerald-500/15"
+                    : "hover:bg-white/3 border border-transparent"
+                }`}>
+                <p className="text-xs sm:text-sm font-medium text-white truncate">{p.name}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{p.tissueType}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="flex-1 h-1 bg-white/8 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full"
+                      style={{ width: `${p.completionRate}%` }} />
+                  </div>
+                  <span className="text-[10px] text-gray-500">{p.completionRate.toFixed(0)}%</span>
                 </div>
-                <span className="text-[10px] text-gray-500">{p.completionRate.toFixed(0)}%</span>
-              </div>
-            </button>
-          ))
-        )}
-      </div>
-    </>
-  )
-}
-           {onDelete && (
+              </button>
+              {onDelete && (
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); e.preventDefault(); onDelete(p.id, p.name) }}
