@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import {
   GitBranch, Plus, CheckCircle2, Circle, Clock,
-  Loader2, Zap, ArrowRight, ChevronLeft, X, Box, ExternalLink
+  Loader2, Zap, ArrowRight, ChevronLeft, X, Box, ExternalLink, Trash2
 } from "lucide-react"
 import { PIPELINE_STAGES } from "@/lib/ai/pipeline"
 // R12.68 · ExportBar universal + adapter da Pipeline
@@ -55,6 +55,32 @@ export default function PipelinePage() {
       const res = await fetch("/api/pipeline")
       if (res.ok) setProjects(await res.json())
     } catch { /* */ } finally { setLoading(false) }
+  }
+
+  async function deleteProject(id: string, name: string) {
+    const ok = typeof window !== "undefined"
+      ? window.confirm(`Excluir o projeto "${name}"?\n\nTodas as etapas e análises associadas serão removidas permanentemente. Esta ação não pode ser desfeita.`)
+      : false
+    if (!ok) return
+
+    try {
+      const res = await fetch(`/api/pipeline?id=${encodeURIComponent(id)}`, { method: "DELETE" })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: "Falha ao excluir" }))
+        if (typeof window !== "undefined") window.alert(data?.error ?? "Falha ao excluir projeto")
+        return
+      }
+      // Remove do state local
+      setProjects(prev => prev.filter(p => p.id !== id))
+      // Se o projeto excluído era o selecionado, limpa a seleção
+      if (selectedProject?.id === id) {
+        setSelectedProject(null)
+        setAnalysis(null)
+        setNotebookEntry(null)
+      }
+    } catch {
+      if (typeof window !== "undefined") window.alert("Erro de rede ao excluir projeto")
+    }
   }
 
   async function createProject() {
@@ -153,6 +179,7 @@ export default function PipelinePage() {
           projects={projects} loading={loading} selectedProject={selectedProject}
           onSelect={(p) => { setSelectedProject(p); setAnalysis(null) }}
           onNew={() => setShowCreate(true)}
+          onDelete={deleteProject}
         />
       </div>
 
@@ -166,6 +193,7 @@ export default function PipelinePage() {
               onSelect={(p) => { setSelectedProject(p); setAnalysis(null); setShowList(false) }}
               onNew={() => { setShowList(false); setShowCreate(true) }}
               onClose={() => setShowList(false)}
+              onDelete={deleteProject}
             />
           </div>
         </div>
@@ -375,10 +403,11 @@ export default function PipelinePage() {
 }
 
 function ProjectsPanel({
-  projects, loading, selectedProject, onSelect, onNew, onClose,
+  projects, loading, selectedProject, onSelect, onNew, onClose, onDelete,
 }: {
   projects: PipelineProject[]; loading: boolean; selectedProject: PipelineProject | null
   onSelect: (p: PipelineProject) => void; onNew: () => void; onClose?: () => void
+  onDelete?: (id: string, name: string) => void
 }) {
   return (
     <>
@@ -430,6 +459,25 @@ function ProjectsPanel({
                 <span className="text-[10px] text-gray-500">{p.completionRate.toFixed(0)}%</span>
               </div>
             </button>
+          ))
+        )}
+      </div>
+    </>
+  )
+}
+           {onDelete && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); onDelete(p.id, p.name) }}
+                  className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center opacity-60 md:opacity-0 group-hover:opacity-100 hover:bg-red-500/15 hover:border-red-500/30 active:scale-95 transition-all"
+                  aria-label={`Excluir projeto ${p.name}`}
+                  title="Excluir projeto"
+                  data-testid={`pipeline-delete-${p.id}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-gray-400 hover:text-red-400" />
+                </button>
+              )}
+            </div>
           ))
         )}
       </div>

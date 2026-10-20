@@ -138,3 +138,29 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ error: "Ação inválida" }, { status: 400 })
 }
+
+// DELETE /api/pipeline?id=... — exclui projeto (e suas etapas via cascade)
+// Permite excluir projetos em qualquer estágio (DRAFT, IN_PROGRESS, COMPLETED).
+export async function DELETE(req: NextRequest) {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
+  }
+
+  const { searchParams } = new URL(req.url)
+  const projectId = searchParams.get("id")
+  if (!projectId) {
+    return NextResponse.json({ error: "id é obrigatório" }, { status: 400 })
+  }
+
+  // Valida ownership: só o dono do projeto pode excluir
+  const project = await getPipelineProject(projectId, session.user.id)
+  if (!project) {
+    return NextResponse.json({ error: "Projeto não encontrado" }, { status: 404 })
+  }
+
+  // onDelete: Cascade no schema remove todas as PipelineStage automaticamente
+  await prisma.pipelineProject.delete({ where: { id: projectId } })
+
+  return NextResponse.json({ ok: true, id: projectId })
+}
