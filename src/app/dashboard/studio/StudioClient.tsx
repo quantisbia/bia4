@@ -1046,9 +1046,24 @@ const VIEWER_SCRIPT = `
       e.preventDefault();
     }, { passive: false });
 
+    // CRITICAL: inicializa __biaViewer ANTES de animate() rodar
+    // (caso contrário a primeira frame tenta setar .raf em undefined)
+    const resizeObs = new ResizeObserver(() => {
+      const nw = canvas.clientWidth || 500;
+      const nh = canvas.clientHeight || 400;
+      renderer.setSize(nw, nh, false);
+      camera.aspect = nw / nh;
+      camera.updateProjectionMatrix();
+    });
+    resizeObs.observe(canvas);
+
+    window.__biaViewer = { renderer, scene, camera, mesh, raf: 0, ro: resizeObs };
+
     // Auto-rotate
     let autoAngle = 0;
     function animate() {
+      // Guard: se o viewer foi destruído, para o loop
+      if (!window.__biaViewer) return;
       const raf = requestAnimationFrame(animate);
       window.__biaViewer.raf = raf;
       if (!dragging) {
@@ -1062,17 +1077,6 @@ const VIEWER_SCRIPT = `
     }
     animate();
 
-    // Resize responsivo
-    const ro = new ResizeObserver(() => {
-      const nw = canvas.clientWidth || 500;
-      const nh = canvas.clientHeight || 400;
-      renderer.setSize(nw, nh, false);
-      camera.aspect = nw / nh;
-      camera.updateProjectionMatrix();
-    });
-    ro.observe(canvas);
-
-    window.__biaViewer = { renderer, scene, camera, mesh, raf: 0, ro };
     console.log('[BIA Studio] viewer OK:', triangleCount, 'tri |', w + 'x' + h);
   };
 })();
