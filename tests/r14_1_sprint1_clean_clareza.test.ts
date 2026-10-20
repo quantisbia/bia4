@@ -438,11 +438,12 @@ describe("R14.1 · I) QuickActions personalizadas por perfil", () => {
     }
   })
 
-  it("ortopedista vê bioprint-model + pipeline destacadas (em primeiro)", () => {
+  it("ortopedista vê studio-scaffold + bioprint-model destacados em primeiro (R14.3)", () => {
     const actions = resolveQuickActionsForUser("orthopedist", "clinical")
     const firstTwoIds = actions.slice(0, 2).map(a => a.id)
-    // bioprint-model vem antes de pipeline conforme ordem do highlightedActions
-    expect(firstTwoIds).toEqual(["bioprint-model", "pipeline"])
+    // R14.3 · BIA Studio foi inserido no topo da highlightedActions dos médicos
+    // (eles não sabem CAD — geram STL por voz direto no Studio).
+    expect(firstTwoIds).toEqual(["studio-scaffold", "bioprint-model"])
     expect(actions[0].isHighlighted).toBe(true)
     expect(actions[1].isHighlighted).toBe(true)
   })

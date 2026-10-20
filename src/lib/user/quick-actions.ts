@@ -35,6 +35,17 @@ export interface QuickAction {
 }
 
 export const ALL_QUICK_ACTIONS: QuickAction[] = [
+  // R14.3 · BIA Studio (prioridade máxima pra médicos sem CAD)
+  {
+    id: "studio-scaffold",
+    title: "BIA Studio",
+    titleClinical: "Gerar Scaffold por Voz",
+    desc: "STL de scaffold TPMS por texto/voz",
+    descClinical: "Fale o que você quer — a BIA gera o STL",
+    href: "/dashboard/studio",
+    iconName: "Sparkles",
+    color: "fuchsia",
+  },
   {
     id: "pipeline",
     title: "Novo Pipeline",

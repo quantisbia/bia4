@@ -64,7 +64,8 @@ export const USER_PROFILES: UserProfile[] = [
     description:
       "Scaffolds ósseos personalizados, cartilagem articular, calota craniana, mandíbula, reconstruções.",
     defaultMode: "clinical",
-    highlightedActions: ["bioprint-model", "pipeline", "protocols", "chat"],
+    // R14.3 · BIA Studio em primeiro — médicos não sabem CAD, geram por voz
+    highlightedActions: ["studio-scaffold", "bioprint-model", "pipeline", "protocols", "chat"],
     recommendedKitCategories: ["ortopedia", "cbmf"],
     recommendedEbookId: "ebook-biofabricacao-ortopedia-2026",
     recommendedModuleSlugs: ["biomateriais", "arquitetura-3d", "tecidos", "avaliacao-celular"],
@@ -78,7 +79,7 @@ export const USER_PROFILES: UserProfile[] = [
     description:
       "Pele bioimpressa multicamada, testes dermato-cosméticos, cicatrização, modelos substitutos a animais.",
     defaultMode: "clinical",
-    highlightedActions: ["bioprint-model", "formulator-pro", "organoids", "chat"],
+    highlightedActions: ["studio-scaffold", "bioprint-model", "formulator-pro", "organoids", "chat"],
     recommendedKitCategories: ["dermatologia"],
     recommendedModuleSlugs: ["tecidos", "biotintas", "celulas"],
     accentColor: "rose",
@@ -91,7 +92,7 @@ export const USER_PROFILES: UserProfile[] = [
     description:
       "Enxertos alveolares, membranas PRF, scaffolds periodontais, regeneração óssea maxilar.",
     defaultMode: "clinical",
-    highlightedActions: ["bioprint-model", "pipeline", "protocols", "chat"],
+    highlightedActions: ["studio-scaffold", "bioprint-model", "pipeline", "protocols", "chat"],
     recommendedKitCategories: ["odontologia", "cbmf"],
     recommendedModuleSlugs: ["biomateriais", "tecidos", "desenvolvimento-projeto"],
     accentColor: "sky",

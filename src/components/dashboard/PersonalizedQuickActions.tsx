@@ -16,6 +16,7 @@ import {
   MessageSquare, BookOpen, BookMarked, Map as MapIcon, Info, Wrench,
   Sparkles,
 } from "lucide-react"
+// R14.3 · Sparkles também é usado como ícone de QuickAction (BIA Studio)
 import { useUIMode } from "@/lib/user/use-ui-mode"
 import { resolveQuickActionsForUser } from "@/lib/user/quick-actions"
 import { cn } from "@/lib/utils/helpers"
@@ -23,6 +24,7 @@ import { cn } from "@/lib/utils/helpers"
 const ICON_MAP = {
   GitBranch, Printer, FlaskConical, CircleDot, FileText, Microscope,
   MessageSquare, BookOpen, BookMarked, Map: MapIcon, Info, Wrench,
+  Sparkles,
 } as const
 
 export interface PersonalizedQuickActionsProps {

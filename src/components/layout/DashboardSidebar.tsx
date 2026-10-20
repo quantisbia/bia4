@@ -11,7 +11,7 @@ import {
   LogOut, Zap, ChevronRight, Menu, X, Printer, ClipboardCheck, BookMarked,
   Crown, Wrench, Info, Map, Atom, Library, GraduationCap,
   Lightbulb, Beaker, ShieldCheck, UserCircle, ChevronDown,
-  Microscope,
+  Microscope, Sparkles,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { isSuperAdmin } from "@/lib/auth/admin-shared"
@@ -122,6 +122,9 @@ export const NAV_GROUPS: NavGroup[] = [
     icon: Lightbulb,
     accent: "text-sky-400",
     items: [
+      { href: "/dashboard/studio",         label: "BIA Studio",       icon: Sparkles,
+        info: "Gere scaffolds TPMS (gyroid, schwarz-p, diamond) por voz ou texto em pt-BR — zero CAD, STL pronto em segundos.",
+        badge: "novo" },
       { href: "/dashboard/pipeline",       label: "Pipeline",         labelKey: "nav_pipeline",   icon: GitBranch,
         info: "Fluxo guiado em 12 etapas: do problema clínico ao protocolo validado." },
       { href: "/dashboard/formulator-pro", label: "Formulador Pro",   labelKey: "nav_formulator", icon: Atom,
