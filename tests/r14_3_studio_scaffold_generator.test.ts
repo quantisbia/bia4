@@ -569,16 +569,21 @@ describe("R14.3 · K) Arquivos de UI/API presentes", () => {
     expect(src).toMatch(/lang\s*=\s*["']pt-BR["']/)
   })
 
-  it("StudioClient tem data-testids esperados", () => {
+  it("StudioClient tem data-testids esperados (R14.4: botões renomeados)", () => {
     const src = read("src/app/dashboard/studio/StudioClient.tsx")
+    // Testids com string literal
     for (const id of [
       "studio-prompt-input",
-      "studio-generate-button",
+      "studio-prompt-generate",     // R14.4 · gerar via prompt
+      "studio-generate-guided",     // R14.4 · gerar via fluxo guiado
       "studio-mic-button",
       "studio-preview-canvas",
     ]) {
       expect(src, id).toContain(`"${id}"`)
     }
+    // Testids com template literal (anatomy e infill)
+    expect(src, "anatomy-option template").toMatch(/anatomy-option-\$\{opt\.kind\}/)
+    expect(src, "infill-pattern template").toMatch(/infill-pattern-\$\{p\.kind\}/)
   })
 
   it("API route /api/studio/scaffold/generate existe", () => {
