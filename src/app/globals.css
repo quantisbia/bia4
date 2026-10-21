@@ -2449,3 +2449,180 @@ html.light .bia-bioprint-process nav ol li > div[class*="bg-white/"] {
 /* ═══════════════════════════════════════════════════════════════════════════
    FIM R12.37
    ═══════════════════════════════════════════════════════════════════════════ */
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   R14.6 — ACADEMY LIGHT MODE: polimento de legibilidade (Janaina 2026-10-20)
+   ─────────────────────────────────────────────────────────────────────────
+   Problema: Em modo claro, a paleta fuchsia/violet-escura da Academy
+   (bg-[#080412]/70, text-fuchsia-300/60, bg-fuchsia-500/15, etc.) ficava
+   com baixo contraste → leitura ruim no laboratório, especialmente no
+   mobile sob luz forte.
+   
+   Solução: forçar fundos brancos/lilás-claro + textos fuchsia profundos
+   com contraste WCAG AA/AAA, preservando a identidade visual (gradient
+   violet→fuchsia continua forte em botões e ícones).
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* ─── 1) Sidebar Academy desktop + mobile drawer — fundo claro ─── */
+html.light aside[data-testid="academy-desktop-sidebar"],
+html.light div[class*="bg-[#080412]"]:has([data-testid="academy-sidebar-grouped-nav"]),
+html.light div[class*="bg-[#080412]"]:has([data-testid*="academy"]) {
+  background-color: hsl(295 60% 98%) !important; /* lilás clarinho */
+  border-right-color: hsl(300 40% 88%) !important;
+}
+
+/* ─── 2) Header mobile Academy ─── */
+html.light header[class*="bg-[#080412]"]:has(a[data-testid="academy-mobile-back-to-bia"]) {
+  background-color: hsl(0 0% 100% / 0.96) !important;
+  border-bottom-color: hsl(300 40% 88%) !important;
+}
+
+/* ─── 3) Logo "Academy / BIA · Biofabrication" — texto escuro ─── */
+html.light aside[data-testid="academy-desktop-sidebar"] .text-white,
+html.light div:has([data-testid="academy-sidebar-grouped-nav"]) .text-white,
+html.light header:has(a[data-testid="academy-mobile-back-to-bia"]) .text-white {
+  color: hsl(300 85% 24%) !important; /* fuchsia Quantis profundo */
+}
+
+/* ─── 4) Caption "APRENDER / PRATICAR / CELEBRAR" (text-fuchsia-300/60) ─── */
+html.light aside[data-testid="academy-desktop-sidebar"] [class*="text-fuchsia-300/"],
+html.light div:has([data-testid="academy-sidebar-grouped-nav"]) [class*="text-fuchsia-300/"] {
+  color: hsl(300 80% 36%) !important;
+  opacity: 1 !important;
+}
+
+/* ─── 5) Links de nav Academy — inativos (text-gray-400 → cinza-escuro) ─── */
+html.light aside[data-testid="academy-desktop-sidebar"] a[data-testid*="academy-sidebar-link"],
+html.light div:has([data-testid="academy-sidebar-grouped-nav"]) a[data-testid*="academy-sidebar-link"] {
+  color: hsl(295 40% 25%) !important;
+}
+
+html.light aside[data-testid="academy-desktop-sidebar"] a[data-testid*="academy-sidebar-link"] .text-gray-500,
+html.light aside[data-testid="academy-desktop-sidebar"] a[data-testid*="academy-sidebar-link"] svg.text-gray-500 {
+  color: hsl(295 35% 42%) !important;
+}
+
+html.light aside[data-testid="academy-desktop-sidebar"] a[data-testid*="academy-sidebar-link"]:hover {
+  background-color: hsl(300 70% 94%) !important;
+  color: hsl(300 85% 22%) !important;
+}
+
+/* ─── 6) Link ATIVO Academy (gradient fuchsia-500/15 + border fuchsia-500/25) ─── */
+html.light aside[data-testid="academy-desktop-sidebar"] a[class*="from-violet-500/15"],
+html.light div:has([data-testid="academy-sidebar-grouped-nav"]) a[class*="from-violet-500/15"] {
+  background-image: linear-gradient(
+    to right,
+    hsl(268 75% 92%),
+    hsl(300 80% 93%)
+  ) !important;
+  border-color: hsl(300 70% 70%) !important;
+  color: hsl(300 85% 22%) !important;
+}
+
+html.light aside[data-testid="academy-desktop-sidebar"] a[class*="from-violet-500/15"] svg,
+html.light aside[data-testid="academy-desktop-sidebar"] a[class*="from-violet-500/15"] .text-fuchsia-300,
+html.light div:has([data-testid="academy-sidebar-grouped-nav"]) a[class*="from-violet-500/15"] svg,
+html.light div:has([data-testid="academy-sidebar-grouped-nav"]) a[class*="from-violet-500/15"] .text-fuchsia-300 {
+  color: hsl(300 85% 32%) !important;
+}
+
+/* ─── 7) Botão "Voltar para a BIA" ─── */
+html.light aside[data-testid="academy-desktop-sidebar"] a[data-testid="academy-sidebar-back-to-bia"],
+html.light div:has([data-testid="academy-sidebar-grouped-nav"]) a[data-testid="academy-sidebar-back-to-bia"] {
+  color: hsl(268 70% 28%) !important;
+  border-color: hsl(268 50% 78%) !important;
+  background-color: hsl(268 60% 96%) !important;
+}
+
+html.light aside[data-testid="academy-desktop-sidebar"] a[data-testid="academy-sidebar-back-to-bia"]:hover,
+html.light div:has([data-testid="academy-sidebar-grouped-nav"]) a[data-testid="academy-sidebar-back-to-bia"]:hover {
+  background-color: hsl(268 65% 92%) !important;
+  color: hsl(268 80% 20%) !important;
+}
+
+/* ─── 8) Botão BIA no mobile header ─── */
+html.light header:has(a[data-testid="academy-mobile-back-to-bia"]) a[data-testid="academy-mobile-back-to-bia"] {
+  background-color: hsl(268 60% 94%) !important;
+  border-color: hsl(268 50% 75%) !important;
+  color: hsl(268 80% 24%) !important;
+}
+
+/* ─── 9) Botão menu (Menu / X) mobile ─── */
+html.light header:has(a[data-testid="academy-mobile-back-to-bia"]) button[aria-label="Abrir menu"],
+html.light div[class*="bg-[#080412]"]:has([data-testid="academy-sidebar-grouped-nav"]) button {
+  background-color: hsl(300 50% 94%) !important;
+  border-color: hsl(300 40% 80%) !important;
+  color: hsl(300 80% 24%) !important;
+}
+
+/* ─── 10) InfoTooltip popup (bg-[#0c0820]) — fundo claro + texto escuro ─── */
+html.light div[class*="bg-[#0c0820]"]:has(.text-fuchsia-200) {
+  background-color: hsl(300 80% 97%) !important;
+  border-color: hsl(300 60% 72%) !important;
+  box-shadow: 0 20px 40px hsl(300 50% 60% / 0.18) !important;
+}
+
+html.light div[class*="bg-[#0c0820]"]:has(.text-fuchsia-200) .text-fuchsia-200 {
+  color: hsl(300 85% 24%) !important;
+}
+
+html.light div[class*="bg-[#0c0820]"]:has(.text-fuchsia-200) .text-gray-300 {
+  color: hsl(295 40% 20%) !important;
+}
+
+/* Botão (i) do InfoTooltip */
+html.light aside[data-testid="academy-desktop-sidebar"] button[aria-label*="O que é"],
+html.light div:has([data-testid="academy-sidebar-grouped-nav"]) button[aria-label*="O que é"] {
+  color: hsl(300 40% 50%) !important;
+}
+
+html.light aside[data-testid="academy-desktop-sidebar"] button[aria-label*="O que é"]:hover,
+html.light div:has([data-testid="academy-sidebar-grouped-nav"]) button[aria-label*="O que é"]:hover {
+  color: hsl(300 85% 32%) !important;
+  background-color: hsl(300 70% 92%) !important;
+}
+
+/* ─── 11) User row (bottom) — Academy ─── */
+html.light aside[data-testid="academy-desktop-sidebar"] .text-gray-300,
+html.light div:has([data-testid="academy-sidebar-grouped-nav"]) .text-gray-300 {
+  color: hsl(295 50% 20%) !important;
+}
+
+html.light aside[data-testid="academy-desktop-sidebar"] .text-gray-600,
+html.light div:has([data-testid="academy-sidebar-grouped-nav"]) .text-gray-600 {
+  color: hsl(295 25% 42%) !important;
+}
+
+/* ─── 12) Separadores (border-white/[0.06]) ─── */
+html.light aside[data-testid="academy-desktop-sidebar"] [class*="border-white/"],
+html.light div:has([data-testid="academy-sidebar-grouped-nav"]) [class*="border-white/"],
+html.light header:has(a[data-testid="academy-mobile-back-to-bia"]) [class*="border-white/"] {
+  border-color: hsl(300 40% 86%) !important;
+}
+
+/* ─── 13) Backdrop drawer mobile Academy (bg-black/70) ─── */
+html.light .md\:hidden.fixed.inset-0.z-50[class*="bg-black/"]:has(~ div [data-testid="academy-sidebar-grouped-nav"]),
+html.light .md\:hidden.fixed.inset-0.z-50[class*="bg-black/"] {
+  background-color: hsl(300 40% 15% / 0.35) !important;
+}
+
+/* ─── 14) Preferences bar (idioma + tema) Academy — garantir contraste ─── */
+html.light [data-testid="academy-sidebar-preferences"] {
+  background-color: hsl(300 60% 96%);
+  border-radius: 0.75rem;
+  padding: 0.5rem;
+}
+
+/* ─── 15) Páginas internas Academy — garantir fundo claro + texto escuro ───
+   Rotas /academy/dashboard, /academy/journey, /academy/modules, etc.
+   usam bg-[#050208] (preto-vinho) no layout wrapper. */
+html.light main:has(div[data-testid*="academy"]),
+html.light div[class*="bg-[#050208]"] {
+  background-color: hsl(295 55% 98%) !important;
+  color: hsl(295 60% 10%) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FIM R14.6 — Academy Light Mode polish
+   ═══════════════════════════════════════════════════════════════════════════ */

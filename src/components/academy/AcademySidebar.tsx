@@ -27,6 +27,8 @@ import {
   ChevronRight, Info,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
+import { ThemeToggle } from "@/components/ui/ThemeToggle"
+import { LocaleSwitcher } from "@/components/ui/LocaleSwitcher"
 
 export const ACADEMY_NAV_ITEMS = [
   { href: "/academy/dashboard",  label: "Dashboard",     icon: LayoutDashboard, exact: true,
@@ -225,6 +227,15 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         })}
       </nav>
 
+      {/* ── Preferências — idioma + tema (R14.6) ── */}
+      <div
+        className="px-3 pt-3 pb-2 border-t border-white/[0.06] flex items-center justify-between gap-2"
+        data-testid="academy-sidebar-preferences"
+      >
+        <LocaleSwitcher />
+        <ThemeToggle />
+      </div>
+
       {/* ── Bottom section ── */}
       <div className="px-2 pb-3 border-t border-white/[0.06] pt-2 space-y-0.5">
         {BOTTOM_ITEMS.map(item => {
@@ -321,6 +332,9 @@ function MobileHeader() {
             {currentItem?.label ?? "Academy"}
           </span>
         </div>
+
+        {/* Idioma rápido no header mobile (R14.6) */}
+        <LocaleSwitcher />
 
         <Link
           href="/dashboard"

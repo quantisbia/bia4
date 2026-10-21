@@ -723,6 +723,9 @@ function MobileHeader() {
           </span>
         </div>
 
+        {/* Idioma rápido no header mobile (R14.6) */}
+        <LocaleSwitcher />
+
         <Link href="/dashboard/billing"
           className={cn(
             "flex items-center gap-1 rounded-lg px-2.5 py-1.5 active:scale-95 transition-all border shrink-0",
