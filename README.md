@@ -207,6 +207,17 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R20 — UMA só ferramenta de fatiamento: BioSlicer é a base; tudo mais é caminho (2026-10-21)
+
+**Mandato:** *"precisamos manter apenas 1 ferramenta de fatiamento e bioimpressão… as demais serão apenas caminhos para essa base."*
+**Decisão:** `src/lib/slicer/*` (BioSlicer) é a única base. Cobrança mantida: **6 créditos por G-code** (`POST /api/gcode/charge`, admin isento). Multi-material em **1 G-code** com `T0..T3`; a usuária informa quantos cabeçotes.
+
+**R20.1 · lib** — `target.ts` (Petri 30/35/60/90/100, lâmina, placa 6/12/24/48/96 SBS; **1º poço sup-esq = ponto zero**, demais poços por offset de pitch, z-hop/pausa/purga entre poços, `;WELL:A1`), `tools.ts` (`ToolHead`/`ToolsConfig`, papel→ferramenta, troca = retração→`T<n>`→prime→dwell, `M218` ou offset no caminho), writer reescrito (volume por T, `;TOOL:`, `;LAYER_COUNT` = camadas×cópias).
+**R20.2 · UI** — `/dashboard/bioprint/slice` é o BioSlicer (Etapa 3): painéis **5 · Onde imprimir** (TargetPanel) e **6 · Cabeçotes e biotintas** (ToolsPanel, biotintas vindas da Etapa 2), **modal de confirmação** antes de fatiar, cobrança + gate de download/handoff.
+**R20.3 · unificação** — removidos `engine.ts`, `quick-gcode.ts`, `medical-gcode.ts`, `advanced-gcode.ts`, `/api/gcode/generate`, `emitter/kinematics/trajectory-planner`, `BasicModePanel`, `MultiBioinkSelector`, `context-to-quick` (+9 testes legados). `/slicer`, `/quick-gcode`, `/gcode`, `/gcode/medical`, `/gcode/advanced` → redirecionam para `/slice`. **Printability** fatia o STL real do teste via `sliceMesh` (+cobrança). **RegeneratePanel** (pré-execução) refatia local a malha da Etapa 3 (+cobrança). Sidebar: item único "Fatiar (Etapa 3)".
+**R20-B · infills honestos** — `infill-advanced.ts`: **ondas** (básico, senoide com fase alternada), **Schwarz P**, **Diamond** (TPMS por marching squares com fase em Z), **Voronoi** (células 2D determinísticas), **Perlin** (iso-curvas de value-noise), **gradiente radial**. Seletores com rótulo+dica (`INFILL_PATTERN_LABELS`); Avançado via `?tab=advanced`. **Prévia grátis** (3 camadas: base/meio/topo, `previewLayers`) dentro do modal, antes de cobrar.
+**Testes:** `r20_target_tools` (8), `r20b_infills_honestos` (24), `r19_origin_is_origin` enxuto (6). Suite 100 % verde.
+
 ### R19.1 — O PRIMEIRO CORDÃO NASCE NO PONTO ZERO (zero deslocamento após o G92) (2026-10-21)
 - Antes (mesmo com a peça centrada) o G-code fazia um `G0` "seco" do (0,0) até o perímetro externo. Agora, em **todos os geradores** (Etapa 3 engine, G-code Rápido, BioSlicer STL):
   - na 1ª camada os perímetros vão de **dentro para fora** (o mais interno primeiro);

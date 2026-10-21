@@ -3,7 +3,7 @@
  *   placeMesh → layerZs/sliceAtZ → planLayer → writeGCode → stats/avisos bio.
  */
 
-import type { TriMesh, SliceParams, ExtrusionModel, SliceResult, SlicedLayer, SliceWarning, Vec2 } from "./types"
+import type { TriMesh, SliceParams, ExtrusionModel, SliceResult, SlicedLayer, SliceWarning, Vec2, BBox3 } from "./types"
 import { placeMesh, layerZs, sliceAtZ } from "./mesh-slice"
 import { planLayer } from "./toolpath"
 import { writeGCode } from "./gcode-writer"
@@ -36,6 +36,32 @@ function mulberry32(seed: number) {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
+}
+
+/**
+ * R20-B · Preview GRÁTIS antes de fatiar: fatia só algumas camadas (amostra)
+ * para a usuária ver paredes + infill como ficarão. Não gera G-code, não cobra.
+ */
+export function previewLayers(job: Pick<SliceJob, "mesh" | "params">, sample = 3): { layers: SlicedLayer[]; bbox: BBox3; total: number } {
+  const P = job.params
+  const mesh = placeMesh(job.mesh, { scale: P.scale, rotationZ_deg: P.rotationZ_deg, centerX: P.originX_mm, centerY: P.originY_mm, baseZ: 0 })
+  const bb = mesh.bbox
+  const zs = layerZs(bb, P.layerHeight_mm, P.firstLayerHeight_mm)
+  const n = zs.length
+  const picks = n <= sample ? zs.map((_, i) => i) : Array.from({ length: sample }, (_, k) => Math.min(n - 1, Math.round((k * (n - 1)) / (sample - 1))))
+  const rand = mulberry32(1337)
+  const tol = Math.min(0.03, P.nozzleDiameter_mm / 10)
+  const layers: SlicedLayer[] = []
+  let cursor: Vec2 = { x: P.originX_mm, y: P.originY_mm }
+  for (const i of picks) {
+    const z = zs[i]
+    const h = i === 0 ? P.firstLayerHeight_mm : P.layerHeight_mm
+    const contours = sliceAtZ(mesh, z, tol)
+    const plan = planLayer({ contours, layerIndex: i, z_mm: z, layerHeight_mm: h, params: P, startPoint: cursor, rand })
+    cursor = plan.endPoint
+    layers.push({ index: i, z_mm: z, height_mm: h, contours, paths: plan.paths })
+  }
+  return { layers, bbox: bb, total: n }
 }
 
 export function sliceMesh(job: SliceJob): SliceResult {

@@ -100,7 +100,7 @@ describe("R20-B · Perlin e Gradiente", () => {
   })
   it("Gradiente: espaçamento cresce do centro para a borda", () => {
     const paths = gradient(square(20), 1, 0, 2.5)
-    const ys = [...new Set(paths.map((p) => Math.round(p[0].y * 1000) / 1000))].sort((a, b) => a - b)
+    const ys = Array.from(new Set(paths.map((p) => Math.round(p[0].y * 1000) / 1000))).sort((a, b) => a - b)
     const pos = ys.filter((y) => y >= 0)
     const gaps = pos.slice(1).map((y, i) => y - pos[i])
     expect(gaps.length).toBeGreaterThan(3)

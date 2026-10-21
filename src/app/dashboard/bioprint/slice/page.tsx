@@ -13,7 +13,7 @@
  * ═══════════════════════════════════════════════════════════════════════
  */
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { Suspense, useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import {
   Upload, Mic, MicOff, Wand2, Layers, Download, Send, Settings2, Sparkles, AlertTriangle,
@@ -34,12 +34,21 @@ import { ToolsPanel, type BioinkOption } from "@/components/slicer/ToolsPanel"
 import { sendToExecute } from "@/lib/bioprint/execute-handoff"
 import { Target, Palette, ShieldCheck, X as XIcon } from "lucide-react"
 import { LayerPreview } from "@/components/slicer/LayerPreview"
+import { previewLayers } from "@/lib/slicer/slice"
+import { INFILL_PATTERN_LABELS, BASIC_INFILL_PATTERNS, ADVANCED_INFILL_PATTERNS } from "@/lib/slicer/infill-advanced"
+import { useSearchParams } from "next/navigation"
+import type { SlicedLayer, BBox3 } from "@/lib/slicer/types"
 
 type Mode = "basic" | "advanced"
 type Rheo = { viscosity_PaS?: number; powerLawN?: number }
 const HANDOFF_KEY = "bia.host.gcode.handoff"
 
 export default function BioSlicerPage() {
+  // useSearchParams exige Suspense no build estático do Next 14
+  return <Suspense fallback={<div className="text-sm text-gray-400 p-6">Carregando BioSlicer…</div>}><BioSlicerInner /></Suspense>
+}
+
+function BioSlicerInner() {
   const { state, updateSlice } = useBioprintProcess()
   // R20: BioSlicer É a Etapa 3. Não bloqueia — avisa se Etapa 1/2 não estão prontas.
   const modelReady = state.model.status === "ready"
@@ -50,7 +59,10 @@ export default function BioSlicerPage() {
   const [stored, setStored] = useState<Array<{ id: string; name: string; sizeKb: number; source: string }>>([])
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const [mode, setMode] = useState<Mode>("basic")
+  const searchParams = useSearchParams()
+  const [mode, setMode] = useState<Mode>(() => (searchParams?.get("tab") === "advanced" ? "advanced" : "basic"))
+  // R20-B: preview grátis (amostra de camadas) antes de confirmar
+  const [preview, setPreview] = useState<{ layers: SlicedLayer[]; bbox: BBox3; total: number } | null>(null)
   const [profile, setProfile] = useState<SliceProfile>(BASIC_PROFILES[0])
   const [P, setP] = useState<SliceParams>({ ...BASIC_PROFILES[0].params })
   const [X, setX] = useState<ExtrusionModel>({ ...BASIC_PROFILES[0].extrusion })
@@ -278,7 +290,7 @@ export default function BioSlicerPage() {
           <h2 className="text-xl font-bold flex items-center gap-2"><Layers className="w-5 h-5 text-emerald-300" /> Fatiamento — BioSlicer</h2>
           <p className="text-sm text-gray-400 mt-1 max-w-3xl">
             O único fatiador da BIA: STL da Etapa 1, Studio, upload ou primitiva → G-code Marlin/Klipper com extrusão volumétrica por seringa,
-            preenchimentos reais (linhas, grid, triangular, honeycomb, concêntrico, zigzag, gyroid), alvo (Petri/placa de poços) e 1–4 cabeçotes.
+            preenchimentos honestos (linhas, grid, triangular, hexagonal, ondas, concêntrico, zigzag, gyroid; e no Avançado: Schwarz P, Diamond, Voronoi, Perlin, gradiente), alvo (Petri/placa de poços) e 1–4 cabeçotes.
             <b className="text-gray-200"> Ponto zero é ponto zero</b>: o 1º cordão nasce onde o bico está. Sem <code>G28</code>, sem park.
           </p>
         </div>
@@ -408,7 +420,7 @@ export default function BioSlicerPage() {
             <ToolsPanel tools={tools} onChange={setTools} bioinks={bioinkOptions} baseExtrusion={X} />
           </Panel>
 
-          <button onClick={() => setConfirmOpen(true)} disabled={!mesh || !!busy} className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-emerald-500 to-cyan-500 text-black disabled:opacity-40 flex items-center justify-center gap-2">
+          <button onClick={() => { if (mesh) { try { setPreview(previewLayers({ mesh, params: P }, 3)) } catch { setPreview(null) } } setConfirmOpen(true) }} disabled={!mesh || !!busy} className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-emerald-500 to-cyan-500 text-black disabled:opacity-40 flex items-center justify-center gap-2">
             {busy ? <><RefreshCw className="w-4 h-4 animate-spin" /> {busy}</> : <><Layers className="w-4 h-4" /> Fatiar e gerar G-code (6 créditos)</>}
           </button>
           {error && <div className="text-sm text-red-300 flex gap-2"><AlertTriangle className="w-4 h-4 shrink-0" />{error}</div>}
@@ -477,12 +489,18 @@ export default function BioSlicerPage() {
 
       {confirmOpen && mesh && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setConfirmOpen(false)}>
-          <div className="w-full max-w-lg rounded-2xl border border-emerald-400/30 bg-[#0b1412] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-2xl rounded-2xl border border-emerald-400/30 bg-[#0b1412] shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
               <div className="flex items-center gap-2 text-white font-semibold"><ShieldCheck className="w-5 h-5 text-emerald-300" /> Confirme antes de fatiar</div>
               <button onClick={() => setConfirmOpen(false)} className="p-1 rounded hover:bg-white/10 text-gray-400"><XIcon className="w-4 h-4" /></button>
             </div>
-            <div className="p-5 space-y-2.5 text-sm">
+            <div className="p-5 space-y-2.5 text-sm max-h-[80vh] overflow-auto">
+              {preview && preview.layers.length > 0 && (
+                <div className="rounded-lg border border-white/10 bg-black/30 p-2 mb-2">
+                  <div className="text-[11px] text-gray-400 mb-1">Prévia grátis — {preview.layers.length} de {preview.total} camadas (base, meio, topo). É isso que vai para o G-code.</div>
+                  <LayerPreview layers={preview.layers} bbox={preview.bbox} lineWidth_mm={P.lineWidth_mm} height={220} />
+                </div>
+              )}
               <Row k="Modelo" v={`${mesh.name ?? "malha"} · ${meshSize ? `${(meshSize.x * P.scale).toFixed(1)} × ${(meshSize.y * P.scale).toFixed(1)} × ${(meshSize.z * P.scale).toFixed(1)} mm` : ""}`} />
               <Row k="Preenchimento" v={`${infillLabel(P.infillPattern)} · ${P.infillDensity} %${P.strandSpacing_mm ? ` · espaçamento ${P.strandSpacing_mm} mm` : ""}`} />
               <Row k="Paredes / camada" v={`${P.wallCount} parede(s) · camada ${P.layerHeight_mm} mm · agulha ${P.nozzleDiameter_mm} mm`} />
@@ -508,7 +526,7 @@ function Row({ k, v }: { k: string; v: string }) {
   return <div className="flex gap-3"><span className="w-32 shrink-0 text-gray-500">{k}</span><span className="text-gray-100">{v}</span></div>
 }
 function infillLabel(p: InfillPattern): string {
-  return ({ rectilinear: "Linhas (woodpile 0/90)", grid: "Grid (quadriculado)", triangles: "Triangular", honeycomb: "Honeycomb (hexagonal)", concentric: "Concêntrico", gyroid: "Gyroid", zigzag: "Zigzag contínuo", none: "Sem preenchimento (só paredes)" } as Record<string, string>)[p] ?? p
+  return INFILL_PATTERN_LABELS[p]?.label ?? p
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -541,14 +559,10 @@ function BasicParams({ P, setP, X, setX }: { P: SliceParams; setP: (p: SlicePara
       <Range label="Altura de camada" tip={PARAM_TIPS.layerHeight_mm} value={P.layerHeight_mm} min={0.1} max={1.2} step={0.01} unit="mm" onChange={(v) => setP({ ...P, layerHeight_mm: v, firstLayerHeight_mm: Math.round(v * 0.9 * 100) / 100 })} hint={`${Math.round((P.layerHeight_mm / P.nozzleDiameter_mm) * 100)} % do bico`} />
       <Field label="Padrão de infill" tip={PARAM_TIPS.infillPattern}>
         <select value={P.infillPattern} onChange={(e) => setP({ ...P, infillPattern: e.target.value as InfillPattern })} className={inp}>
-          <option value="rectilinear">Woodpile 0/90 (scaffold clássico)</option>
-          <option value="zigzag">Zigzag contínuo (menos gotas)</option>
-          <option value="grid">Grade cruzada</option>
-          <option value="gyroid">Gyroid (isotrópico)</option>
-          <option value="concentric">Concêntrico (discos)</option>
-          <option value="honeycomb">Favo (hexagonal)</option>
-          <option value="none">Sem infill (só paredes)</option>
+          {BASIC_INFILL_PATTERNS.map((p) => <option key={p} value={p}>{INFILL_PATTERN_LABELS[p].label}</option>)}
+          {!(BASIC_INFILL_PATTERNS as readonly string[]).includes(P.infillPattern) && <option value={P.infillPattern}>{INFILL_PATTERN_LABELS[P.infillPattern]?.label ?? P.infillPattern} (avançado)</option>}
         </select>
+        <div className="text-[11px] text-gray-500 mt-1">{INFILL_PATTERN_LABELS[P.infillPattern]?.hint}</div>
       </Field>
       {P.infillPattern !== "none" && <Range label="Densidade do infill" tip={PARAM_TIPS.infillDensity} value={P.infillDensity} min={5} max={100} step={5} unit="%" onChange={(v) => setP({ ...P, infillDensity: v, strandSpacing_mm: undefined })} hint={`porosidade ≈ ${100 - P.infillDensity} %`} />}
       <Range label="Velocidade" tip={PARAM_TIPS.speedPerimeter_mms} value={P.speedPerimeter_mms} min={1} max={20} step={0.5} unit="mm/s" onChange={(v) => setP({ ...P, speedPerimeter_mms: v, speedInfill_mms: Math.round(v * 1.2 * 10) / 10, speedFirstLayer_mms: Math.max(1, Math.round(v * 0.7 * 10) / 10) })} />
@@ -589,8 +603,9 @@ function AdvancedParams({ P, setP, X, setX, rheology, setRheology }: {
       </Group>
       <Group title="Infill">
         <F k="infillPattern" label="Padrão"><select value={P.infillPattern} onChange={(e) => setP({ ...P, infillPattern: e.target.value as InfillPattern })} className={inp}>
-          {(["rectilinear", "zigzag", "grid", "triangles", "honeycomb", "gyroid", "concentric", "none"] as InfillPattern[]).map((p) => <option key={p} value={p}>{p}</option>)}
-        </select></F>
+          <optgroup label="Básicos">{BASIC_INFILL_PATTERNS.map((p) => <option key={p} value={p}>{INFILL_PATTERN_LABELS[p].label}</option>)}</optgroup>
+          <optgroup label="Avançados (TPMS / orgânicos)">{ADVANCED_INFILL_PATTERNS.map((p) => <option key={p} value={p}>{INFILL_PATTERN_LABELS[p].label}</option>)}</optgroup>
+        </select><div className="text-[11px] text-gray-500 mt-1">{INFILL_PATTERN_LABELS[P.infillPattern]?.hint}</div></F>
         <F k="infillDensity" label="Densidade (%)">{num("infillDensity", 1, 0, 100)}</F>
         <F k="strandSpacing_mm" label="Espaçamento (mm, opcional)"><input type="number" step={0.05} value={P.strandSpacing_mm ?? ""} placeholder="auto" onChange={(e) => setP({ ...P, strandSpacing_mm: e.target.value === "" ? undefined : +e.target.value })} className={inp} /></F>
         <F k="infillAngle_deg" label="Ângulo base (°)">{num("infillAngle_deg", 5, -180, 180)}</F>

@@ -68,7 +68,7 @@ const STEP_CARDS: StepCardDef[] = [
     title: "Fatiamento",
     short: STEP_LABELS.slice,
     description:
-      "Motor de G-code: altura de camada, velocidade, pressão, padrão de infill BIO (parallel, gradient, vascular sacrificial, FRESH, esferoides). Estimativa de tempo e volume.",
+      "BioSlicer — o único fatiador da BIA: STL → G-code com extrusão volumétrica por seringa, infills honestos (linhas, grid, hexagonal, ondas, gyroid; avançado: Schwarz P, Diamond, Voronoi, Perlin, gradiente), alvo Petri/placa 6–96 poços, 1–4 cabeçotes. Ponto zero = bico. Prévia grátis; 6 créditos por G-code.",
     icon: Layers,
     route: "/dashboard/bioprint/slice",
     color: "violet",
