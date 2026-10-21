@@ -2,1517 +2,670 @@
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
- *  BIA — Etapa 2 / 4 · Biotinta (formulação + reologia + catálogo)
- *  ───────────────────────────────────────────────────────────────────────
- *  Unifica em uma única tela:
- *    A. FORMULAR  — material + concentração + crosslinker + células + aditivos
- *    B. CATÁLOGO  — DB com biomateriais validados (807 formulações)
- *    C. REOLOGIA  — simulação Hagen-Poiseuille + warnings de viabilidade
- *
- *  Substitui /dashboard/biomaterials + tabs bioink/db/rheology de /bioprinting.
- *  Escreve em state.bioink do BioprintProcessContext.
- *
- *  Pré-requisito: state.model.status === "ready"
- *
- *  Janaina Dernowsek / Quantis Biotechnology — 2026
+ *  BIA v4 · R16 · Laboratório de Biotintas (guiado)
+ *  ─────────────────────────────────────────────────────────────────────
+ *  3 passos, zero parâmetros soltos:
+ *   1. Decisões — objetivo, células, equipamento, experiência
+ *   2. Receita — recomendação + janela de biofabricação + alternativas
+ *   3. Bancada — quantidades calculadas, preparo, reticulação, se der errado
+ *  Modo Básico (padrão) esconde reologia/explicações; Avançado mostra tudo.
+ *  Página antiga (parâmetros livres): /dashboard/bioprint/bioink/classic
  * ═══════════════════════════════════════════════════════════════════════
  */
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
-  Droplets, Database, BarChart3, Search, Loader2, FlaskConical,
-  Microscope, Star, ArrowRight, AlertTriangle, CheckCircle2, ChevronDown,
-  ChevronUp, Info, Beaker, Sparkles, Filter, X, ChevronRight, TrendingUp,
-  Plus, Trash2, Layers,
+  FlaskConical, ArrowRight, ArrowLeft, Check, Sparkles, Lightbulb, Thermometer, Syringe,
+  AlertTriangle, Info, BookOpen, Download, Copy, Wrench, Layers, Target, Beaker, SlidersHorizontal,
+  Sun, Snowflake, CircleDot, Microscope, ExternalLink, RotateCcw,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
-import { useBioprintProcess, type BioinkRole, type BioinkFormulation } from "@/lib/bioprint/process-context"
-// R12.68 · ExportBar universal + adapter da Biotinta (Bioink)
-import { ExportBar } from "@/components/notebook/ExportBar"
-import { buildContentFromBioinkDrafts } from "@/lib/export/adapters/bioink-adapter"
+import { useBioprintProcess } from "@/lib/bioprint/process-context"
+import {
+  RECIPES, GOAL_LABELS, CELL_LABELS, ZONE_LABELS, DEFAULT_EQUIPMENT,
+  recommend, pickAlternatives, evaluateRecipeWindow, planBench, relevantTroubles,
+  protocolMarkdown, toBioinkPatch, slicerHint, getRecipe,
+  type Goal, type CellTypeId, type Equipment, type Experience, type Recipe, type Recommendation,
+} from "@/lib/bioink-lab"
 
-// ─── Constantes da biotinta (importadas da página antiga, agora aqui) ─────
+type Step = 1 | 2 | 3
+const LAB_KEY = "bia:bioink-lab"
+const SLICER_HINT_KEY = "bia:slicer-hint"
+const NOZZLES = [0.2, 0.26, 0.33, 0.41, 0.51, 0.6, 0.84]
+const GOAL_ORDER: Goal[] = ["learn", "skin", "cartilage", "bone", "vascular", "liver", "cardiac", "neural", "organoid", "generic_cells"]
+const CELL_ORDER: CellTypeId[] = ["none", "fibroblast", "keratinocyte", "chondrocyte", "osteoblast", "msc", "huvec", "hepatocyte", "cardiomyocyte", "neuron", "ipsc", "tumor"]
 
-interface MatPreset {
-  id: string
-  label: string
-  conc: string
-  concDefault: number      // valor inicial do slider
-  temp: number              // °C
-  note: string
-  defaultCrosslinker: string
-  defaultCrosslinkerConc: number
-}
-
-const BIOINK_MATERIALS: MatPreset[] = [
-  { id: "gelma",    label: "GelMA",              conc: "5–15%",       concDefault: 8,    temp: 37, note: "Fotocrosslink UV 365 nm 30–60s",      defaultCrosslinker: "UV 365 nm + LAP",   defaultCrosslinkerConc: 0.3  },
-  { id: "alginate", label: "Alginato de Sódio",  conc: "2–4%",        concDefault: 3,    temp: 25, note: "CaCl₂ 50–200 mM crosslink iônico",    defaultCrosslinker: "CaCl₂",             defaultCrosslinkerConc: 100  },
-  { id: "fibrin",   label: "Fibrina",            conc: "10–30 mg/mL", concDefault: 20,   temp: 37, note: "Trombina 1–5 U/mL · gelifica 5–10 min", defaultCrosslinker: "Trombina",          defaultCrosslinkerConc: 2    },
-  { id: "collagen", label: "Colágeno Tipo I",    conc: "1–5 mg/mL",   concDefault: 3,    temp: 4,  note: "Imprimir a 4 °C · gelifica a 37 °C",  defaultCrosslinker: "Térmico 37 °C",     defaultCrosslinkerConc: 0    },
-  { id: "chitosan", label: "Quitosana",          conc: "1–3%",        concDefault: 2,    temp: 25, note: "Crosslink pH ou TPP",                  defaultCrosslinker: "TPP",               defaultCrosslinkerConc: 1    },
-  { id: "hama",     label: "HA-MA (Hialuronato)", conc: "2–4%",       concDefault: 3,    temp: 25, note: "UV crosslink · G' 100–2000 Pa",        defaultCrosslinker: "UV 365 nm + LAP",   defaultCrosslinkerConc: 0.3  },
-  { id: "pegda",    label: "PEGDA",              conc: "10–30%",      concDefault: 15,   temp: 25, note: "Fotocrosslink UV · rígido",            defaultCrosslinker: "UV 365 nm + LAP",   defaultCrosslinkerConc: 0.3  },
-  { id: "decm",     label: "dECM",               conc: "1–3%",        concDefault: 2,    temp: 4,  note: "Matriz descelularizada · gelifica 37 °C", defaultCrosslinker: "Térmico 37 °C",  defaultCrosslinkerConc: 0    },
-  { id: "pcl",      label: "PCL",                conc: "100%",        concDefault: 100,  temp: 90, note: "Extrusão 90–100 °C · scaffolds rígidos", defaultCrosslinker: "Solidificação",   defaultCrosslinkerConc: 0    },
-  { id: "pluronic", label: "Pluronic F127",      conc: "20–40%",      concDefault: 30,   temp: 4,  note: "Suporte sacrificial · gel reversível",  defaultCrosslinker: "Lavagem 4 °C",     defaultCrosslinkerConc: 0    },
-  { id: "custom",   label: "Formulação Custom",  conc: "—",           concDefault: 5,    temp: 25, note: "Parâmetros personalizados",            defaultCrosslinker: "—",                 defaultCrosslinkerConc: 0    },
-]
-
-// 10 tipos celulares do biomedical-params (chaves de CELL_SENSITIVITY)
-const CELL_TYPES = [
-  { id: "hMSC",         label: "hMSC (mesênquimal)",        note: "Tolerante · ideal para osso/cartilagem" },
-  { id: "iPSC",         label: "iPSC (pluripotente)",        note: "Sensível ao cisalhamento · viabilidade crítica" },
-  { id: "Hepatocyte",   label: "Hepatócito",                 note: "Muito sensível · prefere encapsulamento" },
-  { id: "Cardiomyocyte",label: "Cardiomiócito",              note: "Sensível · viabilidade ≥85% pós-bio" },
-  { id: "Chondrocyte",  label: "Condrócito",                 note: "Tolerante · ideal para cartilagem articular" },
-  { id: "Osteoblast",   label: "Osteoblasto",                note: "Tolerante · osso e dental" },
-  { id: "Fibroblast",   label: "Fibroblasto",                note: "Muito tolerante · padrão para pele" },
-  { id: "Keratinocyte", label: "Queratinócito",              note: "Tolerante · pele superficial" },
-  { id: "Endothelial",  label: "Endotelial (HUVEC)",         note: "Tolerante · vascularização" },
-  { id: "Neuron",       label: "Neurônio",                   note: "Muito sensível · cisalhamento mínimo" },
-]
-
-// Categorias do catálogo de 807 biomateriais
-const DB_CATEGORIES: Array<{ value: string; label: string }> = [
-  { value: "HYDROGEL",       label: "Hidrogel" },
-  { value: "SCAFFOLD",       label: "Scaffold / Polímero" },
-  { value: "BIOINK",         label: "Bioink Formulada" },
-  { value: "COMPOSITE",      label: "Compósito" },
-  { value: "DECELLULARIZED", label: "MEC Descelularizada" },
-  { value: "COATING",        label: "Coating / Peptídeo" },
-  { value: "MEMBRANE",       label: "Membrana" },
-  { value: "NANOPARTICLE",   label: "Nanopartícula" },
-]
-const DB_CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
-  DB_CATEGORIES.map(c => [c.value, c.label])
-)
-const DB_CATEGORY_COLORS: Record<string, string> = {
-  HYDROGEL:       "text-blue-400 bg-blue-500/10 border-blue-500/20",
-  SCAFFOLD:       "text-purple-400 bg-purple-500/10 border-purple-500/20",
-  BIOINK:         "text-teal-400 bg-teal-500/10 border-teal-500/20",
-  COMPOSITE:      "text-amber-400 bg-amber-500/10 border-amber-500/20",
-  DECELLULARIZED: "text-rose-400 bg-rose-500/10 border-rose-500/20",
-  COATING:        "text-cyan-400 bg-cyan-500/10 border-cyan-500/20",
-  MEMBRANE:       "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-  NANOPARTICLE:   "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
-}
-
-// ─── Types do DB de 807 ──────────────────────────────────────────────────
-
-type CompositionJson = Record<string, unknown>
-interface Biomaterial {
-  id: string
-  name: string
-  category: string
-  composition: string | CompositionJson
-  concentration?: string
-  applications: string[]
-  biocompatibility: string
-  crosslinking?: string
-  tissueTypes?: string[]
-  tags?: string[]
-}
-
-interface DBSuggestion {
-  material: string
-  score: number
-  n: number
-  cellFriendly: number
-  typicalPressure: number | null
-  typicalTemp: number | null
-  typicalSpeed: number | null
-  typicalNeedle: number | null
-  concentrations: string[]
-  sampleFormulation: string
-}
-
-// ─── Reologia (cópia simplificada de bioprinting/page.tsx) ───────────────
-
-interface RheologyInput {
-  materialId: string
-  concentration: number
-  hasCells: boolean
-  cellDensityM: number      // milhões/mL
-  nozzleUm: number
-  printSpeedMmS: number
-}
-
-interface RheologyResult {
-  viscosityPaS: number      // valor numérico para gravar no context
-  yieldStressPa: number
-  gPrime: number
-  shearStressPa: number
-  shearRate: number
-  printability: "excellent" | "moderate" | "high-shear"
-  recommendation: string
-  warnings: string[]
-}
-
-function calculateRheology(input: RheologyInput): RheologyResult {
-  const { materialId, concentration: conc, hasCells, cellDensityM, nozzleUm, printSpeedMmS } = input
-
-  // Wall shear rate via Hagen-Poiseuille simplificado:
-  // γ̇_wall = 4Q / (π R³); Q ≈ v · A (área da seção)
-  const R = (nozzleUm / 2) / 1_000_000  // µm → m
-  const A = Math.PI * R * R
-  const v = printSpeedMmS / 1000        // mm/s → m/s
-  const Q = v * A
-  const shear = (4 * Q) / (Math.PI * R * R * R)  // 1/s
-
-  // Estimativas material-específicas (mPa·s, Pa, Pa)
-  let viscosity_mPaS = 500
-  let yieldStress = 20
-  let gPrime = 300
-
-  switch (materialId) {
-    case "gelma":
-      viscosity_mPaS = 50 + conc * 80
-      yieldStress = conc * 3
-      gPrime = conc * 200
-      break
-    case "alginate":
-      viscosity_mPaS = conc * 400
-      yieldStress = conc * 8
-      gPrime = conc * 500
-      break
-    case "collagen":
-      viscosity_mPaS = conc * 120
-      yieldStress = conc * 2
-      gPrime = conc * 80
-      break
-    case "fibrin":
-      viscosity_mPaS = conc * 30
-      yieldStress = conc * 1
-      gPrime = conc * 60
-      break
-    case "chitosan":
-      viscosity_mPaS = conc * 350
-      yieldStress = conc * 6
-      gPrime = conc * 400
-      break
-    case "hama":
-      viscosity_mPaS = conc * 600
-      yieldStress = conc * 5
-      gPrime = conc * 350
-      break
-    case "pegda":
-      viscosity_mPaS = conc * 50
-      yieldStress = conc * 1
-      gPrime = conc * 30
-      break
-    case "decm":
-      viscosity_mPaS = conc * 200
-      yieldStress = conc * 3
-      gPrime = conc * 150
-      break
-    case "pcl":
-      viscosity_mPaS = 5000
-      yieldStress = 200
-      gPrime = 100000
-      break
-    case "pluronic":
-      viscosity_mPaS = conc * 1500
-      yieldStress = conc * 30
-      gPrime = conc * 800
-      break
-  }
-
-  const viscosityPaS = viscosity_mPaS / 1000
-  const shearStressPa = viscosityPaS * shear
-
-  const printability: RheologyResult["printability"] =
-    shearStressPa < 50  ? "excellent" :
-    shearStressPa < 100 ? "moderate" : "high-shear"
-
-  const warnings: string[] = []
-  if (hasCells && shearStressPa > 50)
-    warnings.push("Shear > 50 Pa pode comprometer viabilidade celular (Blaeser et al. 2016)")
-  if (nozzleUm < 200 && hasCells)
-    warnings.push("Nozzle < 200 µm + células: risco de lise por obstrução do bico")
-  if (hasCells && cellDensityM > 10)
-    warnings.push("Densidade > 10×10⁶ cel/mL: monitorar agregação e sedimentação")
-  if (materialId === "collagen" && input.nozzleUm > 0)
-    warnings.push("Colágeno: imprimir a 4 °C; cabeça aquecida >10 °C causa gelificação prematura")
-  if (materialId === "pluronic" && hasCells)
-    warnings.push("Pluronic é sacrificial — destinado a canais vasculares, não para encapsulamento celular")
-
-  const recommendation = gPrime > 500
-    ? "Material adequado para extrusão — boa retenção de forma pós-impressão."
-    : gPrime > 100
-      ? "Limítrofe: considere aumentar concentração ou pré-crosslink leve para melhorar fidelidade."
-      : "Módulo elástico baixo — risco de colapso. Aumentar concentração ou trocar de material."
-
-  return {
-    viscosityPaS,
-    yieldStressPa: yieldStress,
-    gPrime,
-    shearStressPa,
-    shearRate: shear,
-    printability,
-    recommendation,
-    warnings,
-  }
-}
-
-// ─── R12.58: roles funcionais das biotintas ────────────────────────────
-const ROLE_DEFS: Array<{ id: BioinkRole; label: string; hint: string; color: string }> = [
-  { id: "structural",   label: "Estrutural",  hint: "Matriz principal · sustenta o scaffold",       color: "#34d399" },
-  { id: "cellular",     label: "Celular",     hint: "Carrega células · encapsula tipo celular",     color: "#a78bfa" },
-  { id: "sacrificial",  label: "Sacrificial", hint: "Removida depois · gera vazios / canais",       color: "#fbbf24" },
-  { id: "vascular",     label: "Vascular",    hint: "Canal perfundível (Pluronic, alginato temp.)", color: "#f472b6" },
-  { id: "support-bath", label: "Banho supp.", hint: "FRESH / suspensão · não é impressa como fio",  color: "#94a3b8" },
-]
-
-const TOOL_COLORS = ["#22d3ee", "#a78bfa"] as const  // T0 ciano, T1 violeta
-
-// ─── R12.58: draft (estado local de UMA biotinta durante edição) ──────
-interface FormulationDraft {
-  tool: 0 | 1
-  role: BioinkRole
-  materialId: string
-  concentration: number
-  crosslinker: string
-  crosslinkerConc: number
-  hasCells: boolean
-  cellType: string
+interface LabState {
+  goal: Goal
+  cell: CellTypeId
+  equipment: Equipment
+  experience: Experience
+  recipeId: string | null
   cellDensity: number
-  additivesText: string
+  printVolume_mL: number
+  advanced: boolean
 }
 
-function draftFromContext(f: BioinkFormulation | undefined, toolIdx: 0 | 1): FormulationDraft {
-  if (!f) {
-    // Default para "nova biotinta 2" (T1) — assume papel celular
-    const preset = BIOINK_MATERIALS[0]
-    return {
-      tool: toolIdx,
-      role: toolIdx === 0 ? "structural" : "cellular",
-      materialId: preset.id,
-      concentration: preset.concDefault,
-      crosslinker: preset.defaultCrosslinker,
-      crosslinkerConc: preset.defaultCrosslinkerConc,
-      hasCells: toolIdx === 1,   // Bio 2 geralmente carrega células
-      cellType: "Fibroblast",
-      cellDensity: 2,
-      additivesText: "",
-    }
-  }
-  // Mapeia BioinkFormulation → draft. materialId vem direto se existir,
-  // senão tenta casar pelo label.
-  const preset =
-    BIOINK_MATERIALS.find(m => m.id === f.materialId) ??
-    BIOINK_MATERIALS.find(m => m.label.toLowerCase() === (f.material ?? "").toLowerCase()) ??
-    BIOINK_MATERIALS[0]
-  return {
-    tool: toolIdx,
-    role: f.role,
-    materialId: preset.id,
-    concentration: f.concentration ?? preset.concDefault,
-    crosslinker: f.crosslinker ?? preset.defaultCrosslinker,
-    crosslinkerConc: f.crosslinkerConc ?? preset.defaultCrosslinkerConc,
-    hasCells: f.cellType !== null,
-    cellType: f.cellType ?? "Fibroblast",
-    cellDensity: f.cellDensityMillionMl ?? 2,
-    additivesText: (f.additives ?? []).join(", "),
-  }
+const DEFAULT_LAB: LabState = {
+  goal: "learn", cell: "none", equipment: DEFAULT_EQUIPMENT, experience: "first",
+  recipeId: null, cellDensity: 2, printVolume_mL: 1, advanced: false,
 }
 
-function draftToFormulation(d: FormulationDraft): BioinkFormulation {
-  const preset = BIOINK_MATERIALS.find(m => m.id === d.materialId) ?? BIOINK_MATERIALS[0]
-  const additives = d.additivesText
-    .split(",").map(s => s.trim()).filter(s => s.length > 0)
-  return {
-    tool: d.tool,
-    color: TOOL_COLORS[d.tool] ?? "#22d3ee",
-    role: d.role,
-    material: preset.label,
-    materialId: preset.id,
-    concentration: d.concentration,
-    crosslinker: d.crosslinker,
-    crosslinkerConc: d.crosslinkerConc,
-    cellType: d.hasCells ? d.cellType : null,
-    cellDensityMillionMl: d.hasCells ? d.cellDensity : null,
-    additives,
-    rheology: null,   // preenchido só na biotinta ativa (ver useEffect)
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// MAIN PAGE
-// ═══════════════════════════════════════════════════════════════════════════
-export default function BioprintBioinkPage() {
+export default function BioinkLabPage() {
+  const router = useRouter()
   const { state, updateBioink } = useBioprintProcess()
-  const [tab, setTab] = useState<"formulate" | "catalog" | "rheology">("formulate")
+  const [lab, setLab] = useState<LabState>(DEFAULT_LAB)
+  const [step, setStep] = useState<Step>(1)
+  const [hydrated, setHydrated] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
 
-  // ─── R12.58: estado é um array de 1 ou 2 drafts ────────────────────────
-  // Hidrata do context:
-  //   - Se já houver formulations[] persistidas → usa
-  //   - Senão, se houver campos legacy → migra para formulations[0]
-  //   - Senão, começa com 1 biotinta default (T0 estrutural GelMA)
-  const [drafts, setDrafts] = useState<FormulationDraft[]>(() => {
-    const fs = state.bioink.formulations ?? []
-    if (fs.length >= 2) {
-      return [draftFromContext(fs[0], 0), draftFromContext(fs[1], 1)]
-    }
-    if (fs.length === 1) {
-      return [draftFromContext(fs[0], 0)]
-    }
-    // Legacy fallback (usuário vindo de R12.55.x)
-    if (state.bioink.material) {
-      const preset =
-        BIOINK_MATERIALS.find(m => m.label.toLowerCase() === state.bioink.material!.toLowerCase()) ??
-        BIOINK_MATERIALS.find(m => m.id === state.bioink.material!.toLowerCase()) ??
-        BIOINK_MATERIALS[0]
-      return [{
-        tool: 0,
-        role: state.bioink.cellType ? "cellular" : "structural",
-        materialId: preset.id,
-        concentration: state.bioink.concentration ?? preset.concDefault,
-        crosslinker: state.bioink.crosslinker ?? preset.defaultCrosslinker,
-        crosslinkerConc: state.bioink.crosslinkerConc ?? preset.defaultCrosslinkerConc,
-        hasCells: state.bioink.cellType !== null,
-        cellType: state.bioink.cellType ?? "Fibroblast",
-        cellDensity: state.bioink.cellDensityMillionMl ?? 2,
-        additivesText: (state.bioink.additives ?? []).join(", "),
-      }]
-    }
-    return [draftFromContext(undefined, 0)]
-  })
-
-  const [activeIdx, setActiveIdx] = useState<0 | 1>(0)
-  // Se drafts encolheu para 1 (usuário removeu bio 2) e activeIdx=1 → volta pra 0
+  // ── persistência leve ────────────────────────────────────────────────
   useEffect(() => {
-    if (activeIdx >= drafts.length) setActiveIdx(0)
-  }, [drafts.length, activeIdx])
-
-  const activeDraft = drafts[activeIdx] ?? drafts[0]
-  const matPreset = BIOINK_MATERIALS.find(m => m.id === activeDraft.materialId) ?? BIOINK_MATERIALS[0]
-
-  // Para reologia + warnings: precisa de um nozzleUm e printSpeedMmS chutados
-  // (a etapa de fatiamento vai sobrescrever — aqui usamos defaults razoáveis)
-  const [nozzleUm, setNozzleUm]         = useState<number>(300)
-  const [printSpeedMmS, setPrintSpeedMmS] = useState<number>(15)
-
-  // ─── R12.68 · ExportBar: escopo + vínculo com Notebook ────────────────
-  // Escopo padrão "active" (só a biotinta ativa). Se drafts.length === 2,
-  // usuária pode escolher via dropdown "Exportar: ativa | ambas | T0 | T1"
-  const [exportScope, setExportScope] = useState<"active" | "both" | "single-0" | "single-1">("active")
-  const [notebookEntry, setNotebookEntry] = useState<{ entryId: string; currentVersion: number } | null>(null)
-
-  // Ao mudar drafts (nova formulação) ou o escopo, o vínculo com Notebook é resetado
-  useEffect(() => {
-    setNotebookEntry(null)
-  }, [drafts, exportScope])
-
-  // Reologia derivada — calculada só para a biotinta ATIVA
-  const rheology = useMemo<RheologyResult>(() => calculateRheology({
-    materialId: activeDraft.materialId,
-    concentration: activeDraft.concentration,
-    hasCells: activeDraft.hasCells,
-    cellDensityM: activeDraft.cellDensity,
-    nozzleUm, printSpeedMmS,
-  }), [activeDraft.materialId, activeDraft.concentration, activeDraft.hasCells, activeDraft.cellDensity, nozzleUm, printSpeedMmS])
-
-  // Pre-requisito visual (etapa 1 não pronta?)
-  const isUnlocked = state.model.status === "ready"
-
-  // ─── Helpers para editar biotinta ativa ─────────────────────────────────
-  const patchActive = useCallback((patch: Partial<FormulationDraft>) => {
-    setDrafts(prev => prev.map((d, i) => i === activeIdx ? { ...d, ...patch } : d))
-  }, [activeIdx])
-
-  const handleMaterialChange = useCallback((id: string) => {
-    const p = BIOINK_MATERIALS.find(m => m.id === id)
-    patchActive({
-      materialId: id,
-      ...(p ? {
-        concentration: p.concDefault,
-        crosslinker: p.defaultCrosslinker,
-        crosslinkerConc: p.defaultCrosslinkerConc,
-      } : {}),
-    })
-  }, [patchActive])
-
-  const handleAddSecond = useCallback(() => {
-    setDrafts(prev => {
-      if (prev.length >= 2) return prev
-      return [...prev, draftFromContext(undefined, 1)]
-    })
-    setActiveIdx(1)
-  }, [])
-
-  const handleRemoveSecond = useCallback(() => {
-    setDrafts(prev => prev.slice(0, 1))
-    setActiveIdx(0)
-  }, [])
-
-  // ─── Persistir no context (debounced via useEffect) ────────────────────
-  useEffect(() => {
-    const formulations = drafts.map(draftToFormulation)
-    // Injeta rheology só na biotinta ativa (é a que temos calc atual)
-    if (formulations[activeIdx]) {
-      formulations[activeIdx] = {
-        ...formulations[activeIdx],
-        rheology: {
-          viscosityPaS: rheology.viscosityPaS,
-          yieldStressPa: rheology.yieldStressPa,
-        },
+    try {
+      const raw = sessionStorage.getItem(LAB_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<LabState & { step: Step }>
+        setLab((p) => ({ ...p, ...parsed, equipment: { ...p.equipment, ...(parsed.equipment ?? {}) } }))
+        if (parsed.step) setStep(parsed.step)
       }
-    }
-    // Status: ready se biotinta principal tem material + conc > 0
-    const primary = formulations[0]
-    const status = (primary && primary.material && primary.concentration > 0) ? "ready" : "draft"
-    const strategy: "single" | "dual" | "multi" =
-      formulations.length === 1 ? "single" :
-      formulations.length === 2 ? "dual" : "multi"
+    } catch { /* noop */ }
+    setHydrated(true)
+  }, [])
+  useEffect(() => {
+    if (!hydrated) return
+    try { sessionStorage.setItem(LAB_KEY, JSON.stringify({ ...lab, step })) } catch { /* noop */ }
+  }, [lab, step, hydrated])
 
-    // Espelha campos legacy a partir de formulations[0] — mantém
-    // slice/page.tsx + control/page.tsx funcionando sem refactor.
-    updateBioink({
-      status,
-      formulations,
-      strategy,
-      material: primary?.material ?? null,
-      concentration: primary?.concentration ?? null,
-      crosslinker: primary?.crosslinker ?? null,
-      crosslinkerConc: primary?.crosslinkerConc ?? null,
-      cellType: primary?.cellType ?? null,
-      cellDensityMillionMl: primary?.cellDensityMillionMl ?? null,
-      additives: primary?.additives ?? [],
-      rheology: primary?.rheology ?? null,
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drafts, activeIdx, rheology.viscosityPaS, rheology.yieldStressPa])
+  const set = useCallback(<K extends keyof LabState>(k: K, v: LabState[K]) => setLab((p) => ({ ...p, [k]: v })), [])
+  const setEq = useCallback(<K extends keyof Equipment>(k: K, v: Equipment[K]) => setLab((p) => ({ ...p, equipment: { ...p.equipment, [k]: v } })), [])
+
+  // volume vem do modelo (Etapa 1) se já houver STL/geometria com stats
+  const modelVolumeMm3 = state.model.stats?.volumeMm3 ?? null
+  useEffect(() => {
+    if (!hydrated || !modelVolumeMm3 || modelVolumeMm3 <= 0) return
+    const ml = modelVolumeMm3 / 1000
+    setLab((p) => (p.recipeId ? p : { ...p, printVolume_mL: Math.max(0.2, Math.round(ml * 10) / 10) }))
+  }, [modelVolumeMm3, hydrated])
+
+  // ── recomendação ─────────────────────────────────────────────────────
+  const recs = useMemo(() => recommend({ goal: lab.goal, cell: lab.cell, equipment: lab.equipment, experience: lab.experience }), [lab.goal, lab.cell, lab.equipment, lab.experience])
+  const top = recs[0]
+  const alternatives = useMemo(() => pickAlternatives(recs, 3), [recs])
+  const chosen: Recipe | null = useMemo(() => (lab.recipeId ? getRecipe(lab.recipeId) ?? null : null), [lab.recipeId])
+  const chosenRec: Recommendation | null = useMemo(() => recs.find((r) => r.recipe.id === lab.recipeId) ?? null, [recs, lab.recipeId])
+
+  const hasCells = lab.cell !== "none" && chosen ? chosen.cellDensity_Mml[1] > 0 : false
+  const cellDensityClamped = useMemo(() => {
+    if (!chosen || !hasCells) return 0
+    const [lo, hi] = chosen.cellDensity_Mml
+    return Math.min(hi, Math.max(lo, lab.cellDensity))
+  }, [chosen, hasCells, lab.cellDensity])
+
+  const win = useMemo(() => (chosen ? evaluateRecipeWindow(chosen, lab.cell, { nozzle_mm: lab.equipment.nozzle_mm }) : null), [chosen, lab.cell, lab.equipment.nozzle_mm])
+  const bench = useMemo(() => (chosen ? planBench({ recipe: chosen, printVolume_mL: lab.printVolume_mL, cellDensity_Mml: hasCells ? cellDensityClamped : null }) : null), [chosen, lab.printVolume_mL, hasCells, cellDensityClamped])
+  const troubles = useMemo(() => (chosen ? relevantTroubles(chosen.crosslink, hasCells, chosen.components.some((c) => c.role === "bioactive")) : []), [chosen, hasCells])
+
+  const goStep2 = () => { setStep(2); if (!lab.recipeId || !recs.some((r) => r.recipe.id === lab.recipeId)) set("recipeId", top.recipe.id); window.scrollTo({ top: 0, behavior: "smooth" }) }
+  const pickRecipe = (id: string) => { set("recipeId", id); const r = getRecipe(id); if (r) set("cellDensity", Math.round((r.cellDensity_Mml[0] + r.cellDensity_Mml[1]) / 2 * 10) / 10) }
+  const goStep3 = () => { setStep(3); window.scrollTo({ top: 0, behavior: "smooth" }) }
+
+  const flash = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2600) }
+
+  // ── ações finais ─────────────────────────────────────────────────────
+  const markdown = useMemo(() => (chosen && bench && win ? protocolMarkdown({ recipe: chosen, cell: lab.cell, cellDensity_Mml: hasCells ? cellDensityClamped : null, bench, window: win }) : ""), [chosen, bench, win, lab.cell, hasCells, cellDensityClamped])
+
+  const downloadMd = () => {
+    if (!chosen) return
+    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" })
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `protocolo-${chosen.id}.md`; a.click(); URL.revokeObjectURL(a.href)
+    flash("Protocolo baixado (.md)")
+  }
+  const copyMd = async () => { try { await navigator.clipboard.writeText(markdown); flash("Protocolo copiado") } catch { flash("Não foi possível copiar") } }
+
+  const sendToPipeline = (dest: "slice" | "slicer") => {
+    if (!chosen) return
+    const patch = toBioinkPatch(chosen, lab.cell, hasCells ? cellDensityClamped : null)
+    const { labRecipeId, labPrintTemp_C, labStartParams, ...ctxPatch } = patch
+    updateBioink(ctxPatch)
+    try {
+      sessionStorage.setItem(SLICER_HINT_KEY, JSON.stringify({
+        text: slicerHint(chosen, lab.cell, GOAL_LABELS[lab.goal].label),
+        recipeId: labRecipeId, printTemp_C: labPrintTemp_C, startParams: labStartParams, materialId: chosen.pipelineMaterialId, from: "bioink-lab",
+      }))
+    } catch { /* noop */ }
+    router.push(dest === "slicer" ? "/dashboard/bioprint/slicer" : "/dashboard/bioprint/slice")
+  }
 
   return (
-    <div className="bia-bioink-page flex flex-col min-h-full bg-[#0a0a0f]">
+    <div className="bia-bioink-lab flex flex-col min-h-full bg-[#0a0a0f] text-gray-200">
       {/* Cabeçalho */}
       <header className="px-4 sm:px-6 py-5 border-b border-white/5">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.25em] text-cyan-300/80 font-semibold mb-1">
-              Etapa 2 / 4 · Bioimpressão
-            </div>
+            <div className="text-[10px] uppercase tracking-[0.25em] text-emerald-300/80 font-semibold mb-1">Etapa 2 / 4 · Bioimpressão</div>
             <h1 className="text-lg sm:text-2xl font-bold text-white flex items-center gap-2">
-              <Droplets className="w-5 h-5 text-cyan-400" />
-              Biotinta
+              <FlaskConical className="w-5 h-5 text-emerald-400" /> Laboratório de Biotintas
             </h1>
             <p className="text-xs sm:text-sm text-gray-400 mt-1 max-w-2xl">
-              Defina o material, concentração, agente de crosslinking e células — as propriedades reológicas
-              são calculadas em tempo real para alertar sobre cisalhamento e viabilidade.
+              Você escolhe <b className="text-gray-200">o que quer imprimir</b>; a BIA devolve uma receita validada, a posição na janela de biofabricação e o protocolo de bancada com quantidades.
             </p>
           </div>
-
-          {state.bioink.status === "ready" && (
-            <Link
-              href="/dashboard/bioprint/slice"
-              className="hidden sm:inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/15 hover:bg-cyan-500/25
-                border border-cyan-500/40 text-cyan-200 text-sm font-medium rounded-xl transition-colors"
-            >
-              Continuar para Fatiamento <ArrowRight className="w-4 h-4" />
-            </Link>
-          )}
+          <div className="flex items-center gap-2">
+            <button onClick={() => set("advanced", !lab.advanced)} className={cn("inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors", lab.advanced ? "bg-violet-500/15 border-violet-400/40 text-violet-200" : "bg-white/5 border-white/10 text-gray-300 hover:border-white/20")} title="Mostrar reologia, explicações e parâmetros">
+              <SlidersHorizontal className="w-3.5 h-3.5" /> {lab.advanced ? "Avançado" : "Básico"}
+            </button>
+            <Link href="/dashboard/bioprint/bioink/classic" className="text-xs px-3 py-1.5 rounded-lg border border-white/10 text-gray-400 hover:text-gray-200 hover:border-white/20">Modo clássico</Link>
+          </div>
         </div>
 
-        {/* Tabs */}
-        <div className="mt-5 flex gap-1.5 bg-white/3 border border-white/8 rounded-xl p-1 w-fit max-w-full overflow-x-auto">
-          <SourceTab label="Formular" icon={FlaskConical} active={tab === "formulate"} onClick={() => setTab("formulate")} />
-          <SourceTab label="Catálogo (807)" icon={Database} active={tab === "catalog"} onClick={() => setTab("catalog")} />
-          <SourceTab label="Reologia" icon={BarChart3} active={tab === "rheology"} onClick={() => setTab("rheology")} dot={rheology.warnings.length > 0 ? "amber" : null} />
-        </div>
+        {/* Stepper */}
+        <nav className="mt-5 grid grid-cols-3 gap-2 max-w-2xl" aria-label="Passos">
+          {([1, 2, 3] as Step[]).map((s) => {
+            const labels = { 1: ["Decisões", Target], 2: ["Receita", Beaker], 3: ["Bancada", Syringe] } as const
+            const [label, Icon] = labels[s]
+            const done = s < step
+            const active = s === step
+            return (
+              <button key={s} onClick={() => { if (s < step || (s === 2) || (s === 3 && lab.recipeId)) setStep(s) }} className={cn("flex items-center gap-2 px-3 py-2 rounded-xl border text-left text-xs transition-colors", active ? "bg-emerald-500/15 border-emerald-400/40 text-emerald-100" : done ? "bg-white/5 border-white/10 text-gray-300 hover:border-white/20" : "bg-white/3 border-white/5 text-gray-500")}>
+                <span className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0", active ? "bg-emerald-400 text-black" : done ? "bg-white/15 text-white" : "bg-white/5")}>{done ? <Check className="w-3.5 h-3.5" /> : s}</span>
+                <span className="flex items-center gap-1.5"><Icon className="w-3.5 h-3.5" /> {label}</span>
+              </button>
+            )
+          })}
+        </nav>
       </header>
 
-      {/* Aviso se etapa 1 não pronta */}
-      {!isUnlocked && (
-        <div className="mx-4 sm:mx-6 mt-4 rounded-xl bg-amber-500/8 border border-amber-500/30 p-4 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <div className="text-sm font-semibold text-amber-200">Etapa 1 (Modelo 3D) ainda não foi concluída</div>
-            <div className="text-xs text-amber-100/70 mt-0.5">
-              Você pode preparar a formulação aqui, mas para avançar é necessário ter um modelo 3D pronto.
-            </div>
-          </div>
-          <Link
-            href="/dashboard/bioprint/model"
-            className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-100 transition-colors"
-          >
-            Voltar à Etapa 1
-          </Link>
-        </div>
-      )}
-
-      {/* R12.68 · ExportBar universal + dropdown de escopo (Janaina opção C) */}
-      {tab === "formulate" && drafts.length > 0 && (
-        <div className="px-4 sm:px-6 pt-4">
-          <div className="flex flex-wrap items-center gap-3 rounded-xl bg-white/[0.03] border border-white/10 p-2">
-            {drafts.length === 2 && (
-              <label className="flex items-center gap-2 text-xs text-gray-400">
-                <span className="font-medium">Escopo:</span>
-                <select
-                  value={exportScope}
-                  onChange={(e) => setExportScope(e.target.value as typeof exportScope)}
-                  className="rounded-md bg-white/5 border border-white/10 text-xs text-white px-2 py-1 focus:outline-none focus:border-violet-500/40"
-                  data-testid="bioink-export-scope"
-                >
-                  <option value="active">Biotinta ativa (T{activeIdx})</option>
-                  <option value="both">Ambas as biotintas (T0 + T1)</option>
-                  <option value="single-0">Apenas T0</option>
-                  <option value="single-1">Apenas T1</option>
-                </select>
-              </label>
-            )}
-            <div className="flex-1 min-w-0">
-              <ExportBar
-                buildContent={() => {
-                  // Resolve o escopo em runtime, para pegar drafts/activeIdx atualizados
-                  const scope =
-                    exportScope === "both"
-                      ? "both"
-                      : exportScope === "single-0" || exportScope === "single-1"
-                        ? "single"
-                        : "active"
-                  const singleIdx: 0 | 1 =
-                    exportScope === "single-1" ? 1 : 0
-                  return buildContentFromBioinkDrafts({
-                    drafts,
-                    materialsInfo: BIOINK_MATERIALS.map((m) => ({ id: m.id, label: m.label })),
-                    rheology: rheology as unknown as {
-                      shearRateS: number
-                      wallShearStressPa: number
-                      viscosityPas?: number
-                      printabilityScore?: number
-                      warnings?: string[]
-                    },
-                    scope,
-                    activeIdx,
-                    singleIdx,
-                    nozzleUm,
-                    printSpeedMmS,
-                    existing: notebookEntry ?? undefined,
-                  })
-                }}
-                onSaved={(res) =>
-                  setNotebookEntry({
-                    entryId: res.entryId,
-                    currentVersion: res.versionNumber,
-                  })
-                }
-                size="sm"
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Conteúdo */}
-      <main className="flex-1 px-4 sm:px-6 py-6">
-        {tab === "formulate" && (
-          <FormulatePanel
-            drafts={drafts}
-            activeIdx={activeIdx}
-            onSelectBiotinta={(i) => setActiveIdx(i as 0 | 1)}
-            onAddSecond={handleAddSecond}
-            onRemoveSecond={handleRemoveSecond}
-            activeDraft={activeDraft}
-            matPreset={matPreset}
-            onMaterialChange={handleMaterialChange}
-            onRoleChange={(role) => patchActive({ role })}
-            onConcentrationChange={(n) => patchActive({ concentration: n })}
-            onCrosslinkerChange={(s) => patchActive({ crosslinker: s })}
-            onCrosslinkerConcChange={(n) => patchActive({ crosslinkerConc: n })}
-            onHasCellsChange={(b) => patchActive({ hasCells: b })}
-            onCellTypeChange={(s) => patchActive({ cellType: s })}
-            onCellDensityChange={(n) => patchActive({ cellDensity: n })}
-            onAdditivesChange={(s) => patchActive({ additivesText: s })}
-            rheology={rheology}
-          />
+      <main className="flex-1 px-4 sm:px-6 py-6 max-w-6xl w-full mx-auto">
+        {step === 1 && <StepDecisions lab={lab} set={set} setEq={setEq} top={top} onNext={goStep2} />}
+        {step === 2 && chosen && chosenRec && win && (
+          <StepRecipe lab={lab} chosen={chosen} chosenRec={chosenRec} recs={recs} alternatives={alternatives} win={win} onPick={pickRecipe} onBack={() => setStep(1)} onNext={goStep3} />
         )}
-        {tab === "catalog" && (
-          <CatalogPanel
-            onPickMaterial={(name) => {
-              // Heurística para mapear nome do DB → preset
-              const map: Record<string, string> = {
-                "gelma": "gelma", "alginate": "alginate", "alginato": "alginate",
-                "fibrin": "fibrin", "fibrina": "fibrin", "fibrinogen": "fibrin",
-                "collagen": "collagen", "colágeno": "collagen", "colageno": "collagen",
-                "chitosan": "chitosan", "quitosana": "chitosan",
-                "hyaluronic": "hama", "hialur": "hama", "ha-ma": "hama",
-                "pegda": "pegda", "decm": "decm", "pcl": "pcl", "pluronic": "pluronic",
-              }
-              const lower = name.toLowerCase()
-              const matched = Object.entries(map).find(([k]) => lower.includes(k))?.[1] ?? "custom"
-              handleMaterialChange(matched)
-              setTab("formulate")
-            }}
-          />
-        )}
-        {tab === "rheology" && (
-          <RheologyPanel
-            rheology={rheology}
-            nozzleUm={nozzleUm}            onNozzleChange={setNozzleUm}
-            printSpeedMmS={printSpeedMmS}  onPrintSpeedChange={setPrintSpeedMmS}
-            materialLabel={matPreset.label}
-            concentration={activeDraft.concentration}
-          />
+        {step === 3 && chosen && bench && win && (
+          <StepBench lab={lab} set={set} chosen={chosen} bench={bench} win={win} hasCells={hasCells} cellDensity={cellDensityClamped} troubles={troubles} onBack={() => setStep(2)} onDownload={downloadMd} onCopy={copyMd} onSend={sendToPipeline} />
         )}
       </main>
 
-      {/* Rodapé sticky com CTA — mostra AMBAS as biotintas */}
-      {state.bioink.status === "ready" && (
-        <footer className="sticky bottom-0 z-10 bg-[#0a0a0f]/95 backdrop-blur border-t border-cyan-500/20 px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm min-w-0 flex-wrap">
-            <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
-            {drafts.map((d, i) => {
-              const p = BIOINK_MATERIALS.find(m => m.id === d.materialId) ?? BIOINK_MATERIALS[0]
-              return (
-                <span key={i} className="inline-flex items-center gap-1.5 text-gray-300 truncate">
-                  {i > 0 && <span className="text-gray-600 mx-1">·</span>}
-                  <span
-                    className="inline-block w-2 h-2 rounded-full shrink-0"
-                    style={{ background: TOOL_COLORS[i] }}
-                    aria-hidden
-                  />
-                  <span className="text-cyan-300 font-medium">Bio {i + 1} [T{i}]:</span>
-                  <span className="truncate">
-                    {p.label} {d.concentration}%
-                    {d.hasCells && ` · ${d.cellType} ${d.cellDensity}×10⁶/mL`}
-                  </span>
-                </span>
-              )
-            })}
-          </div>
-          <Link
-            href="/dashboard/bioprint/slice"
-            className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-cyan-950 text-sm font-semibold rounded-lg transition-colors"
-          >
-            Etapa 3 · Fatiamento <ArrowRight className="w-4 h-4" />
-          </Link>
-        </footer>
-      )}
+      {toast && <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-emerald-500/90 text-black text-sm font-medium px-4 py-2 rounded-xl shadow-lg z-50">{toast}</div>}
     </div>
   )
 }
 
-// ─── Tab da fonte ─────────────────────────────────────────────────────────
-function SourceTab({
-  label, icon: Icon, active, onClick, dot,
-}: {
-  label: string; icon: typeof Droplets; active: boolean; onClick: () => void; dot?: "amber" | "cyan" | null
+// ─────────────────────────────────────────────────────────────────────────
+//  PASSO 1 · Decisões
+// ─────────────────────────────────────────────────────────────────────────
+function StepDecisions({ lab, set, setEq, top, onNext }: {
+  lab: LabState
+  set: <K extends keyof LabState>(k: K, v: LabState[K]) => void
+  setEq: <K extends keyof Equipment>(k: K, v: Equipment[K]) => void
+  top: Recommendation
+  onNext: () => void
 }) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "px-3.5 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap",
-        active
-          ? "bg-cyan-500/20 text-cyan-200 ring-1 ring-cyan-500/40"
-          : "text-gray-400 hover:text-gray-200 hover:bg-white/5"
-      )}
-    >
-      <Icon className="w-4 h-4" />
-      {label}
-      {dot && <span className={cn("w-1.5 h-1.5 rounded-full", dot === "amber" ? "bg-amber-400" : "bg-cyan-400")} />}
-    </button>
-  )
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// PAINEL A — FORMULAR (R12.58 · multi-biotinta)
-// ═══════════════════════════════════════════════════════════════════════════
-interface FormulateProps {
-  drafts: FormulationDraft[]
-  activeIdx: 0 | 1
-  onSelectBiotinta: (i: number) => void
-  onAddSecond: () => void
-  onRemoveSecond: () => void
-  activeDraft: FormulationDraft
-  matPreset: MatPreset
-  onMaterialChange: (id: string) => void
-  onRoleChange: (r: BioinkRole) => void
-  onConcentrationChange: (n: number) => void
-  onCrosslinkerChange: (s: string) => void
-  onCrosslinkerConcChange: (n: number) => void
-  onHasCellsChange: (b: boolean) => void
-  onCellTypeChange: (s: string) => void
-  onCellDensityChange: (n: number) => void
-  onAdditivesChange: (s: string) => void
-  rheology: RheologyResult
-}
-
-function FormulatePanel(p: FormulateProps) {
-  const {
-    drafts, activeIdx, onSelectBiotinta, onAddSecond, onRemoveSecond,
-    activeDraft, matPreset,
-    onMaterialChange, onRoleChange,
-    onConcentrationChange,
-    onCrosslinkerChange,
-    onCrosslinkerConcChange,
-    onHasCellsChange,
-    onCellTypeChange,
-    onCellDensityChange,
-    onAdditivesChange,
-    rheology,
-  } = p
-
-  const {
-    materialId, role, concentration, crosslinker, crosslinkerConc,
-    hasCells, cellType, cellDensity, additivesText,
-  } = activeDraft
+  const cellsForGoal = useMemo(() => {
+    const ok = new Set<CellTypeId>()
+    RECIPES.filter((r) => r.goals.includes(lab.goal)).forEach((r) => r.cellsOk.forEach((c) => ok.add(c)))
+    return ok
+  }, [lab.goal])
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5">
-      {/* ── R12.58: seletor de biotintas ── */}
-      <section className="rounded-2xl border border-cyan-500/20 bg-cyan-500/[0.03] p-4">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-            <Layers className="w-4 h-4 text-cyan-400" />
-            Biotintas do scaffold
-            <span className="text-[10px] uppercase tracking-wider font-normal text-gray-500">
-              {drafts.length === 1 ? "single-material" : "dual-material"}
-            </span>
-          </h3>
-          {drafts.length < 2 ? (
-            <button
-              type="button"
-              onClick={onAddSecond}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg
-                bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/40 text-violet-200 transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Adicionar biotinta 2
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onRemoveSecond}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg
-                bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-200 transition-colors"
-              title="Remover biotinta 2 (mantém apenas a biotinta 1)"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              Remover biotinta 2
-            </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {drafts.map((d, i) => {
-            const preset = BIOINK_MATERIALS.find(m => m.id === d.materialId) ?? BIOINK_MATERIALS[0]
-            const roleInfo = ROLE_DEFS.find(r => r.id === d.role)
-            const isActive = i === activeIdx
+    <div className="space-y-8">
+      {/* Objetivo */}
+      <section id="lab-goal">
+        <SectionTitle n={1} title="O que você quer imprimir?" hint="Escolha o objetivo biológico — isso define a família de materiais." />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mt-3">
+          {GOAL_ORDER.map((g) => {
+            const L = GOAL_LABELS[g]
+            const active = lab.goal === g
             return (
-              <button
-                key={i}
-                type="button"
-                onClick={() => onSelectBiotinta(i)}
-                className={cn(
-                  "text-left rounded-xl border p-3 transition-all",
-                  isActive
-                    ? "bg-cyan-500/10 border-cyan-500/50 ring-1 ring-cyan-500/30"
-                    : "bg-white/3 border-white/8 hover:bg-white/5 hover:border-white/15"
-                )}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span
-                    className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{ background: TOOL_COLORS[i] }}
-                    aria-hidden
-                  />
-                  <span className={cn("text-xs font-semibold", isActive ? "text-cyan-200" : "text-gray-200")}>
-                    Biotinta {i + 1}
-                  </span>
-                  <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-gray-400">
-                    T{i}
-                  </span>
-                  {roleInfo && (
-                    <span className="text-[9px] uppercase tracking-wider text-gray-500 ml-auto">
-                      {roleInfo.label}
-                    </span>
-                  )}
-                </div>
-                <div className={cn("text-[13px] font-semibold", isActive ? "text-white" : "text-gray-300")}>
-                  {preset.label} <span className="font-mono text-cyan-300/80">{d.concentration}%</span>
-                </div>
-                <div className="text-[11px] text-gray-500 mt-0.5 truncate">
-                  {d.hasCells ? `+ ${d.cellType} ${d.cellDensity}×10⁶/mL` : "acelular"}
-                </div>
+              <button key={g} onClick={() => { set("goal", g); if (!cellsForGoal.has(lab.cell)) set("cell", "none") }} className={cn("text-left p-3 rounded-xl border transition-all", active ? "bg-emerald-500/15 border-emerald-400/50 ring-1 ring-emerald-400/30" : "bg-white/3 border-white/8 hover:border-white/20")}>
+                <div className="text-xl leading-none mb-1.5">{L.emoji}</div>
+                <div className={cn("text-sm font-semibold", active ? "text-emerald-100" : "text-gray-200")}>{L.label}</div>
+                <div className="text-[11px] text-gray-500 mt-0.5 leading-snug">{L.hint}</div>
               </button>
             )
           })}
         </div>
+      </section>
 
-        {drafts.length === 1 && (
-          <p className="text-[11px] text-gray-500 mt-3 leading-relaxed">
-            💡 Bioimpressão real de tecidos raramente usa 1 só material.
-            Ex: <span className="text-gray-300">GelMA estrutural (T0) + Alginato com células (T1)</span>,
-            ou <span className="text-gray-300">PCL rígido (T0) + Colágeno celular (T1)</span>.
-          </p>
+      {/* Células */}
+      <section id="lab-cells">
+        <SectionTitle n={2} title="Com quais células?" hint="Sem células é o melhor começo: valide forma e parâmetros antes de gastar células." />
+        <div className="flex flex-wrap gap-2 mt-3">
+          {CELL_ORDER.map((c) => {
+            const L = CELL_LABELS[c]
+            const active = lab.cell === c
+            const fits = cellsForGoal.has(c)
+            return (
+              <button key={c} onClick={() => set("cell", c)} title={L.note} className={cn("px-3 py-1.5 rounded-full border text-xs transition-colors flex items-center gap-1.5", active ? "bg-emerald-500/20 border-emerald-400/50 text-emerald-100" : fits ? "bg-white/3 border-white/10 text-gray-300 hover:border-white/25" : "bg-white/2 border-white/5 text-gray-600 hover:text-gray-400")}>
+                {L.label}
+                {c !== "none" && <span className={cn("w-1.5 h-1.5 rounded-full", L.sensitivity === "high" ? "bg-rose-400" : L.sensitivity === "mid" ? "bg-amber-400" : "bg-emerald-400")} title={`sensibilidade ao shear: ${L.sensitivity}`} />}
+              </button>
+            )
+          })}
+        </div>
+        {lab.cell !== "none" && (
+          <p className="text-[11px] text-gray-500 mt-2 flex items-center gap-1.5"><Info className="w-3.5 h-3.5" /> {CELL_LABELS[lab.cell].note}. {!cellsForGoal.has(lab.cell) && <span className="text-amber-300">Pouco usual para este objetivo — a BIA vai avisar.</span>}</p>
         )}
       </section>
 
-      {/* ── Papel funcional (role) — R12.58 ── */}
-      <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
-        <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-          <span
-            className="inline-block w-3 h-3 rounded-full"
-            style={{ background: TOOL_COLORS[activeIdx] }}
-            aria-hidden
-          />
-          Papel da Biotinta {activeIdx + 1} no scaffold
-        </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-          {ROLE_DEFS.map(r => (
-            <button
-              key={r.id}
-              type="button"
-              onClick={() => onRoleChange(r.id)}
-              className={cn(
-                "p-2.5 rounded-lg border text-left transition-all",
-                role === r.id
-                  ? "border-cyan-500/50 bg-cyan-500/10 ring-1 ring-cyan-500/30"
-                  : "border-white/8 bg-white/3 hover:border-white/15 hover:bg-white/5"
-              )}
-              title={r.hint}
-            >
-              <div className={cn(
-                "text-xs font-semibold",
-                role === r.id ? "text-cyan-200" : "text-white"
-              )}>
-                {r.label}
-              </div>
-              <div className="text-[10px] text-gray-500 mt-0.5 leading-tight line-clamp-2">
-                {r.hint}
-              </div>
+      {/* Equipamento */}
+      <section id="lab-equipment">
+        <SectionTitle n={3} title="O que você tem na bancada?" hint="Só o que muda a receita. Nada de pressão, fluxo ou reologia aqui." />
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-3">
+          <Toggle icon={Sun} label="Luz 365/405 nm" desc="Lanterna UV, módulo da impressora ou caixa de cura" on={lab.equipment.hasLight} onChange={(v) => setEq("hasLight", v)} />
+          <Toggle icon={Thermometer} label="Cabeçote com temperatura" desc="Seringa aquecida ou refrigerada" on={lab.equipment.hasTempHead} onChange={(v) => setEq("hasTempHead", v)} />
+          <Toggle icon={Snowflake} label="Mesa com temperatura" desc="Mesa fria/quente ou placa Peltier" on={lab.equipment.hasTempBed} onChange={(v) => setEq("hasTempBed", v)} />
+          <div className="p-3 rounded-xl border border-white/8 bg-white/3">
+            <div className="text-xs font-semibold text-gray-200 flex items-center gap-1.5 mb-2"><CircleDot className="w-3.5 h-3.5 text-cyan-300" /> Agulha disponível</div>
+            <div className="flex flex-wrap gap-1">
+              {NOZZLES.map((n) => (
+                <button key={n} onClick={() => setEq("nozzle_mm", n)} className={cn("text-[11px] px-2 py-1 rounded-md border", lab.equipment.nozzle_mm === n ? "bg-cyan-500/20 border-cyan-400/50 text-cyan-100" : "border-white/10 text-gray-400 hover:border-white/25")}>{n} mm</button>
+              ))}
+            </div>
+            <div className="text-[10px] text-gray-500 mt-1.5">{gaugeLabel(lab.equipment.nozzle_mm)}</div>
+          </div>
+        </div>
+      </section>
+
+      {/* Experiência */}
+      <section id="lab-experience">
+        <SectionTitle n={4} title="Sua experiência com biotintas" hint="Ajusta o quanto a BIA prioriza receitas tolerantes a erro." />
+        <div className="flex flex-wrap gap-2 mt-3">
+          {([["first", "Primeira vez", "Quero algo que dá certo"], ["some", "Já imprimi algumas", "Posso seguir protocolos de 1 h"], ["expert", "Rotina no lab", "Mostre o estado da arte"]] as const).map(([k, l, d]) => (
+            <button key={k} onClick={() => set("experience", k)} className={cn("text-left px-4 py-2.5 rounded-xl border transition-colors min-w-[180px]", lab.experience === k ? "bg-emerald-500/15 border-emerald-400/50" : "bg-white/3 border-white/8 hover:border-white/20")}>
+              <div className={cn("text-sm font-semibold", lab.experience === k ? "text-emerald-100" : "text-gray-200")}>{l}</div>
+              <div className="text-[11px] text-gray-500">{d}</div>
             </button>
           ))}
         </div>
       </section>
 
-      {/* ── Material ── */}
-      <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
-        <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-          <FlaskConical className="w-4 h-4 text-cyan-400" />
-          Material da Biotinta {activeIdx + 1}
-        </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-4">
-          {BIOINK_MATERIALS.map(mat => (
-            <button
-              key={mat.id}
-              onClick={() => onMaterialChange(mat.id)}
-              className={cn(
-                "p-3 rounded-xl border text-left transition-all",
-                materialId === mat.id
-                  ? "border-cyan-500/50 bg-cyan-500/10 ring-1 ring-cyan-500/30"
-                  : "border-white/8 bg-white/3 hover:border-white/15 hover:bg-white/5"
-              )}
-            >
-              <div className={cn(
-                "text-xs font-semibold leading-tight",
-                materialId === mat.id ? "text-cyan-200" : "text-white"
-              )}>
-                {mat.label}
-              </div>
-              <div className="text-[10px] text-gray-500 mt-0.5">{mat.conc}</div>
-            </button>
-          ))}
-        </div>
-
-        <div className="rounded-xl bg-cyan-500/5 border border-cyan-500/20 p-3 flex items-start gap-2">
-          <Info className="w-4 h-4 text-cyan-400 mt-0.5 shrink-0" />
-          <p className="text-xs text-cyan-100/90">{matPreset.note}</p>
-        </div>
-      </section>
-
-      {/* ── Concentração + crosslinker ── */}
-      <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
-        <h3 className="text-sm font-semibold text-white mb-3">Concentração & crosslinking</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Field label={`Concentração (${matPreset.id === "pcl" ? "%, w/w" : matPreset.id === "fibrin" || matPreset.id === "collagen" ? "mg/mL" : "%, w/v"})`}>
-            <div className="flex items-center gap-2">
-              <input
-                type="range"
-                min={0.5} max={matPreset.id === "pcl" ? 100 : matPreset.id === "fibrin" ? 30 : 40}
-                step={0.5}
-                value={concentration}
-                onChange={e => onConcentrationChange(parseFloat(e.target.value))}
-                className="flex-1 accent-cyan-500"
-              />
-              <span className="text-sm font-mono text-cyan-300 w-14 text-right">{concentration}</span>
-            </div>
-            <div className="text-[10px] text-gray-500 mt-1">Faixa típica: {matPreset.conc}</div>
-          </Field>
-
-          <Field label="Agente de crosslinking">
-            <input
-              type="text"
-              value={crosslinker}
-              onChange={e => onCrosslinkerChange(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white
-                focus:outline-none focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/20"
-            />
-          </Field>
-
-          <Field label="Conc. crosslinker">
-            <input
-              type="number" step={0.05} min={0}
-              value={crosslinkerConc}
-              onChange={e => onCrosslinkerConcChange(parseFloat(e.target.value) || 0)}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white
-                focus:outline-none focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/20"
-            />
-          </Field>
-
-          <Field label="Aditivos / fatores">
-            <input
-              type="text"
-              value={additivesText}
-              onChange={e => onAdditivesChange(e.target.value)}
-              placeholder="TGF-β1, BMP-2, VEGF..."
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white
-                placeholder:text-gray-600 focus:outline-none focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/20"
-            />
-            <div className="text-[10px] text-gray-500 mt-1">Separe por vírgula</div>
-          </Field>
-        </div>
-      </section>
-
-      {/* ── Células ── */}
-      <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-            <Microscope className="w-4 h-4 text-violet-400" />
-            Incorporação celular
-          </h3>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <button
-              type="button"
-              onClick={() => onHasCellsChange(!hasCells)}
-              className={cn(
-                "w-10 h-5 rounded-full relative transition-colors",
-                hasCells ? "bg-violet-600" : "bg-white/15"
-              )}
-            >
-              <span
-                className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all"
-                style={{ left: hasCells ? "22px" : "2px" }}
-              />
-            </button>
-            <span className="text-xs text-gray-300">Biotinta com células</span>
-          </label>
-        </div>
-
-        {hasCells && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Tipo celular">
-                <select
-                  value={cellType}
-                  onChange={e => onCellTypeChange(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white
-                    focus:outline-none focus:border-violet-500/40 focus:ring-1 focus:ring-violet-500/20"
-                >
-                  {CELL_TYPES.map(c => (
-                    <option key={c.id} value={c.id}>{c.label}</option>
-                  ))}
-                </select>
-                <div className="text-[10px] text-gray-500 mt-1">
-                  {CELL_TYPES.find(c => c.id === cellType)?.note}
-                </div>
-              </Field>
-
-              <Field label="Densidade (×10⁶ cel/mL)">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range" min={0.5} max={30} step={0.5}
-                    value={cellDensity}
-                    onChange={e => onCellDensityChange(parseFloat(e.target.value))}
-                    className="flex-1 accent-violet-500"
-                  />
-                  <span className="text-sm font-mono text-violet-300 w-16 text-right">{cellDensity}×10⁶</span>
-                </div>
-                <div className="text-[10px] text-gray-500 mt-1">Padrão: 1–10 · alta densidade: 20</div>
-              </Field>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <Pill color="violet" title="Viabilidade alvo" value="≥ 80% pós-impressão (Live/Dead AO/PI)" />
-              <Pill color="amber"  title="Tempo máximo"     value="< 2h fora de incubadora" />
-              <Pill color="rose"   title="pH alvo"          value="7.2 – 7.4" />
+      {/* Prévia + avançar */}
+      <div className="sticky bottom-3 z-10">
+        <div className="rounded-2xl border border-emerald-400/30 bg-[#0d1512]/95 backdrop-blur p-4 flex items-center justify-between gap-3 flex-wrap shadow-xl">
+          <div className="flex items-center gap-3 min-w-0">
+            <Sparkles className="w-5 h-5 text-emerald-300 shrink-0" />
+            <div className="min-w-0">
+              <div className="text-[11px] text-emerald-300/80 uppercase tracking-wider">Recomendação da BIA</div>
+              <div className="text-sm font-semibold text-white truncate">{top.recipe.name}</div>
+              <div className="text-[11px] text-gray-400 truncate">{top.blockers.length ? <span className="text-amber-300">{top.blockers[0]}</span> : top.reasons[0]}</div>
             </div>
           </div>
-        )}
-      </section>
-
-      {/* ── Preview reologia / alertas inline ── */}
-      <section className={cn(
-        "rounded-2xl border p-5",
-        rheology.printability === "excellent" ? "bg-emerald-500/[0.04] border-emerald-500/20" :
-        rheology.printability === "moderate"  ? "bg-amber-500/[0.04] border-amber-500/30" :
-                                                 "bg-rose-500/[0.04] border-rose-500/30"
-      )}>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 text-cyan-400" />
-            Reologia estimada
-          </h3>
-          <PrintabilityBadge p={rheology.printability} />
+          <button onClick={onNext} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-400 text-black font-semibold text-sm hover:bg-emerald-300 transition-colors">
+            Ver receita <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
-          <Stat label="Viscosidade"     value={`${(rheology.viscosityPaS * 1000).toFixed(0)} mPa·s`} />
-          <Stat label="Yield stress"    value={`${rheology.yieldStressPa.toFixed(1)} Pa`} />
-          <Stat label="Módulo G'"        value={`${rheology.gPrime.toFixed(0)} Pa`} />
-          <Stat label="Shear stress"     value={`${rheology.shearStressPa.toFixed(1)} Pa`} highlight={rheology.shearStressPa > 50} />
-        </div>
-
-        <p className="text-xs text-gray-300 leading-relaxed">{rheology.recommendation}</p>
-
-        {rheology.warnings.length > 0 && (
-          <div className="mt-3 space-y-2 pt-3 border-t border-white/5">
-            {rheology.warnings.map((w, i) => (
-              <div key={i} className="flex items-start gap-2 text-xs">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
-                <span className="text-amber-200/90">{w}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      </div>
     </div>
   )
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// PAINEL B — CATÁLOGO (DB de 807)
-// ═══════════════════════════════════════════════════════════════════════════
-function CatalogPanel({ onPickMaterial }: { onPickMaterial: (name: string) => void }) {
-  const [biomaterials, setBiomaterials] = useState<Biomaterial[]>([])
-  const [total, setTotal]     = useState(0)
-  const [search, setSearch]   = useState("")
-  const [category, setCategory] = useState("")
-  const [loading, setLoading]   = useState(false)
-  const [expanded, setExpanded] = useState<string | null>(null)
-  const [tissueQuery, setTissueQuery]   = useState("")
-  const [suggestions, setSuggestions]   = useState<DBSuggestion[]>([])
-  const [sugLoading, setSugLoading]     = useState(false)
+function gaugeLabel(mm: number): string {
+  const map: Record<string, string> = { "0.2": "27G — muito fina, só géis fluidos", "0.26": "25G — alta resolução, shear alto", "0.33": "23G — resolução/viabilidade equilibradas", "0.41": "22G — padrão da bioimpressão", "0.51": "21G — células sensíveis", "0.6": "20G — partículas (HAp), alta viabilidade", "0.84": "18G — treino e pastas" }
+  return map[String(mm)] ?? ""
+}
 
-  // Carrega lista do DB
-  useEffect(() => {
-    const t = setTimeout(async () => {
-      setLoading(true)
-      try {
-        const params = new URLSearchParams()
-        if (search) params.set("search", search)
-        if (category) params.set("category", category)
-        params.set("limit", "60")
-        const res = await fetch(`/api/biomaterials?${params}`)
-        if (res.ok) {
-          const data = await res.json()
-          setBiomaterials(data.biomaterials)
-          setTotal(data.total)
-        }
-      } catch { /* ignore */ }
-      finally { setLoading(false) }
-    }, 300)
-    return () => clearTimeout(t)
-  }, [search, category])
-
-  // Sugestões por tecido
-  useEffect(() => {
-    if (!tissueQuery || tissueQuery.length < 3) { setSuggestions([]); return }
-    const t = setTimeout(async () => {
-      setSugLoading(true)
-      try {
-        const res = await fetch(`/api/bioprint/suggest?tissue=${encodeURIComponent(tissueQuery)}`)
-        if (res.ok) {
-          const data = await res.json()
-          setSuggestions(data.suggestions ?? [])
-        }
-      } catch { /* ignore */ }
-      finally { setSugLoading(false) }
-    }, 500)
-    return () => clearTimeout(t)
-  }, [tissueQuery])
+// ─────────────────────────────────────────────────────────────────────────
+//  PASSO 2 · Receita
+// ─────────────────────────────────────────────────────────────────────────
+function StepRecipe({ lab, chosen, chosenRec, recs, alternatives, win, onPick, onBack, onNext }: {
+  lab: LabState; chosen: Recipe; chosenRec: Recommendation; recs: Recommendation[]; alternatives: Recommendation[]
+  win: ReturnType<typeof evaluateRecipeWindow>
+  onPick: (id: string) => void; onBack: () => void; onNext: () => void
+}) {
+  const isTop = recs[0]?.recipe.id === chosen.id
+  const zone = ZONE_LABELS[win.zone]
+  const [showAll, setShowAll] = useState(false)
+  const list = showAll ? recs.filter((r) => r.recipe.id !== chosen.id) : alternatives.filter((r) => r.recipe.id !== chosen.id)
 
   return (
-    <div className="max-w-6xl mx-auto space-y-5">
-      {/* Cabeçalho do catálogo */}
-      <div className="rounded-2xl bg-cyan-500/5 border border-cyan-500/15 p-4 flex gap-3">
-        <Database className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
-        <div className="flex-1">
-          <div className="text-sm font-semibold text-white">Catálogo CECT — {total > 0 ? `${total} de ` : ""}807 formulações validadas</div>
-          <div className="text-xs text-gray-400 mt-0.5 leading-relaxed">
-            Banco de dados peer-reviewed. Busque pelo tecido alvo para ver materiais mais usados, ou navegue por categoria.
+    <div className="space-y-6">
+      {/* Cartão principal */}
+      <section className="rounded-2xl border border-emerald-400/30 bg-gradient-to-br from-emerald-500/10 via-transparent to-cyan-500/5 p-5">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <div className="text-[11px] uppercase tracking-wider text-emerald-300/80 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" /> {isTop ? "Melhor receita para você" : "Receita escolhida"} · nível {levelLabel(chosen.level)}
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold text-white mt-1">{chosen.name}</h2>
+            <p className="text-sm text-gray-300 mt-1 max-w-2xl">{chosen.short}</p>
+          </div>
+          <div className="flex gap-2 text-[11px]">
+            <Pill icon={Thermometer} label={`${chosen.printTemp_C} °C${chosen.bedTemp_C != null ? ` · mesa ${chosen.bedTemp_C} °C` : ""}`} />
+            <Pill icon={CircleDot} label={`agulha ${chosen.startParams.nozzle_mm} mm`} />
+            <Pill icon={Layers} label={crosslinkLabel(chosen.crosslink)} />
           </div>
         </div>
-      </div>
 
-      {/* Sugestões por tecido (rápido) */}
-      <div className="rounded-2xl border border-white/8 bg-white/3 p-5">
-        <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-violet-400" />
-          Sugestão por tipo de tecido
-        </h3>
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-          <input
-            type="text"
-            value={tissueQuery}
-            onChange={e => setTissueQuery(e.target.value)}
-            placeholder="ex: cartilagem, osso, pele, cardíaco, hepático…"
-            className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white
-              placeholder:text-gray-600 focus:outline-none focus:border-violet-500/40 focus:ring-1 focus:ring-violet-500/20"
-          />
-        </div>
+        {/* bloqueios / avisos */}
+        {(chosenRec.blockers.length > 0 || chosenRec.warnings.length > 0) && (
+          <div className="mt-4 space-y-1.5">
+            {chosenRec.blockers.map((b, i) => <div key={`b${i}`} className="flex gap-2 text-xs text-rose-200 bg-rose-500/10 border border-rose-400/30 rounded-lg px-3 py-2"><AlertTriangle className="w-4 h-4 shrink-0" /> {b}</div>)}
+            {chosenRec.warnings.map((w, i) => <div key={`w${i}`} className="flex gap-2 text-xs text-amber-200 bg-amber-500/10 border border-amber-400/30 rounded-lg px-3 py-2"><Info className="w-4 h-4 shrink-0" /> {w}</div>)}
+          </div>
+        )}
 
-        {sugLoading ? (
-          <div className="text-center py-6"><Loader2 className="w-5 h-5 text-violet-400 mx-auto animate-spin" /></div>
-        ) : suggestions.length > 0 ? (
-          <div className="space-y-2">
-            {suggestions.slice(0, 5).map((s, idx) => (
-              <div key={s.material}
-                className="bg-white/[0.03] border border-white/8 rounded-xl p-3 flex items-start gap-3 hover:border-cyan-500/30 transition-colors">
-                <div className="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0 font-bold text-xs text-cyan-400">
-                  {idx + 1}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1 gap-2">
-                    <span className="text-sm font-semibold text-white truncate">{s.material}</span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      {Array.from({ length: Math.min(5, Math.round(s.score / 2)) }).map((_, i) => (
-                        <Star key={i} className="w-3 h-3 text-amber-400 fill-amber-400" />
-                      ))}
-                      <span className="text-[9px] text-gray-600 ml-1">{s.n} estudos</span>
+        <div className="grid lg:grid-cols-[1fr_320px] gap-5 mt-5">
+          {/* Por quê + componentes */}
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-xs uppercase tracking-wider text-gray-400 mb-2">Por que esta receita</h3>
+              <ul className="space-y-1">
+                {chosenRec.reasons.map((r, i) => <li key={i} className="text-sm text-gray-200 flex gap-2"><Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" /> {r}</li>)}
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-xs uppercase tracking-wider text-gray-400 mb-2">O que vai na biotinta</h3>
+              <div className="rounded-xl border border-white/8 divide-y divide-white/5 overflow-hidden">
+                {chosen.components.map((c, i) => (
+                  <div key={i} className="px-3 py-2.5 flex items-start gap-3 bg-white/2">
+                    <span className={cn("mt-1 w-2 h-2 rounded-full shrink-0", roleColor(c.role))} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm text-gray-100 flex items-baseline gap-2 flex-wrap">
+                        <span className="font-medium">{c.name}</span>
+                        <span className="text-emerald-300 font-mono text-xs">{c.amount} {c.unit}</span>
+                      </div>
+                      {lab.advanced && <div className="text-[11px] text-gray-400 mt-0.5">{c.why}{c.substitute && <span className="text-gray-500"> · Alternativa: {c.substitute}</span>}</div>}
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] text-gray-400">
-                    {s.typicalPressure && <span>💧 {s.typicalPressure} kPa</span>}
-                    {s.typicalTemp     && <span>🌡️ {s.typicalTemp} °C</span>}
-                    {s.typicalSpeed    && <span>⚡ {s.typicalSpeed} mm/s</span>}
-                    {s.typicalNeedle   && <span>🎯 {s.typicalNeedle} µm</span>}
-                  </div>
-                  {s.cellFriendly > 0 && (
-                    <div className="flex items-center gap-1.5 mt-1.5">
-                      <Microscope className="w-3 h-3 text-violet-400" />
-                      <span className="text-[10px] text-violet-300">{s.cellFriendly}% com células</span>
+                ))}
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3 text-xs">
+              <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/5 p-3">
+                <div className="text-emerald-300 font-semibold mb-1">Prós</div>
+                <ul className="space-y-0.5 text-gray-300">{chosen.pros.map((p, i) => <li key={i}>• {p}</li>)}</ul>
+              </div>
+              <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-3">
+                <div className="text-amber-300 font-semibold mb-1">Limitações</div>
+                <ul className="space-y-0.5 text-gray-300">{chosen.cons.map((p, i) => <li key={i}>• {p}</li>)}</ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Janela de biofabricação */}
+          <aside className="rounded-xl border border-white/10 bg-black/30 p-4">
+            <h3 className="text-xs uppercase tracking-wider text-gray-400 mb-1 flex items-center gap-1.5"><Target className="w-3.5 h-3.5" /> Janela de biofabricação</h3>
+            <p className="text-[11px] text-gray-500 mb-3">Fidelidade de forma × viabilidade celular com {CELL_LABELS[lab.cell].label.toLowerCase()} e agulha {lab.equipment.nozzle_mm} mm.</p>
+            <WindowChart fidelity={win.fidelity} viability={win.viability} inWindow={win.inWindow} />
+            <div className={cn("mt-3 text-xs font-semibold px-2.5 py-1.5 rounded-lg inline-flex items-center gap-1.5", zone.tone === "good" ? "bg-emerald-500/15 text-emerald-200" : zone.tone === "warn" ? "bg-amber-500/15 text-amber-200" : "bg-rose-500/15 text-rose-200")}>
+              {zone.tone === "good" ? <Check className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />} {zone.label}
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-center">
+              <Stat label="Fidelidade" value={`${win.fidelity}`} />
+              <Stat label="Viabilidade" value={`${win.viability}`} />
+            </div>
+            {lab.advanced && (
+              <>
+                <ul className="mt-3 space-y-1 text-[11px] text-gray-400">{win.notes.map((n, i) => <li key={i}>· {n}</li>)}</ul>
+                <div className="mt-3 pt-3 border-t border-white/5 text-[11px] text-gray-400 space-y-0.5 font-mono">
+                  <div>η ≈ {chosen.rheology.viscosity_PaS} Pa·s · τy ≈ {chosen.rheology.yieldStress_Pa} Pa</div>
+                  <div>G′ ≈ {chosen.rheology.gPrime_Pa} Pa · tan δ ≈ {chosen.rheology.tanDelta} · n ≈ {chosen.rheology.powerLawN}</div>
+                </div>
+              </>
+            )}
+          </aside>
+        </div>
+
+        {lab.advanced && (
+          <details className="mt-4 text-xs">
+            <summary className="cursor-pointer text-gray-400 hover:text-gray-200 flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5" /> {chosen.references.length} referências</summary>
+            <ul className="mt-2 space-y-1 text-gray-400">
+              {chosen.references.map((r, i) => (
+                <li key={i} className="flex gap-1.5">
+                  <span>•</span>
+                  <span>{r.label}{(r.doi || r.url) && <a className="text-cyan-300 hover:underline ml-1 inline-flex items-center gap-0.5" href={r.doi ? `https://doi.org/${r.doi}` : r.url} target="_blank" rel="noreferrer">abrir <ExternalLink className="w-3 h-3" /></a>}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+      </section>
+
+      {/* Alternativas */}
+      <section>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-semibold text-gray-200 flex items-center gap-1.5"><Lightbulb className="w-4 h-4 text-amber-300" /> {showAll ? "Todas as receitas" : "Alternativas"}</h3>
+          <button onClick={() => setShowAll(!showAll)} className="text-xs text-gray-400 hover:text-gray-200">{showAll ? "Mostrar só as compatíveis" : `Ver todas (${recs.length})`}</button>
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {list.map((r) => (
+            <button key={r.recipe.id} onClick={() => onPick(r.recipe.id)} className={cn("text-left p-3 rounded-xl border transition-colors", r.blockers.length ? "border-white/5 bg-white/2 opacity-70 hover:opacity-100" : "border-white/10 bg-white/3 hover:border-emerald-400/40")}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-semibold text-gray-100 truncate">{r.recipe.name}</div>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-gray-400 shrink-0">{levelLabel(r.recipe.level)}</span>
+              </div>
+              <div className="text-[11px] text-gray-500 mt-1 line-clamp-2">{r.recipe.short}</div>
+              <div className="mt-2 flex items-center gap-2 text-[10px]">
+                <span className="text-gray-400">F {r.fidelity}</span><span className="text-gray-600">·</span><span className="text-gray-400">V {r.viability}</span>
+                {r.blockers.length > 0 && <span className="ml-auto text-rose-300 truncate">{r.blockers[0]}</span>}
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <div className="flex items-center justify-between gap-3 pt-2">
+        <button onClick={onBack} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 text-gray-300 text-sm hover:border-white/25"><ArrowLeft className="w-4 h-4" /> Decisões</button>
+        <button onClick={onNext} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-400 text-black font-semibold text-sm hover:bg-emerald-300">Ir para a bancada <ArrowRight className="w-4 h-4" /></button>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+//  PASSO 3 · Bancada
+// ─────────────────────────────────────────────────────────────────────────
+function StepBench({ lab, set, chosen, bench, win, hasCells, cellDensity, troubles, onBack, onDownload, onCopy, onSend }: {
+  lab: LabState
+  set: <K extends keyof LabState>(k: K, v: LabState[K]) => void
+  chosen: Recipe
+  bench: ReturnType<typeof planBench>
+  win: ReturnType<typeof evaluateRecipeWindow>
+  hasCells: boolean
+  cellDensity: number
+  troubles: ReturnType<typeof relevantTroubles>
+  onBack: () => void; onDownload: () => void; onCopy: () => void; onSend: (d: "slice" | "slicer") => void
+}) {
+  const [openTrouble, setOpenTrouble] = useState<string | null>(null)
+  const canCells = lab.cell !== "none" && chosen.cellDensity_Mml[1] > 0
+  return (
+    <div className="space-y-6">
+      {/* Entradas mínimas */}
+      <section className="rounded-2xl border border-white/10 bg-white/3 p-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <label className="block">
+          <span className="text-xs text-gray-400 flex items-center gap-1.5"><Syringe className="w-3.5 h-3.5" /> Volume a imprimir (mL)</span>
+          <input type="number" min={0.1} step={0.1} value={lab.printVolume_mL} onChange={(e) => set("printVolume_mL", Math.max(0.1, parseFloat(e.target.value) || 0.1))} className="mt-1 w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-400/50 outline-none" />
+          <span className="text-[10px] text-gray-500">Vem do fatiamento quando disponível. 1 mL ≈ cubo de 10 mm sólido.</span>
+        </label>
+        <label className={cn("block", !canCells && "opacity-50")}>
+          <span className="text-xs text-gray-400 flex items-center gap-1.5"><Microscope className="w-3.5 h-3.5" /> Densidade celular (×10⁶/mL)</span>
+          <input type="range" disabled={!canCells} min={chosen.cellDensity_Mml[0] || 0} max={chosen.cellDensity_Mml[1] || 1} step={0.5} value={cellDensity} onChange={(e) => set("cellDensity", parseFloat(e.target.value))} className="mt-2 w-full accent-emerald-400" />
+          <span className="text-[11px] text-gray-300 font-mono">{canCells ? `${cellDensity} × 10⁶/mL` : "acelular"} <span className="text-gray-500">(faixa validada {chosen.cellDensity_Mml[0]}–{chosen.cellDensity_Mml[1]})</span></span>
+        </label>
+        <div className="rounded-xl border border-white/8 bg-black/30 p-3 text-xs">
+          <div className="text-gray-400 mb-1">Resumo</div>
+          <div className="text-gray-100 font-semibold">{chosen.name}</div>
+          <div className="text-gray-400">{CELL_LABELS[lab.cell].label}{hasCells ? ` · ${cellDensity} M/mL` : ""} · {GOAL_LABELS[lab.goal].label}</div>
+          <div className="text-gray-400 mt-1">Janela: F {win.fidelity} · V {win.viability} · <span className={win.inWindow ? "text-emerald-300" : "text-amber-300"}>{ZONE_LABELS[win.zone].label}</span></div>
+        </div>
+      </section>
+
+      <div className="grid lg:grid-cols-2 gap-5">
+        {/* Quantidades */}
+        <section className="rounded-2xl border border-emerald-400/25 bg-emerald-500/5 p-4">
+          <h3 className="text-sm font-semibold text-emerald-200 flex items-center gap-1.5 mb-1"><Beaker className="w-4 h-4" /> Quantidades para {bench.totalVolume_mL} mL</h3>
+          <p className="text-[11px] text-gray-400 mb-3">{lab.printVolume_mL} mL de impressão + {bench.deadVolume_mL} mL de volume morto + 30 % de margem → {bench.syringes} seringa(s) de {bench.perSyringe_mL} mL.</p>
+          <table className="w-full text-xs">
+            <tbody className="divide-y divide-white/5">
+              {bench.lines.map((l, i) => (
+                <tr key={i}>
+                  <td className="py-2 pr-2 text-gray-200 align-top">{l.name}</td>
+                  <td className="py-2 text-right font-mono text-emerald-200 whitespace-nowrap align-top">{l.value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {lab.advanced && bench.lines.some((l) => l.note) && (
+            <ul className="mt-2 text-[10px] text-gray-500 space-y-0.5">{bench.lines.filter((l) => l.note).map((l, i) => <li key={i}>· {l.name.split("(")[0].trim()}: {l.note}</li>)}</ul>
+          )}
+          {hasCells && (
+            <div className="mt-3 text-[11px] text-gray-300 bg-black/30 rounded-lg p-2.5 flex gap-2"><Info className="w-4 h-4 text-cyan-300 shrink-0" /> {chosen.cellMixRatio}</div>
+          )}
+        </section>
+
+        {/* Preparo */}
+        <section className="rounded-2xl border border-white/10 bg-white/3 p-4">
+          <h3 className="text-sm font-semibold text-gray-100 flex items-center gap-1.5 mb-3"><FlaskConical className="w-4 h-4 text-cyan-300" /> Preparo passo a passo</h3>
+          <ol className="space-y-2.5">
+            {chosen.prep.map((s, i) => (
+              <li key={i} className="flex gap-3">
+                <span className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0", s.critical ? "bg-amber-400/20 text-amber-200 border border-amber-400/40" : "bg-white/8 text-gray-200")}>{i + 1}</span>
+                <div className="min-w-0">
+                  <div className="text-sm text-gray-100 font-medium flex items-center gap-2 flex-wrap">{s.title}{s.critical && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-200">crítico</span>}{(s.minutes || s.temp_C != null) && <span className="text-[10px] text-gray-500 font-mono">{s.minutes ? `${s.minutes} min` : ""}{s.temp_C != null ? ` · ${s.temp_C} °C` : ""}</span>}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">{s.detail}</div>
+                </div>
+              </li>
+            ))}
+          </ol>
+          <div className="mt-3 pt-3 border-t border-white/5 text-[11px] text-gray-400 space-y-1">
+            <div><b className="text-gray-300">Esterilização:</b> {chosen.sterilization}</div>
+            <div><b className="text-gray-300">Validade:</b> {chosen.shelfLife}</div>
+            <div><b className="text-gray-300">Imprimível por:</b> {chosen.printWindow_min[0]}–{chosen.printWindow_min[1]} min após o preparo{hasCells && ` · células fora da incubadora ≤ ${chosen.cellWindow_min} min`}</div>
+          </div>
+        </section>
+
+        {/* Parâmetros iniciais + reticulação */}
+        <section className="rounded-2xl border border-white/10 bg-white/3 p-4">
+          <h3 className="text-sm font-semibold text-gray-100 flex items-center gap-1.5 mb-3"><Layers className="w-4 h-4 text-violet-300" /> Parâmetros que dão certo</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <Stat label="Agulha" value={`${chosen.startParams.nozzle_mm} mm`} />
+            <Stat label="Velocidade" value={`${chosen.startParams.speed_mms} mm/s`} />
+            <Stat label="Camada" value={`${chosen.startParams.layerHeight_mm} mm`} />
+            <Stat label="Fluxo" value={`${chosen.startParams.flowPercent} %`} />
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <Stat label="Seringa" value={`${chosen.printTemp_C} °C`} />
+            <Stat label="Mesa" value={chosen.bedTemp_C != null ? `${chosen.bedTemp_C} °C` : "ambiente"} />
+          </div>
+          {chosen.startParams.pressure_kPa && <div className="text-[11px] text-gray-500 mt-2">Equivalente pneumático: {chosen.startParams.pressure_kPa[0]}–{chosen.startParams.pressure_kPa[1]} kPa.</div>}
+          <div className="mt-3 text-[11px] text-gray-300 bg-black/30 rounded-lg p-2.5 flex gap-2"><Lightbulb className="w-4 h-4 text-amber-300 shrink-0" /> Antes do G-code: extrude 1 linha reta de 20 mm e 1 ângulo de 90°. Cordão contínuo, sem gota e sem fio → pode imprimir.</div>
+
+          <h4 className="text-xs font-semibold text-gray-200 mt-4 mb-2 flex items-center gap-1.5"><Sun className="w-3.5 h-3.5 text-amber-300" /> Reticulação · {crosslinkLabel(chosen.crosslink)}</h4>
+          <ol className="space-y-1.5">
+            {chosen.crosslinkProtocol.map((s, i) => (
+              <li key={i} className="text-xs text-gray-300 flex gap-2"><span className="text-gray-500 font-mono">{i + 1}.</span><span><b className="text-gray-100">{s.title}</b> — {s.detail}{s.minutes ? <span className="text-gray-500"> ({s.minutes} min)</span> : null}</span></li>
+            ))}
+          </ol>
+        </section>
+
+        {/* Troubleshooting */}
+        <section className="rounded-2xl border border-white/10 bg-white/3 p-4">
+          <h3 className="text-sm font-semibold text-gray-100 flex items-center gap-1.5 mb-3"><Wrench className="w-4 h-4 text-rose-300" /> Se der errado</h3>
+          <div className="divide-y divide-white/5">
+            {troubles.map((t) => {
+              const open = openTrouble === t.id
+              return (
+                <div key={t.id}>
+                  <button onClick={() => setOpenTrouble(open ? null : t.id)} className="w-full text-left py-2 text-sm text-gray-200 flex items-center justify-between gap-2 hover:text-white">
+                    <span>{t.symptom}</span><span className="text-gray-500 text-xs">{open ? "−" : "+"}</span>
+                  </button>
+                  {open && (
+                    <div className="pb-3 text-xs space-y-2">
+                      <div><div className="text-gray-500 mb-0.5">Causas prováveis</div><ul className="text-gray-300 space-y-0.5">{t.likelyCauses.map((c, i) => <li key={i}>• {c}</li>)}</ul></div>
+                      <div><div className="text-gray-500 mb-0.5">Correções</div><ul className="text-emerald-200 space-y-0.5">{t.fixes.map((c, i) => <li key={i}>✓ {c}</li>)}</ul></div>
+                      {t.knob && <div className="text-[11px] text-violet-200 bg-violet-500/10 border border-violet-400/20 rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1.5"><SlidersHorizontal className="w-3.5 h-3.5" /> No BioSlicer/Host: {t.knob.param} {t.knob.direction === "up" ? "↑" : "↓"} {t.knob.amount}</div>}
                     </div>
                   )}
                 </div>
-                <button
-                  onClick={() => onPickMaterial(s.material)}
-                  className="shrink-0 px-2.5 py-1.5 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 rounded-lg text-[11px] font-semibold transition-colors flex items-center gap-1"
-                >
-                  Usar <ChevronRight className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
+              )
+            })}
           </div>
-        ) : tissueQuery.length >= 3 ? (
-          <div className="text-center py-4 text-xs text-gray-500">
-            Nenhuma sugestão para &quot;{tissueQuery}&quot;
-          </div>
-        ) : (
-          <div className="text-center py-4 text-xs text-gray-600">
-            Digite o tipo de tecido para ver materiais ranqueados por adequação
-          </div>
-        )}
+        </section>
       </div>
 
-      {/* Lista completa do DB */}
-      <div className="rounded-2xl border border-white/8 bg-white/3 p-5">
-        <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-cyan-400" />
-          Navegar catálogo
-        </h3>
-
-        {/* Search + filter */}
-        <div className="flex gap-2 mb-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar biomaterial..."
-              className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white
-                placeholder:text-gray-600 focus:outline-none focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/20"
-            />
+      {/* Ações */}
+      <div className="sticky bottom-3 z-10">
+        <div className="rounded-2xl border border-emerald-400/30 bg-[#0d1512]/95 backdrop-blur p-4 flex items-center justify-between gap-3 flex-wrap shadow-xl">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={onBack} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/10 text-gray-300 text-xs hover:border-white/25"><ArrowLeft className="w-3.5 h-3.5" /> Receita</button>
+            <button onClick={onDownload} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/10 text-gray-200 text-xs hover:border-white/25"><Download className="w-3.5 h-3.5" /> Protocolo .md</button>
+            <button onClick={onCopy} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/10 text-gray-200 text-xs hover:border-white/25"><Copy className="w-3.5 h-3.5" /> Copiar</button>
+            <button onClick={() => { sessionStorage.removeItem(LAB_KEY); location.reload() }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/10 text-gray-400 text-xs hover:border-white/25" title="Recomeçar"><RotateCcw className="w-3.5 h-3.5" /></button>
           </div>
-          <div className="relative">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-            <select
-              value={category} onChange={e => setCategory(e.target.value)}
-              className="bg-white/5 border border-white/10 rounded-xl pl-9 pr-8 py-2.5 text-sm text-gray-300 appearance-none cursor-pointer focus:outline-none focus:border-cyan-500/40"
-            >
-              <option value="">Todas</option>
-              {DB_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
+          <div className="flex items-center gap-2">
+            <button onClick={() => onSend("slice")} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-400/40 text-emerald-100 text-sm hover:bg-emerald-500/10">Fatiamento (Etapa 3) <ArrowRight className="w-4 h-4" /></button>
+            <button onClick={() => onSend("slicer")} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-400 text-black font-semibold text-sm hover:bg-emerald-300"><Layers className="w-4 h-4" /> Enviar ao BioSlicer</button>
           </div>
         </div>
-
-        {loading ? (
-          <div className="text-center py-12">
-            <Loader2 className="w-6 h-6 text-cyan-400 mx-auto animate-spin" />
-          </div>
-        ) : biomaterials.length === 0 ? (
-          <div className="text-center py-12 text-sm text-gray-500">
-            <FlaskConical className="w-8 h-8 mx-auto mb-2 opacity-40" />
-            Nenhum biomaterial encontrado
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {biomaterials.map(bm => (
-              <div key={bm.id} className="rounded-xl border border-white/8 bg-white/[0.02]">
-                <button
-                  onClick={() => setExpanded(expanded === bm.id ? null : bm.id)}
-                  className="w-full p-3 text-left flex items-start gap-3 hover:bg-white/5 transition-colors rounded-xl"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0">
-                    <FlaskConical className="w-3.5 h-3.5 text-cyan-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-xs font-medium text-white leading-tight">{bm.name}</p>
-                      {expanded === bm.id
-                        ? <ChevronUp className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
-                        : <ChevronDown className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
-                      }
-                    </div>
-                    <span className={cn(
-                      "text-[10px] px-2 py-0.5 rounded-md border inline-block mt-1.5",
-                      DB_CATEGORY_COLORS[bm.category] ?? "text-gray-400"
-                    )}>
-                      {DB_CATEGORY_LABELS[bm.category] ?? bm.category}
-                    </span>
-                  </div>
-                </button>
-                {expanded === bm.id && (
-                  <div className="px-3 pb-3 border-t border-white/5 pt-2 space-y-1">
-                    <DetailRow label="Composição"     value={formatComposition(bm.composition)} />
-                    <DetailRow label="Concentração"   value={getConcentration(bm)} />
-                    {bm.crosslinking && <DetailRow label="Crosslinking" value={bm.crosslinking} />}
-                    {bm.biocompatibility && <DetailRow label="Biocompat."  value={bm.biocompatibility} />}
-                    {bm.applications?.length > 0 && (
-                      <div className="flex flex-wrap gap-1 pt-1">
-                        {bm.applications.slice(0, 4).map((app, i) => (
-                          <span key={i} className="text-[10px] px-2 py-0.5 bg-white/5 rounded-md text-gray-400">{app}</span>
-                        ))}
-                      </div>
-                    )}
-                    <button
-                      onClick={() => onPickMaterial(bm.name)}
-                      className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-[11px] font-semibold rounded-lg transition-colors"
-                    >
-                      Usar este material <ChevronRight className="w-3 h-3" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   )
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// PAINEL C — REOLOGIA
-// ═══════════════════════════════════════════════════════════════════════════
-interface RheologyPanelProps {
-  rheology: RheologyResult
-  nozzleUm: number;              onNozzleChange: (n: number) => void
-  printSpeedMmS: number;         onPrintSpeedChange: (n: number) => void
-  materialLabel: string
-  concentration: number
-}
-
-function RheologyPanel({ rheology, nozzleUm, onNozzleChange, printSpeedMmS, onPrintSpeedChange, materialLabel, concentration }: RheologyPanelProps) {
+// ─────────────────────────────────────────────────────────────────────────
+//  Componentes auxiliares
+// ─────────────────────────────────────────────────────────────────────────
+function SectionTitle({ n, title, hint }: { n: number; title: string; hint: string }) {
   return (
-    <div className="max-w-4xl mx-auto space-y-5">
-      {/* Sliders de calibragem */}
-      <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            <h3 className="text-sm font-semibold text-white">Parâmetros de extrusão (preview)</h3>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Ajustáveis aqui só para ver o impacto reológico. Os valores reais serão definidos na Etapa 3 (Fatiamento).
-            </p>
-          </div>
-          <span className="text-[10px] text-gray-500 bg-white/5 px-2 py-1 rounded-full">preview</span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Diâmetro do bico (µm)">
-            <div className="flex items-center gap-2">
-              <input
-                type="range" min={100} max={1000} step={10}
-                value={nozzleUm} onChange={e => onNozzleChange(parseInt(e.target.value, 10))}
-                className="flex-1 accent-cyan-500"
-              />
-              <span className="text-sm font-mono text-cyan-300 w-14 text-right">{nozzleUm}</span>
-            </div>
-          </Field>
-          <Field label="Velocidade de impressão (mm/s)">
-            <div className="flex items-center gap-2">
-              <input
-                type="range" min={1} max={60} step={1}
-                value={printSpeedMmS} onChange={e => onPrintSpeedChange(parseInt(e.target.value, 10))}
-                className="flex-1 accent-cyan-500"
-              />
-              <span className="text-sm font-mono text-cyan-300 w-14 text-right">{printSpeedMmS}</span>
-            </div>
-          </Field>
-        </div>
-      </section>
-
-      {/* Resultado reológico detalhado */}
-      <section className={cn(
-        "rounded-2xl border p-5",
-        rheology.printability === "excellent" ? "bg-emerald-500/[0.04] border-emerald-500/20" :
-        rheology.printability === "moderate"  ? "bg-amber-500/[0.04] border-amber-500/30" :
-                                                 "bg-rose-500/[0.04] border-rose-500/30"
-      )}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 text-cyan-400" />
-            {materialLabel} {concentration}% — propriedades reológicas
-          </h3>
-          <PrintabilityBadge p={rheology.printability} />
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-          <Stat label="Viscosidade η"   value={`${(rheology.viscosityPaS * 1000).toFixed(0)} mPa·s`} />
-          <Stat label="Yield τ₀"         value={`${rheology.yieldStressPa.toFixed(1)} Pa`} />
-          <Stat label="Módulo G' (elástico)"  value={`${rheology.gPrime.toFixed(0)} Pa`} />
-          <Stat label="Módulo G'' (viscoso)"  value={`${(rheology.gPrime * 0.4).toFixed(0)} Pa`} />
-          <Stat label="Shear rate γ̇"     value={`${rheology.shearRate.toFixed(1)} 1/s`} mono />
-          <Stat label="Shear stress τ"   value={`${rheology.shearStressPa.toFixed(1)} Pa`} highlight={rheology.shearStressPa > 50} />
-        </div>
-
-        <div className="rounded-xl bg-white/3 border border-white/8 p-3 mb-3">
-          <p className="text-xs text-gray-300 leading-relaxed">{rheology.recommendation}</p>
-        </div>
-
-        {rheology.warnings.length > 0 && (
-          <div className="space-y-2">
-            {rheology.warnings.map((w, i) => (
-              <div key={i} className="rounded-xl bg-amber-500/5 border border-amber-500/20 p-3 flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                <p className="text-xs text-amber-200/90">{w}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Modelos CFD aplicáveis */}
-      <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
-        <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 text-blue-400" />
-          Modelos CFD aplicáveis
-        </h3>
-        <div className="space-y-1.5 text-xs">
-          <ModelRow name="Herschel-Bulkley" formula="τ = τ₀ + K·γ̇ⁿ" detail="fluidos com yield stress (alginato, GelMA)" />
-          <ModelRow name="Casson"            formula="√τ = √τ₀ + √(η∞·γ̇)" detail="biotintas fibrínicas e sangue" />
-          <ModelRow name="Power Law (Cross)" formula="η = K·γ̇ⁿ⁻¹" detail="pseudoplásticos (n<1 = ideal)" />
-          <ModelRow name="Hagen-Poiseuille"   formula="ΔP = 8ηLQ/πR⁴" detail="queda de pressão no bico" />
-          <ModelRow name="Reynolds"           formula="Re < 1" detail="fluxo laminar (típico na bioimpressão)" />
-        </div>
-      </section>
+    <div className="flex items-start gap-3">
+      <span className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-400/30 text-emerald-200 text-sm font-bold flex items-center justify-center shrink-0">{n}</span>
+      <div><h2 className="text-base font-semibold text-white">{title}</h2><p className="text-xs text-gray-500">{hint}</p></div>
     </div>
   )
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// HELPERS DE UI
-// ═══════════════════════════════════════════════════════════════════════════
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Toggle({ icon: Icon, label, desc, on, onChange }: { icon: typeof Sun; label: string; desc: string; on: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div>
-      <label className="text-[11px] text-gray-400 block mb-1.5 font-medium">{label}</label>
-      {children}
-    </div>
+    <button onClick={() => onChange(!on)} role="switch" aria-checked={on} className={cn("text-left p-3 rounded-xl border transition-colors", on ? "bg-cyan-500/10 border-cyan-400/40" : "bg-white/3 border-white/8 hover:border-white/20")}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs font-semibold text-gray-200 flex items-center gap-1.5"><Icon className={cn("w-3.5 h-3.5", on ? "text-cyan-300" : "text-gray-500")} /> {label}</div>
+        <span className={cn("w-8 h-4.5 rounded-full relative transition-colors", on ? "bg-cyan-400" : "bg-white/10")} style={{ height: 18 }}><span className={cn("absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white transition-all", on ? "left-4" : "left-0.5")} /></span>
+      </div>
+      <div className="text-[11px] text-gray-500 mt-1">{desc}</div>
+    </button>
   )
 }
 
-function Stat({ label, value, mono, highlight }: { label: string; value: string; mono?: boolean; highlight?: boolean }) {
+function Pill({ icon: Icon, label }: { icon: typeof Sun; label: string }) {
+  return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-black/30 border border-white/10 text-gray-300 whitespace-nowrap"><Icon className="w-3 h-3" /> {label}</span>
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-lg bg-black/30 border border-white/8 px-2 py-1.5 text-center"><div className="text-[10px] text-gray-500">{label}</div><div className="text-sm font-mono text-gray-100">{value}</div></div>
+}
+
+/** Gráfico SVG da janela de biofabricação (x = viabilidade, y = fidelidade) */
+function WindowChart({ fidelity, viability, inWindow }: { fidelity: number; viability: number; inWindow: boolean }) {
+  const W = 260, H = 180, pad = 26
+  const x = pad + (viability / 100) * (W - 2 * pad)
+  const y = H - pad - (fidelity / 100) * (H - 2 * pad)
+  // janela: viabilidade ≥ 65, fidelidade ≥ 45
+  const wx = pad + 0.65 * (W - 2 * pad)
+  const wy = H - pad - 0.45 * (H - 2 * pad)
   return (
-    <div>
-      <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">{label}</div>
-      <div className={cn(
-        "text-sm font-semibold",
-        mono && "font-mono text-xs",
-        highlight ? "text-amber-300" : "text-white"
-      )}>{value}</div>
-    </div>
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
+      <defs>
+        <linearGradient id="winbg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stopColor="#f43f5e" stopOpacity="0.18" /><stop offset="0.5" stopColor="#f59e0b" stopOpacity="0.12" /><stop offset="1" stopColor="#10b981" stopOpacity="0.25" /></linearGradient>
+      </defs>
+      <rect x={pad} y={pad} width={W - 2 * pad} height={H - 2 * pad} fill="url(#winbg)" rx="6" />
+      <rect x={wx} y={pad} width={W - pad - wx} height={wy - pad} fill="#10b981" fillOpacity="0.18" stroke="#34d399" strokeOpacity="0.6" strokeDasharray="3 3" rx="4" />
+      <text x={wx + 4} y={pad + 12} fontSize="9" fill="#6ee7b7">janela</text>
+      <line x1={pad} y1={H - pad} x2={W - pad} y2={H - pad} stroke="#ffffff22" />
+      <line x1={pad} y1={pad} x2={pad} y2={H - pad} stroke="#ffffff22" />
+      <text x={W / 2} y={H - 8} fontSize="9" fill="#9ca3af" textAnchor="middle">viabilidade celular →</text>
+      <text x={10} y={H / 2} fontSize="9" fill="#9ca3af" textAnchor="middle" transform={`rotate(-90 10 ${H / 2})`}>fidelidade de forma →</text>
+      <circle cx={x} cy={y} r="9" fill={inWindow ? "#10b981" : "#f59e0b"} fillOpacity="0.25" />
+      <circle cx={x} cy={y} r="4.5" fill={inWindow ? "#34d399" : "#fbbf24"} stroke="#000" strokeWidth="1" />
+    </svg>
   )
 }
 
-function Pill({ color, title, value }: { color: "violet" | "amber" | "rose"; title: string; value: string }) {
-  const c = {
-    violet: "bg-violet-500/5 border-violet-500/20 text-violet-300",
-    amber:  "bg-amber-500/5 border-amber-500/20 text-amber-300",
-    rose:   "bg-rose-500/5 border-rose-500/20 text-rose-300",
-  }[color]
-  return (
-    <div className={cn("rounded-xl border p-3", c)}>
-      <div className="text-[10px] font-semibold uppercase tracking-wider mb-0.5 opacity-80">{title}</div>
-      <div className="text-xs text-gray-200">{value}</div>
-    </div>
-  )
+function levelLabel(l: Recipe["level"]) { return l === "starter" ? "iniciante" : l === "intermediate" ? "intermediário" : "avançado" }
+function crosslinkLabel(k: Recipe["crosslink"]) {
+  return { ionic: "reticulação iônica (CaCl₂)", photo: "fotorreticulação 405 nm", thermal: "gelificação térmica", enzymatic: "reticulação enzimática", none: "sem reticulação", sacrificial: "tinta sacrificial" }[k]
 }
-
-function PrintabilityBadge({ p }: { p: RheologyResult["printability"] }) {
-  if (p === "excellent")
-    return <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">✓ Imprimibilidade excelente</span>
-  if (p === "moderate")
-    return <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300">⚠ Moderada</span>
-  return <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300">✗ Cisalhamento alto</span>
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <p className="text-xs text-gray-400">
-      <span className="text-gray-500">{label}: </span>
-      {value}
-    </p>
-  )
-}
-
-function ModelRow({ name, formula, detail }: { name: string; formula: string; detail: string }) {
-  return (
-    <div className="flex items-baseline gap-2 py-1">
-      <span className="text-gray-300 font-medium min-w-[140px]">{name}</span>
-      <span className="font-mono text-blue-300 text-[11px]">{formula}</span>
-      <span className="text-gray-500 text-[11px]">— {detail}</span>
-    </div>
-  )
-}
-
-// ─── Helpers compartilhados com biomaterials antigo ───────────────────────
-
-function formatComposition(c: string | CompositionJson | null | undefined): string {
-  if (!c) return "—"
-  if (typeof c === "string") return c
-  const parts: string[] = []
-  if (c.shortName) parts.push(String(c.shortName))
-  if (c.family) parts.push(`família ${String(c.family)}`)
-  if (c.modulus_kPa) parts.push(`módulo ${String(c.modulus_kPa)}`)
-  if (c.poreSize_um) parts.push(`poros ${String(c.poreSize_um)}`)
-  if (parts.length === 0) {
-    return Object.entries(c).slice(0, 3).map(([k, v]) =>
-      `${k}: ${Array.isArray(v) ? v.join("/") : String(v)}`
-    ).join(" • ")
-  }
-  return parts.join(" • ")
-}
-
-function getConcentration(bm: Biomaterial): string {
-  if (bm.concentration) return bm.concentration
-  if (typeof bm.composition === "object" && bm.composition && "concentration" in bm.composition) {
-    return String((bm.composition as Record<string, unknown>).concentration)
-  }
-  return "—"
+function roleColor(r: string) {
+  return { polymer: "bg-emerald-400", crosslinker: "bg-amber-400", photoinitiator: "bg-violet-400", thickener: "bg-cyan-400", bioactive: "bg-rose-400", solvent: "bg-gray-500", cells: "bg-pink-400" }[r] ?? "bg-gray-500"
 }

@@ -117,6 +117,31 @@ export default function BioSlicerPage() {
     setResult(null)
   }, [])
 
+  // R16: hint vindo do Laboratório de Biotintas (receita → objetivo + parâmetros iniciais)
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("bia:slicer-hint")
+      if (!raw) return
+      sessionStorage.removeItem("bia:slicer-hint")
+      const h = JSON.parse(raw) as { text?: string; startParams?: { nozzle_mm: number; speed_mms: number; layerHeight_mm: number; flowPercent: number } }
+      if (h.text) { setIntentText(h.text); runIntent(h.text) }
+      if (h.startParams) {
+        const sp = h.startParams
+        setP((p) => ({
+          ...p,
+          nozzleDiameter_mm: sp.nozzle_mm,
+          lineWidth_mm: Math.round(sp.nozzle_mm * 1.15 * 100) / 100,
+          layerHeight_mm: sp.layerHeight_mm,
+          firstLayerHeight_mm: Math.min(p.firstLayerHeight_mm, sp.layerHeight_mm),
+          speedPerimeter_mms: sp.speed_mms,
+          speedInfill_mms: sp.speed_mms,
+          speedFirstLayer_mms: Math.max(1, Math.round(sp.speed_mms * 0.7 * 10) / 10),
+        }))
+        setX((x) => ({ ...x, flowMultiplier: sp.flowPercent / 100 }))
+      }
+    } catch { /* noop */ }
+  }, [runIntent])
+
   const toggleVoice = useCallback(() => {
     if (listening) { recRef.current?.stop(); setListening(false); return }
     const w = window as unknown as { SpeechRecognition?: new () => SR; webkitSpeechRecognition?: new () => SR }
