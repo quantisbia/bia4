@@ -71,7 +71,14 @@ export type InfillPattern =
   | "concentric"    // anéis internos
   | "gyroid"        // aproximação 2D do gyroid
   | "zigzag"        // rectilinear conectado → caminho contínuo (menos gotas)
+  | "waves"         // R20-B: linhas senoidais paralelas (ondas)
   | "none"
+  // R20-B · aba Avançado — cada um gera o que o nome diz
+  | "schwarz_p"     // TPMS Schwarz P (iso-curvas por camada)
+  | "diamond"       // TPMS Schwarz D
+  | "voronoi"       // células de Voronoi 2D (trabecular)
+  | "perlin"        // iso-curvas de ruído (orgânico)
+  | "gradient"      // gradiente radial de espaçamento
 
 export type WallOrder = "outside_in" | "inside_out"
 export type SeamPosition = "nearest" | "aligned" | "random" | "rear"

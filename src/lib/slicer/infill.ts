@@ -13,6 +13,7 @@
 
 import type { Polygon, Path, Vec2, InfillPattern, BBox2 } from "./types"
 import { bboxOf, bboxUnion, clipPathToPolySet, clipSegmentToPolySet, offsetPolySet, rotate, dist, pointInPolySet } from "./polygon-ops"
+import { waves, schwarzP, diamond, voronoi, perlin, gradient } from "./infill-advanced"
 
 export interface InfillInput {
   region: Polygon[]
@@ -39,6 +40,12 @@ export function spacingFromDensity(pattern: InfillPattern, lineWidth: number, de
     case "triangles": return (3 * lineWidth) / d * 0.85
     case "honeycomb": return lineWidth / (d * 0.866)
     case "gyroid": return lineWidth / d * 1.15
+    case "waves": return lineWidth / d * 1.1          // comprimento extra da senoide
+    case "schwarz_p": return lineWidth / d * 1.2
+    case "diamond": return lineWidth / d * 1.4
+    case "voronoi": return lineWidth / d * 1.3        // célula ~ espaçamento
+    case "perlin": return lineWidth / d * 1.1
+    case "gradient": return lineWidth / d * 0.7       // espaçamento no CENTRO (cresce até 2.5×)
     default: return lineWidth / d
   }
 }
@@ -74,9 +81,16 @@ export function generateInfill(inp: InfillInput): InfillOutput {
     case "honeycomb": paths = honeycomb(inp.region, spacing, inp.angle_deg); break
     case "concentric": paths = concentric(inp.region, spacing); break
     case "gyroid": paths = gyroid2D(inp.region, inp.gyroidCell_mm ?? spacing * 2, inp.z_mm, inp.lineWidth_mm); break
+    // R20-B
+    case "waves": paths = waves(inp.region, spacing, inp.angle_deg, inp.layerIndex, inp.lineWidth_mm); break
+    case "schwarz_p": paths = schwarzP(inp.region, inp.gyroidCell_mm ?? spacing * 2, inp.z_mm, inp.lineWidth_mm); break
+    case "diamond": paths = diamond(inp.region, inp.gyroidCell_mm ?? spacing * 2, inp.z_mm, inp.lineWidth_mm); break
+    case "voronoi": paths = voronoi(inp.region, spacing); break
+    case "perlin": paths = perlin(inp.region, inp.gyroidCell_mm ?? spacing * 2, inp.z_mm, inp.lineWidth_mm); break
+    case "gradient": paths = gradient(inp.region, spacing, inp.angle_deg); break
     default: paths = []
   }
-  const poreApplicable = ["rectilinear", "zigzag", "grid", "triangles", "honeycomb"].includes(inp.pattern)
+  const poreApplicable = ["rectilinear", "zigzag", "grid", "triangles", "honeycomb", "waves"].includes(inp.pattern)
   return {
     paths: paths.filter((p) => p.length >= 2 && pathLen(p) > inp.lineWidth_mm * 0.5),
     spacing_mm: spacing,
