@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
@@ -10,7 +10,7 @@ import {
   FileText, BookOpen, MessageSquare, CreditCard, Settings,
   LogOut, Zap, ChevronRight, Menu, X, Printer, ClipboardCheck, BookMarked, Layers, Cpu,
   Crown, Wrench, Info, Map, Atom, Library, GraduationCap,
-  Lightbulb, Beaker, ShieldCheck, UserCircle, ChevronDown,
+  Lightbulb, ShieldCheck, UserCircle, ChevronDown,
   Microscope, Sparkles,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
@@ -57,7 +57,7 @@ export const NAV_ITEMS = [
   { href: "/dashboard/formulator-pro",     label: "Formulador Pro",       icon: Atom,            exact: false,
     info: "Versão profissional: monte formulações multi-componente livremente (até 8 biomateriais — catálogo OU customizados), defina objetivo clínico (cicatrização, osso, gengiva, implante mamário…), especificações viscoelásticas e a IA gera análise científica completa: score, incompatibilidades, protocolo, ISO/ANVISA. Custo: 10 créditos." },
   { href: "/dashboard/bioprint",           label: "Bioimpressão",         icon: Printer,         exact: false,
-    info: "Processo completo de bioimpressão em 4 etapas lineares: (1) Modelo 3D — upload ou gerar entre 5 categorias com IA, (2) Biotinta — formular com 807 biomateriais + reologia em tempo real, (3) Fatiamento — motor G-code com 11 algoritmos e parâmetros biomédicos, (4) Execução — controle ao vivo com viabilidade, crosslink e pós-processamento. Cada etapa desbloqueia a próxima. Custo: 6 créditos por G-code." },
+    info: "Processo completo de bioimpressão em 4 etapas lineares: (1) Modelo 3D — upload ou gerar entre 5 categorias com IA, (2) Biotinta — escolher receita validada + células (laboratório avançado opcional), (3) Fatiamento — motor G-code com 11 algoritmos e parâmetros biomédicos, (4) Execução — controle ao vivo com viabilidade, crosslink e pós-processamento. Cada etapa desbloqueia a próxima. Custo: 6 créditos por G-code." },
   { href: "/dashboard/organoids",          label: "Organoid Builder",     icon: CircleDot,       exact: false,
     info: "Desenhe esferoides e organoides (intestinal, hepático, neural, cardíaco, renal, pancreático, pulmonar) com protocolo QMicroNiche™ integrado e moldes não-adesivos QMatrix™." },
   { href: "/dashboard/protocols",          label: "Protocolos GLP/GMP",   icon: FileText,        exact: false,

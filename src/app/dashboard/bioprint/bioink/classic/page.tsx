@@ -502,7 +502,7 @@ export default function BioprintBioinkPage() {
               são calculadas em tempo real para alertar sobre cisalhamento e viabilidade.
               {" "}
               <Link href="/dashboard/bioprint/bioink" className="text-emerald-300 hover:underline">
-                Voltar ao Laboratório de Biotintas (guiado) →
+                ← Voltar à Etapa 2 simples
               </Link>
             </p>
           </div>

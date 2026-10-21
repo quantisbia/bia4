@@ -57,7 +57,7 @@ const STEP_CARDS: StepCardDef[] = [
     title: "Biotinta",
     short: STEP_LABELS.bioink,
     description:
-      "Formulação do hidrogel: material base (GelMA, alginato, colágeno...), concentração, crosslinker, células e aditivos. Sugestões do banco de literatura + simulação reológica.",
+      "Escolha uma biotinta validada (alginato-gelatina, GelMA, Pluronic, FRESH...) e as células. Os parâmetros que funcionam vêm junto. Laboratório avançado e formulação livre ficam em Opções avançadas.",
     icon: Droplets,
     route: "/dashboard/bioprint/bioink",
     color: "cyan",
