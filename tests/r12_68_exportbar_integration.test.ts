@@ -510,7 +510,8 @@ describe("R12.68.G · Formulator Pro instalou ExportBar E removeu handleSaveProt
 
 // ─────────────────────────────────────────────────────────────────────
 describe("R12.68.H · Bioink instalou ExportBar com dropdown de escopo (opção C)", () => {
-  const src = readSrc("src/app/dashboard/bioprint/bioink/page.tsx")
+  // R16.3: a formulação livre (com ExportBar) vive em /bioink/classic; /bioink virou a Etapa 2 simples.
+  const src = readSrc("src/app/dashboard/bioprint/bioink/classic/page.tsx")
 
   it("Importa ExportBar + buildContentFromBioinkDrafts", () => {
     expect(src).toMatch(/import\s*\{\s*ExportBar\s*\}\s*from\s*["']@\/components\/notebook\/ExportBar["']/)
