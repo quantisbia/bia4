@@ -93,9 +93,11 @@ export function emitHeader(
   lines.push("G92 X0 Y0 Z0 E0        ; zerar TODAS as coordenadas AQUI (ponto atual = origem)")
 
   // Temperatura
+  // R19.1: só M140 (não bloqueia). M190 ficava esperando a mesa chegar na
+  // temperatura — em bioimpressão (24 °C) isso pode nunca acontecer e a
+  // impressão "não começa". A usuária estabiliza a mesa ANTES pelo painel.
   if (bp.hasHeatedBed && bioink.temperature_c) {
-    lines.push(`M140 S${fmt(bioink.temperature_c)}        ; set bed temp`)
-    lines.push(`M190 S${fmt(bioink.temperature_c)}        ; wait for bed temp`)
+    lines.push(`M140 S${fmt(bioink.temperature_c)}        ; set bed temp (sem esperar)`)
   }
 
   // Pressão pneumática (bioprinter específico)

@@ -86,6 +86,7 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
   let cur: Vec2 = { x: 0, y: 0 }
   let curZ = P.zOffset_mm
   let retracted = false
+  let firstBeadDone = false // R19.1
   const eRetract = volumeToE(X.retractVolume_uL, X)
   const ePrime = volumeToE(X.primeVolume_uL, X)
   const retractF = F(X.retractSpeed_mms)
@@ -100,6 +101,7 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
     push(`G1 X${f(P.purgeLine_mm)} Y0 E${f(e, 4)} F${F(P.speedFirstLayer_mms)}`)
     cur = { x: P.purgeLine_mm, y: 0 }
     curZ = zTop
+    firstBeadDone = true // purga explícita já saiu do ponto zero extrudando
     extrude += P.purgeLine_mm; eTotal += e
     volume += beadArea_mm2(P.lineWidth_mm * 1.5, h) * P.purgeLine_mm * X.flowMultiplier
     time += P.purgeLine_mm / P.speedFirstLayer_mms
@@ -163,9 +165,33 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
       if (role !== lastRole) { push(`;TYPE:${role}`); lastRole = role }
       const eMm = ePerMm(tp.lineWidth_mm, L.height_mm, X)
       const speedF = F(tp.speed_mms)
-      goTravel(tp.points[0], zTop)
-      startExtrusion()
-      const seq = tp.closed ? [...tp.points, tp.points[0]] : tp.points
+      let pts = tp.points
+      if (!firstBeadDone) {
+        // R19.1: PONTO ZERO É PONTO ZERO — o 1º cordão da impressão nasce no
+        // ponto onde o bico está (0,0). Rotaciona o caminho para começar no
+        // vértice mais próximo da origem e EXTRUDA a aproximação (sem travel).
+        let bi = 0, bd = Infinity
+        for (let i = 0; i < pts.length; i++) { const d = pts[i].x ** 2 + pts[i].y ** 2; if (d < bd) { bd = d; bi = i } }
+        if (tp.closed) pts = [...pts.slice(bi), ...pts.slice(0, bi)]
+        else if (bi > pts.length / 2) pts = [...pts].reverse()
+        const first = pts[0]
+        push(`G1 Z${f(zTop)} F${F(P.speedZ_mms)}        ; altura da 1ª camada, sem sair do ponto zero`)
+        curZ = zTop
+        startExtrusion()
+        const d0 = dist(cur, first)
+        if (d0 > 1e-3) {
+          const e0 = d0 * eMm
+          push(`G1 X${f(first.x)} Y${f(first.y)} E${f(e0, 5)} F${speedF}  ; aproximação extrudada a partir do ponto zero`)
+          eTotal += e0; extrude += d0; time += d0 / tp.speed_mms
+          volume += beadArea_mm2(tp.lineWidth_mm, L.height_mm) * d0 * X.flowMultiplier
+        }
+        cur = first
+        firstBeadDone = true
+      } else {
+        goTravel(pts[0], zTop)
+        startExtrusion()
+      }
+      const seq = tp.closed ? [...pts, pts[0]] : pts
       let segLen = 0
       for (let i = 1; i < seq.length; i++) {
         const p = seq[i]

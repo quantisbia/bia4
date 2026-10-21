@@ -207,6 +207,15 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R19.1 — O PRIMEIRO CORDÃO NASCE NO PONTO ZERO (zero deslocamento após o G92) (2026-10-21)
+- Antes (mesmo com a peça centrada) o G-code fazia um `G0` "seco" do (0,0) até o perímetro externo. Agora, em **todos os geradores** (Etapa 3 engine, G-code Rápido, BioSlicer STL):
+  - na 1ª camada os perímetros vão de **dentro para fora** (o mais interno primeiro);
+  - o caminho é rotacionado para começar no vértice **mais próximo do ponto zero**;
+  - o trajeto do (0,0) até esse vértice é **extrudado** (`G1 … E>0`, "aproximação extrudada") — **nenhum movimento sem depositar** antes do primeiro cordão.
+- Cabeçalho da Etapa 3: `M190` (esperar temperatura) removido — só `M140`; a mesa a 24 °C podia nunca "chegar" e a impressão não começava.
+- Skirt zerado também nos perfis do BioSlicer (opt-in).
+- Testes: 5 novos (16 no `r19_origin_is_origin`), teste R15 ajustado para skirt opt-in. 216 verdes.
+
 ### R19 — Etapa A · PONTO ZERO É PONTO ZERO (2026-10-21)
 - **Problema:** após o `G92 X0 Y0 Z0 E0` o G-code da Etapa 3 mandava o bico para (60,45) fixo (e o G-code Rápido para (110,110)) → "viagem na diagonal"; no fim, `G1 X0 Y200` (park) atravessava a mesa.
 - **Engine (Etapa 3):** peça única centrada em **(0,0) = posição do bico**. Placas 6/12/24/48/96/384: o **primeiro poço selecionado (superior-esquerdo, ex. A1) é a origem** e os demais são **offsets relativos pelo pitch** da placa; trajetória sempre começa pelo poço de referência. Cabeçalho ganha `; Origin: ...`.

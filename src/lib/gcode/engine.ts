@@ -162,13 +162,40 @@ function polygonToMoves(
   job: PrintJob,
   wellId: string,
   layer: number,
+  /**
+   * R19.1: posição atual do bico. Se informada, o polígono é ROTACIONADO para
+   * começar no vértice mais próximo e o deslocamento até ele é EXTRUDADO
+   * (cordão de aproximação) em vez de travel — zero deslocamento "seco".
+   */
+  from?: Point2D,
 ): Move[] {
   if (poly.length === 0) return []
   const moves: Move[] = []
-  const first = poly[0]
-  // travel to start
-  moves.push({ ...travelTo(first.x, first.y, job.bioink, z, wellId), layer })
-  moves.push({ ...primeExtruder(job.bioink), wellId, layer })
+  let ring = poly
+  if (from) {
+    let bi = 0, bd = Infinity
+    for (let i = 0; i < poly.length; i++) {
+      const d = (poly[i].x - from.x) ** 2 + (poly[i].y - from.y) ** 2
+      if (d < bd) { bd = d; bi = i }
+    }
+    ring = [...poly.slice(bi), ...poly.slice(0, bi)]
+  }
+  const first = ring[0]
+  if (from) {
+    const d = Math.hypot(first.x - from.x, first.y - from.y)
+    if (d > 0.05) {
+      // cordão de aproximação: sai extrudando do ponto onde o bico está
+      moves.push({ ...extrudeTo(first.x, first.y, d * extrusionPerMm, job.bioink, z, wellId, layer), comment: "aproximação extrudada (sem travel)" })
+    } else {
+      // já está no vértice: só garante o Z
+      moves.push({ type: "travel", x: first.x, y: first.y, z, f: mmsToMmMin(job.bioink.travelSpeed_mms), wellId, layer, comment: "ajuste de Z no ponto atual" })
+    }
+  } else {
+    // travel to start (perímetros subsequentes / outras camadas)
+    moves.push({ ...travelTo(first.x, first.y, job.bioink, z, wellId), layer })
+    moves.push({ ...primeExtruder(job.bioink), wellId, layer })
+  }
+  poly = ring
 
   let prev = first
   for (let i = 1; i <= poly.length; i++) {
@@ -394,9 +421,17 @@ export function generateGCodeForJob(input: EngineInput): GCodeResult {
 
       // Perímetros (walls)
       const localPerims = bounds.getPerimetersAtZ(z, job.walls, wallSpacing)
-      const perims = localPerims.map((p) => translatePoly(p, center.x, center.y))
+      let perims = localPerims.map((p) => translatePoly(p, center.x, center.y))
+      // R19.1: PONTO ZERO É PONTO ZERO — o PRIMEIRO cordão da impressão sai
+      // do ponto exato onde o bico está (centro do alvo). Para isso, na 1ª
+      // camada do 1º poço, imprimimos de DENTRO para FORA (perímetro mais
+      // interno primeiro) e o deslocamento até ele é extrudado, não travel.
+      const isVeryFirst = wi === 0 && li === 0 && job.skirtLoops === 0
+      if (isVeryFirst) perims = [...perims].reverse()
+      let nozzle: Point2D | undefined = isVeryFirst ? { x: center.x, y: center.y } : undefined
       for (const poly of perims) {
-        moves.push(...polygonToMoves(poly, z, extrusionPerMm, job, wid, li))
+        moves.push(...polygonToMoves(poly, z, extrusionPerMm, job, wid, li, nozzle))
+        nozzle = undefined
       }
 
       // Infill (apenas se infillPercent > 0)

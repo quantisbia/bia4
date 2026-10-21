@@ -11,6 +11,9 @@ import { BIOPRINTER_PROFILES } from "@/lib/gcode/profiles/bioprinters"
 import type { PrintJob, Bioink } from "@/lib/gcode/core/types"
 import { validateGcode, DEFAULT_BIO_LIMITS } from "@/lib/bioprint/gcode-validator"
 import { generateQuickGcode, type QuickGeometry, type QuickBioinkParams } from "@/lib/bioprint/quick-gcode"
+import { sliceMesh } from "@/lib/slicer/slice"
+import { boxMesh } from "@/lib/slicer/primitives"
+import { BASIC_PROFILES } from "@/lib/slicer/profiles"
 
 const bioink: Bioink = {
   id: "t-alg", material: "Alginato 3 % + Gelatina 7 %", concentration: 3, hasCells: false,
@@ -26,6 +29,17 @@ const job = (over: Partial<PrintJob> = {}): PrintJob => ({
 
 /** só linhas de comando (sem comentários) */
 const cmds = (g: string) => g.split("\n").map((l) => l.replace(/;.*$/, "").trim()).filter(Boolean)
+
+/** primeiro comando de movimento XY DEPOIS do G92 — deve ser G1 com E>0 (sair extrudando), nunca G0 seco */
+function firstXYLineAfterG92(gcode: string): string | null {
+  let seen = false
+  for (const l of cmds(gcode)) {
+    if (/^G92\b/.test(l)) { seen = true; continue }
+    if (!seen) continue
+    if (/^G[01]\b/.test(l) && /[XY]-?\d/.test(l)) return l
+  }
+  return null
+}
 
 /** primeiro G0/G1 com X ou Y */
 function firstXY(gcode: string): { x: number; y: number } | null {
@@ -112,6 +126,44 @@ describe("R19 · Etapa A · engine (Etapa 3)", () => {
     expect(codes).not.toContain("PARK_MOVE")
     expect(codes).not.toContain("OUT_OF_VOLUME_X")
     expect(v.verdict).not.toBe("blocked")
+  })
+})
+
+describe("R19.1 · o PRIMEIRO cordão nasce no ponto zero (sem deslocamento seco)", () => {
+  it("engine (Etapa 3): 1º movimento XY após G92 é G1 com E>0, a partir de (0,0)", () => {
+    const r = generateGCodeForJob({ job: job(), geometryId: "disk", geometryParams: { radius: 10, thickness: 1.2 } })
+    const l = firstXYLineAfterG92(r.gcode)!
+    expect(l).toMatch(/^G1\b/)
+    expect(parseFloat(l.match(/E(-?[\d.]+)/)![1])).toBeGreaterThan(0) // extrusão positiva
+    // na 1ª camada começa pelo perímetro INTERNO (mais perto do centro)
+    const m = l.match(/X(-?[\d.]+) Y(-?[\d.]+)/)!
+    expect(Math.hypot(+m[1], +m[2])).toBeLessThan(10) // interno (raio 10 - 0.41)
+    expect(r.gcode).toMatch(/aproximação extrudada/)
+  })
+  it("engine: membrana retangular também sai extrudando do zero", () => {
+    const r = generateGCodeForJob({ job: job(), geometryId: "membrane", geometryParams: { width: 12, height: 12, depth: 0.8 } })
+    const l = firstXYLineAfterG92(r.gcode)!
+    expect(l).toMatch(/^G1\b.*E/)
+  })
+  it("engine: NÃO espera temperatura (sem M190/M109 bloqueantes)", () => {
+    const r = generateGCodeForJob({ job: job(), geometryId: "disk", geometryParams: { radius: 6, thickness: 0.8 } })
+    expect(cmds(r.gcode).some((l) => /^M190\b|^M109\b/.test(l))).toBe(false)
+  })
+  it("G-code Rápido: 1º movimento XY após G92 é G1 com E>0", () => {
+    const geom = { id: "cube", width: 10, depth: 10, height: 1 } as QuickGeometry
+    const ink = { materialLabel: "Alginato", nozzleDiameter_mm: 0.41, viscosity_PaS: 5, printSpeed_mms: 8, travelSpeed_mms: 30, hasCells: false } as QuickBioinkParams
+    const g = generateQuickGcode(geom, ink, { layerHeight_mm: 0.4, walls: 2, infillPattern: "rectilinear", infillDensity_pct: 30 }).gcode
+    const l = firstXYLineAfterG92(g)!
+    expect(l).toMatch(/^G1\b.*E/)
+  })
+  it("BioSlicer (STL): 1º movimento XY após G92 é G1 com E>0; skirt desligado nos perfis básicos", () => {
+    const mesh = boxMesh(12, 12, 1.0)
+    const prof = BASIC_PROFILES[0]
+    expect(prof.params.skirtLoops).toBe(0)
+    const res = sliceMesh({ mesh, params: { ...prof.params }, extrusion: prof.extrusion, profileId: prof.id, profileName: prof.name })
+    const l = firstXYLineAfterG92(res.gcode)!
+    expect(l).toMatch(/^G1\b.*E/)
+    expect(res.gcode).toMatch(/aproximação extrudada a partir do ponto zero/)
   })
 })
 

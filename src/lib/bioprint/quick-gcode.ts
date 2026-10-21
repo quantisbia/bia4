@@ -488,17 +488,44 @@ interface MoveAcc {
 
 function emitPolygon(acc: MoveAcc, poly: Point[], feedrate_mms: number, travelSpeed_mms: number, comment?: string) {
   if (poly.length < 2) return
-  // Travel até o primeiro ponto
-  const first = poly[0]
-  if (!acc.last || dist(acc.last, first) > 0.05) {
-    acc.list.push({
-      type: "G0",
-      x: first.x, y: first.y, z: acc.z,
-      f: mmsToMmMin(travelSpeed_mms),
-      comment: comment ? `travel: ${comment}` : "travel",
-    })
+  // R19.1: PONTO ZERO É PONTO ZERO. No PRIMEIRO cordão da impressão o bico
+  // está em (0,0) — rotacionamos o polígono para começar no vértice mais
+  // próximo e EXTRUDAMOS o trajeto até ele (cordão de aproximação) em vez
+  // de dar um travel seco. Nada se desloca sem depositar.
+  if (acc.list.length === 0) {
+    const origin = { x: 0, y: 0 }
+    let bi = 0, bd = Infinity
+    for (let i = 0; i < poly.length; i++) {
+      const d = (poly[i].x - origin.x) ** 2 + (poly[i].y - origin.y) ** 2
+      if (d < bd) { bd = d; bi = i }
+    }
+    // mantém o fechamento se o polígono repete o 1º ponto no fim
+    const closed = dist(poly[0], poly[poly.length - 1]) < 1e-6
+    const core = closed ? poly.slice(0, -1) : poly
+    const rot = [...core.slice(bi), ...core.slice(0, bi)]
+    poly = closed ? [...rot, rot[0]] : rot
+    const first = poly[0]
+    const d0 = dist(origin, first)
+    if (d0 > 0.05) {
+      acc.e += d0 * acc.ePerMm
+      acc.list.push({ type: "G1", x: first.x, y: first.y, z: acc.z, e: acc.e, f: mmsToMmMin(feedrate_mms), comment: "aproximação extrudada a partir do ponto zero (sem travel)" })
+    } else {
+      acc.list.push({ type: "G0", x: first.x, y: first.y, z: acc.z, f: mmsToMmMin(travelSpeed_mms), comment: "ajuste de Z no ponto zero" })
+    }
+    acc.last = { x: first.x, y: first.y }
+  } else {
+    // Travel até o primeiro ponto
+    const first = poly[0]
+    if (!acc.last || dist(acc.last, first) > 0.05) {
+      acc.list.push({
+        type: "G0",
+        x: first.x, y: first.y, z: acc.z,
+        f: mmsToMmMin(travelSpeed_mms),
+        comment: comment ? `travel: ${comment}` : "travel",
+      })
+    }
+    acc.last = { x: first.x, y: first.y }
   }
-  acc.last = { x: first.x, y: first.y }
 
   // Extrude pelos pontos
   for (let i = 1; i < poly.length; i++) {
@@ -625,7 +652,11 @@ export function generateQuickGcode(
 
     // Para múltiplas paredes, offset cada uma (simplificado: só desenha a externa N vezes com pequeno offset)
     const numWalls = Math.max(1, opts.walls)
-    for (let w = 0; w < numWalls && w < 3; w++) {
+    // R19.1: na 1ª camada, de DENTRO para FORA (parede mais interna primeiro)
+    // para o 1º cordão nascer perto do ponto zero.
+    const wallOrder = Array.from({ length: Math.min(numWalls, 3) }, (_, i) => i)
+    if (li === 0) wallOrder.reverse()
+    for (const w of wallOrder) {
       const offset = w * nozzle
       for (const poly of walls) {
         const shifted = offset > 0 ? shrinkPolygon(poly, offset) : poly

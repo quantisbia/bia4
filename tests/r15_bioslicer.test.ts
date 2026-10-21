@@ -234,7 +234,9 @@ describe("R15 · pipeline sliceMesh → G-code", () => {
     expect(r.gcode).toMatch(/^;LAYER_COUNT:\d+$/m)
     expect(r.gcode).toMatch(/;TYPE:WALL-OUTER/)
     expect(r.gcode).toMatch(/;TYPE:FILL/)
-    expect(r.gcode).toMatch(/;TYPE:SKIRT/)
+    // R19: skirt é opt-in (desligado por padrão) — só aparece se skirtLoops > 0
+    expect(r.gcode).not.toMatch(/;TYPE:SKIRT/)
+    expect(run(undefined, { skirtLoops: 1 }).gcode).toMatch(/;TYPE:SKIRT/)
     expect(r.gcode).toMatch(/;BIA_META \{/)
     expect(r.stats.extrudeLength_mm).toBeGreaterThan(100)
     expect(r.stats.volume_uL).toBeGreaterThan(0)

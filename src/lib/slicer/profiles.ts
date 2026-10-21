@@ -25,7 +25,7 @@ export function baseParams(nozzle_mm = 0.41): SliceParams {
     bottomLayers: 0, topLayers: 0,
     speedPerimeter_mms: 6, speedInfill_mms: 8, speedFirstLayer_mms: 4, speedTravel_mms: 40, speedZ_mms: 5,
     zHop_mm: 1.0, retractMinTravel_mm: 2, avoidCrossing: true,
-    skirtLoops: 1, skirtDistance_mm: 4, purgeLine_mm: 0,
+    skirtLoops: 0, skirtDistance_mm: 4, purgeLine_mm: 0, // R19: skirt opt-in — 1º cordão nasce no ponto zero
     cartridgeTemp_C: null, bedTemp_C: null, waitForTemps: false,
     originX_mm: 0, originY_mm: 0, zOffset_mm: 0, scale: 1, rotationZ_deg: 0,
     hasCells: false, layerPause_s: 0, customStart: "", customEnd: "", customLayerChange: "",
@@ -43,7 +43,7 @@ export const BASIC_PROFILES: SliceProfile[] = [
     name: "Primeira impressão (alginato/gelatina)",
     description: "Começa aqui. Grade 0/90 em 2–4 camadas, agulha 22G (0,41 mm), seringa 10 mL. Zero retração, velocidade baixa.",
     tier: "basic",
-    params: { ...baseParams(0.41), infillPattern: "rectilinear", infillDensity: 35, wallCount: 1, speedPerimeter_mms: 5, speedInfill_mms: 6, speedFirstLayer_mms: 4, zHop_mm: 0.8, skirtLoops: 1 },
+    params: { ...baseParams(0.41), infillPattern: "rectilinear", infillDensity: 35, wallCount: 1, speedPerimeter_mms: 5, speedInfill_mms: 6, speedFirstLayer_mms: 4, zHop_mm: 0.8, skirtLoops: 0 },
     extrusion: withExtrusion({ primeVolume_uL: 0.5, retractVolume_uL: 0, flowMultiplier: 1.0 }),
     tips: [
       "Posicione o bico ENCOSTADO no substrato (ou a ~0,3 mm) antes de iniciar — o G92 vai zerar ali.",
@@ -173,7 +173,7 @@ export const ADVANCED_PROFILES: SliceProfile[] = [
     name: "Teste de imprimibilidade (Pr de Ouyang)",
     description: "Grade 2 camadas para medir circularidade de poros (Pr = L²/(16A)).",
     tier: "advanced",
-    params: { ...baseParams(0.41), infillPattern: "rectilinear", strandSpacing_mm: 2.0, infillDensity: 25, wallCount: 1, speedPerimeter_mms: 6, speedInfill_mms: 6, skirtLoops: 1 },
+    params: { ...baseParams(0.41), infillPattern: "rectilinear", strandSpacing_mm: 2.0, infillDensity: 25, wallCount: 1, speedPerimeter_mms: 6, speedInfill_mms: 6, skirtLoops: 0 },
     extrusion: withExtrusion({ primeVolume_uL: 0.5, retractVolume_uL: 0.3 }),
     tips: [
       "Pr ≈ 1 → poros quadrados; Pr < 0,9 → gel muito fluido (fusão); Pr > 1,1 → sub-gelificado/irregular.",
@@ -224,7 +224,7 @@ export const PARAM_TIPS: Record<string, string> = {
   speedTravel_mms: "30–60 mm/s. Muito rápido vibra a bandeja/poço.",
   zHop_mm: "Sobe Z antes de travel para não arrastar o gel. 0,5–1,5 mm. FRESH ≤ 0,3 mm.",
   retractMinTravel_mm: "Só retrai se o travel for maior que isso.",
-  skirtLoops: "Anel ao redor para estabilizar o fluxo. 1 em substrato aberto; 0 em poços.",
+  skirtLoops: "Desligado por padrão: o 1º cordão nasce no ponto zero (G92). Ligue só se quiser escorvar na própria mesa.",
   purgeLine_mm: "Linha reta de purga antes do skirt. Útil após trocar cartucho.",
   cartridgeTemp_C: "GelMA 21–25 °C · Gelatina/alginato 22–28 °C · Matrigel 4–10 °C · Pluronic 20–24 °C · PCL 80–110 °C.",
   bedTemp_C: "37 °C gelifica Matrigel/colágeno; 4–15 °C firma gelatina/GelMA; vazio = não emitir.",
