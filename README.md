@@ -72,6 +72,18 @@ e **host serial profissional** no padrão Printrun/OctoPrint — tudo no browser
 **Testes:** `tests/r15_bioslicer.test.ts` (35) + `tests/r15_marlin_host.test.ts` (11, inclui recuperação com 15 % de corrupção serial).
 **Referências:** Ribeiro 2017 · Ouyang 2016 · Blaeser 2016 · Compaired 2025 (IJB) · Cordova 2024 (Enderstruder) · Hinton 2015 / Lee 2019 (FRESH) · Allevi GelMA.
 
+### 🧫 Laboratório de Biotintas guiado (NOVO em R16 — v4.6)
+Reformulação completa de `/dashboard/bioprint/bioink`: **o usuário escolhe decisões, não parâmetros**. Pesquisa de base: janela de biofabricação (Malda 2013 / Schwab 2020), faixas reológicas de Elango 2025 (η 10²–10⁴ mPa·s, τy 10–10³ Pa, tan δ 0,1–1), Gao 2018 (tan δ 0,25–0,45 ótimo p/ gelatina-alginato), Blaeser 2016 (shear ≤ 5 kPa), protocolos CELLINK/Allevi (GelMA 10 % + LAP 0,25 %, 405 nm; alginato + CaCl₂), Cavallo 2025 (pele), Markstedt 2015 (CNF-alginato), Kolesky 2014 (Pluronic), Hinton 2015 / Lee 2019 (FRESH colágeno), Brassard 2021 (organoides). Desafios endereçados: janela estreita fidelidade × viabilidade, temperatura (GelMA 21–25 °C), variação de lote, esterilização de soluções viscosas, bolhas/entupimento, sedimentação celular, dosagem de reticulação, tentativa-e-erro.
+
+| Passo | O que o usuário faz | O que a BIA devolve |
+|------|------|------|
+| **1 · Decisões** | Objetivo (10: aprender, pele, cartilagem, osso, vascular, fígado, cardíaco, neural, organoide, modelo in vitro), células (12 tipos c/ sensibilidade ao shear), equipamento (luz 405 nm · cabeçote c/ temperatura · mesa c/ temperatura · agulha) e experiência | Recomendação ao vivo no rodapé |
+| **2 · Receita** | Vê a receita recomendada e alternativas; pode trocar | **10 receitas validadas com DOI** (Alg 3 %+Gel 7 %, GelMA 10 %/5 %, Alg+CNF+HAp, Pluronic 35 %, Colágeno FRESH, Fibrina+Gelatina, Matrigel+Alg, GelMA+HAMA, pasta de calibração), motivos "por que sim", bloqueios de equipamento, avisos, componentes com função, prós/limitações e **gráfico da janela de biofabricação** (fidelidade × viabilidade com shear de Herschel-Bulkley na agulha escolhida) |
+| **3 · Bancada** | Informa volume a imprimir (pré-preenchido do modelo da Etapa 1) e densidade celular | **Quantidades calculadas** (g/mg/mL por componente, volume morto 0,25 mL/seringa, margem 30 %, divisão 10:1 biotinta:células, nº de células, nº de seringas, concentração final pós-diluição), preparo passo a passo com passos críticos, esterilização/validade/janela de tempo, **parâmetros que dão certo** (agulha, velocidade, camada, fluxo, temperaturas, kPa equivalente), protocolo de reticulação, **"Se der errado"** (12 sintomas → causas → correções → botão do BioSlicer/Host), export **.md**, "Enviar ao BioSlicer" (pré-preenche objetivo + agulha/camada/velocidade/fluxo) ou ao Fatiamento (Etapa 3) |
+
+Modo **Básico** (padrão) esconde reologia, explicações e referências; **Avançado** mostra tudo. A página antiga com parâmetros livres continua em `/dashboard/bioprint/bioink/classic`.
+**Lib pura:** `src/lib/bioink-lab/` — `types`, `recipes` (10), `window` (janela + shear HB), `recommend` (score por objetivo/células/equipamento/experiência), `calculator` (plano de bancada), `troubleshooting`, `protocol` (Markdown + `toBioinkPatch` p/ o contexto com `formulations[0]` **e** campos legados + `slicerHint`). **Testes:** `tests/r16_bioink_lab.test.ts` (27).
+
 ### 📚 Manual do Usuário (NOVO em v4.3)
 5 capítulos didáticos com racional fácil de entender:
 1. **Formulador Pro** (8 min) — Como criar formulações profissionais
@@ -186,6 +198,13 @@ GOOGLE_AI_API_KEY=...
 ---
 
 ## 🗓 Changelog Recente
+
+### R16 — Laboratório de Biotintas guiado: decisões → receita validada → bancada calculada (2026-10-21)
+- **Problema:** página de Biotinta confusa, com dezenas de parâmetros soltos; usuário sem saber o que "dá certo".
+- **Pesquisa:** desafios reais da formulação (janela de biofabricação estreita, temperatura, lote, esterilização, bolhas, sedimentação, reticulação) → lib `src/lib/bioink-lab/` com 10 receitas validadas (DOI), modelo de janela fidelidade × viabilidade, calculadora de bancada, troubleshooting e export de protocolo.
+- **UI:** 3 passos (Decisões / Receita / Bancada), Básico/Avançado, gráfico da janela, "Enviar ao BioSlicer" com hint de objetivo + parâmetros iniciais. Página antiga preservada em `/bioink/classic`.
+- **Integração:** `updateBioink` recebe `formulations[0]` **e** campos legados (material, concentração, crosslinker, célula, densidade, reologia) — Fatiamento, Controle e Stepper continuam funcionando. BioSlicer lê `bia:slicer-hint`.
+- **Testes:** 27 novos (62 no total com R15). Vercel faz o build.
 
 ### R13.14 — BIA Academy: Biblioteca + Certificados (3 formatos) + Brinde QMatrix (2026-10-10)
 
