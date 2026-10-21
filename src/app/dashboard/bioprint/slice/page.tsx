@@ -2,2688 +2,757 @@
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
- *  BIA — Etapa 3 / 4 · Fatiamento (slicing + G-code)
- *  ───────────────────────────────────────────────────────────────────────
- *  Unifica em uma única tela:
- *    A. PARÂMETROS — bioprinter + layer height + speed + pressão + bico + infill
- *    B. MULTI-POÇO  — placas SBS 6/12/24/48/96/384 (opcional)
- *    C. G-CODE      — preview do código + download + estatísticas
- *
- *  LÊ:  state.model (geometria, params) + state.bioink (material, conc, cells)
- *  ESCREVE: state.slice (parâmetros + gcode + estimate)
- *
- *  Substitui /dashboard/bioprinting/engine + tab slicer de /bioprinting.
- *  Usa motor real /api/gcode/generate (engine validado + auditoria + créditos).
- *
- *  Pré-requisito: state.model.status === "ready" && state.bioink.status === "ready"
- *
- *  Janaina Dernowsek / Quantis Biotechnology — 2026
+ *  BIA v4 · R15→R20 · /dashboard/bioprint/slice — BioSlicer (Etapa 3 oficial, fatiador único)
+ *  ─────────────────────────────────────────────────────────────────────
+ *  1. Modelo: STL da Etapa 1 (IndexedDB), upload direto, ou primitiva.
+ *  2. Objetivo: texto/voz → auto-profile com decisões explicadas — ou
+ *     perfil manual Básico / Avançado.
+ *  3. Parâmetros: Básico (poucos campos) ou Avançado (todos + dicas).
+ *  4. Fatiar → preview por camada, estatísticas bio, avisos.
+ *  5. Exportar .gcode / enviar ao Host / Etapa 4.
  * ═══════════════════════════════════════════════════════════════════════
  */
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import {
-  Layers, Wrench, FileCode2, Printer, Settings2, Loader2, Sparkles,
-  ArrowRight, AlertTriangle, CheckCircle2, Info, Download, Copy,
-  Wind, Thermometer, Target, BarChart3, Clock, Droplets, Activity,
-  Beaker, Zap, AlertCircle, ChevronDown, ChevronRight, Microscope,
-  Lightbulb, ShieldAlert, Square,
+  Upload, Mic, MicOff, Wand2, Layers, Download, Send, Settings2, Sparkles, AlertTriangle,
+  CheckCircle2, Info, Box, Cylinder, Circle, RefreshCw, Lightbulb, Gauge, FlaskConical,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
-import { useBioprintProcess, isBioinkReady } from "@/lib/bioprint/process-context"
-import { INFILL_PATTERNS, TEMPERATURE_PROFILES, CLASSIC_INFILL_PATTERNS } from "@/lib/bioprinter/biomedical-params"
-import { BIOPRINTERS, getBioprinterById, supportsWebSerial } from "@/lib/bioprinting/bioprinters"
-import { SUPPORTED_GEOMETRY_IDS, isPerimeterOnlyGeometry, classifyGeometry } from "@/lib/gcode/slicer/geometry-bounds"
-import { TissueDesigner, type TissueDesignerValue } from "@/components/bioprinting/TissueDesigner"
-import { PrinterConnection } from "@/components/bioprinting/PrinterConnection"
-import { GcodeValidatorPanel } from "@/components/bioprinter/GcodeValidatorPanel"
-// R12.54: card de recomendação inteligente por tecido (Onda 1: membrana/vaso/músculo/nervo)
-import { TissueRecommendationCard } from "@/components/bioprint/TissueRecommendationCard"
-import { inferTissueFromGeometry } from "@/lib/bioprint/tissue-presets"
-import type { PresetParams } from "@/lib/bioprint/tissue-presets"
-// R12.55: modo Básico (default) vs Avançado (gated) — pipeline verificado vs experimental
-// R12.59: BasicModePanel agora lê geometria/blend do contexto (fluxo contínuo)
-import { BasicModePanel } from "@/components/bioprinter/BasicModePanel"
+import { useBioprintProcess } from "@/lib/bioprint/process-context"
+import {
+  type TriMesh, type SliceParams, type ExtrusionModel, type SliceResult, type SliceProfile, type InfillPattern,
+  parseSTL, sliceMesh, parseIntent, INTENT_EXAMPLES, BASIC_PROFILES, ADVANCED_PROFILES, PARAM_TIPS,
+  SYRINGE_CATALOG, NEEDLE_GAUGES, defaultLayerHeight, defaultLineWidth, PRIMITIVE_CATALOG, type IntentResult,
+} from "@/lib/slicer"
+import { getMesh, getLastMeshId, listMeshes, putMesh, newMeshId, triMeshToSTL } from "@/lib/slicer/mesh-store"
+import { type PrintTarget, DEFAULT_TARGET, describeTarget } from "@/lib/slicer/target"
+import { type ToolsConfig, singleTool, describeTools } from "@/lib/slicer/tools"
+import { TargetPanel } from "@/components/slicer/TargetPanel"
+import { ToolsPanel, type BioinkOption } from "@/components/slicer/ToolsPanel"
+import { sendToExecute } from "@/lib/bioprint/execute-handoff"
+import { Target, Palette, ShieldCheck, X as XIcon } from "lucide-react"
+import { LayerPreview } from "@/components/slicer/LayerPreview"
 
-// Timeout máximo de geração — evita rodar para sempre se o engine travar
-const GCODE_TIMEOUT_MS = 45_000
+type Mode = "basic" | "advanced"
+type Rheo = { viscosity_PaS?: number; powerLawN?: number }
+const HANDOFF_KEY = "bia.host.gcode.handoff"
 
-// ─── Mapeamento material BIA → algoritmo padrão do engine ────────────────
-// O motor /api/gcode/generate aceita algoritmos enum específicos.
-const ENGINE_ALGORITHMS = [
-  { id: "gyroid_tpms",   name: "Gyroid TPMS",        category: "paramétrico",     icon: "🌀",  bestFor: ["osso", "cartilagem", "vascularização"] },
-  { id: "voronoi_3d",    name: "Voronoi 3D",          category: "não-paramétrico", icon: "🕸️",  bestFor: ["osso trabecular", "scaffolds biomiméticos"] },
-  { id: "voronoi_2d",    name: "Voronoi 2D",          category: "não-paramétrico", icon: "🔷",  bestFor: ["pele", "membranas finas"] },
-  { id: "perlin_noise",  name: "Perlin (orgânico)",   category: "não-paramétrico", icon: "🌫️",  bestFor: ["fígado", "parênquima"] },
-  { id: "gradient",      name: "Gradient",            category: "paramétrico",     icon: "📈",  bestFor: ["pele", "vascularização radial"] },
-  { id: "rectilinear",   name: "Rectilinear",         category: "paramétrico",     icon: "┼",    bestFor: ["scaffolds simples", "MVP"] },
-  { id: "linear",        name: "Linear",              category: "paramétrico",     icon: "≡",    bestFor: ["pele fina", "córnea"] },
-  { id: "honeycomb",     name: "Honeycomb",           category: "paramétrico",     icon: "🔶",  bestFor: ["osso", "regeneração"] },
-  { id: "concentric",    name: "Concêntrico",         category: "paramétrico",     icon: "◎",    bestFor: ["córnea", "lente"] },
-  { id: "schwarz_p",     name: "Schwarz P (TPMS)",   category: "paramétrico",     icon: "🧊",  bestFor: ["scaffolds volumosos"] },
-  { id: "diamond_tpms",  name: "Diamond (TPMS)",     category: "paramétrico",     icon: "💎",  bestFor: ["alta resistência"] },
-] as const
-
-type EngineAlgorithm = typeof ENGINE_ALGORITHMS[number]["id"]
-
-// Heurística de material da biotinta → perfil de temperatura do biomedical-params
-function pickTempProfile(materialLabel: string | null) {
-  if (!materialLabel) return TEMPERATURE_PROFILES[0]
-  const lower = materialLabel.toLowerCase()
-  if (lower.includes("gelma") || lower.includes("gelatina")) return TEMPERATURE_PROFILES.find(p => p.bioinkType.toLowerCase().includes("gelma")) ?? TEMPERATURE_PROFILES[0]
-  if (lower.includes("alginato") || lower.includes("alginate")) return TEMPERATURE_PROFILES.find(p => p.bioinkType.toLowerCase().includes("alginato")) ?? TEMPERATURE_PROFILES[0]
-  if (lower.includes("colágeno") || lower.includes("colageno") || lower.includes("collagen")) return TEMPERATURE_PROFILES.find(p => p.bioinkType.toLowerCase().includes("colágeno")) ?? TEMPERATURE_PROFILES[0]
-  if (lower.includes("fibrin")) return TEMPERATURE_PROFILES.find(p => p.bioinkType.toLowerCase().includes("fibrina")) ?? TEMPERATURE_PROFILES[0]
-  if (lower.includes("pegda") || lower.includes("pegma")) return TEMPERATURE_PROFILES.find(p => p.bioinkType.toLowerCase().includes("pegda")) ?? TEMPERATURE_PROFILES[0]
-  if (lower.includes("decm")) return TEMPERATURE_PROFILES.find(p => p.bioinkType.toLowerCase().includes("decm")) ?? TEMPERATURE_PROFILES[0]
-  if (lower.includes("pluronic")) return TEMPERATURE_PROFILES.find(p => p.bioinkType.toLowerCase().includes("pluronic")) ?? TEMPERATURE_PROFILES[0]
-  return TEMPERATURE_PROFILES[0]
-}
-
-// Heurística de algoritmo recomendado baseado em categoria do modelo + tipo celular
-function recommendAlgorithm(category: string | null, hasCells: boolean): EngineAlgorithm {
-  if (category === "rigid-tissue") return "gyroid_tpms"
-  if (category === "biomimetic-tpms") return "gyroid_tpms"
-  if (category === "organoid-vascular") return "voronoi_3d"
-  if (category === "printability-test") return "rectilinear"
-  if (category === "soft-tissue" && hasCells) return "gradient"
-  return "gyroid_tpms"
-}
-
-// ─── R12.22: Mapeamento direto pattern (UI) → algorithm (engine) ─────────────
-// Antes existiam DOIS seletores (Algoritmo + Padrão BIA/Clássico) e o usuário
-// podia escolher combinações conflitantes. Agora o algoritmo é DERIVADO do
-// padrão escolhido (família + id) — uma única decisão.
-const PATTERN_TO_ALGORITHM: Record<string, EngineAlgorithm> = {
-  // Biomédico (BIA) — escolhas que mapeiam a algoritmos do engine
-  "parallel-lines":       "linear",
-  "sacrificial-vascular": "voronoi_2d",
-  "hex-macropores":       "honeycomb",
-  "gradient-micropores":  "gradient",
-  "zonal-multimaterial":  "gradient",
-  "embedded-spheroids":   "voronoi_3d",
-  "freeform-suspension":  "perlin_noise",
-  // Clássico (slicer)
-  "classic-lines":         "linear",
-  "classic-grid":          "rectilinear",
-  "classic-triangular":    "rectilinear",
-  "classic-trihexagon":    "honeycomb",
-  "classic-cubic":         "rectilinear",
-  "classic-octet":         "honeycomb",
-  "classic-concentric":    "concentric",
-  "classic-zigzag":        "rectilinear",
-  "classic-wave":          "perlin_noise",
-  "classic-crosshatch":    "rectilinear",
-  "classic-gyroid-light":  "gyroid_tpms",
-}
-
-function patternToAlgorithm(
-  patternId: string,
-  category: string | null,
-  hasCells: boolean,
-): EngineAlgorithm {
-  return PATTERN_TO_ALGORITHM[patternId] ?? recommendAlgorithm(category, hasCells)
-}
-
-// ─── Tipo do resultado do engine ────────────────────────────────────────────
-interface GCodeResponse {
-  success: boolean
-  jobName: string
-  jobId: string
-  gcode: string
-  totalLines?: number
-  estimatedTime_min: number
-  bioinkVolume_uL: number
-  layerCount: number
-  wellsUsed?: string[]
-  warnings?: string[]
-  stats?: {
-    viabilityEstimate_pct?: number
-    shearStressMax_Pa?: number
-    totalMoves?: number
-  }
-  summary?: {
-    bioprinter: string
-    bioink: string
-    algorithm: string
-    wellsCount: number
-    layerCount: number
-    estimatedTime: string
-    volume: string
-    viability: string
-  }
-  creditsUsed: number
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// COMPONENTE PRINCIPAL
-// ═══════════════════════════════════════════════════════════════════════════
-export default function BioprintSlicePage() {
+export default function BioSlicerPage() {
   const { state, updateSlice } = useBioprintProcess()
-
-  // Pré-requisitos
+  // R20: BioSlicer É a Etapa 3. Não bloqueia — avisa se Etapa 1/2 não estão prontas.
   const modelReady = state.model.status === "ready"
-  // R12.10: usa isBioinkReady (verifica formulations[] OU legacy material)
-  const bioinkReady = isBioinkReady(state.bioink)
-  const isUnlocked = modelReady && bioinkReady
+  const bioinkReady = state.bioink.status === "ready"
 
-  // ── Tab atual (params é o padrão; tissue é OPCIONAL/avançado) ──
-  const [tab, setTab] = useState<"tissue" | "params" | "wells" | "gcode">("params")
+  const [mesh, setMesh] = useState<TriMesh | null>(null)
+  const [meshSource, setMeshSource] = useState<string>("")
+  const [stored, setStored] = useState<Array<{ id: string; name: string; sizeKb: number; source: string }>>([])
+  const fileRef = useRef<HTMLInputElement>(null)
 
-  // ── R12.55: modo Básico (default) vs Avançado (gated) ─────────────────
-  // Básico = quick-gcode síncrono (<100ms) + geometrias 3D simples + validador estático
-  // Avançado = engine.ts (Motor A) — geometrias anatômicas + TPMS (experimental, 45s timeout)
-  const [sliceMode, setSliceMode] = useState<"basic" | "advanced">(() => {
-    const cls = state.model.geometryId ? classifyGeometry(state.model.geometryId) : "unknown"
-    // Se a geometria escolhida em /model é anatômica/TPMS, entra direto em Avançado.
-    // Caso contrário, mantém o padrão Básico (recomendado).
-    return cls === "advanced" ? "advanced" : "basic"
-  })
+  const [mode, setMode] = useState<Mode>("basic")
+  const [profile, setProfile] = useState<SliceProfile>(BASIC_PROFILES[0])
+  const [P, setP] = useState<SliceParams>({ ...BASIC_PROFILES[0].params })
+  const [X, setX] = useState<ExtrusionModel>({ ...BASIC_PROFILES[0].extrusion })
+  const [rheology, setRheology] = useState<Rheo | undefined>({ viscosity_PaS: 2 })
 
-  // ── TissueDesigner (R10) ─ perfil biomimético inteligente ──
-  const [tissueDesign, setTissueDesign] = useState<TissueDesignerValue>({
-    profileId: null,
-    pattern: null,
-  })
+  const [intentText, setIntentText] = useState("")
+  const [intent, setIntent] = useState<IntentResult | null>(null)
+  const [listening, setListening] = useState(false)
+  const recRef = useRef<{ stop: () => void } | null>(null)
 
-  // ── Parâmetros do slicer ──
-  // R12.47: default mudou de cellink_biox → bioender_bioedtech porque é a
-  // impressora real que os usuários BIA têm em mãos (BioEnder = Marlin/Klipper
-  // 200×200×200 mm, baud 115200, USB Web Serial direto). O CELLINK BIO X
-  // continua disponível no seletor para quem usar essa máquina, mas o default
-  // agora corresponde ao hardware que a Bia e demais bioedutech têm.
-  const [bioprinterId, setBioprinterId] = useState<string>("bioender_bioedtech")
+  const [result, setResult] = useState<SliceResult | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  // Recomendar perfil térmico baseado na biotinta
-  const recommendedProfile = useMemo(() => pickTempProfile(state.bioink.material), [state.bioink.material])
+  // R20: alvo + cabeçotes + confirmação + cobrança
+  const [target, setTarget] = useState<PrintTarget>(DEFAULT_TARGET)
+  const [tools, setTools] = useState<ToolsConfig>(() => singleTool(BASIC_PROFILES[0].extrusion, "Biotinta"))
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [charged, setCharged] = useState<null | { ok: boolean; msg: string }>(null)
+  const TARGET_KEY = "bia:slicer-target"
+  useEffect(() => { try { const raw = sessionStorage.getItem(TARGET_KEY); if (raw) setTarget(JSON.parse(raw)) } catch { /* noop */ } }, [])
+  useEffect(() => { try { sessionStorage.setItem(TARGET_KEY, JSON.stringify(target)) } catch { /* noop */ } }, [target])
 
-  const [layerHeightMm, setLayerHeightMm] = useState<number>(state.slice.layerHeightMm ?? 0.25)
-  const [printSpeedMmS, setPrintSpeedMmS] = useState<number>(state.slice.printSpeedMmS ?? 8)
-  const [pressureKPa, setPressureKPa] = useState<number>(state.slice.pressureKPa ?? 80)
-  /** R12.11: Pressão pode ser desabilitada (printers FDM puros não usam) */
-  const [pressureEnabled, setPressureEnabled] = useState<boolean>(true)
-  /**
-   * R12.11: Multiplicador de extrusão (flow rate, equivalente ao 'Flow' do Cura).
-   * R17: Default 1.0 (teoria volumétrica). ANTES era 0.6 e, somado ao
-   * M221 S50 do /execute, o fluxo real saía em ~30 % → "não sai biotinta".
-   * O ajuste fino agora é feito em TEMPO REAL no /execute (M221 começa
-   * ≥ 100 % e a BIA lembra o valor que funcionou por biotinta).
-   */
-  const [extrusionMultiplier, setExtrusionMultiplier] = useState<number>(
-    state.slice.extrusionMultiplier ?? 1.0,
-  )
-  const [nozzleDiameterUm, setNozzleDiameterUm] = useState<number>(state.slice.nozzleDiameterUm ?? 410)
-  const [infillPercent, setInfillPercent] = useState<number>(state.slice.infillPercent ?? 30)
-  const [infillPatternId, setInfillPatternId] = useState<string>(state.slice.infillPatternId ?? INFILL_PATTERNS[0].id)
-  /** R12.11: Família do padrão de infill — biomédico (BIA) ou clássico (Cura-style) */
-  const [infillFamily, setInfillFamily] = useState<"biomedical" | "classic">("biomedical")
-
-  /**
-   * R12.36: Modo "Apenas Contorno" (perimeter-only).
-   * Quando true, força infillPercent=0 e desabilita seletor de padrão.
-   * Engine emite só os walls (perímetros) — não tenta gerar infill, evitando
-   * G-code inválido em geometrias de teste sem volume interno (linhas, grade,
-   * pontes, torres, escadas, leque de ângulos, fidelidade da biotinta).
-   * Auto-ativa para geometrias da lista PERIMETER_ONLY_GEOMETRY_IDS.
-   */
-  const [perimeterOnly, setPerimeterOnly] = useState<boolean>(() => {
-    if (state.slice.perimeterOnly !== null && state.slice.perimeterOnly !== undefined) {
-      return state.slice.perimeterOnly
-    }
-    return state.model.geometryId ? isPerimeterOnlyGeometry(state.model.geometryId) : false
-  })
-
-  /** R12.36: Geometria atual é forçadamente perimeter-only (não pode desligar)? */
-  const isGeometryForciblyPerimeterOnly = useMemo(
-    () => state.model.geometryId ? isPerimeterOnlyGeometry(state.model.geometryId) : false,
-    [state.model.geometryId],
-  )
-
-  /**
-   * R12.36: Auto-ativar perimeterOnly quando geometria for de teste de contorno.
-   * Quando o usuário troca de modelo (na Etapa 1) para um teste de printability,
-   * automaticamente ligamos o modo "Apenas Contorno" para que o G-code não
-   * tente gerar infill em uma geometria sem volume.
-   */
+  // biotintas da Etapa 2 → opções para os cabeçotes
+  const bioinkOptions: BioinkOption[] = (state.bioink.formulations?.length ? state.bioink.formulations : []).map((f) => ({
+    label: f.label ?? f.material ?? "Biotinta", materialId: f.materialId ?? undefined, role: f.role,
+  }))
+  if (bioinkOptions.length === 0 && state.bioink.material) bioinkOptions.push({ label: state.bioink.material })
+  // mantém o T0 com a extrusão/biotinta corrente quando há 1 cabeçote
   useEffect(() => {
-    if (isGeometryForciblyPerimeterOnly && !perimeterOnly) {
-      setPerimeterOnly(true)
-    }
+    setTools((t) => t.heads.length === 1 ? { ...t, heads: [{ ...t.heads[0], extrusion: X, label: bioinkOptions[0]?.label ?? t.heads[0].label, materialId: bioinkOptions[0]?.materialId }] } : t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isGeometryForciblyPerimeterOnly])
+  }, [X, state.bioink.material, state.bioink.formulations?.length])
 
-  /**
-   * R12.22: O algorithm é DERIVADO automaticamente do padrão escolhido (família +
-   * id) em vez de ser uma escolha independente. Isso elimina o conflito anterior
-   * entre o seletor "Algoritmo de preenchimento" e o seletor "Biomédico/Clássico"
-   * (que podiam apontar para coisas incompatíveis). Uma única decisão do usuário.
-   */
-  const algorithm: EngineAlgorithm = useMemo(
-    () => patternToAlgorithm(infillPatternId, state.model.category, !!state.bioink.cellType),
-    [infillPatternId, state.model.category, state.bioink.cellType],
-  )
-  const [walls, setWalls] = useState<number>(2)
-  // R19: skirt DESLIGADO por padrão — só com a caixa marcada (a purga é feita na Etapa 4)
-  const [skirtLoops, setSkirtLoops] = useState<number>(state.slice.skirtLoops ?? 0)
-  const [retractionMm, setRetractionMm] = useState<number>(state.slice.retractionMm ?? 0)
-  /** R12.11: Controle térmico pode ser desabilitado (impressão à temp. ambiente) */
-  const [temperatureEnabled, setTemperatureEnabled] = useState<boolean>(true)
-
-  // Temperaturas — sugestão automática do perfil mas editável
-  const [cartridgeTempC, setCartridgeTempC] = useState<number>(
-    state.slice.cartridgeTempC ?? recommendedProfile.cartridgeTempC.ideal
-  )
-  const [bedTempC, setBedTempC] = useState<number>(
-    state.slice.bedTempC ?? recommendedProfile.bedTempC.ideal
-  )
-  const [chamberTempC, setChamberTempC] = useState<number>(
-    state.slice.chamberTempC ?? recommendedProfile.chamberTempC.ideal
-  )
-
-  // ─── R12.54: Tecido alvo (Onda 1) ───────────────────────────────────────
-  // tissueId começa inferido pela geometria (membrane→membrana, vessel→vaso,
-  // heart→musculo...) mas o usuário pode mudar via dropdown no card.
-  // Quando vazio, o card vira modo "sem preset" mas ainda permite override.
-  const inferredTissueId = useMemo(
-    () => inferTissueFromGeometry(state.model.geometryId),
-    [state.model.geometryId],
-  )
-  const [tissueId, setTissueId] = useState<string>(inferredTissueId ?? "membrana")
-
-  // Quando a geometria muda na Etapa 1, atualizar tissueId se ele tinha sido
-  // inferido (não sobrescreve escolha manual feita pelo usuário antes)
-  useEffect(() => {
-    if (inferredTissueId && inferredTissueId !== tissueId) {
-      setTissueId(inferredTissueId)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inferredTissueId])
-
-  // Bioink ID: vem do formulations[0].materialId (R12.10) com fallback
-  // pra material legacy do bioink step
-  const currentBioinkId = useMemo<string>(() => {
-    const first = state.bioink.formulations?.[0]
-    if (first?.materialId) return first.materialId
-    // Fallback: tenta mapear material legacy → id padronizado
-    const mat = (state.bioink.material ?? "").toLowerCase()
-    if (mat.includes("gelma")) return "gelma"
-    if (mat.includes("algin")) return "alginate"
-    if (mat.includes("colág") || mat.includes("collagen")) return "collagen_I"
-    if (mat.includes("fibrin")) return "fibrinogen"
-    return "alginate"  // fallback seguro
-  }, [state.bioink.formulations, state.bioink.material])
-
-  // currentParams: snapshot de todos os parâmetros atuais — entrada
-  // controlada do TissueRecommendationCard. Sempre que QUALQUER um dos
-  // setters acima for chamado, esse objeto é recalculado.
-  const currentParams = useMemo<PresetParams>(() => ({
-    layerHeightMm,
-    printSpeedMmS,
-    pressureKPa,
-    flowPercent: Math.round(extrusionMultiplier * 100),
-    infillPercent,
-    infillPatternId,
-    walls,
-    skirtLoops,
-    retractionMm,
-    cartridgeTempC,
-    bedTempC,
-    chamberTempC: temperatureEnabled ? chamberTempC : null,
-    perimeterOnly,
-  }), [
-    layerHeightMm, printSpeedMmS, pressureKPa, extrusionMultiplier,
-    infillPercent, infillPatternId, walls, skirtLoops, retractionMm,
-    cartridgeTempC, bedTempC, chamberTempC, temperatureEnabled, perimeterOnly,
-  ])
-
-  // handleApplyParams: callback do card. Aplica TODOS os parâmetros nos
-  // setters individuais existentes. Não dispara fetch de G-code — o usuário
-  // ainda precisa clicar no botão "Gerar G-code" depois (ou em alguns casos
-  // o próprio card chama isso depois de aplicar).
-  const handleApplyParams = useCallback((params: PresetParams) => {
-    setLayerHeightMm(params.layerHeightMm)
-    setPrintSpeedMmS(params.printSpeedMmS)
-    setPressureKPa(params.pressureKPa)
-    setExtrusionMultiplier(params.flowPercent / 100)
-    setInfillPercent(params.infillPercent)
-    setInfillPatternId(params.infillPatternId)
-    // Família do padrão é derivada do id
-    if (params.infillPatternId.startsWith("classic-")) {
-      setInfillFamily("classic")
-    } else {
-      setInfillFamily("biomedical")
-    }
-    setWalls(params.walls)
-    setSkirtLoops(params.skirtLoops)
-    setRetractionMm(params.retractionMm)
-    setCartridgeTempC(params.cartridgeTempC)
-    setBedTempC(params.bedTempC)
-    if (params.chamberTempC !== null) {
-      setChamberTempC(params.chamberTempC)
-      setTemperatureEnabled(true)
-    }
-    setPerimeterOnly(params.perimeterOnly)
+  const refreshStored = useCallback(async () => {
+    try { setStored((await listMeshes()).map((m) => ({ id: m.id, name: m.name, sizeKb: m.sizeKb, source: m.source }))) } catch { /* noop */ }
   }, [])
 
-  // ── Multi-poço (opcional) ──
-  const [useMultiWell, setUseMultiWell] = useState<boolean>(false)
-  const [plateFormat, setPlateFormat] = useState<6 | 12 | 24 | 48 | 96 | 384>(24)
-  const [selectedWells, setSelectedWells] = useState<string[]>(["A1"])
-  const [zHopBetweenWellsMm, setZHopBetweenWellsMm] = useState<number>(5)
-  const [pauseBetweenWellsS, setPauseBetweenWellsS] = useState<number>(2)
-  const [purgeVolumeUL, setPurgeVolumeUL] = useState<number>(1)
-
-  // ── Estado de geração ──
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<{ message: string; details?: string; suggestions?: string[] } | null>(null)
-  const [result, setResult] = useState<GCodeResponse | null>(
-    state.slice.gcode
-      ? {
-          success: true,
-          jobName: "biprint_local",
-          jobId: "cached",
-          gcode: state.slice.gcode,
-          estimatedTime_min: state.slice.estimate?.estimatedTimeMin ?? 0,
-          bioinkVolume_uL: (state.slice.estimate?.estimatedVolumeMl ?? 0) * 1000,
-          layerCount: state.slice.estimate?.totalLayers ?? 0,
-          creditsUsed: 0,
-        }
-      : null
-  )
-
-  // ── Preview do bioprinter selecionado ──
-  const currentPrinter = useMemo(() => getBioprinterById(bioprinterId), [bioprinterId])
-
-  // Quando o material muda no state.bioink, ajustar perfil de temperatura sugerido
   useEffect(() => {
-    setCartridgeTempC(recommendedProfile.cartridgeTempC.ideal)
-    setBedTempC(recommendedProfile.bedTempC.ideal)
-    setChamberTempC(recommendedProfile.chamberTempC.ideal)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.bioink.material])
-
-  /**
-   * R12.63 — Auto-preset de flow multiplier por material.
-   * Se a usuária escolher Nivea na Etapa 2, aplicamos 0.4× automaticamente
-   * (a menos que ela já tenha ajustado manualmente antes). Isso porque o
-   * Nivea é menos viscoso que biotintas típicas, então precisa de MENOS
-   * extrusão pra evitar over-extrusion. Ver
-   * `FLOW_MULTIPLIER_BY_MATERIAL` em biomaterials.ts.
-   */
-  useEffect(() => {
-    const mat = (state.bioink.material ?? "").toLowerCase()
-    // Detecta Nivea (id "nivea_cream" ou nome contendo "nivea")
-    const isNivea = mat.includes("nivea")
-    // Só auto-aplica se o context ainda não tem valor persistido —
-    // respeita override manual da usuária.
-    if (isNivea && state.slice.extrusionMultiplier === null) {
-      setExtrusionMultiplier(0.4)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.bioink.material])
-
-  // Persistir parâmetros no context (sem o gcode, que é separado)
-  useEffect(() => {
-    if (!isUnlocked) return
-    updateSlice({
-      // status só vira "ready" quando G-code é gerado com sucesso
-      status: result ? "ready" : "draft",
-      layerHeightMm,
-      printSpeedMmS,
-      pressureKPa,
-      nozzleDiameterUm,
-      infillPatternId,
-      infillPercent,
-      perimeterOnly,
-      cartridgeTempC,
-      bedTempC,
-      chamberTempC,
-      skirtLoops,
-      retractionMm,
-      // R12.62: persiste multiplicador de extrusão pra /execute reemitir M221
-      extrusionMultiplier,
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    isUnlocked,
-    layerHeightMm, printSpeedMmS, pressureKPa, nozzleDiameterUm,
-    infillPatternId, infillPercent, perimeterOnly,
-    cartridgeTempC, bedTempC, chamberTempC,
-    skirtLoops, retractionMm, extrusionMultiplier, result,
-  ])
-
-  // ── Helper: gera lista de sugestões contextuais quando há falha ──
-  const buildSuggestions = useCallback((reason: "geometry-unsupported" | "validation" | "engine" | "timeout" | "auth"): string[] => {
-    const out: string[] = []
-    const gid = state.model.geometryId ?? ""
-
-    if (reason === "geometry-unsupported") {
-      out.push(
-        `A geometria "${gid}" ainda não tem caminho 3D otimizado no engine BIA. Use uma das geometrias com suporte completo:`,
-        "• disk (Ø10mm × 3mm) — teste rápido de printabilidade",
-        "• membrane (30×30×2 mm) — pele/derme",
-        "• cube_tissue (20×20×10 mm) — bloco de tecido",
-        "• tpms_gyroid (20×20×20 mm) — scaffold ósseo",
-        "• organoid_sphere (Ø10mm) — organoide",
-      )
-      return out
-    }
-
-    if (reason === "validation") {
-      out.push(
-        "Algum parâmetro está fora da faixa aceita. Verifique:",
-        `• Layer height entre 0.05 e 1.0 mm (atual: ${layerHeightMm})`,
-        `• Pressão entre 5 e 700 kPa (atual: ${pressureKPa})`,
-        `• Speed entre 1 e 50 mm/s (atual: ${printSpeedMmS})`,
-        `• Nozzle entre 100 e 1500 µm (atual: ${nozzleDiameterUm})`,
-        `• Infill entre 0 e 100% (atual: ${infillPercent})`,
-      )
-      return out
-    }
-
-    if (reason === "timeout") {
-      out.push(
-        "A geração demorou mais que 45 segundos — provavelmente a geometria está muito grande ou complexa.",
-        "Tente reduzir os parâmetros:",
-        "• Diminua o tamanho do modelo na Etapa 1 (ex: TPMS 20×20×20 → 10×10×10 mm)",
-        "• Aumente layer height (ex: 0.25 → 0.40 mm) — reduz nº de camadas",
-        "• Reduza infill (ex: 30% → 15%)",
-        "• Para Voronoi 3D em construtos > 30mm, prefira gyroid_tpms (mais rápido)",
-      )
-      return out
-    }
-
-    if (reason === "auth") {
-      out.push(
-        "Sessão expirou ou créditos insuficientes (6 créditos por geração).",
-        "• Faça login novamente",
-        "• Verifique seus créditos em /dashboard/billing",
-      )
-      return out
-    }
-
-    // engine error genérico — sugestões baseadas em contexto
-    out.push("Algumas dicas para a próxima tentativa:")
-    if (state.bioink.cellType && pressureKPa > 100) {
-      out.push(`⚠️ Pressão ${pressureKPa} kPa é alta para células vivas. Reduza para 30–80 kPa.`)
-    }
-    if (nozzleDiameterUm < 250 && state.bioink.cellType) {
-      out.push(`⚠️ Bico ${nozzleDiameterUm}µm muito fino para células. Use 410µm (22G) ou 580µm (20G).`)
-    }
-    if (printSpeedMmS > 20 && state.bioink.cellType) {
-      out.push(`⚠️ Speed ${printSpeedMmS}mm/s alto para células. Use 5–10 mm/s.`)
-    }
-    if (layerHeightMm > nozzleDiameterUm / 1000 * 0.8) {
-      out.push(`⚠️ Layer height ${layerHeightMm}mm > 80% do bico. Use ${(nozzleDiameterUm / 1000 * 0.5).toFixed(2)} mm.`)
-    }
-    if (useMultiWell && selectedWells.length === 0) {
-      out.push("⚠️ Multi-poço ativado mas nenhum poço selecionado. Vá na tab Multi-poço.")
-    }
-    // R12.36: warnings de infill só fazem sentido quando NÃO está em modo contorno
-    if (!perimeterOnly && algorithm === "voronoi_3d" && infillPercent > 50) {
-      out.push("⚠️ Voronoi 3D com infill > 50% gera trabéculas muito densas. Tente 25–40%.")
-    }
-    if (perimeterOnly) {
-      out.push("ℹ️ Modo 'Apenas Contorno' ativo: G-code emite só perímetros (walls), sem preenchimento.")
-    }
-    if (out.length === 1) {
-      // nenhum aviso específico — sugestão padrão segura
-      out.push(
-        "• Tente o algoritmo padrão: gyroid_tpms com infill 30%, layer 0.25mm, speed 8mm/s",
-        "• Use um modelo simples (disk Ø10mm × 3mm) para validar antes",
-        "• Verifique que sua geometria está entre as 20 suportadas pelo engine",
-      )
-    }
-    return out
-  }, [
-    state.model.geometryId, state.bioink.cellType, layerHeightMm, pressureKPa,
-    printSpeedMmS, nozzleDiameterUm, infillPercent, useMultiWell,
-    selectedWells.length, algorithm, perimeterOnly,
-  ])
-
-  // ── Geração de G-code ──
-  const generateGCode = useCallback(async () => {
-    if (!isUnlocked) {
-      setError({ message: "Complete as etapas 1 (Modelo) e 2 (Biotinta) antes de gerar G-code." })
-      return
-    }
-    if (!state.model.geometryId) {
-      setError({
-        message: "Modelo 3D não tem geometryId — verifique a Etapa 1.",
-        suggestions: ["Volte para /dashboard/bioprint/model e selecione/gere um modelo válido."],
-      })
-      return
-    }
-
-    // Pré-check: geometria está mapeada no engine de bounds?
-    if (!(SUPPORTED_GEOMETRY_IDS as readonly string[]).includes(state.model.geometryId)) {
-      setError({
-        message: `A geometria "${state.model.geometryId}" não tem caminho 3D otimizado.`,
-        details: "Engine vai usar um fallback genérico (disk Ø20mm × 5mm), o que pode não representar fielmente o modelo.",
-        suggestions: buildSuggestions("geometry-unsupported"),
-      })
-      // Não bloqueia — apenas avisa. Continua se usuário insistir.
-    }
-
-    setLoading(true)
-    setError(null)
-    setResult(null)
-
-    // AbortController para timeout
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), GCODE_TIMEOUT_MS)
-
-    try {
-      // ─ Geometry: id + params do state.model ─
-      const geomParams: Record<string, number> = {}
-      if (state.model.params) {
-        for (const [k, v] of Object.entries(state.model.params)) {
-          if (typeof v === "number") geomParams[k] = v
-        }
-      }
-
-      // ─ Bioink payload (formato esperado pelo /api/gcode/generate) ─
-      const bioinkPayload = {
-        material: state.bioink.material ?? "Custom",
-        concentration: state.bioink.concentration ?? 5,
-        hasCells: !!state.bioink.cellType,
-        cellDensity: state.bioink.cellDensityMillionMl ?? undefined,
-        viscosity_cP: state.bioink.rheology?.viscosityPaS
-          ? state.bioink.rheology.viscosityPaS * 1000  // Pa·s → cP
-          : 1500,
-        crosslinker: state.bioink.crosslinker ?? undefined,
-        temperature_c: cartridgeTempC,
-        pressure_kpa: pressureKPa,
-        shearStressMax_Pa: 50,
-        nozzleDiameter_um: nozzleDiameterUm,
-        // R12.62: BUGFIX — antes hardcoded em 1.0, ignorando o slider da UI.
-        // Agora respeita o valor escolhido pela usuária (default 0.6 para
-        // biotintas viscosas; ver comentário no useState acima).
-        flowMultiplier: extrusionMultiplier,
-        retraction_mm: retractionMm,
-        printSpeed_mms: printSpeedMmS,
-        travelSpeed_mms: 50,
-      }
-
-      // ─ WellPlate (opcional) ─
-      const wellPlatePayload = useMultiWell
-        ? {
-            format: plateFormat,
-            selectedWells,
-            replicationMode: "same" as const,
-            zHopBetweenWells_mm: zHopBetweenWellsMm,
-            pauseBetweenWells_s: pauseBetweenWellsS,
-            purgeVolume_uL: purgeVolumeUL,
-            wipeTowerEnabled: false,
-          }
-        : undefined
-
-      /**
-       * R12.36: Em modo "Apenas Contorno", FORÇA infillPercent=0 — o engine
-       * (src/lib/gcode/engine.ts linha 374: `if (job.infillPercent > 0)`)
-       * pula totalmente a geração de infill e emite só perímetros (walls),
-       * evitando G-code inválido em geometrias sem volume interno.
-       * Mantemos `algorithm` apenas para satisfazer o Zod schema (não será
-       * usado pelo engine quando infillPercent=0).
-       */
-      const effectiveInfillPercent = perimeterOnly ? 0 : infillPercent
-      // Garante walls >= 1 em modo contorno (não faz sentido perimeter-only com 0 walls)
-      const effectiveWalls = perimeterOnly ? Math.max(1, walls) : walls
-
-      const body = {
-        geometry: { id: state.model.geometryId, params: geomParams },
-        infill: {
-          algorithm,
-          infillPercent: effectiveInfillPercent,
-          // Sem macroPorosity em modo contorno — não há volume interno para porosidade
-          ...(perimeterOnly ? {} : {
-            macroPorosity: {
-              density: 1 - infillPercent / 100,
-              poreSize_um: 450,
-            },
-          }),
-        },
-        bioink: bioinkPayload,
-        bioprinterId,
-        layerHeight_mm: layerHeightMm,
-        walls: effectiveWalls,
-        skirtLoops,
-        wellPlate: wellPlatePayload,
-        tissue: state.model.category ?? "tecido",
-        application: "scaffold",
-        jobName: perimeterOnly
-          ? `bia_${state.model.geometryId}_perimeter-only`
-          : `bia_${state.model.geometryId}_${algorithm}`,
-      }
-
-      const res = await fetch("/api/gcode/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      })
-      clearTimeout(timeoutId)
-
-      let data: { error?: string; details?: unknown; gcode?: string; layerCount?: number; estimatedTime_min?: number; bioinkVolume_uL?: number; success?: boolean } & Partial<GCodeResponse>
+    (async () => {
+      await refreshStored()
       try {
-        data = await res.json()
-      } catch {
-        throw new Error("Resposta do servidor inválida (não-JSON). Engine pode ter caído — tente novamente em 30 segundos.")
-      }
-
-      if (!res.ok) {
-        // Auth/credits
-        if (res.status === 401) {
-          setError({
-            message: "Não autenticado — sessão expirou.",
-            suggestions: buildSuggestions("auth"),
-          })
-          return
+        const last = getLastMeshId()
+        if (last) {
+          const m = await getMesh(last)
+          if (m) { setMesh(parseSTL(m.bytes, m.name)); setMeshSource(`${m.source}: ${m.name}`) }
         }
-        if (res.status === 402 || (data.error || "").toLowerCase().includes("crédito")) {
-          setError({
-            message: data.error || "Créditos insuficientes (6 por geração).",
-            suggestions: buildSuggestions("auth"),
-          })
-          return
-        }
-        // Validação Zod
-        if (res.status === 400 && data.details) {
-          setError({
-            message: data.error || "Dados inválidos enviados ao engine.",
-            details: typeof data.details === "object"
-              ? JSON.stringify(data.details, null, 2).slice(0, 500)
-              : String(data.details).slice(0, 500),
-            suggestions: buildSuggestions("validation"),
-          })
-          return
-        }
-        // Erro do engine (5xx ou outro 4xx)
-        setError({
-          message: data.error || `Erro ${res.status} do engine`,
-          suggestions: buildSuggestions("engine"),
-        })
-        return
-      }
+      } catch { /* noop */ }
+    })()
+  }, [refreshStored])
 
-      // Sanity check do resultado
-      if (!data.gcode || (data.layerCount ?? 0) === 0) {
-        setError({
-          message: "Engine retornou G-code vazio ou sem camadas.",
-          details: `O motor calculou ${data.layerCount ?? 0} camadas para a geometria "${state.model.geometryId}". Isso normalmente indica que a geometria não tem bounds válidos no slicer.`,
-          suggestions: buildSuggestions("geometry-unsupported"),
-        })
-        return
-      }
+  const loadStored = useCallback(async (id: string) => {
+    const m = await getMesh(id)
+    if (m) { setMesh(parseSTL(m.bytes, m.name)); setMeshSource(`${m.source}: ${m.name}`); setResult(null) }
+  }, [])
 
-      setResult(data as GCodeResponse)
-      // Persistir gcode + estimate
-      // R12.53: também persiste bioprinterId pra que /execute saiba qual
-      // filtro USB usar no requestPort (CH340 vs CP210x vs FTDI etc).
-      updateSlice({
-        status: "ready",
-        bioprinterId,
-        gcode: data.gcode ?? null,
-        estimate: {
-          totalLayers: data.layerCount ?? 0,
-          estimatedTimeMin: data.estimatedTime_min ?? 0,
-          estimatedVolumeMl: data.bioinkVolume_uL ? data.bioinkVolume_uL / 1000 : undefined,
-        },
-      })
-      // Pular para tab G-code
-      setTab("gcode")
-    } catch (err) {
-      clearTimeout(timeoutId)
-      // Timeout/abort
-      if (err instanceof Error && err.name === "AbortError") {
-        setError({
-          message: `Geração cancelada — passou de ${GCODE_TIMEOUT_MS / 1000}s.`,
-          details: "O engine pode estar processando uma geometria muito complexa. Veja as sugestões abaixo para simplificar.",
-          suggestions: buildSuggestions("timeout"),
-        })
-        return
+  const onFile = useCallback(async (file: File) => {
+    setError(null)
+    try {
+      const buf = await file.arrayBuffer()
+      const m = parseSTL(buf, file.name)
+      if (m.triangleCount === 0) throw new Error("STL sem triângulos válidos.")
+      setMesh(m); setMeshSource(`upload: ${file.name}`); setResult(null)
+      await putMesh({ id: newMeshId("upload"), name: file.name, bytes: buf, format: "stl", createdAt: Date.now(), source: "upload" })
+      await refreshStored()
+    } catch (e) { setError(e instanceof Error ? e.message : "Falha ao ler STL") }
+  }, [refreshStored])
+
+  const makePrimitive = useCallback(async (id: string, p: Record<string, number>) => {
+    const prim = PRIMITIVE_CATALOG.find((c) => c.id === id)
+    if (!prim) return
+    const m = prim.make(p)
+    setMesh(m); setMeshSource(`primitiva: ${prim.label}`); setResult(null)
+    try {
+      await putMesh({ id: newMeshId("prim"), name: `${m.name}.stl`, bytes: triMeshToSTL(m.vertices, m.triangleCount, `BIA ${prim.label}`), format: "stl", createdAt: Date.now(), source: "primitive", meta: p })
+      await refreshStored()
+    } catch { /* noop */ }
+  }, [refreshStored])
+
+  const applyProfile = useCallback((pf: SliceProfile) => {
+    setProfile(pf)
+    setP({ ...pf.params })
+    setX({ ...pf.extrusion, syringe: pf.extrusion.syringe ? { ...pf.extrusion.syringe } : undefined })
+    setResult(null)
+  }, [])
+
+  const runIntent = useCallback((text: string) => {
+    if (!text.trim()) return
+    const r = parseIntent(text)
+    setIntent(r); setProfile(r.profile); setP({ ...r.params }); setX({ ...r.extrusion })
+    if (r.rheology) setRheology(r.rheology)
+    if (r.profile.tier === "advanced") setMode("advanced")
+    setResult(null)
+  }, [])
+
+  // R16: hint vindo do Laboratório de Biotintas (receita → objetivo + parâmetros iniciais)
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("bia:slicer-hint")
+      if (!raw) return
+      sessionStorage.removeItem("bia:slicer-hint")
+      const h = JSON.parse(raw) as { text?: string; startParams?: { nozzle_mm: number; speed_mms: number; layerHeight_mm: number; flowPercent: number } }
+      if (h.text) { setIntentText(h.text); runIntent(h.text) }
+      if (h.startParams) {
+        const sp = h.startParams
+        setP((p) => ({
+          ...p,
+          nozzleDiameter_mm: sp.nozzle_mm,
+          lineWidth_mm: Math.round(sp.nozzle_mm * 1.15 * 100) / 100,
+          layerHeight_mm: sp.layerHeight_mm,
+          firstLayerHeight_mm: Math.min(p.firstLayerHeight_mm, sp.layerHeight_mm),
+          speedPerimeter_mms: sp.speed_mms,
+          speedInfill_mms: sp.speed_mms,
+          speedFirstLayer_mms: Math.max(1, Math.round(sp.speed_mms * 0.7 * 10) / 10),
+        }))
+        setX((x) => ({ ...x, flowMultiplier: sp.flowPercent / 100 }))
       }
-      const msg = err instanceof Error ? err.message : "Erro inesperado"
-      setError({
-        message: msg,
-        suggestions: buildSuggestions("engine"),
-      })
-    } finally {
-      clearTimeout(timeoutId)
-      setLoading(false)
+    } catch { /* noop */ }
+  }, [runIntent])
+
+  const toggleVoice = useCallback(() => {
+    if (listening) { recRef.current?.stop(); setListening(false); return }
+    const w = window as unknown as { SpeechRecognition?: new () => SR; webkitSpeechRecognition?: new () => SR }
+    const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition
+    if (!Ctor) { setError("Reconhecimento de voz não suportado neste navegador (use Chrome/Edge)."); return }
+    const rec = new Ctor()
+    rec.lang = "pt-BR"; rec.interimResults = true; rec.continuous = false
+    let finalText = ""
+    rec.onresult = (ev) => {
+      let interim = ""
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const t = ev.results[i][0].transcript
+        if (ev.results[i].isFinal) finalText += t; else interim += t
+      }
+      setIntentText(finalText || interim)
     }
-  }, [
-    isUnlocked, state.model, state.bioink, algorithm, infillPercent,
-    bioprinterId, layerHeightMm, walls, skirtLoops, retractionMm,
-    pressureKPa, printSpeedMmS, nozzleDiameterUm, cartridgeTempC,
-    useMultiWell, plateFormat, selectedWells, zHopBetweenWellsMm,
-    pauseBetweenWellsS, purgeVolumeUL, updateSlice, buildSuggestions,
-  ])
+    rec.onend = () => { setListening(false); if (finalText) runIntent(finalText) }
+    rec.onerror = () => setListening(false)
+    recRef.current = rec
+    rec.start()
+    setListening(true)
+  }, [listening, runIntent])
 
-  // ── Download do G-code ──
-  const downloadGCode = useCallback(() => {
-    if (!result?.gcode) return
-    const header = [
-      "; ═══════════════════════════════════════════════════════════",
-      "; BIA · Bioprint Process — G-code",
-      "; ═══════════════════════════════════════════════════════════",
-      `; Modelo: ${state.model.name ?? state.model.geometryId}`,
-      `; Bioink: ${state.bioink.material} ${state.bioink.concentration}%`,
-      state.bioink.cellType
-        ? `; Células: ${state.bioink.cellType} ${state.bioink.cellDensityMillionMl}×10^6/mL`
-        : "; Sem células (scaffold acelular)",
-      `; Bioprinter: ${currentPrinter?.fullName ?? bioprinterId}`,
-      // R12.36: header reflete modo "Apenas Contorno" quando ativo (infill=0)
-      perimeterOnly
-        ? `; Modo: APENAS CONTORNO (perímetros, sem preenchimento) | walls=${walls}`
-        : `; Algoritmo: ${algorithm}  | Infill: ${infillPercent}%`,
-      `; Layer: ${layerHeightMm} mm | Speed: ${printSpeedMmS} mm/s | Pressão: ${pressureKPa} kPa`,
-      `; Temp: cartucho ${cartridgeTempC}°C / bed ${bedTempC}°C / chamber ${chamberTempC}°C`,
-      "; ═══════════════════════════════════════════════════════════",
-      "; ⚠️  ANTES DE INICIAR: faça homing (G28), nivele a mesa e calibre Z-offset",
-      "; ═══════════════════════════════════════════════════════════",
-      "",
-    ].join("\n")
+  const doSlice = useCallback(async () => {
+    if (!mesh) { setError("Carregue um STL ou gere uma primitiva primeiro."); return }
+    setError(null); setBusy("Preparando…")
+    await new Promise((r) => setTimeout(r, 20))
+    try {
+      let params = P
+      if (intent?.targetSize_mm && P.scale === 1) {
+        const bb = mesh.bbox
+        const sx = bb.maxX - bb.minX, sy = bb.maxY - bb.minY, sz = bb.maxZ - bb.minZ
+        const c: number[] = []
+        if (intent.targetSize_mm.x && sx > 0) c.push(intent.targetSize_mm.x / sx)
+        if (intent.targetSize_mm.y && sy > 0) c.push(intent.targetSize_mm.y / sy)
+        if (intent.targetSize_mm.z && sz > 0) c.push(intent.targetSize_mm.z / sz)
+        if (c.length) { params = { ...P, scale: Math.min(...c) }; setP(params) }
+      }
+      const r = sliceMesh({
+        mesh, params, extrusion: X, profileId: profile.id, profileName: profile.name, rheology,
+        jobName: mesh.name ?? "bia-print",
+        target, tools,
+        meta: { geometryId: state.model.geometryId ?? mesh.name ?? "stl", tissue: intent?.tissue ?? state.control.tissueType ?? null, material: intent?.material ?? state.bioink.material ?? null, intent: intentText || null },
+        onProgress: (f, s) => setBusy(`${s} (${Math.round(f * 100)}%)`),
+      })
+      setResult(r)
+      setCharged(null)
+      // R20: cobrança por G-code gerado (6 créditos; admin isento). Sem crédito → não libera download/handoff.
+      try {
+        const res = await fetch("/api/gcode/charge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ summary: {
+          jobName: mesh.name ?? "bia-print", profileId: profile.id, infill: params.infillPattern, infillDensity: params.infillDensity,
+          layerCount: r.stats.layerCount, volume_uL: Math.round(r.stats.volume_uL), time_s: r.stats.estimatedTime_s,
+          target: target.kind, wells: r.stats.wells ?? 1, tools: tools.heads.length, materialIds: tools.heads.map((h) => h.materialId ?? h.label).slice(0, 4),
+          meshName: mesh.name, geometryId: state.model.geometryId ?? undefined, gcodeLines: r.gcode.split("\n").length,
+        } }) })
+        if (res.ok) { const j = await res.json(); setCharged({ ok: true, msg: j.charged ? `${j.charged} créditos debitados` : "sem cobrança (admin)" }) }
+        else if (res.status === 402) { const j = await res.json().catch(() => ({})); setCharged({ ok: false, msg: `Créditos insuficientes (saldo ${j.balance ?? "?"}, necessário ${j.required ?? 6}). Recarregue para baixar/enviar.` }) }
+        else setCharged({ ok: false, msg: "Não foi possível registrar a cobrança. Tente novamente." })
+      } catch { setCharged({ ok: false, msg: "Sem conexão para registrar a cobrança." }) }
+      updateSlice({
+        status: r.warnings.some((w) => w.level === "error") ? "draft" : "ready",
+        gcode: r.gcode,
+        layerHeightMm: params.layerHeight_mm, printSpeedMmS: params.speedPerimeter_mms, nozzleDiameterUm: Math.round(params.nozzleDiameter_mm * 1000),
+        infillPatternId: params.infillPattern, infillPercent: params.infillDensity, skirtLoops: params.skirtLoops,
+        cartridgeTempC: params.cartridgeTemp_C, bedTempC: params.bedTemp_C,
+        estimate: { totalLayers: r.stats.layerCount, estimatedTimeMin: Math.round(r.stats.estimatedTime_s / 60), estimatedVolumeMl: Math.round(r.stats.volume_uL) / 1000 },
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao fatiar")
+    } finally { setBusy(null) }
+  }, [mesh, P, X, profile, rheology, intent, intentText, state, updateSlice, target, tools])
 
-    const blob = new Blob([header + result.gcode], { type: "text/plain" })
-    const url = URL.createObjectURL(blob)
+  const download = useCallback(() => {
+    if (!result) return
+    if (charged && !charged.ok) { setError(charged.msg); return }
+    const blob = new Blob([result.gcode], { type: "text/plain" })
     const a = document.createElement("a")
-    a.href = url
-    a.download = `${result.jobName ?? "bia"}.gcode`
+    a.href = URL.createObjectURL(blob)
+    a.download = `${(mesh?.name ?? "bia").replace(/\.stl$/i, "")}_${profile.id}.gcode`
     a.click()
-    URL.revokeObjectURL(url)
-  }, [result, state.model, state.bioink, currentPrinter, bioprinterId, algorithm, infillPercent, layerHeightMm, printSpeedMmS, pressureKPa, cartridgeTempC, bedTempC, chamberTempC, perimeterOnly, walls])
+    URL.revokeObjectURL(a.href)
+  }, [result, mesh, profile, charged])
+
+  const sendToHost = useCallback(() => {
+    if (!result) return
+    if (charged && !charged.ok) { setError(charged.msg); return }
+    try { sessionStorage.setItem(HANDOFF_KEY, JSON.stringify({ gcode: result.gcode, name: `${mesh?.name ?? "bia"}.gcode`, from: "slicer", syringe: X.syringe ?? null })) } catch { /* noop */ }
+    window.location.href = "/dashboard/bioprint/host"
+  }, [result, mesh, X, charged])
+
+  const sendToStep4 = useCallback(() => {
+    if (!result) return
+    if (charged && !charged.ok) { setError(charged.msg); return }
+    sendToExecute({ gcode: result.gcode, name: `${(mesh?.name ?? "bia").replace(/\.stl$/i, "")}.gcode`, from: "slicer" })
+  }, [result, mesh, charged])
+
+  const meshSize = mesh ? { x: mesh.bbox.maxX - mesh.bbox.minX, y: mesh.bbox.maxY - mesh.bbox.minY, z: mesh.bbox.maxZ - mesh.bbox.minZ } : null
+  const errors = result?.warnings.filter((w) => w.level === "error") ?? []
 
   return (
-    <div className="bia-slice-page flex flex-col min-h-full bg-[#0a0a0f]">
-      {/* Cabeçalho */}
-      <header className="px-4 sm:px-6 py-5 border-b border-white/5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.25em] text-violet-300/80 font-semibold mb-1">
-              Etapa 3 / 4 · Bioimpressão
-            </div>
-            <h1 className="text-lg sm:text-2xl font-bold text-white flex items-center gap-2">
-              <Layers className="w-5 h-5 text-violet-400" />
-              Fatiamento
-            </h1>
-            <p className="text-xs sm:text-sm text-gray-400 mt-1 max-w-2xl">
-              Configure a bioimpressora, padrão de preenchimento, temperaturas e gere o G-code real
-              com cálculo de viabilidade celular e tempo estimado.
-            </p>
-          </div>
-
-          {state.slice.status === "ready" && (
-            <Link
-              href="/dashboard/bioprint/control"
-              className="hidden sm:inline-flex items-center gap-2 px-4 py-2 bg-violet-500/15 hover:bg-violet-500/25
-                border border-violet-500/40 text-violet-200 text-sm font-medium rounded-xl transition-colors"
-            >
-              Continuar para Execução <ArrowRight className="w-4 h-4" />
-            </Link>
-          )}
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.25em] text-emerald-300/80 font-semibold mb-1">Etapa 3 / 4 · Bioimpressão</div>
+          <h2 className="text-xl font-bold flex items-center gap-2"><Layers className="w-5 h-5 text-emerald-300" /> Fatiamento — BioSlicer</h2>
+          <p className="text-sm text-gray-400 mt-1 max-w-3xl">
+            O único fatiador da BIA: STL da Etapa 1, Studio, upload ou primitiva → G-code Marlin/Klipper com extrusão volumétrica por seringa,
+            preenchimentos reais (linhas, grid, triangular, honeycomb, concêntrico, zigzag, gyroid), alvo (Petri/placa de poços) e 1–4 cabeçotes.
+            <b className="text-gray-200"> Ponto zero é ponto zero</b>: o 1º cordão nasce onde o bico está. Sem <code>G28</code>, sem park.
+          </p>
         </div>
-
-        {/* Tabs */}
-        <div className="mt-5 flex gap-1.5 bg-white/3 border border-white/8 rounded-xl p-1 w-fit max-w-full overflow-x-auto">
-          <TabButton label="Parâmetros" icon={Settings2} active={tab === "params"} onClick={() => setTab("params")} />
-          <TabButton label="Tecido (opcional)" icon={Microscope} active={tab === "tissue"} onClick={() => setTab("tissue")} dot={tissueDesign.profileId ? "violet" : null} badge="avançado" />
-          <TabButton label="Multi-poço" icon={Beaker} active={tab === "wells"} onClick={() => setTab("wells")} dot={useMultiWell ? "violet" : null} />
-          <TabButton label="G-code" icon={FileCode2} active={tab === "gcode"} onClick={() => setTab("gcode")} dot={result ? "emerald" : null} />
+        <div className="flex items-center gap-2 text-xs">
+          <ModeToggle mode={mode} onChange={setMode} />
+          <Link href="/dashboard/bioprint/host" className="px-3 py-1.5 rounded-lg border border-white/10 hover:border-emerald-400/40 text-gray-300">Host →</Link>
         </div>
       </header>
 
-      {/* Aviso se etapas anteriores não prontas */}
-      {!isUnlocked && (
-        <div className="mx-4 sm:mx-6 mt-4 rounded-xl bg-amber-500/8 border border-amber-500/30 p-4 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <div className="text-sm font-semibold text-amber-200">
-              {!modelReady && !bioinkReady && "Etapas 1 e 2 ainda não foram concluídas"}
-              {!modelReady && bioinkReady && "Etapa 1 (Modelo 3D) ainda não foi concluída"}
-              {modelReady && !bioinkReady && "Etapa 2 (Biotinta) ainda não foi concluída"}
-            </div>
-            <div className="text-xs text-amber-100/70 mt-0.5">
-              Para gerar G-code é necessário ter o modelo 3D pronto E a biotinta formulada.
-            </div>
+      {(!modelReady || !bioinkReady) && (
+        <div className="rounded-xl bg-amber-500/8 border border-amber-500/30 p-3 flex items-start gap-3 text-xs">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <div className="flex-1 text-amber-100">
+            {!modelReady && !bioinkReady ? "Etapas 1 (Modelo) e 2 (Biotinta) ainda não foram concluídas." : !modelReady ? "Etapa 1 (Modelo 3D) ainda não foi concluída — você pode carregar um STL ou primitiva aqui mesmo." : "Etapa 2 (Biotinta) ainda não foi concluída — os cabeçotes vão usar uma biotinta genérica."}
           </div>
-          <div className="flex flex-col gap-1.5">
-            {!modelReady && (
-              <Link
-                href="/dashboard/bioprint/model"
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-100 whitespace-nowrap"
-              >
-                → Modelo 3D
-              </Link>
-            )}
-            {!bioinkReady && (
-              <Link
-                href="/dashboard/bioprint/bioink"
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-100 whitespace-nowrap"
-              >
-                → Biotinta
-              </Link>
-            )}
+          <div className="flex gap-1.5">
+            {!modelReady && <Link href="/dashboard/bioprint/model" className="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-100 whitespace-nowrap">→ Modelo</Link>}
+            {!bioinkReady && <Link href="/dashboard/bioprint/bioink" className="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-100 whitespace-nowrap">→ Biotinta</Link>}
           </div>
         </div>
       )}
 
-      {/* Contexto resumido (etapas anteriores) */}
-      {isUnlocked && (
-        <div className="mx-4 sm:mx-6 mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="rounded-xl bg-rose-500/5 border border-rose-500/20 px-4 py-3 flex items-center gap-3">
-            <Microscope className="w-4 h-4 text-rose-400 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] uppercase tracking-wider text-rose-300/70 font-semibold">Etapa 1 · Modelo</div>
-              <div className="text-sm text-rose-100 truncate">
-                {state.model.name ?? state.model.geometryId}
-                <span className="text-rose-300/60 text-xs ml-2">
-                  ({state.model.source === "upload" ? "upload" : state.model.source === "generated" ? "gerado" : "IA"})
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="rounded-xl bg-cyan-500/5 border border-cyan-500/20 px-4 py-3 flex items-center gap-3">
-            <Droplets className="w-4 h-4 text-cyan-400 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] uppercase tracking-wider text-cyan-300/70 font-semibold">Etapa 2 · Biotinta</div>
-              <div className="text-sm text-cyan-100 truncate">
-                {state.bioink.material} {state.bioink.concentration}%
-                {state.bioink.cellType && (
-                  <span className="text-cyan-300/60 text-xs ml-2">
-                    + {state.bioink.cellType} {state.bioink.cellDensityMillionMl}×10⁶/mL
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* R12.55: Seletor de modo Básico ↔ Avançado                       */}
-      {/* Básico = pipeline verificado (default). Avançado = experimental. */}
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {isUnlocked && (
-        <div className="mx-4 sm:mx-6 mt-4">
-          {sliceMode === "basic" ? (
-            <div className="rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent p-4">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div className="flex items-start gap-3 min-w-0 flex-1">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center shrink-0">
-                    <Zap className="w-5 h-5 text-emerald-300" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-sm font-bold text-white">⚡ Modo Básico · Pipeline Verificado</h3>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-200 font-semibold border border-emerald-500/30 uppercase tracking-wider">recomendado</span>
-                    </div>
-                    <p className="text-xs text-emerald-100/80 mt-1">
-                      Geometrias 3D simples (cubo, cilindro, disco, patch, tubo) + mistura de biotintas.
-                      G-code síncrono &lt;100ms, validador estático + Nelson 2021 (shear stress).
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setSliceMode("advanced")}
-                  className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 whitespace-nowrap transition-colors"
-                  title="Trocar para o motor experimental (Motor A / engine.ts) com anatômicos e TPMS"
-                >
-                  Ir para Modo Avançado 🧪
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-transparent p-4">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div className="flex items-start gap-3 min-w-0 flex-1">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center shrink-0">
-                    <ShieldAlert className="w-5 h-5 text-amber-300" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-sm font-bold text-white">🧪 Modo Avançado · Experimental</h3>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-200 font-semibold border border-amber-500/30 uppercase tracking-wider">motor A</span>
-                    </div>
-                    <p className="text-xs text-amber-100/80 mt-1">
-                      Anatômicos (femur, coração, rim, ouvido…) + TPMS (gyroid, schwarz, diamond) via engine.ts.
-                      Geração pode levar até 45s e falhar em geometrias complexas.
-                      Use apenas quando o Básico não atende.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setSliceMode("basic")}
-                  className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-100 whitespace-nowrap transition-colors"
-                  title="Voltar ao pipeline verificado (recomendado)"
-                >
-                  Voltar ao Modo Básico ⚡
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Conteúdo da tab */}
-      <main className="flex-1 px-4 sm:px-6 py-6 pb-24">
-
-        {/* ─── R12.55/R12.59: Modo Básico renderiza painel dedicado ─────
-             R12.59: BasicModePanel agora lê geometria e biotinta DIRETAMENTE
-             do contexto (state.model + state.bioink.formulations[]), sem
-             re-perguntar. jobName vira opcional (default = bia_<model>_<geom>). */}
-        {isUnlocked && sliceMode === "basic" && (
-          <div className="max-w-5xl mx-auto">
-            <BasicModePanel
-              jobName={`bia_${state.model.name?.replace(/\W+/g, "_").toLowerCase() ?? "basic"}_${state.model.geometryId ?? "cube"}`}
-              onGcodeGenerated={(gcode, quickResult) => {
-                updateSlice({
-                  status: "ready",
-                  bioprinterId,
-                  gcode,
-                  estimate: {
-                    totalLayers: quickResult.layerCount,
-                    estimatedTimeMin: quickResult.estimatedTime_min,
-                    estimatedVolumeMl: quickResult.bioinkVolume_uL / 1000,
-                  },
-                })
-              }}
-            />
-
-            {/* CTA para próxima etapa quando G-code está pronto */}
-            {state.slice.status === "ready" && state.slice.gcode && (
-              <div className="mt-6 rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 to-transparent p-5 flex items-center justify-between gap-3 flex-wrap">
-                <div>
-                  <div className="text-sm font-bold text-white flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                    G-code pronto para execução
-                  </div>
-                  <div className="text-xs text-violet-200/80 mt-1">
-                    Já pode conectar a bioimpressora e enviar o job.
-                  </div>
-                </div>
-                <Link
-                  href="/dashboard/bioprint/control"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500/20 hover:bg-violet-500/30 border border-violet-500/50 text-violet-100 text-sm font-semibold rounded-xl transition-colors"
-                >
-                  Continuar para Execução <ArrowRight className="w-4 h-4" />
-                </Link>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ─── R12.55: Modo Avançado (ou bloqueado) renderiza tabs originais ─ */}
-        {(!isUnlocked || sliceMode === "advanced") && (
-          <>
-        {tab === "tissue" && (
-          <div className="max-w-5xl mx-auto space-y-5">
-            {/* Banner OPCIONAL — deixa claro que esta etapa não é obrigatória */}
-            <div className="rounded-2xl border border-fuchsia-500/30 bg-gradient-to-br from-fuchsia-500/10 via-violet-500/5 to-transparent p-5">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-fuchsia-500/20 border border-fuchsia-400/30 flex items-center justify-center shrink-0">
-                  <Sparkles className="w-5 h-5 text-fuchsia-300" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <h3 className="text-base font-bold text-white">Designer Inteligente de Tecidos</h3>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-fuchsia-500/20 border border-fuchsia-400/40 text-fuchsia-200">
-                      Etapa opcional · Avançado
-                    </span>
-                  </div>
-                  <p className="text-sm text-fuchsia-100/90 leading-relaxed mb-3">
-                    Você <strong>não precisa</strong> usar esta etapa para gerar o G-code. O tecido-alvo já foi definido
-                    quando você selecionou o modelo (Etapa 1) e formulou a biotinta (Etapa 2). Os parâmetros padrão na aba
-                    <strong className="text-white"> Parâmetros</strong> já consideram o tecido escolhido.
-                  </p>
-                  <p className="text-xs text-fuchsia-100/70 leading-relaxed">
-                    👉 Use o <strong>Designer de Tecidos</strong> se quiser <strong>ajuste fino biomimético</strong>: padrões
-                    inspirados em tecidos nativos (osso trabecular, cartilagem zonal, pele em camadas, vasos perfundíveis,
-                    fígado lobular) com parâmetros otimizados pela literatura científica. Ele <strong>sobrescreve</strong> os
-                    sliders da aba Parâmetros com valores cientificamente validados para o tecido escolhido.
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      onClick={() => setTab("params")}
-                      className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 border border-white/15 text-white inline-flex items-center gap-1.5"
-                    >
-                      ← Voltar para Parâmetros (recomendado)
-                    </button>
-                    <span className="text-[11px] text-fuchsia-200/70 px-2 py-1.5">
-                      ou continue abaixo para usar perfis biomiméticos →
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <TissueDesigner
-              value={tissueDesign}
-              hasCells={!!state.bioink.cellType}
-              onChange={(v) => {
-                setTissueDesign(v)
-                // Auto-aplica os parâmetros do perfil aos sliders clássicos
-                if (v.infillDensity !== undefined) setInfillPercent(v.infillDensity)
-                if (v.nozzleDiameter !== undefined) setNozzleDiameterUm(v.nozzleDiameter)
-                if (v.printSpeed !== undefined) setPrintSpeedMmS(v.printSpeed)
-                if (v.pressure !== undefined) setPressureKPa(v.pressure)
-                if (v.layerHeight !== undefined) setLayerHeightMm(v.layerHeight)
-              }}
-            />
-            {tissueDesign.profileId && (
-              <div className="mt-6 flex items-center justify-between rounded-2xl bg-quantis-purple-500/10 border border-quantis-purple-400/30 p-4">
-                <div className="text-sm text-quantis-lilac-100">
-                  Perfil aplicado. Avance para <strong>Parâmetros</strong> para ajustes finais e depois gere o G-code.
-                </div>
-                <button
-                  onClick={() => setTab("params")}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-quantis-lilac-500 hover:bg-quantis-lilac-400 text-quantis-ink-950 text-sm font-bold rounded-lg transition-colors"
-                >
-                  Continuar <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-        {tab === "params" && (
-          <>
-            {/* R12.54: Card "Recomendado pela BIA" + Painel "Ajustar e Regenerar"
-                Aparece ANTES dos sliders manuais quando há um tecido inferido.
-                Onda 1: membrana / vaso / músculo / nervo. */}
-            {isUnlocked && (
-              <div className="max-w-5xl mx-auto mb-5">
-                <TissueRecommendationCard
-                  tissueId={tissueId}
-                  bioinkId={currentBioinkId}
-                  geometryId={state.model.geometryId}
-                  currentParams={currentParams}
-                  onApplyParams={handleApplyParams}
-                  onTissueChange={setTissueId}
-                />
-              </div>
-            )}
-            <ParamsPanel
-            bioprinterId={bioprinterId} onBioprinterChange={setBioprinterId}
-            currentPrinter={currentPrinter}
-            algorithm={algorithm} /* R12.22: derivado do padrão (sem setter) */
-            layerHeightMm={layerHeightMm} onLayerHeightChange={setLayerHeightMm}
-            printSpeedMmS={printSpeedMmS} onPrintSpeedChange={setPrintSpeedMmS}
-            pressureKPa={pressureKPa} onPressureChange={setPressureKPa}
-            pressureEnabled={pressureEnabled} onPressureEnabledChange={setPressureEnabled}
-            extrusionMultiplier={extrusionMultiplier} onExtrusionMultiplierChange={setExtrusionMultiplier}
-            nozzleDiameterUm={nozzleDiameterUm} onNozzleChange={setNozzleDiameterUm}
-            infillPercent={infillPercent} onInfillChange={setInfillPercent}
-            infillPatternId={infillPatternId} onInfillPatternChange={setInfillPatternId}
-            infillFamily={infillFamily} onInfillFamilyChange={setInfillFamily}
-            perimeterOnly={perimeterOnly} onPerimeterOnlyChange={setPerimeterOnly}
-            perimeterOnlyForced={isGeometryForciblyPerimeterOnly}
-            walls={walls} onWallsChange={setWalls}
-            skirtLoops={skirtLoops} onSkirtLoopsChange={setSkirtLoops}
-            retractionMm={retractionMm} onRetractionChange={setRetractionMm}
-            cartridgeTempC={cartridgeTempC} onCartridgeTempChange={setCartridgeTempC}
-            bedTempC={bedTempC} onBedTempChange={setBedTempC}
-            chamberTempC={chamberTempC} onChamberTempChange={setChamberTempC}
-            temperatureEnabled={temperatureEnabled} onTemperatureEnabledChange={setTemperatureEnabled}
-            recommendedProfile={recommendedProfile}
-            modelCategory={state.model.category}
-            hasCells={!!state.bioink.cellType}
-          />
-          </>
-        )}
-        {tab === "wells" && (
-          <WellsPanel
-            useMultiWell={useMultiWell} onUseMultiWellChange={setUseMultiWell}
-            plateFormat={plateFormat} onPlateFormatChange={setPlateFormat}
-            selectedWells={selectedWells} onSelectedWellsChange={setSelectedWells}
-            zHopBetweenWellsMm={zHopBetweenWellsMm} onZHopChange={setZHopBetweenWellsMm}
-            pauseBetweenWellsS={pauseBetweenWellsS} onPauseChange={setPauseBetweenWellsS}
-            purgeVolumeUL={purgeVolumeUL} onPurgeVolumeChange={setPurgeVolumeUL}
-          />
-        )}
-        {tab === "gcode" && (
-          <div className="space-y-6">
-            {/* PREPARAÇÃO DA BIOIMPRESSORA — conexão USB + joystick (R10) */}
-            <PrinterPrepSection
-              gcode={result?.gcode ?? state.slice.gcode ?? ""}
-              printerName={currentPrinter?.fullName ?? "Bioimpressora BIA"}
-              bioprinterId={bioprinterId}
-            />
-            <GCodePanel
-              loading={loading}
-              error={error}
-              result={result}
-              onGenerate={generateGCode}
-              onDownload={downloadGCode}
-              isUnlocked={isUnlocked}
-              perimeterOnly={perimeterOnly}
-            />
-          </div>
-        )}
-          </>
-        )}
-      </main>
-
-      {/* Rodapé sticky com botão de geração ou CTA de avançar */}
-      <footer className="sticky bottom-0 z-10 bg-[#0a0a0f]/95 backdrop-blur border-t border-violet-500/20 px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm min-w-0">
-          {state.slice.status === "ready" ? (
-            <>
-              <CheckCircle2 className="w-4 h-4 text-violet-400 shrink-0" />
-              <span className="text-violet-300 font-medium shrink-0">G-code:</span>
-              <span className="text-gray-300 truncate">
-                {result?.layerCount ?? state.slice.estimate?.totalLayers} camadas ·
-                {" "}{result?.estimatedTime_min ?? state.slice.estimate?.estimatedTimeMin} min
-                {result?.stats?.viabilityEstimate_pct && ` · viabilidade ${result.stats.viabilityEstimate_pct}%`}
-              </span>
-            </>
-          ) : (
-            <>
-              <Info className="w-4 h-4 text-gray-500 shrink-0" />
-              <span className="text-gray-400 text-xs">
-                {isUnlocked ? "Configure os parâmetros e gere o G-code para avançar" : "Complete as etapas 1 e 2 primeiro"}
-              </span>
-            </>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          {isUnlocked && !state.slice.status.includes("ready") && (
-            <button
-              onClick={generateGCode}
-              disabled={loading || !isUnlocked}
-              className={cn(
-                "inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors",
-                loading || !isUnlocked
-                  ? "bg-white/5 text-gray-500 cursor-not-allowed"
-                  : "bg-violet-500 hover:bg-violet-400 text-violet-950"
-              )}
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-              {loading ? "Gerando…" : "Gerar G-code"}
-            </button>
-          )}
-          {state.slice.status === "ready" && (
-            <>
-              {/* R12.52: rota principal — vai direto pra /execute que tem o
-                  controller serial real. /control é um simulador (só log
-                  virtual, não envia comandos pra impressora) e era pra onde
-                  o link apontava antes, o que travava a impressão real. */}
-              <Link
-                href="/dashboard/bioprint/execute"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-sm font-semibold rounded-lg transition-colors"
-              >
-                Imprimir agora <ArrowRight className="w-4 h-4" />
-              </Link>
-              {/* Mantém acesso ao simulador para quem quer revisar parâmetros
-                  antes de subir pra máquina real. */}
-              <Link
-                href="/dashboard/bioprint/control"
-                className="inline-flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium rounded-lg transition-colors"
-                title="Abrir simulador de controle (não envia para a bioimpressora)"
-              >
-                Simular <ArrowRight className="w-3 h-3" />
-              </Link>
-            </>
-          )}
-        </div>
-      </footer>
-    </div>
-  )
-}
-
-// ─── Tab button ──────────────────────────────────────────────────────────
-function TabButton({
-  label, icon: Icon, active, onClick, dot, badge,
-}: {
-  label: string; icon: typeof Layers; active: boolean; onClick: () => void
-  dot?: "violet" | "emerald" | null
-  badge?: string
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "px-3.5 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap",
-        active
-          ? "bg-violet-500/20 text-violet-200 ring-1 ring-violet-500/40"
-          : "text-gray-400 hover:text-gray-200 hover:bg-white/5"
-      )}
-    >
-      <Icon className="w-4 h-4" />
-      {label}
-      {badge && (
-        <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-fuchsia-500/15 border border-fuchsia-500/30 text-fuchsia-300">
-          {badge}
-        </span>
-      )}
-      {dot && <span className={cn(
-        "w-1.5 h-1.5 rounded-full",
-        dot === "violet" ? "bg-violet-400" : "bg-emerald-400"
-      )} />}
-    </button>
-  )
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// PAINEL A — PARÂMETROS
-// ═══════════════════════════════════════════════════════════════════════════
-interface ParamsProps {
-  bioprinterId: string; onBioprinterChange: (id: string) => void
-  currentPrinter: ReturnType<typeof getBioprinterById>
-  /** R12.22: agora só-leitura — derivado do padrão de infill escolhido. */
-  algorithm: EngineAlgorithm
-  layerHeightMm: number; onLayerHeightChange: (n: number) => void
-  printSpeedMmS: number; onPrintSpeedChange: (n: number) => void
-  pressureKPa: number; onPressureChange: (n: number) => void
-  pressureEnabled: boolean; onPressureEnabledChange: (b: boolean) => void
-  extrusionMultiplier: number; onExtrusionMultiplierChange: (n: number) => void
-  nozzleDiameterUm: number; onNozzleChange: (n: number) => void
-  infillPercent: number; onInfillChange: (n: number) => void
-  infillPatternId: string; onInfillPatternChange: (id: string) => void
-  infillFamily: "biomedical" | "classic"; onInfillFamilyChange: (f: "biomedical" | "classic") => void
-  /** R12.36: modo "Apenas Contorno" — força infillPercent=0, desabilita seletor de padrão */
-  perimeterOnly: boolean; onPerimeterOnlyChange: (b: boolean) => void
-  /** R12.36: geometria atual EXIGE modo contorno (não pode ser desligado) */
-  perimeterOnlyForced: boolean
-  walls: number; onWallsChange: (n: number) => void
-  skirtLoops: number; onSkirtLoopsChange: (n: number) => void
-  retractionMm: number; onRetractionChange: (n: number) => void
-  cartridgeTempC: number; onCartridgeTempChange: (n: number) => void
-  bedTempC: number; onBedTempChange: (n: number) => void
-  chamberTempC: number; onChamberTempChange: (n: number) => void
-  temperatureEnabled: boolean; onTemperatureEnabledChange: (b: boolean) => void
-  recommendedProfile: typeof TEMPERATURE_PROFILES[number]
-  modelCategory: string | null
-  hasCells: boolean
-}
-
-function ParamsPanel(p: ParamsProps) {
-  const [showRationale, setShowRationale] = useState(false)
-  const recommendedAlgo = recommendAlgorithm(p.modelCategory, p.hasCells)
-  const algoInfo = ENGINE_ALGORITHMS.find(a => a.id === p.algorithm)
-  const patternInfo = INFILL_PATTERNS.find(x => x.id === p.infillPatternId)
-  const classicPatternInfo = CLASSIC_INFILL_PATTERNS.find(x => x.id === p.infillPatternId)
-  const activePatternInfo = patternInfo || classicPatternInfo
-
-  return (
-    <div className="max-w-5xl mx-auto space-y-5">
-      {/* ── Bioimpressora ── */}
-      <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
-        <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-          <Printer className="w-4 h-4 text-violet-400" />
-          Bioimpressora
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-3 max-h-72 overflow-y-auto pr-1">
-          {BIOPRINTERS.map(bp => (
-            <button
-              key={bp.id}
-              onClick={() => p.onBioprinterChange(bp.id)}
-              className={cn(
-                "p-3 rounded-xl border text-left transition-all",
-                p.bioprinterId === bp.id
-                  ? "border-violet-500/50 bg-violet-500/10 ring-1 ring-violet-500/30"
-                  : "border-white/8 bg-white/3 hover:border-white/15 hover:bg-white/5"
-              )}
-            >
-              <div className="flex items-start justify-between gap-2 mb-0.5">
-                <div className={cn(
-                  "text-xs font-semibold",
-                  p.bioprinterId === bp.id ? "text-violet-200" : "text-white"
-                )}>
-                  {bp.brand} {bp.model}
-                </div>
-                <span className="text-base shrink-0">{bp.icon}</span>
-              </div>
-              <div className="text-[10px] text-gray-500">
-                {bp.buildVolume.x}×{bp.buildVolume.y}×{bp.buildVolume.z} mm · {bp.numHeads} cabeçote{bp.numHeads > 1 ? "s" : ""}
-                {bp.hasUVcuring && " · UV"}
-                {supportsWebSerial(bp) && " · USB"}
-              </div>
-            </button>
-          ))}
-        </div>
-        {p.currentPrinter && (
-          <div className="rounded-xl bg-violet-500/5 border border-violet-500/20 p-3 text-xs text-violet-100/85 space-y-1">
-            <p><strong className="text-violet-300">{p.currentPrinter.fullName}</strong></p>
-            <p className="text-gray-400">
-              Resolução XY: {p.currentPrinter.resolution_um.xy} µm ·
-              Speed: ≤{p.currentPrinter.maxSpeed_mm_s} mm/s ·
-              Temp: {p.currentPrinter.temperatureRange_C.min}–{p.currentPrinter.temperatureRange_C.max}°C
-              {p.currentPrinter.pressureRange_kPa && ` · Pressão: ${p.currentPrinter.pressureRange_kPa.min}–${p.currentPrinter.pressureRange_kPa.max} kPa`}
-            </p>
-            <p className="text-gray-500">{p.currentPrinter.description}</p>
-          </div>
-        )}
-      </section>
-
-      {/*
-        R12.22: A seção "Algoritmo de preenchimento" foi REMOVIDA daqui.
-        O algoritmo do engine agora é derivado automaticamente do "Padrão
-        de infill" escolhido logo abaixo (Biomédico ou Clássico) — uma
-        única decisão do usuário, sem conflito entre os dois seletores.
-        Um pequeno indicador mostra qual algoritmo está ativo, com dica de
-        otimização da BIA quando o padrão escolhido difere do recomendado.
-      */}
-      {/* R12.36: quando perimeterOnly ativo, mostramos um card específico
-          ao invés do display de algoritmo (pois não há infill rodando). */}
-      {p.perimeterOnly ? (
-        <section className="rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/[0.08] to-orange-500/[0.05] p-4">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2 min-w-0">
-              <Square className="w-4 h-4 text-amber-300 shrink-0" />
-              <div className="min-w-0">
-                <div className="text-[10px] uppercase tracking-wider text-amber-300/80 font-semibold">
-                  Modo do engine
-                </div>
-                <div className="text-sm font-bold text-amber-100 truncate">
-                  🔲 Apenas Contorno (perímetros, sem preenchimento)
-                  <span className="ml-2 text-[10px] font-normal text-amber-300/70">
-                    · perimeter-only
-                  </span>
-                </div>
-              </div>
-            </div>
-            <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-200 shrink-0">
-              ✓ Indicado para testes de impressibilidade
-            </span>
-          </div>
-          <div className="mt-2 text-[11px] text-amber-100/80">
-            <strong className="text-amber-300">Melhor para:</strong>{" "}
-            geometrias de teste sem volume interno · grade de fusão · ponte de colapso · torre de empilhamento · fidelidade da biotinta
-          </div>
-        </section>
-      ) : (
-        <section className="rounded-2xl border border-violet-500/20 bg-gradient-to-r from-violet-500/[0.07] to-fuchsia-500/[0.05] p-4">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2 min-w-0">
-              <Sparkles className="w-4 h-4 text-violet-400 shrink-0" />
-              <div className="min-w-0">
-                <div className="text-[10px] uppercase tracking-wider text-violet-300/80 font-semibold">
-                  Algoritmo do engine (auto-derivado do padrão)
-                </div>
-                <div className="text-sm font-bold text-violet-100 truncate">
-                  {algoInfo?.icon} {algoInfo?.name ?? p.algorithm}
-                  <span className="ml-2 text-[10px] font-normal text-violet-300/70">
-                    · {algoInfo?.category}
-                  </span>
-                </div>
-              </div>
-            </div>
-            {recommendedAlgo === p.algorithm ? (
-              <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 shrink-0">
-                ✓ BIA recomenda este algoritmo
-              </span>
-            ) : (
-              <span
-                className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-200 shrink-0"
-                title={`Para sua biotinta + modelo, a BIA recomendaria: ${ENGINE_ALGORITHMS.find(a => a.id === recommendedAlgo)?.name}`}
-              >
-                ⚠ BIA sugere: {ENGINE_ALGORITHMS.find(a => a.id === recommendedAlgo)?.name}
-              </span>
-            )}
-          </div>
-          {algoInfo && (
-            <div className="mt-2 text-[11px] text-violet-100/80">
-              <strong className="text-violet-300">Melhor para:</strong> {algoInfo.bestFor.join(" · ")}
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* ── Parâmetros físicos ── */}
-      <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
-        <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-          <Settings2 className="w-4 h-4 text-violet-400" />
-          Parâmetros físicos
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <SliderField
-            label="Altura de camada" icon={Layers}
-            min={0.05} max={0.5} step={0.025}
-            value={p.layerHeightMm} onChange={p.onLayerHeightChange}
-            display={`${p.layerHeightMm.toFixed(3)} mm`}
-            hint="50–500 µm · padrão 200–250 µm"
-          />
-          <SliderField
-            label="Velocidade impressão" icon={Wind}
-            min={1} max={30} step={1}
-            value={p.printSpeedMmS} onChange={p.onPrintSpeedChange}
-            display={`${p.printSpeedMmS} mm/s`}
-            hint={p.hasCells ? "Com células: 3–10 mm/s" : "Acelular: 5–20 mm/s"}
-          />
-          <SliderField
-            label="Diâmetro bico" icon={Target}
-            min={100} max={1200} step={10}
-            value={p.nozzleDiameterUm} onChange={p.onNozzleChange}
-            display={`${p.nozzleDiameterUm} µm`}
-            hint="Bio: 200–410 µm padrão"
-          />
-          {/*
-            R12.63: bloco de multiplicador de extrusão destacado — passa a
-            ser DECISÃO explícita antes de mandar pra impressora, não só um
-            slider perdido. Presets rápidos (Nivea 0.4× / Bio padrão 0.6× /
-            FDM 1.0×) evitam que a usuária tenha que lembrar o valor certo.
-          */}
-          <div className="rounded-xl border border-amber-500/25 bg-amber-500/[0.04] p-3 -mx-1">
-            <SliderField
-              label="⚡ Multiplicador de extrusão (flow rate)"
-              icon={Activity}
-              min={0.3} max={2.0} step={0.05}
-              value={p.extrusionMultiplier} onChange={p.onExtrusionMultiplierChange}
-              display={`${p.extrusionMultiplier.toFixed(2)}×`}
-              hint="Deixe 1.0× e ajuste o fluxo em TEMPO REAL na Etapa 4 (botão 'Não está saindo') — a BIA lembra o valor que funcionou por biotinta"
-            />
-            <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-amber-500/15">
-              <span className="text-[10px] text-amber-300/80 font-semibold mr-1 self-center">
-                Presets:
-              </span>
-              <button
-                type="button"
-                onClick={() => p.onExtrusionMultiplierChange(0.4)}
-                className={cn(
-                  "text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors",
-                  Math.abs(p.extrusionMultiplier - 0.4) < 0.001
-                    ? "bg-amber-500/25 border-amber-400/60 text-amber-100"
-                    : "bg-white/[0.03] border-white/10 text-gray-300 hover:bg-amber-500/10 hover:border-amber-500/30"
-                )}
-                title="Padrão-ouro pra teste inicial com Creme Nivea — creme puro, menos viscoso"
-              >
-                🧴 Nivea 0.4×
-              </button>
-              <button
-                type="button"
-                onClick={() => p.onExtrusionMultiplierChange(0.6)}
-                className={cn(
-                  "text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors",
-                  Math.abs(p.extrusionMultiplier - 0.6) < 0.001
-                    ? "bg-emerald-500/25 border-emerald-400/60 text-emerald-100"
-                    : "bg-white/[0.03] border-white/10 text-gray-300 hover:bg-emerald-500/10 hover:border-emerald-500/30"
-                )}
-                title="Valor antigo (R12.62). Hoje recomendamos 1.0× + ajuste em tempo real"
-              >
-                🧫 Antigo 0.6×
-              </button>
-              <button
-                type="button"
-                onClick={() => p.onExtrusionMultiplierChange(1.0)}
-                className={cn(
-                  "text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors",
-                  Math.abs(p.extrusionMultiplier - 1.0) < 0.001
-                    ? "bg-cyan-500/25 border-cyan-400/60 text-cyan-100"
-                    : "bg-white/[0.03] border-white/10 text-gray-300 hover:bg-cyan-500/10 hover:border-cyan-500/30"
-                )}
-                title="Recomendado: volume teórico. Ajuste fino pelo M221 em tempo real na Etapa 4"
-              >
-                ✅ Padrão 1.0×
-              </button>
-              <button
-                type="button"
-                onClick={() => p.onExtrusionMultiplierChange(1.5)}
-                className={cn(
-                  "text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors",
-                  Math.abs(p.extrusionMultiplier - 1.5) < 0.001
-                    ? "bg-violet-500/25 border-violet-400/60 text-violet-100"
-                    : "bg-white/[0.03] border-white/10 text-gray-300 hover:bg-violet-500/10 hover:border-violet-500/30"
-                )}
-                title="Biotintas muito viscosas (>3000 cP) ou entupimento parcial"
-              >
-                🌊 Viscosa 1.5×
-              </button>
-            </div>
-          </div>
-          <SliderField
-            label="Preenchimento (densidade)" icon={BarChart3}
-            min={0} max={100} step={1}
-            value={p.perimeterOnly ? 0 : p.infillPercent}
-            onChange={p.onInfillChange}
-            display={p.perimeterOnly ? "0% (apenas contorno)" : `${p.infillPercent}%`}
-            hint={p.perimeterOnly ? "Modo contorno ativo — só perímetros (walls)" : "0% = oco · 20–40% scaffolds · 100% sólido"}
-            disabled={p.perimeterOnly}
-          />
-          <SliderField
-            label="Paredes (walls)" icon={Layers}
-            min={1} max={5} step={1}
-            value={p.walls} onChange={p.onWallsChange}
-            display={`${p.walls}`}
-            hint="2 é padrão"
-          />
-          {/* R19: skirt é OPT-IN. Desligado = a peça começa exatamente no ponto zero. */}
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-            <label className="flex items-start gap-2.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={p.skirtLoops > 0}
-                onChange={(e) => p.onSkirtLoopsChange(e.target.checked ? 1 : 0)}
-                className="mt-0.5 accent-violet-400"
-              />
-              <span className="text-xs">
-                <span className="text-gray-100 font-medium">Imprimir saia (skirt) ao redor da peça</span>
-                <span className="block text-[10px] text-gray-500 mt-0.5">
-                  Desligado por padrão: a impressão começa <b className="text-gray-300">exatamente no ponto zero (G92)</b>. A saia afasta o bico ~3 mm antes de começar — use só se quiser escorvar na própria mesa. Purga recomendada: botão na Etapa 4.
-                </span>
-              </span>
-            </label>
-            {p.skirtLoops > 0 && (
-              <div className="mt-2 pl-6">
-                <SliderField
-                  label="Voltas da saia" icon={Wrench}
-                  min={1} max={5} step={1}
-                  value={p.skirtLoops} onChange={p.onSkirtLoopsChange}
-                  display={`${p.skirtLoops}`}
-                />
-              </div>
-            )}
-          </div>
-          <SliderField
-            label="Retração" icon={Wrench}
-            min={0} max={2} step={0.1}
-            value={p.retractionMm} onChange={p.onRetractionChange}
-            display={`${p.retractionMm.toFixed(1)} mm`}
-            hint={p.hasCells ? "Com células: 0 mm" : "0.3–0.5 mm"}
-          />
-        </div>
-
-        {/* Pressão de extrusão — TOGGLE OPCIONAL */}
-        <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-4">
-          <label className="flex items-center justify-between gap-3 cursor-pointer mb-2">
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-violet-400" />
-              <span className="text-sm font-semibold text-white">Pressão de extrusão (pneumática)</span>
-              <span className="text-[10px] text-gray-500">opcional</span>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={p.pressureEnabled}
-              onClick={() => p.onPressureEnabledChange(!p.pressureEnabled)}
-              className={cn(
-                "relative w-11 h-6 rounded-full transition-colors flex-shrink-0",
-                p.pressureEnabled ? "bg-violet-500" : "bg-white/10"
-              )}
-            >
-              <span
-                className={cn(
-                  "absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform",
-                  p.pressureEnabled && "translate-x-5"
-                )}
-              />
-            </button>
-          </label>
-          <p className="text-[11px] text-gray-400 mb-3">
-            Ative apenas para bioimpressoras <strong>pneumáticas</strong> (CELLINK, Allevi, Regemat, BioEnder com cabeçote pneumático).
-            Para FDM puro (PLA/PCL) deixe desativado.
-          </p>
-          {p.pressureEnabled && (
-            <SliderField
-              label="Pressão (kPa)" icon={Activity}
-              min={0} max={700} step={5}
-              value={p.pressureKPa} onChange={p.onPressureChange}
-              display={`${p.pressureKPa} kPa`}
-              hint="Hidrogéis 10–120 · Alginato 30–80 · PCL >300"
-            />
-          )}
-        </div>
-
-        {/* Padrão de infill — Biomédico, Clássico OU Apenas Contorno (R12.36) */}
-        <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-4">
-          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-violet-400" />
-              <span className="text-sm font-semibold text-white">Padrão de preenchimento</span>
-            </div>
-            <div className="flex flex-wrap items-center gap-1 bg-black/40 rounded-lg p-1">
-              <button
-                type="button"
-                disabled={p.perimeterOnly}
-                onClick={() => {
-                  p.onInfillFamilyChange("biomedical")
-                  p.onInfillPatternChange(INFILL_PATTERNS[0].id)
-                }}
-                className={cn(
-                  "px-3 py-1 rounded-md text-[11px] font-semibold transition-colors",
-                  p.perimeterOnly && "opacity-40 cursor-not-allowed",
-                  !p.perimeterOnly && p.infillFamily === "biomedical"
-                    ? "bg-violet-500/30 text-violet-100 ring-1 ring-violet-400/40"
-                    : "text-gray-400 hover:text-white"
-                )}
-              >
-                🧬 Biomédico (BIA)
-              </button>
-              <button
-                type="button"
-                disabled={p.perimeterOnly}
-                onClick={() => {
-                  p.onInfillFamilyChange("classic")
-                  p.onInfillPatternChange(CLASSIC_INFILL_PATTERNS[0].id)
-                }}
-                className={cn(
-                  "px-3 py-1 rounded-md text-[11px] font-semibold transition-colors",
-                  p.perimeterOnly && "opacity-40 cursor-not-allowed",
-                  !p.perimeterOnly && p.infillFamily === "classic"
-                    ? "bg-violet-500/30 text-violet-100 ring-1 ring-violet-400/40"
-                    : "text-gray-400 hover:text-white"
-                )}
-              >
-                ⚙️ Clássico (slicer)
-              </button>
-              {/* R12.36: toggle "Apenas Contorno" — alternativa às famílias biomédico/clássico */}
-              <button
-                type="button"
-                onClick={() => p.onPerimeterOnlyChange(!p.perimeterOnly)}
-                disabled={p.perimeterOnlyForced}
-                title={p.perimeterOnlyForced
-                  ? "Esta geometria é um teste de contorno — modo Apenas Contorno é obrigatório"
-                  : "Desliga o preenchimento — emite só os perímetros (walls)"}
-                className={cn(
-                  "px-3 py-1 rounded-md text-[11px] font-semibold transition-colors flex items-center gap-1",
-                  p.perimeterOnly
-                    ? "bg-amber-500/30 text-amber-100 ring-1 ring-amber-400/40"
-                    : "text-gray-400 hover:text-white",
-                  p.perimeterOnlyForced && "cursor-not-allowed"
-                )}
-              >
-                <Square className="w-3 h-3" />
-                Apenas Contorno
-              </button>
-            </div>
-          </div>
-
-          {/* R12.36: card explicativo quando modo contorno está ativo */}
-          {p.perimeterOnly && (
-            <div className="mb-3 rounded-lg bg-amber-500/10 border border-amber-500/30 p-3 text-xs">
-              <div className="flex items-start gap-2">
-                <Info className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <p className="text-amber-100 font-medium">
-                    Modo &ldquo;Apenas Contorno&rdquo; ativo {p.perimeterOnlyForced && "(obrigatório para esta geometria)"}
-                  </p>
-                  <p className="text-amber-200/80">
-                    O G-code será gerado <strong>somente com os perímetros (walls)</strong> — sem preenchimento interno.
-                    Recomendado para testes de impressibilidade: linha, grade de fusão, ponte de colapso, estrela de
-                    overhang, torre de empilhamento, escada Z, leque de ângulos e fidelidade da biotinta.
-                  </p>
-                  <p className="text-amber-300/60 text-[10px]">
-                    Racional: estas geometrias não possuem volume interno fechado — tentar gerar infill produziria
-                    G-code inválido (filamentos no vazio). O engine pula totalmente a etapa de infill quando
-                    densidade = 0%, emitindo só os contornos. Use o slider &ldquo;Paredes (walls)&rdquo; para escolher
-                    quantos perímetros traçar (1–5).
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <p className={cn("text-[11px] text-gray-400 mb-3", p.perimeterOnly && "opacity-40")}>
-            {p.infillFamily === "biomedical"
-              ? "Padrões avançados otimizados para biofabricação — porosidade, vascularização e zonação inspiradas em tecidos nativos."
-              : "Padrões clássicos dos slicers tradicionais (Cura, PrusaSlicer, Simplify3D) — familiar, rápido e bem-validado para FDM/scaffolds."}
-          </p>
-
-          {/* R12.36: wrapper que desabilita os botões de padrão quando perimeterOnly */}
-          <div className={cn(p.perimeterOnly && "opacity-40 pointer-events-none select-none")}>
-          {p.infillFamily === "biomedical" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {INFILL_PATTERNS.map(x => (
-                <button
-                  key={x.id}
-                  type="button"
-                  onClick={() => p.onInfillPatternChange(x.id)}
-                  className={cn(
-                    "p-2.5 rounded-lg border text-left text-xs transition-all",
-                    p.infillPatternId === x.id
-                      ? "border-violet-500/50 bg-violet-500/10 ring-1 ring-violet-500/30 text-violet-100"
-                      : "border-white/10 bg-white/5 hover:border-white/20 text-gray-300"
-                  )}
-                >
-                  <div className="font-semibold mb-0.5">{x.name}</div>
-                  <div className="text-[10px] text-gray-500 capitalize">{x.category}</div>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-              {CLASSIC_INFILL_PATTERNS.map(x => (
-                <button
-                  key={x.id}
-                  type="button"
-                  onClick={() => p.onInfillPatternChange(x.id)}
-                  className={cn(
-                    "p-2.5 rounded-lg border text-left text-xs transition-all",
-                    p.infillPatternId === x.id
-                      ? "border-violet-500/50 bg-violet-500/10 ring-1 ring-violet-500/30 text-violet-100"
-                      : "border-white/10 bg-white/5 hover:border-white/20 text-gray-300"
-                  )}
-                >
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-base">{x.icon}</span>
-                    <span className="text-[9px] text-violet-300/70 font-mono">F{x.strength}/T{x.printTime}</span>
-                  </div>
-                  <div className="font-semibold leading-tight">{x.name}</div>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {activePatternInfo && !p.perimeterOnly && (
-            <div className="mt-3 rounded-lg bg-violet-500/5 border border-violet-500/20 p-3 text-xs">
-              <div className="flex items-start gap-2">
-                <Info className="w-4 h-4 text-violet-400 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <p className="text-violet-200 font-medium">{activePatternInfo.name}</p>
-                  <p className="text-gray-400">{activePatternInfo.description}</p>
-                  {patternInfo && (
-                    <p className="text-gray-500 text-[10px]">
-                      Spacing ideal: {patternInfo.filamentSpacingUm.ideal} µm ·
-                      Porosidade: {patternInfo.porosityPercent.min}–{patternInfo.porosityPercent.max}% ·
-                      Ref: {patternInfo.ref}
-                    </p>
-                  )}
-                  {classicPatternInfo && (
-                    <p className="text-gray-500 text-[10px]">
-                      Densidade típica: {classicPatternInfo.typicalDensityPercent.ideal}% ·
-                      Força: {"★".repeat(classicPatternInfo.strength)}{"☆".repeat(5 - classicPatternInfo.strength)} ·
-                      Tempo: {"●".repeat(classicPatternInfo.printTime)}{"○".repeat(5 - classicPatternInfo.printTime)} ·
-                      Uso bio: {classicPatternInfo.bioUse}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-          </div> {/* R12.36: fim do wrapper perimeterOnly-disable */}
-        </div>
-      </section>
-
-      {/* ── Temperaturas ── */}
-      <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
-        <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-            <Thermometer className="w-4 h-4 text-violet-400" />
-            Perfil térmico
-            <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-violet-500/15 border border-violet-500/30 text-violet-300">
-              sugerido p/ {p.recommendedProfile.bioinkType}
-            </span>
-            <span className="text-[10px] text-gray-500">opcional</span>
-          </h3>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowRationale(!showRationale)}
-              className="text-[10px] text-violet-400 hover:text-violet-300 flex items-center gap-1"
-            >
-              {showRationale ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-              Racional
-            </button>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <span className="text-[11px] text-gray-400">Com temperatura</span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={p.temperatureEnabled}
-                onClick={() => p.onTemperatureEnabledChange(!p.temperatureEnabled)}
-                className={cn(
-                  "relative w-11 h-6 rounded-full transition-colors",
-                  p.temperatureEnabled ? "bg-violet-500" : "bg-white/10"
-                )}
-              >
-                <span
-                  className={cn(
-                    "absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform",
-                    p.temperatureEnabled && "translate-x-5"
-                  )}
-                />
-              </button>
-            </label>
-          </div>
-        </div>
-
-        {p.temperatureEnabled ? (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <SliderField
-                label="Cartucho (bico)" icon={Thermometer}
-                min={4} max={250} step={1}
-                value={p.cartridgeTempC} onChange={p.onCartridgeTempChange}
-                display={`${p.cartridgeTempC} °C`}
-                hint={`Ideal: ${p.recommendedProfile.cartridgeTempC.ideal}°C · PCL/PLA até 220°C`}
-              />
-              <SliderField
-                label="Mesa (bed)" icon={Thermometer}
-                min={4} max={110} step={1}
-                value={p.bedTempC} onChange={p.onBedTempChange}
-                display={`${p.bedTempC} °C`}
-                hint={`Ideal: ${p.recommendedProfile.bedTempC.ideal}°C`}
-              />
-              <SliderField
-                label="Câmara" icon={Thermometer}
-                min={4} max={50} step={1}
-                value={p.chamberTempC} onChange={p.onChamberTempChange}
-                display={`${p.chamberTempC} °C`}
-                hint={`Ideal: ${p.recommendedProfile.chamberTempC.ideal}°C · UR ${p.recommendedProfile.humidityPercent.ideal}%`}
-              />
-            </div>
-            {showRationale && (
-              <div className="mt-4 rounded-xl bg-violet-500/5 border border-violet-500/20 p-3 text-xs space-y-1">
-                <p className="text-gray-300">{p.recommendedProfile.rationale}</p>
-                <p className="text-gray-500 text-[10px]">Ref: {p.recommendedProfile.ref}</p>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="rounded-xl bg-amber-500/5 border border-amber-500/20 p-4 flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-            <div className="text-xs text-amber-100/90">
-              <strong>Controle térmico desativado.</strong> Os comandos <code className="px-1 bg-black/30 rounded">M104</code>,
-              <code className="px-1 bg-black/30 rounded">M140</code> e <code className="px-1 bg-black/30 rounded">M141</code> não
-              serão incluídos no G-code. Use apenas para bioinks que <strong>polimerizam à temperatura ambiente</strong>
-              (alginato + CaCl₂, fibrina, FRESH) ou para testes com a impressora já pré-aquecida manualmente.
-            </div>
-          </div>
-        )}
-      </section>
-    </div>
-  )
-}
-
-// ─── Slider field reutilizável ────────────────────────────────────────────
-function SliderField({
-  label, icon: Icon, min, max, step, value, onChange, display, hint, disabled,
-}: {
-  label: string; icon: typeof Layers
-  min: number; max: number; step: number
-  value: number; onChange: (n: number) => void
-  display: string; hint?: string
-  disabled?: boolean
-}) {
-  return (
-    <div className={cn(disabled && "opacity-50 pointer-events-none select-none")}>
-      <label className="text-[11px] text-gray-400 mb-1 flex items-center gap-1">
-        <Icon className="w-3 h-3" />
-        {label}
-      </label>
-      <div className="flex items-center gap-2">
-        <input
-          type="range" min={min} max={max} step={step} value={value}
-          onChange={e => onChange(parseFloat(e.target.value))}
-          disabled={disabled}
-          className="flex-1 accent-violet-500"
-        />
-        <span className="text-xs text-violet-300 font-mono w-24 text-right">{display}</span>
-      </div>
-      {hint && <p className="text-[10px] text-gray-600 mt-0.5">{hint}</p>}
-    </div>
-  )
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// PAINEL B — MULTI-POÇO (opcional)
-// ═══════════════════════════════════════════════════════════════════════════
-function WellsPanel({
-  useMultiWell, onUseMultiWellChange,
-  plateFormat, onPlateFormatChange,
-  selectedWells, onSelectedWellsChange,
-  zHopBetweenWellsMm, onZHopChange,
-  pauseBetweenWellsS, onPauseChange,
-  purgeVolumeUL, onPurgeVolumeChange,
-}: {
-  useMultiWell: boolean; onUseMultiWellChange: (b: boolean) => void
-  plateFormat: 6 | 12 | 24 | 48 | 96 | 384; onPlateFormatChange: (f: 6 | 12 | 24 | 48 | 96 | 384) => void
-  selectedWells: string[]; onSelectedWellsChange: (w: string[]) => void
-  zHopBetweenWellsMm: number; onZHopChange: (n: number) => void
-  pauseBetweenWellsS: number; onPauseChange: (n: number) => void
-  purgeVolumeUL: number; onPurgeVolumeChange: (n: number) => void
-}) {
-  // Gerar matriz da placa
-  const rows = useMemo(() => {
-    const config: Record<number, [number, number]> = {
-      6: [2, 3], 12: [3, 4], 24: [4, 6], 48: [6, 8], 96: [8, 12], 384: [16, 24],
-    }
-    const [r, c] = config[plateFormat]
-    const wells: string[] = []
-    for (let i = 0; i < r; i++) {
-      for (let j = 0; j < c; j++) {
-        wells.push(`${String.fromCharCode(65 + i)}${j + 1}`)
-      }
-    }
-    return { rows: r, cols: c, wells }
-  }, [plateFormat])
-
-  const toggleWell = (w: string) => {
-    if (selectedWells.includes(w)) {
-      onSelectedWellsChange(selectedWells.filter(s => s !== w))
-    } else {
-      onSelectedWellsChange([...selectedWells, w])
-    }
-  }
-
-  const selectAll = () => onSelectedWellsChange(rows.wells)
-  const clearAll = () => onSelectedWellsChange([])
-  const selectRow = (rowIdx: number) => {
-    const rowWells = rows.wells.filter(w => w.charCodeAt(0) - 65 === rowIdx)
-    onSelectedWellsChange(Array.from(new Set([...selectedWells, ...rowWells])))
-  }
-  const selectCol = (colIdx: number) => {
-    const colWells = rows.wells.filter(w => parseInt(w.slice(1)) - 1 === colIdx)
-    onSelectedWellsChange(Array.from(new Set([...selectedWells, ...colWells])))
-  }
-
-  return (
-    <div className="max-w-5xl mx-auto space-y-5">
-      {/* Seletor de modo: Direto na mesa OU Placa multi-poços */}
-      <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
-        <h3 className="text-sm font-semibold text-white mb-1 flex items-center gap-2">
-          <Beaker className="w-4 h-4 text-violet-400" />
-          Modo de impressão
-        </h3>
-        <p className="text-xs text-gray-400 mb-4">
-          Escolha onde a bioimpressora vai depositar o material.
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* Card: Direto na mesa */}
-          <button
-            type="button"
-            onClick={() => onUseMultiWellChange(false)}
-            className={cn(
-              "rounded-xl border p-4 text-left transition-all",
-              !useMultiWell
-                ? "border-violet-500/60 bg-violet-500/10 ring-1 ring-violet-500/30"
-                : "border-white/10 bg-white/[0.02] hover:border-white/20"
-            )}
-          >
-            <div className="flex items-start gap-3">
-              <div className={cn(
-                "w-9 h-9 rounded-lg flex items-center justify-center shrink-0",
-                !useMultiWell ? "bg-violet-500/25 text-violet-200" : "bg-white/5 text-gray-400"
-              )}>
-                <Layers className="w-5 h-5" />
-              </div>
-              <div>
-                <div className={cn(
-                  "text-sm font-semibold mb-0.5",
-                  !useMultiWell ? "text-violet-100" : "text-white"
-                )}>
-                  Direto na mesa
-                </div>
-                <p className="text-[11px] text-gray-400 leading-relaxed">
-                  Petri (30/60/90 mm), lâmina ou scaffold. 1 peça única, centrada <b>onde o bico está</b> no G92.
-                </p>
-              </div>
-            </div>
-          </button>
-
-          {/* Card: Placa multi-poços */}
-          <button
-            type="button"
-            onClick={() => onUseMultiWellChange(true)}
-            className={cn(
-              "rounded-xl border p-4 text-left transition-all",
-              useMultiWell
-                ? "border-violet-500/60 bg-violet-500/10 ring-1 ring-violet-500/30"
-                : "border-white/10 bg-white/[0.02] hover:border-white/20"
-            )}
-          >
-            <div className="flex items-start gap-3">
-              <div className={cn(
-                "w-9 h-9 rounded-lg flex items-center justify-center shrink-0",
-                useMultiWell ? "bg-violet-500/25 text-violet-200" : "bg-white/5 text-gray-400"
-              )}>
-                <Beaker className="w-5 h-5" />
-              </div>
-              <div>
-                <div className={cn(
-                  "text-sm font-semibold mb-0.5",
-                  useMultiWell ? "text-violet-100" : "text-white"
-                )}>
-                  Placa multi-poços
-                </div>
-                <p className="text-[11px] text-gray-400 leading-relaxed">
-                  Placas SBS (6–384 poços). O bico começa no <b>centro do primeiro poço</b> (superior-esquerdo) = G92; os demais são offsets pelo pitch da placa.
-                </p>
-              </div>
-            </div>
-          </button>
-        </div>
-      </section>
-
-      {/* === MODO: DIRETO NA MESA — visualização da mesa de impressão === */}
-      {!useMultiWell && (
-        <section className="rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-500/[0.06] to-blue-500/[0.03] p-5">
-          <div className="flex items-start gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-violet-500/15 flex items-center justify-center shrink-0">
-              <Layers className="w-5 h-5 text-violet-300" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-white mb-0.5">Mesa de impressão (build plate)</h3>
-              <p className="text-[11px] text-gray-400">
-                A peça é centrada no <b>ponto zero</b>: leve o bico ao centro da Petri/lâmina pelo joystick, clique em G92 e inicie. Sem viagem inicial, sem park no fim.
-              </p>
-            </div>
-          </div>
-          {/* Visualização simplificada da mesa */}
-          <div className="relative mx-auto" style={{ maxWidth: "320px", aspectRatio: "4/3" }}>
-            <div className="absolute inset-0 rounded-xl border-2 border-violet-400/40 bg-gradient-to-br from-violet-900/20 via-quantis-ink-900/40 to-quantis-ink-900/60 shadow-inner shadow-violet-900/30" />
-            {/* Grid sutil */}
-            <div className="absolute inset-2 rounded-lg opacity-40"
-              style={{
-                backgroundImage: "linear-gradient(rgba(167,139,250,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(167,139,250,0.15) 1px, transparent 1px)",
-                backgroundSize: "20px 20px",
-              }}
-            />
-            {/* Crosshair centro */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16">
-              <div className="absolute top-1/2 left-0 right-0 border-t border-dashed border-violet-300/40" />
-              <div className="absolute left-1/2 top-0 bottom-0 border-l border-dashed border-violet-300/40" />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-violet-300" />
-            </div>
-            {/* Origem X0/Y0 */}
-            <div className="absolute bottom-1 left-1 text-[9px] text-violet-300/70 font-mono">X0,Y0</div>
-            {/* Indicador */}
-            <div className="absolute top-1 right-2 text-[10px] text-violet-200 font-medium bg-violet-500/20 px-1.5 py-0.5 rounded">
-              Centro · origem da peça
-            </div>
-          </div>
-          {/* Alerta posicionamento inicial */}
-          <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/8 p-3 flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-            <div className="text-[11px] text-amber-100 leading-relaxed">
-              <strong className="block mb-0.5">Antes de iniciar a impressão:</strong>
-              Posicione o cabeçote no centro da mesa (X0,Y0 lógico = centro físico) com a biotinta carregada e o Z-offset calibrado para tocar levemente a superfície (~0,1 mm acima). O G-code parte deste ponto.
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* === MODO: MULTI-POÇOS === */}
-      {useMultiWell && (
-        <>
-          {/* Alerta de posicionamento inicial — primeira impressão */}
-          <section className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.08] p-4">
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
-                <AlertCircle className="w-5 h-5 text-amber-300" />
-              </div>
-              <div className="text-[12px] text-amber-100 leading-relaxed space-y-1">
-                <strong className="text-amber-50">Posicionamento inicial obrigatório:</strong>
-                <p>
-                  O G-code assume que a <strong>primeira impressão começa no centro do primeiro poço selecionado</strong> (canto superior esquerdo, ex.: <code className="font-mono text-amber-200 bg-amber-900/30 px-1 rounded">A1</code>).
-                  Posicione manualmente o cabeçote no centro de A1 com a biotinta carregada e ajuste o <strong>Z-offset</strong> para o bico tocar levemente o fundo do poço (~0,1 mm acima).
-                </p>
-                <p>
-                  Entre poços, o cabeçote sobe <strong>{zHopBetweenWellsMm.toFixed(1)} mm</strong> (Z-hop) para não bater nas paredes — ajuste abaixo se o seu cabeçote tiver folga lateral grande ou se os poços forem profundos (recomendado: ≥ altura do poço + 2 mm).
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* Formato da placa */}
-          <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
-            <h3 className="text-sm font-semibold text-white mb-3">Formato SBS</h3>
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-              {([6, 12, 24, 48, 96, 384] as const).map(f => (
-                <button
-                  key={f}
-                  onClick={() => { onPlateFormatChange(f); onSelectedWellsChange(["A1"]) }}
-                  className={cn(
-                    "p-3 rounded-xl border transition-all text-center",
-                    plateFormat === f
-                      ? "border-violet-500/50 bg-violet-500/10 ring-1 ring-violet-500/30"
-                      : "border-white/8 bg-white/3 hover:border-white/15"
-                  )}
-                >
-                  <div className={cn(
-                    "text-base font-bold",
-                    plateFormat === f ? "text-violet-200" : "text-white"
-                  )}>
-                    {f}
-                  </div>
-                  <div className="text-[10px] text-gray-500">poços</div>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          {/* Mapa visual de poços */}
-          <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-white">
-                Poços selecionados: <span className="text-violet-300">{selectedWells.length}</span> / {rows.wells.length}
-              </h3>
-              <div className="flex gap-2">
-                <button onClick={selectAll} className="text-[10px] px-2 py-1 rounded bg-white/5 text-gray-300 hover:bg-white/10">
-                  Todos
-                </button>
-                <button onClick={clearAll} className="text-[10px] px-2 py-1 rounded bg-white/5 text-gray-300 hover:bg-white/10">
-                  Limpar
-                </button>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="border-collapse">
-                <thead>
-                  <tr>
-                    <th></th>
-                    {Array.from({ length: rows.cols }).map((_, c) => (
-                      <th key={c}>
-                        <button
-                          onClick={() => selectCol(c)}
-                          className="text-[9px] text-gray-500 hover:text-violet-300 px-1 cursor-pointer"
-                        >
-                          {c + 1}
-                        </button>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {Array.from({ length: rows.rows }).map((_, r) => (
-                    <tr key={r}>
-                      <td>
-                        <button
-                          onClick={() => selectRow(r)}
-                          className="text-[9px] text-gray-500 hover:text-violet-300 px-1 cursor-pointer"
-                        >
-                          {String.fromCharCode(65 + r)}
-                        </button>
-                      </td>
-                      {Array.from({ length: rows.cols }).map((_, c) => {
-                        const w = `${String.fromCharCode(65 + r)}${c + 1}`
-                        const sel = selectedWells.includes(w)
-                        const size = plateFormat <= 24 ? "w-7 h-7" : plateFormat <= 96 ? "w-5 h-5" : "w-3 h-3"
-                        return (
-                          <td key={c} className="p-0.5">
-                            <button
-                              onClick={() => toggleWell(w)}
-                              title={w}
-                              className={cn(
-                                size, "rounded-full border transition-all",
-                                sel
-                                  ? "bg-violet-500/40 border-violet-400"
-                                  : "border-white/15 hover:border-violet-400/50"
-                              )}
-                            />
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          {/* Parâmetros multi-well */}
-          <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
-            <h3 className="text-sm font-semibold text-white mb-1">Parâmetros entre poços</h3>
-            <p className="text-[11px] text-gray-400 mb-4">
-              <strong className="text-violet-200">Z-hop</strong> é a altura que o bico sobe ao migrar de um poço para o próximo —
-              evita choque com as paredes. Aumente se os poços forem profundos.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <SliderField
-                label="Z-hop entre poços (altura de segurança)" icon={Layers}
-                min={1} max={20} step={0.5}
-                value={zHopBetweenWellsMm} onChange={onZHopChange}
-                display={`${zHopBetweenWellsMm.toFixed(1)} mm`}
-                hint="Subida do bico ao mover entre poços"
-              />
-              <SliderField
-                label="Pausa entre poços" icon={Clock}
-                min={0} max={30} step={1}
-                value={pauseBetweenWellsS} onChange={onPauseChange}
-                display={`${pauseBetweenWellsS} s`}
-                hint="Para gelificação parcial"
-              />
-              <SliderField
-                label="Purga (volume)" icon={Droplets}
-                min={0} max={10} step={0.5}
-                value={purgeVolumeUL} onChange={onPurgeVolumeChange}
-                display={`${purgeVolumeUL.toFixed(1)} µL`}
-                hint="Por troca de poço"
-              />
-            </div>
-          </section>
-        </>
-      )}
-    </div>
-  )
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// PAINEL C — G-CODE
-// ═══════════════════════════════════════════════════════════════════════════
-function GCodePanel({
-  loading, error, result, onGenerate, onDownload, isUnlocked, perimeterOnly,
-}: {
-  loading: boolean
-  error: { message: string; details?: string; suggestions?: string[] } | null
-  result: GCodeResponse | null
-  onGenerate: () => void; onDownload: () => void; isUnlocked: boolean
-  /** R12.42 fix: ReferenceError causado por uso de `perimeterOnly` sem prop */
-  perimeterOnly: boolean
-}) {
-  const [copied, setCopied] = useState(false)
-  const [elapsed, setElapsed] = useState(0)
-  const handleCopy = useCallback(() => {
-    if (!result?.gcode) return
-    navigator.clipboard.writeText(result.gcode).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    })
-  }, [result])
-
-  // Contador de tempo enquanto loading — feedback ao usuário
-  useEffect(() => {
-    if (!loading) { setElapsed(0); return }
-    const start = Date.now()
-    const id = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 250)
-    return () => clearInterval(id)
-  }, [loading])
-
-  return (
-    <div className="max-w-5xl mx-auto space-y-5">
-      {/* Botão de gerar (se ainda não gerou) */}
-      {!result && !loading && !error && (
-        <section className="rounded-2xl border border-violet-500/30 bg-violet-500/5 p-8 text-center">
-          <FileCode2 className="w-12 h-12 text-violet-400 mx-auto mb-3" />
-          <h3 className="text-base font-semibold text-white mb-2">Pronto para gerar o G-code</h3>
-          <p className="text-xs text-gray-400 mb-4 max-w-md mx-auto">
-            O motor real BIA vai aplicar Hagen-Poiseuille, calcular viabilidade celular e gerar o
-            G-code Marlin/Klipper completo para sua bioimpressora.
-          </p>
-          <button
-            onClick={onGenerate}
-            disabled={!isUnlocked}
-            className={cn(
-              "inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl transition-colors",
-              isUnlocked
-                ? "bg-violet-500 hover:bg-violet-400 text-violet-950"
-                : "bg-white/5 text-gray-500 cursor-not-allowed"
-            )}
-          >
-            <Zap className="w-4 h-4" /> Gerar G-code agora
-          </button>
-          <p className="text-[10px] text-gray-600 mt-3">Custo: 6 créditos por geração · timeout em 45s</p>
-        </section>
-      )}
-
-      {/* Loading com contador e mensagens progressivas */}
-      {loading && (
-        <section className="rounded-2xl border border-violet-500/30 bg-violet-500/5 p-8 text-center">
-          <Loader2 className="w-12 h-12 text-violet-400 mx-auto mb-3 animate-spin" />
-          <h3 className="text-base font-semibold text-white mb-1">
-            Gerando G-code… <span className="text-violet-300 tabular-nums">{elapsed}s</span>
-          </h3>
-          <p className="text-xs text-gray-400">
-            {elapsed < 5 && "Validando parâmetros e calculando bounds da geometria"}
-            {elapsed >= 5 && elapsed < 15 && "Pré-computando Voronoi/TPMS e trajetória entre poços"}
-            {elapsed >= 15 && elapsed < 30 && "Emitindo movimentos camada a camada (Hagen-Poiseuille)"}
-            {elapsed >= 30 && "Quase lá — formatando G-code final e calculando viabilidade…"}
-          </p>
-          {elapsed >= 30 && (
-            <p className="text-[10px] text-amber-400 mt-2">
-              ⏱️ Demorando mais que o normal — vai cancelar automaticamente em {45 - elapsed}s se não responder.
-            </p>
-          )}
-        </section>
-      )}
-
-      {/* Erro estruturado com sugestões inteligentes */}
-      {error && !loading && (
-        <section className="rounded-2xl border border-rose-500/30 bg-rose-500/[0.04] p-5">
-          <div className="flex items-start gap-3 mb-3">
-            <div className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0">
-              <AlertCircle className="w-5 h-5 text-rose-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-semibold text-rose-100">Não foi possível gerar o G-code</h3>
-              <p className="text-xs text-rose-100/80 mt-1 leading-relaxed">{error.message}</p>
-              {error.details && (
-                <pre className="mt-2 p-2 rounded-lg bg-black/30 border border-rose-500/20 text-[10px] text-rose-200/70 font-mono overflow-x-auto whitespace-pre-wrap">
-                  {error.details}
-                </pre>
-              )}
-            </div>
-            <button
-              onClick={onGenerate}
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-100 whitespace-nowrap shrink-0"
-            >
-              Tentar novamente
-            </button>
-          </div>
-
-          {/* Sugestões inteligentes */}
-          {error.suggestions && error.suggestions.length > 0 && (
-            <div className="mt-3 rounded-xl bg-amber-500/[0.06] border border-amber-500/25 p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Lightbulb className="w-4 h-4 text-amber-300" />
-                <span className="text-xs font-semibold text-amber-200 uppercase tracking-wider">
-                  Sugestões da BIA para você continuar
-                </span>
-              </div>
-              <ul className="space-y-1 text-xs text-amber-100/85 leading-relaxed">
-                {error.suggestions.map((s, i) => (
-                  <li key={i} className={s.startsWith("•") || s.startsWith("⚠️") ? "ml-3" : "font-medium"}>{s}</li>
-                ))}
-              </ul>
-              <div className="mt-3 pt-3 border-t border-amber-500/15 flex flex-wrap gap-2">
-                <Link
-                  href="/dashboard/bioprint/model"
-                  className="text-[11px] font-medium px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-200"
-                >
-                  ← Trocar modelo (Etapa 1)
-                </Link>
-                <Link
-                  href="/dashboard/bioprint/bioink"
-                  className="text-[11px] font-medium px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/25 text-cyan-200"
-                >
-                  ← Reformular biotinta (Etapa 2)
-                </Link>
-              </div>
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* Resultado */}
-      {result && (
-        <>
-          {/* Sumário */}
-          <section className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-5">
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                <div>
-                  <h3 className="text-sm font-semibold text-emerald-200">G-code gerado com sucesso</h3>
-                  <p className="text-xs text-emerald-100/70 mt-0.5">{result.jobName}</p>
-                </div>
-              </div>
-              <button
-                onClick={onGenerate}
-                disabled={loading}
-                className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/30 text-violet-200"
-              >
-                Regenerar
-              </button>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <StatBox label="Camadas" value={`${result.layerCount}`} icon={Layers} />
-              <StatBox label="Tempo estimado" value={`${result.estimatedTime_min} min`} icon={Clock} />
-              <StatBox label="Volume bioink" value={`${result.bioinkVolume_uL} µL`} icon={Droplets} />
-              <StatBox
-                label="Viabilidade"
-                value={result.stats?.viabilityEstimate_pct ? `${result.stats.viabilityEstimate_pct}%` : "N/A"}
-                icon={Activity}
-                tone={
-                  result.stats?.viabilityEstimate_pct
-                    ? result.stats.viabilityEstimate_pct >= 85 ? "good"
-                    : result.stats.viabilityEstimate_pct >= 70 ? "warn"
-                    : "bad"
-                    : "neutral"
-                }
-              />
-            </div>
-            {result.summary && (
-              <div className="mt-4 pt-4 border-t border-emerald-500/15 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[10px] text-emerald-100/60">
-                <div><span className="text-gray-500">Bioimpressora:</span> {result.summary.bioprinter}</div>
-                <div><span className="text-gray-500">Biotinta:</span> {result.summary.bioink}</div>
-                {/* R12.36: rotula como "Apenas Contorno" quando o job rodou em modo perimeter-only */}
-                <div>
-                  <span className="text-gray-500">Algoritmo:</span>{" "}
-                  {perimeterOnly
-                    ? <span className="text-amber-300">apenas contorno (perimeter-only)</span>
-                    : result.summary.algorithm}
-                </div>
-              </div>
-            )}
-            {result.creditsUsed > 0 && (
-              <p className="mt-3 text-[10px] text-emerald-300/60">Créditos usados: {result.creditsUsed}</p>
-            )}
-          </section>
-
-          {/* 🔬 VALIDADOR VISUAL PROFISSIONAL — toolpath 3D + validação + complexidade */}
-          <GcodeValidatorPanel
-            gcode={result.gcode}
-            title="Validação visual do G-code · Slice"
-            viewerHeight={460}
-          />
-
-          {/* Warnings */}
-          {result.warnings && result.warnings.length > 0 && (
-            <section className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5">
-              <h3 className="text-sm font-semibold text-amber-200 mb-2 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4" />
-                Avisos do engine ({result.warnings.length})
-              </h3>
-              <ul className="space-y-1.5 text-xs text-amber-100/85">
-                {result.warnings.map((w, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="text-amber-400 mt-0.5">•</span>
-                    <span>{w}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {/* ⚠️ BANNER CRÍTICO: Checklist de calibração ANTES da impressão real */}
-          <PrePrintChecklist />
-
-          {/* Actions */}
-          <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
-            <h3 className="text-sm font-semibold text-white mb-3">Ações</h3>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={onDownload}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500 hover:bg-violet-400 text-violet-950 text-sm font-semibold rounded-lg transition-colors"
-              >
-                <Download className="w-4 h-4" /> Baixar .gcode
-              </button>
-              <button
-                onClick={handleCopy}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 text-sm font-medium rounded-lg transition-colors"
-              >
-                <Copy className="w-4 h-4" /> {copied ? "Copiado!" : "Copiar G-code"}
-              </button>
-            </div>
-          </section>
-
-          {/* Preview do G-code */}
-          <section className="rounded-2xl border border-white/8 bg-white/3 p-5">
-            <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-              <FileCode2 className="w-4 h-4 text-violet-400" />
-              Preview do G-code
-              <span className="text-[10px] font-normal text-gray-500">(primeiras 100 linhas)</span>
-            </h3>
-            <pre className="bg-black/40 border border-white/5 rounded-xl p-3 text-[10px] text-gray-300 font-mono overflow-x-auto max-h-96 overflow-y-auto">
-              {result.gcode.split("\n").slice(0, 100).join("\n")}
-              {result.gcode.split("\n").length > 100 && (
-                <span className="text-gray-600">
-                  {"\n; ... +" + (result.gcode.split("\n").length - 100) + " linhas"}
-                </span>
-              )}
-            </pre>
-          </section>
-        </>
-      )}
-    </div>
-  )
-}
-
-// ─── Pre-print Checklist (banner crítico Z-offset + calibração) ────────────
-function PrePrintChecklist() {
-  const ITEMS = [
-    {
-      icon: "🎯",
-      title: "Calibre o Z-offset com bioink real, não com plástico",
-      body: "Bioinks são viscoelásticas. O offset que funciona com PLA NÃO funciona com hidrogel. Coloque uma gota da SUA bioink no cartucho, faça G28 e use G92 Z0 quando o menisco encostar no leito. Diferença típica: bioink precisa de Z 0.05–0.10 mm MAIS alto do que filamento.",
-      tone: "violet",
-    },
-    {
-      icon: "🌡️",
-      title: "Pré-aqueça/refrigere TUDO 10 minutos antes do print",
-      body: "Cartucho, leito E câmara precisam estar em equilíbrio térmico estável. GelMA a 22°C cristaliza no canto frio do leito 4°C — o filamento entope. Use M190 (bed wait) + M109 (cartridge wait) ANTES do G28.",
-      tone: "rose",
-    },
-    {
-      icon: "💨",
-      title: "Purgue o ar do cartucho (anti-bolha)",
-      body: "Bolha de ar = filamento descontínuo = camada falha. Antes de iniciar, faça G1 E1.0 F60 (extrude 1mm devagar) até sair bioink limpa. Repita se a bioink ficou parada > 15 min.",
-      tone: "amber",
-    },
-    {
-      icon: "🦠",
-      title: "Esterilização do bico — UV 5 min ou EtOH 70% (sem encostar)",
-      body: "O bico passou pela mesa e pelo cartucho. Antes de iniciar, ligue UV (M355 S1) por 5 min OU borrife EtOH 70% e espere evaporar. NUNCA toque o bico com luva contaminada.",
-      tone: "cyan",
-    },
-    {
-      icon: "📐",
-      title: "Verifique a primeira camada visualmente",
-      body: "Os primeiros 5mm² da bioimpressão revelam tudo. Se viu filamento descolando do leito, despressurize (Z+5) e RE-CALIBRE. Não tente salvar — repita do zero. Um print ruim contamina o resto.",
-      tone: "emerald",
-    },
-    {
-      icon: "🧊",
-      title: "Crosslinker pronto e na mesa ANTES do start",
-      body: "Para GelMA: lâmpada UV 365nm com filtro Schott UG-11 configurada e CaCl₂ 100mM pré-aquecida 37°C ao lado. NUNCA crosslinkar a frio — choque térmico mata 30–50% das células.",
-      tone: "blue",
-    },
-  ]
-
-  const TONE_MAP: Record<string, { bg: string; border: string; title: string }> = {
-    violet:  { bg: "bg-violet-500/[0.04]",  border: "border-violet-500/25",  title: "text-violet-100" },
-    rose:    { bg: "bg-rose-500/[0.04]",    border: "border-rose-500/25",    title: "text-rose-100" },
-    amber:   { bg: "bg-amber-500/[0.04]",   border: "border-amber-500/25",   title: "text-amber-100" },
-    cyan:    { bg: "bg-cyan-500/[0.04]",    border: "border-cyan-500/25",    title: "text-cyan-100" },
-    emerald: { bg: "bg-emerald-500/[0.04]", border: "border-emerald-500/25", title: "text-emerald-100" },
-    blue:    { bg: "bg-blue-500/[0.04]",    border: "border-blue-500/25",    title: "text-blue-100" },
-  }
-
-  return (
-    <section className="rounded-2xl border-2 border-amber-500/40 bg-gradient-to-br from-amber-500/[0.05] to-rose-500/[0.05] p-5">
-      <div className="flex items-start gap-3 mb-4">
-        <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
-          <ShieldAlert className="w-5 h-5 text-amber-300" />
-        </div>
-        <div>
-          <h3 className="text-base font-bold text-amber-100">
-            ⚠️ Checklist crítico ANTES de mandar pra impressora
-          </h3>
-          <p className="text-xs text-amber-100/75 mt-0.5 leading-relaxed">
-            Bioink não é filamento. Pulei essa lista = print falha + bioink desperdiçada + células mortas.
-            Leia os 6 itens abaixo antes de pressionar &quot;Iniciar&quot; na Etapa 4.
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-        {ITEMS.map((it, i) => {
-          const t = TONE_MAP[it.tone]
-          return (
+      <div className="grid lg:grid-cols-[380px_1fr] gap-6">
+        <div className="space-y-5">
+          <Panel title="1 · Modelo 3D" icon={<Box className="w-4 h-4" />}>
             <div
-              key={i}
-              className={cn("rounded-xl border p-3", t.bg, t.border)}
+              onClick={() => fileRef.current?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) onFile(f) }}
+              className="rounded-lg border border-dashed border-white/15 hover:border-emerald-400/40 p-4 text-center cursor-pointer text-sm text-gray-300"
             >
-              <div className="flex items-start gap-2.5">
-                <span className="text-xl shrink-0 leading-none mt-0.5">{it.icon}</span>
-                <div className="min-w-0">
-                  <p className={cn("text-xs font-semibold leading-tight", t.title)}>{it.title}</p>
-                  <p className="text-[11px] text-gray-300/80 mt-1 leading-relaxed">{it.body}</p>
+              <Upload className="w-5 h-5 mx-auto mb-1 text-emerald-300" />
+              Arraste um <b>.stl</b> (binário ou ASCII) ou clique
+              <input ref={fileRef} type="file" accept=".stl" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f) }} />
+            </div>
+            {stored.length > 0 && (
+              <div className="mt-3">
+                <div className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">Malhas salvas (Etapa 1 / Studio / uploads)</div>
+                <div className="flex flex-col gap-1 max-h-32 overflow-auto">
+                  {stored.slice(0, 8).map((m) => (
+                    <button key={m.id} onClick={() => loadStored(m.id)} className="text-left text-xs px-2 py-1 rounded hover:bg-white/5 flex justify-between gap-2">
+                      <span className="truncate">{m.name}</span><span className="text-gray-500 shrink-0">{m.sizeKb} kB · {m.source}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
+            )}
+            <div className="mt-3">
+              <div className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">Ou gere uma primitiva</div>
+              <div className="grid grid-cols-2 gap-1.5">
+                <PrimBtn icon={<Box className="w-3.5 h-3.5" />} label="Bloco 10×10×3" onClick={() => makePrimitive("box", { x: 10, y: 10, z: 3 })} />
+                <PrimBtn icon={<Circle className="w-3.5 h-3.5" />} label="Disco Ø10×2" onClick={() => makePrimitive("cylinder", { d: 10, z: 2 })} />
+                <PrimBtn icon={<Cylinder className="w-3.5 h-3.5" />} label="Tubo Ø8/5×5" onClick={() => makePrimitive("tube", { d: 8, di: 5, z: 5 })} />
+                <PrimBtn icon={<Sparkles className="w-3.5 h-3.5" />} label="Domo Ø6×2.5" onClick={() => makePrimitive("dome", { d: 6, z: 2.5 })} />
+              </div>
             </div>
-          )
-        })}
+            {mesh && meshSize && (
+              <div className="mt-3 text-xs rounded-lg bg-emerald-500/5 border border-emerald-500/20 p-2.5">
+                <div className="flex items-center gap-1.5 text-emerald-200"><CheckCircle2 className="w-3.5 h-3.5" /> {meshSource}</div>
+                <div className="text-gray-400 mt-1 font-mono">{mesh.triangleCount.toLocaleString("pt-BR")} tri · {meshSize.x.toFixed(1)} × {meshSize.y.toFixed(1)} × {meshSize.z.toFixed(1)} mm</div>
+              </div>
+            )}
+          </Panel>
+
+          <Panel title="2 · Objetivo (texto ou voz)" icon={<Wand2 className="w-4 h-4" />}>
+            <div className="flex gap-2">
+              <textarea
+                value={intentText} onChange={(e) => setIntentText(e.target.value)}
+                placeholder="Ex.: scaffold ósseo 10x10x4 mm, poro 400 µm, alginato com HAp, agulha 18G"
+                rows={3}
+                className="flex-1 text-sm rounded-lg bg-black/30 border border-white/10 focus:border-emerald-400/50 p-2 resize-none"
+              />
+              <div className="flex flex-col gap-1.5">
+                <button onClick={toggleVoice} title="Falar objetivo (pt-BR)" className={cn("p-2 rounded-lg border", listening ? "bg-red-500/20 border-red-400/40 animate-pulse" : "border-white/10 hover:border-emerald-400/40")}>
+                  {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+                <button onClick={() => runIntent(intentText)} title="Montar perfil" className="p-2 rounded-lg bg-emerald-500/20 border border-emerald-400/40 hover:bg-emerald-500/30"><Wand2 className="w-4 h-4" /></button>
+              </div>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {INTENT_EXAMPLES.slice(0, 4).map((ex) => (
+                <button key={ex} onClick={() => { setIntentText(ex); runIntent(ex) }} className="text-[11px] px-2 py-0.5 rounded-full border border-white/10 hover:border-emerald-400/40 text-gray-300 truncate max-w-full">{ex}</button>
+              ))}
+            </div>
+            {intent && (
+              <div className="mt-3 text-xs rounded-lg bg-violet-500/5 border border-violet-500/20 p-2.5 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-violet-200 font-medium">Perfil: {intent.profile.name}</span>
+                  <span className="text-gray-500">confiança {Math.round(intent.confidence * 100)}%</span>
+                </div>
+                {(intent.tissue || intent.material) && <div className="text-gray-400">{intent.tissue && <>tecido: <b className="text-gray-200">{intent.tissue}</b> · </>}{intent.material && <>material: <b className="text-gray-200">{intent.material}</b></>}</div>}
+                <details className="text-gray-400">
+                  <summary className="cursor-pointer text-gray-300">{intent.decisions.length} decisões explicadas</summary>
+                  <ul className="mt-1 space-y-1">
+                    {intent.decisions.map((d, i) => (
+                      <li key={i} className="flex gap-1.5"><span className={cn("mt-1 w-1.5 h-1.5 rounded-full shrink-0", d.source === "user" ? "bg-emerald-400" : d.source === "rule" ? "bg-amber-400" : "bg-gray-500")} /><span><b className="text-gray-300">{d.field}</b> = {String(d.value)} — {d.reason}</span></li>
+                    ))}
+                  </ul>
+                </details>
+                {intent.warnings.map((w, i) => <div key={i} className="text-amber-300 flex gap-1"><AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{w}</div>)}
+              </div>
+            )}
+          </Panel>
+
+          <Panel title={`3 · Perfil ${mode === "basic" ? "Básico" : "Avançado"}`} icon={<Settings2 className="w-4 h-4" />}>
+            <div className="grid grid-cols-1 gap-1.5">
+              {(mode === "basic" ? BASIC_PROFILES : [...BASIC_PROFILES, ...ADVANCED_PROFILES]).map((pf) => (
+                <button key={pf.id} onClick={() => applyProfile(pf)} className={cn("text-left rounded-lg border p-2 text-xs transition", profile.id === pf.id ? "border-emerald-400/50 bg-emerald-500/10" : "border-white/10 hover:border-white/25")}>
+                  <div className="flex items-center justify-between"><span className="font-medium text-gray-100">{pf.name}</span><span className={cn("text-[10px] px-1.5 rounded", pf.tier === "basic" ? "bg-sky-500/20 text-sky-200" : "bg-violet-500/20 text-violet-200")}>{pf.tier === "basic" ? "básico" : "avançado"}</span></div>
+                  <div className="text-gray-400 mt-0.5 line-clamp-2">{pf.description}</div>
+                </button>
+              ))}
+            </div>
+          </Panel>
+
+          <Panel title="4 · Parâmetros" icon={<Gauge className="w-4 h-4" />}>
+            {mode === "basic"
+              ? <BasicParams P={P} setP={setP} X={X} setX={setX} />
+              : <AdvancedParams P={P} setP={setP} X={X} setX={setX} rheology={rheology} setRheology={setRheology} />}
+          </Panel>
+
+          <Panel title="5 · Onde imprimir (ponto zero)" icon={<Target className="w-4 h-4" />}>
+            <TargetPanel target={target} onChange={setTarget} footprint_mm={meshSize ? Math.max(meshSize.x, meshSize.y) * P.scale : null} />
+          </Panel>
+
+          <Panel title="6 · Cabeçotes e biotintas" icon={<Palette className="w-4 h-4" />}>
+            <ToolsPanel tools={tools} onChange={setTools} bioinks={bioinkOptions} baseExtrusion={X} />
+          </Panel>
+
+          <button onClick={() => setConfirmOpen(true)} disabled={!mesh || !!busy} className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-emerald-500 to-cyan-500 text-black disabled:opacity-40 flex items-center justify-center gap-2">
+            {busy ? <><RefreshCw className="w-4 h-4 animate-spin" /> {busy}</> : <><Layers className="w-4 h-4" /> Fatiar e gerar G-code (6 créditos)</>}
+          </button>
+          {error && <div className="text-sm text-red-300 flex gap-2"><AlertTriangle className="w-4 h-4 shrink-0" />{error}</div>}
+        </div>
+
+        <div className="space-y-5">
+          {!result && (
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-8 text-center text-gray-400 text-sm">
+              <Layers className="w-10 h-10 mx-auto mb-3 text-gray-600" />
+              Carregue um modelo, descreva o objetivo (ou escolha um perfil) e clique em <b>Fatiar</b>.<br />
+              O preview mostra camada a camada: paredes, infill e skirt — com a camada anterior sobreposta para conferir o alinhamento 0/90.
+              <TipsBox tips={profile.tips} title={`Dicas do perfil "${profile.name}"`} />
+            </div>
+          )}
+          {result && (
+            <>
+              <Panel title="Preview por camada" icon={<Layers className="w-4 h-4" />}>
+                <LayerPreview layers={result.layers} bbox={result.meshBBox} lineWidth_mm={P.lineWidth_mm} />
+              </Panel>
+
+              <div className="grid sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                <Stat label="Camadas" value={String(result.stats.layerCount)} />
+                <Stat label="Tempo est." value={fmtTime(result.stats.estimatedTime_s)} />
+                <Stat label="Volume" value={`${(result.stats.volume_uL / 1000).toFixed(2)} mL`} sub={`${result.stats.volume_uL.toFixed(0)} µL`} />
+                <Stat label="Êmbolo" value={`${result.stats.plungerTravel_mm.toFixed(1)} mm`} sub={X.syringe ? `seringa ${X.syringe.volume_mL} mL` : "E total"} />
+                <Stat label="Extrusão" value={`${(result.stats.extrudeLength_mm / 1000).toFixed(2)} m`} sub={`travel ${(result.stats.travelLength_mm / 1000).toFixed(2)} m`} />
+                <Stat label="Vazão média" value={`${result.stats.avgFlow_uLs.toFixed(2)} µL/s`} />
+                <Stat label="Shear (bico)" value={result.stats.wallShear_Pa !== null ? `${(result.stats.wallShear_Pa / 1000).toFixed(1)} kPa` : "–"} tone={result.stats.wallShear_Pa !== null ? (result.stats.wallShear_Pa > 10000 ? "bad" : result.stats.wallShear_Pa > 5000 ? "warn" : "ok") : undefined} />
+                <Stat label="Viabilidade est." value={result.stats.viability_pct !== null ? `${result.stats.viability_pct}%` : "– (sem células)"} tone={result.stats.viability_pct !== null ? (result.stats.viability_pct < 80 ? "bad" : result.stats.viability_pct < 90 ? "warn" : "ok") : undefined} />
+              </div>
+
+              {result.warnings.length > 0 && (
+                <div className="space-y-1.5">
+                  {result.warnings.map((w, i) => (
+                    <div key={i} className={cn("rounded-lg border p-2.5 text-xs flex gap-2", w.level === "error" ? "border-red-500/40 bg-red-500/10 text-red-200" : w.level === "warn" ? "border-amber-500/40 bg-amber-500/10 text-amber-100" : "border-sky-500/30 bg-sky-500/5 text-sky-100")}>
+                      {w.level === "info" ? <Info className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
+                      <div><b>{w.message}</b>{w.hint && <div className="opacity-80 mt-0.5">{w.hint}</div>}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                <button onClick={download} className="px-4 py-2 rounded-lg border border-white/15 hover:border-emerald-400/40 text-sm flex items-center gap-2"><Download className="w-4 h-4" /> Baixar .gcode</button>
+                <button onClick={sendToHost} disabled={errors.length > 0} className="px-4 py-2 rounded-lg bg-emerald-500/20 border border-emerald-400/40 hover:bg-emerald-500/30 text-sm flex items-center gap-2 disabled:opacity-40"><Send className="w-4 h-4" /> Enviar ao Host (imprimir)</button>
+                <button onClick={sendToStep4} disabled={errors.length > 0} className="px-4 py-2 rounded-lg border border-white/15 hover:border-white/30 text-sm disabled:opacity-40">Etapa 4 (Execução) →</button>
+                {charged && <span className={cn("text-xs self-center px-2 py-1 rounded border", charged.ok ? "text-emerald-200 border-emerald-400/30 bg-emerald-500/10" : "text-rose-200 border-rose-400/30 bg-rose-500/10")}>{charged.msg}</span>}
+              </div>
+              {errors.length > 0 && <div className="text-xs text-red-300">Resolva os erros acima antes de enviar ao host.</div>}
+              {(result.stats.wells ?? 1) > 1 || (result.stats.toolChanges ?? 0) > 0 ? (
+                <div className="text-xs text-gray-400 flex flex-wrap gap-3">
+                  {(result.stats.wells ?? 1) > 1 && <span>🧫 {result.stats.wells} poços replicados</span>}
+                  {(result.stats.toolChanges ?? 0) > 0 && <span>🎨 {result.stats.toolChanges} trocas de cabeçote · {Object.entries(result.stats.volumeByTool_uL ?? {}).map(([t, v]) => `T${t}: ${(v / 1000).toFixed(2)} mL`).join(" · ")}</span>}
+                </div>
+              ) : null}
+
+              <TipsBox tips={profile.tips} title={`Dicas do perfil "${profile.name}"`} />
+
+              <Panel title="G-code" icon={<FlaskConical className="w-4 h-4" />} subtitle={`${result.gcode.split("\n").length.toLocaleString("pt-BR")} linhas`}>
+                <pre className="text-[11px] leading-relaxed font-mono max-h-72 overflow-auto bg-black/40 rounded-lg p-3 text-gray-300 whitespace-pre">{result.gcode.slice(0, 20000)}{result.gcode.length > 20000 ? "\n… (truncado no preview — o download contém tudo)" : ""}</pre>
+              </Panel>
+            </>
+          )}
+        </div>
       </div>
 
-      <div className="mt-4 pt-3 border-t border-amber-500/15 flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-[11px] text-amber-100/60 italic">
-          Dica BIA: imprima primeiro a versão SEM CÉLULAS (acelular) para validar geometria + Z-offset.
-          Só depois rode com bioink celular cara.
-        </p>
-        <Link
-          href="/dashboard/bioprint/control"
-          className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-200 inline-flex items-center gap-1.5 whitespace-nowrap"
-        >
-          Ir para Execução · Etapa 4 <ArrowRight className="w-3.5 h-3.5" />
-        </Link>
-      </div>
-    </section>
-  )
-}
-
-// ─── Stat box ───────────────────────────────────────────────────────────────
-function StatBox({
-  label, value, icon: Icon, tone = "neutral",
-}: {
-  label: string; value: string; icon: typeof Layers
-  tone?: "good" | "warn" | "bad" | "neutral"
-}) {
-  const colors = {
-    good:    "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
-    warn:    "border-amber-500/30 bg-amber-500/10 text-amber-200",
-    bad:     "border-rose-500/30 bg-rose-500/10 text-rose-200",
-    neutral: "border-white/8 bg-white/3 text-violet-200",
-  }
-  return (
-    <div className={cn("rounded-xl border p-3", colors[tone])}>
-      <div className="flex items-center gap-1.5 mb-1">
-        <Icon className="w-3 h-3 opacity-70" />
-        <span className="text-[10px] uppercase tracking-wider opacity-70">{label}</span>
-      </div>
-      <div className="text-lg font-bold">{value}</div>
+      {confirmOpen && mesh && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setConfirmOpen(false)}>
+          <div className="w-full max-w-lg rounded-2xl border border-emerald-400/30 bg-[#0b1412] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-white font-semibold"><ShieldCheck className="w-5 h-5 text-emerald-300" /> Confirme antes de fatiar</div>
+              <button onClick={() => setConfirmOpen(false)} className="p-1 rounded hover:bg-white/10 text-gray-400"><XIcon className="w-4 h-4" /></button>
+            </div>
+            <div className="p-5 space-y-2.5 text-sm">
+              <Row k="Modelo" v={`${mesh.name ?? "malha"} · ${meshSize ? `${(meshSize.x * P.scale).toFixed(1)} × ${(meshSize.y * P.scale).toFixed(1)} × ${(meshSize.z * P.scale).toFixed(1)} mm` : ""}`} />
+              <Row k="Preenchimento" v={`${infillLabel(P.infillPattern)} · ${P.infillDensity} %${P.strandSpacing_mm ? ` · espaçamento ${P.strandSpacing_mm} mm` : ""}`} />
+              <Row k="Paredes / camada" v={`${P.wallCount} parede(s) · camada ${P.layerHeight_mm} mm · agulha ${P.nozzleDiameter_mm} mm`} />
+              <Row k="Velocidade" v={`${P.speedPerimeter_mms} mm/s perímetro · ${P.speedInfill_mms} mm/s infill`} />
+              <Row k="Onde" v={describeTarget(target)} />
+              <Row k="Cabeçotes" v={describeTools(tools)} />
+              <Row k="Ponto zero" v={target.kind === "plate" ? `Bico no centro do 1º poço — o 1º cordão nasce ali, sem deslocamento.` : `Bico no centro da peça — o 1º cordão nasce ali, sem deslocamento.`} />
+              <Row k="Skirt" v={P.skirtLoops > 0 ? `${P.skirtLoops} volta(s) (você ligou)` : "desligado"} />
+              <div className="text-[11px] text-gray-500 pt-1">Serão debitados <b className="text-gray-300">6 créditos</b> ao gerar. Se algo acima não for o que você quer, cancele e ajuste — nada é inventado: só o que está listado vai para o G-code.</div>
+            </div>
+            <div className="px-5 py-3.5 border-t border-white/10 flex justify-end gap-2">
+              <button onClick={() => setConfirmOpen(false)} className="px-4 py-2 rounded-lg text-sm text-gray-300 hover:bg-white/10">Ajustar</button>
+              <button onClick={() => { setConfirmOpen(false); void doSlice() }} className="px-5 py-2 rounded-lg text-sm font-semibold bg-emerald-400 text-black hover:bg-emerald-300 flex items-center gap-2"><Layers className="w-4 h-4" /> Confirmar e fatiar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// PrinterPrepSection (R10) — Conexão + joystick no topo da aba G-code.
-// Permite que o usuário PREPARE a máquina (homing, Z-offset, purga)
-// ANTES de gerar/enviar o G-code.
-// ═══════════════════════════════════════════════════════════════════════
-function PrinterPrepSection({ gcode, printerName, bioprinterId }: { gcode: string; printerName: string; bioprinterId: string }) {
-  const [expanded, setExpanded] = useState(true)
-  const [isConnected, setIsConnected] = useState(false)
+function Row({ k, v }: { k: string; v: string }) {
+  return <div className="flex gap-3"><span className="w-32 shrink-0 text-gray-500">{k}</span><span className="text-gray-100">{v}</span></div>
+}
+function infillLabel(p: InfillPattern): string {
+  return ({ rectilinear: "Linhas (woodpile 0/90)", grid: "Grid (quadriculado)", triangles: "Triangular", honeycomb: "Honeycomb (hexagonal)", concentric: "Concêntrico", gyroid: "Gyroid", zigzag: "Zigzag contínuo", none: "Sem preenchimento (só paredes)" } as Record<string, string>)[p] ?? p
+}
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Painéis de parâmetros
+// ═══════════════════════════════════════════════════════════════════════════
+
+function BasicParams({ P, setP, X, setX }: { P: SliceParams; setP: (p: SliceParams) => void; X: ExtrusionModel; setX: (x: ExtrusionModel) => void }) {
+  const gauge = NEEDLE_GAUGES.find((g) => Math.abs(g.id_mm - P.nozzleDiameter_mm) < 0.005)
   return (
-    <section className="rounded-2xl bg-gradient-to-br from-quantis-blue-500/[0.06] to-quantis-purple-500/[0.04] border border-quantis-blue-400/30 overflow-hidden">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full px-5 py-4 flex items-center gap-3 hover:bg-white/[0.02] transition-colors text-left"
-      >
-        <div className="w-11 h-11 rounded-xl bg-quantis-blue-500/20 border border-quantis-blue-400/40 flex items-center justify-center shrink-0">
-          <Printer className="w-5 h-5 text-quantis-blue-200" />
+    <div className="space-y-3 text-sm">
+      <Field label="Agulha / bico" tip={PARAM_TIPS.nozzleDiameter_mm}>
+        <select value={gauge?.gauge ?? "custom"} onChange={(e) => {
+          const g = NEEDLE_GAUGES.find((x) => x.gauge === e.target.value)
+          if (g) setP({ ...P, nozzleDiameter_mm: g.id_mm, lineWidth_mm: defaultLineWidth(g.id_mm), layerHeight_mm: defaultLayerHeight(g.id_mm), firstLayerHeight_mm: Math.round(defaultLayerHeight(g.id_mm) * 0.9 * 100) / 100 })
+        }} className={inp}>
+          {NEEDLE_GAUGES.map((g) => <option key={g.gauge} value={g.gauge}>{g.gauge} — Ø {g.id_mm} mm ({g.color})</option>)}
+          {!gauge && <option value="custom">Personalizado ({P.nozzleDiameter_mm} mm)</option>}
+        </select>
+      </Field>
+      <Field label="Seringa" tip="Define a conversão µL → mm de êmbolo (E). Confira o diâmetro interno real da sua seringa.">
+        <select value={X.kind === "pneumatic" ? "pneumatic" : X.syringe ? `${X.syringe.volume_mL}|${X.syringe.innerDiameter_mm}` : "10|14.5"} onChange={(e) => {
+          if (e.target.value === "pneumatic") { setX({ ...X, kind: "pneumatic", pressure_kPa: X.pressure_kPa ?? 75 }); return }
+          const [v, d] = e.target.value.split("|").map(Number)
+          setX({ ...X, kind: "syringe_stepper", syringe: { volume_mL: v, innerDiameter_mm: d } })
+        }} className={inp}>
+          {SYRINGE_CATALOG.map((s) => <option key={s.label} value={`${s.volume_mL}|${s.innerDiameter_mm}`}>{s.label}</option>)}
+          <option value="pneumatic">Pneumático (pressão)</option>
+        </select>
+      </Field>
+      <Range label="Altura de camada" tip={PARAM_TIPS.layerHeight_mm} value={P.layerHeight_mm} min={0.1} max={1.2} step={0.01} unit="mm" onChange={(v) => setP({ ...P, layerHeight_mm: v, firstLayerHeight_mm: Math.round(v * 0.9 * 100) / 100 })} hint={`${Math.round((P.layerHeight_mm / P.nozzleDiameter_mm) * 100)} % do bico`} />
+      <Field label="Padrão de infill" tip={PARAM_TIPS.infillPattern}>
+        <select value={P.infillPattern} onChange={(e) => setP({ ...P, infillPattern: e.target.value as InfillPattern })} className={inp}>
+          <option value="rectilinear">Woodpile 0/90 (scaffold clássico)</option>
+          <option value="zigzag">Zigzag contínuo (menos gotas)</option>
+          <option value="grid">Grade cruzada</option>
+          <option value="gyroid">Gyroid (isotrópico)</option>
+          <option value="concentric">Concêntrico (discos)</option>
+          <option value="honeycomb">Favo (hexagonal)</option>
+          <option value="none">Sem infill (só paredes)</option>
+        </select>
+      </Field>
+      {P.infillPattern !== "none" && <Range label="Densidade do infill" tip={PARAM_TIPS.infillDensity} value={P.infillDensity} min={5} max={100} step={5} unit="%" onChange={(v) => setP({ ...P, infillDensity: v, strandSpacing_mm: undefined })} hint={`porosidade ≈ ${100 - P.infillDensity} %`} />}
+      <Range label="Velocidade" tip={PARAM_TIPS.speedPerimeter_mms} value={P.speedPerimeter_mms} min={1} max={20} step={0.5} unit="mm/s" onChange={(v) => setP({ ...P, speedPerimeter_mms: v, speedInfill_mms: Math.round(v * 1.2 * 10) / 10, speedFirstLayer_mms: Math.max(1, Math.round(v * 0.7 * 10) / 10) })} />
+      <Range label="Paredes" tip={PARAM_TIPS.wallCount} value={P.wallCount} min={0} max={4} step={1} unit="" onChange={(v) => setP({ ...P, wallCount: v })} />
+      <Field label="Temperatura do cartucho" tip={PARAM_TIPS.cartridgeTemp_C}>
+        <div className="flex gap-2 items-center">
+          <input type="checkbox" checked={P.cartridgeTemp_C !== null} onChange={(e) => setP({ ...P, cartridgeTemp_C: e.target.checked ? 23 : null })} />
+          <input type="number" disabled={P.cartridgeTemp_C === null} value={P.cartridgeTemp_C ?? ""} onChange={(e) => setP({ ...P, cartridgeTemp_C: +e.target.value })} className={cn(inp, "w-24")} /> °C
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-base font-bold text-white">Preparar a Bioimpressora</h3>
-            <span className={cn(
-              "text-xs px-2 py-0.5 rounded-full border font-semibold inline-flex items-center gap-1",
-              isConnected
-                ? "bg-emerald-500/15 border-emerald-400/40 text-emerald-200"
-                : "bg-quantis-ink-700/40 border-quantis-ink-500/40 text-quantis-ink-200"
-            )}>
-              {isConnected ? "● ONLINE" : "○ OFFLINE"}
-            </span>
-          </div>
-          <p className="text-sm text-quantis-blue-100/80 mt-0.5">
-            Conecte por USB, faça homing, ajuste Z-offset e purgue antes de gerar/enviar o G-code.
-          </p>
-        </div>
-        {expanded ? <ChevronDown className="w-5 h-5 text-quantis-blue-200" /> : <ChevronRight className="w-5 h-5 text-quantis-blue-200" />}
-      </button>
+      </Field>
+      <Field label="Biotinta com células?" tip={PARAM_TIPS.hasCells}>
+        <label className="flex items-center gap-2 text-gray-300"><input type="checkbox" checked={P.hasCells} onChange={(e) => setP({ ...P, hasCells: e.target.checked })} /> sim — calcular shear/viabilidade</label>
+      </Field>
+    </div>
+  )
+}
 
-      {expanded && (
-        <div className="px-4 sm:px-5 pb-5 border-t border-white/5 pt-4">
-          <PrinterConnection
-            gcode={gcode}
-            printerName={printerName}
-            bioprinterId={bioprinterId}
-            onConnectionChange={setIsConnected}
-          />
-        </div>
-      )}
+function AdvancedParams({ P, setP, X, setX, rheology, setRheology }: {
+  P: SliceParams; setP: (p: SliceParams) => void; X: ExtrusionModel; setX: (x: ExtrusionModel) => void
+  rheology?: Rheo; setRheology: (r?: Rheo) => void
+}) {
+  const num = (k: keyof SliceParams, step = 0.01, min?: number, max?: number) => (
+    <input type="number" step={step} min={min} max={max} value={(P[k] as number | null) ?? ""} onChange={(e) => setP({ ...P, [k]: e.target.value === "" ? null : +e.target.value })} className={inp} />
+  )
+  return (
+    <div className="space-y-4 text-sm">
+      <Group title="Geometria de camada">
+        <F k="nozzleDiameter_mm" label="Bico (mm)">{num("nozzleDiameter_mm", 0.01, 0.05, 2)}</F>
+        <F k="lineWidth_mm" label="Largura de linha (mm)">{num("lineWidth_mm", 0.01, 0.05, 3)}</F>
+        <F k="layerHeight_mm" label="Camada (mm)">{num("layerHeight_mm", 0.01, 0.05, 2)}</F>
+        <F k="firstLayerHeight_mm" label="1ª camada (mm)">{num("firstLayerHeight_mm", 0.01, 0.05, 2)}</F>
+      </Group>
+      <Group title="Paredes">
+        <F k="wallCount" label="Paredes">{num("wallCount", 1, 0, 8)}</F>
+        <F k="wallOrder" label="Ordem"><select value={P.wallOrder} onChange={(e) => setP({ ...P, wallOrder: e.target.value as SliceParams["wallOrder"] })} className={inp}><option value="outside_in">fora → dentro</option><option value="inside_out">dentro → fora</option></select></F>
+        <F k="seam" label="Costura"><select value={P.seam} onChange={(e) => setP({ ...P, seam: e.target.value as SliceParams["seam"] })} className={inp}><option value="nearest">mais próxima</option><option value="aligned">alinhada</option><option value="rear">traseira</option><option value="random">aleatória</option></select></F>
+        <F k="infillOverlap" label="Overlap infill↔parede">{num("infillOverlap", 0.05, 0, 0.6)}</F>
+      </Group>
+      <Group title="Infill">
+        <F k="infillPattern" label="Padrão"><select value={P.infillPattern} onChange={(e) => setP({ ...P, infillPattern: e.target.value as InfillPattern })} className={inp}>
+          {(["rectilinear", "zigzag", "grid", "triangles", "honeycomb", "gyroid", "concentric", "none"] as InfillPattern[]).map((p) => <option key={p} value={p}>{p}</option>)}
+        </select></F>
+        <F k="infillDensity" label="Densidade (%)">{num("infillDensity", 1, 0, 100)}</F>
+        <F k="strandSpacing_mm" label="Espaçamento (mm, opcional)"><input type="number" step={0.05} value={P.strandSpacing_mm ?? ""} placeholder="auto" onChange={(e) => setP({ ...P, strandSpacing_mm: e.target.value === "" ? undefined : +e.target.value })} className={inp} /></F>
+        <F k="infillAngle_deg" label="Ângulo base (°)">{num("infillAngle_deg", 5, -180, 180)}</F>
+        <F k="infillAngleStep_deg" label="Rotação/camada (°)">{num("infillAngleStep_deg", 5, 0, 180)}</F>
+        <F k="infillEveryNLayers" label="Infill a cada N camadas">{num("infillEveryNLayers", 1, 0, 10)}</F>
+        {P.strandSpacing_mm && <div className="col-span-2 text-xs text-sky-200">poro ≈ {Math.max(0, (P.strandSpacing_mm - P.lineWidth_mm) * 1000).toFixed(0)} µm</div>}
+      </Group>
+      <Group title="Velocidades (mm/s)">
+        <F k="speedPerimeter_mms" label="Perímetro">{num("speedPerimeter_mms", 0.5, 0.5, 60)}</F>
+        <F k="speedInfill_mms" label="Infill">{num("speedInfill_mms", 0.5, 0.5, 60)}</F>
+        <F k="speedFirstLayer_mms" label="1ª camada">{num("speedFirstLayer_mms", 0.5, 0.5, 60)}</F>
+        <F k="speedTravel_mms" label="Travel">{num("speedTravel_mms", 1, 1, 150)}</F>
+        <F k="speedZ_mms" label="Z">{num("speedZ_mms", 0.5, 0.5, 20)}</F>
+      </Group>
+      <Group title="Travel / skirt">
+        <F k="zHop_mm" label="Z-hop (mm)">{num("zHop_mm", 0.1, 0, 10)}</F>
+        <F k="retractMinTravel_mm" label="Travel mín. p/ retrair (mm)">{num("retractMinTravel_mm", 0.5, 0, 50)}</F>
+        <F k="skirtLoops" label="Skirt (voltas)">{num("skirtLoops", 1, 0, 5)}</F>
+        <F k="skirtDistance_mm" label="Distância skirt (mm)">{num("skirtDistance_mm", 0.5, 0, 20)}</F>
+        <F k="purgeLine_mm" label="Linha de purga (mm)">{num("purgeLine_mm", 1, 0, 100)}</F>
+        <F k="layerPause_s" label="Pausa entre camadas (s)">{num("layerPause_s", 1, 0, 120)}</F>
+      </Group>
+      <Group title="Temperaturas (vazio = não emitir)">
+        <F k="cartridgeTemp_C" label="Cartucho (°C)">{num("cartridgeTemp_C", 0.5, 0, 250)}</F>
+        <F k="bedTemp_C" label="Mesa (°C)">{num("bedTemp_C", 0.5, 0, 120)}</F>
+        <F k="waitForTemps" label="Esperar atingir (M109/M190)"><input type="checkbox" checked={P.waitForTemps} onChange={(e) => setP({ ...P, waitForTemps: e.target.checked })} /></F>
+      </Group>
+      <Group title="Posicionamento">
+        <F k="originX_mm" label="Centro X (mm)">{num("originX_mm", 0.5, -200, 200)}</F>
+        <F k="originY_mm" label="Centro Y (mm)">{num("originY_mm", 0.5, -200, 200)}</F>
+        <F k="zOffset_mm" label="Z-offset inicial (mm)">{num("zOffset_mm", 0.05, -5, 20)}</F>
+        <F k="scale" label="Escala">{num("scale", 0.01, 0.01, 100)}</F>
+        <F k="rotationZ_deg" label="Rotação Z (°)">{num("rotationZ_deg", 5, -180, 180)}</F>
+        <F k="hasCells" label="Com células"><input type="checkbox" checked={P.hasCells} onChange={(e) => setP({ ...P, hasCells: e.target.checked })} /></F>
+      </Group>
+      <Group title="Extrusão (seringa / pneumático)">
+        <F k="extrusion" label="Tipo"><select value={X.kind} onChange={(e) => setX({ ...X, kind: e.target.value as ExtrusionModel["kind"] })} className={inp}><option value="syringe_stepper">seringa (motor de passo)</option><option value="pneumatic">pneumático</option><option value="filament_eq">filamento equivalente</option></select></F>
+        {X.kind === "syringe_stepper" && <F k="syringe" label="Seringa"><select value={X.syringe ? `${X.syringe.volume_mL}|${X.syringe.innerDiameter_mm}` : ""} onChange={(e) => { const [v, d] = e.target.value.split("|").map(Number); setX({ ...X, syringe: { volume_mL: v, innerDiameter_mm: d } }) }} className={inp}>{SYRINGE_CATALOG.map((s) => <option key={s.label} value={`${s.volume_mL}|${s.innerDiameter_mm}`}>{s.label}</option>)}</select></F>}
+        {X.kind === "syringe_stepper" && <F k="syringeId" label="Ø interno (mm)"><input type="number" step={0.01} value={X.syringe?.innerDiameter_mm ?? 14.5} onChange={(e) => setX({ ...X, syringe: { volume_mL: X.syringe?.volume_mL ?? 10, innerDiameter_mm: +e.target.value } })} className={inp} /></F>}
+        {X.kind === "pneumatic" && <F k="pressure_kPa" label="Pressão (kPa)"><input type="number" step={1} value={X.pressure_kPa ?? 75} onChange={(e) => setX({ ...X, pressure_kPa: +e.target.value })} className={inp} /></F>}
+        <F k="flowMultiplier" label="Multiplicador de fluxo"><input type="number" step={0.05} value={X.flowMultiplier} onChange={(e) => setX({ ...X, flowMultiplier: +e.target.value })} className={inp} /></F>
+        <F k="primeVolume_uL" label="Prime (µL)"><input type="number" step={0.1} value={X.primeVolume_uL} onChange={(e) => setX({ ...X, primeVolume_uL: +e.target.value })} className={inp} /></F>
+        <F k="retractVolume_uL" label="Retração (µL)"><input type="number" step={0.1} value={X.retractVolume_uL} onChange={(e) => setX({ ...X, retractVolume_uL: +e.target.value })} className={inp} /></F>
+        <F k="retractSpeed_mms" label="Vel. êmbolo retr. (mm/s)"><input type="number" step={0.5} value={X.retractSpeed_mms} onChange={(e) => setX({ ...X, retractSpeed_mms: +e.target.value })} className={inp} /></F>
+        <F k="primeDwell_ms" label="Dwell pós-prime (ms)"><input type="number" step={50} value={X.primeDwell_ms} onChange={(e) => setX({ ...X, primeDwell_ms: +e.target.value })} className={inp} /></F>
+      </Group>
+      <Group title="Reologia (para shear/viabilidade)">
+        <F k="viscosity" label="Viscosidade (Pa·s)"><input type="number" step={0.1} value={rheology?.viscosity_PaS ?? ""} placeholder="ex. 2.5" onChange={(e) => setRheology({ ...rheology, viscosity_PaS: e.target.value === "" ? undefined : +e.target.value })} className={inp} /></F>
+        <F k="n" label="Índice power-law n"><input type="number" step={0.05} min={0.1} max={1} value={rheology?.powerLawN ?? ""} placeholder="1 = newtoniano" onChange={(e) => setRheology({ ...rheology, powerLawN: e.target.value === "" ? undefined : +e.target.value })} className={inp} /></F>
+      </Group>
+      <Group title="Firmware e G-code customizado">
+        <F k="firmware" label="Firmware"><select value={P.firmware} onChange={(e) => setP({ ...P, firmware: e.target.value as SliceParams["firmware"] })} className={inp}><option value="marlin">Marlin (Ender/BioEnder)</option><option value="klipper">Klipper</option><option value="reprap">RepRap/Duet</option></select></F>
+        <F k="verboseComments" label="Comentários detalhados"><input type="checkbox" checked={P.verboseComments} onChange={(e) => setP({ ...P, verboseComments: e.target.checked })} /></F>
+        <div className="col-span-2"><label className="text-xs text-gray-400">Start G-code extra</label><textarea rows={2} value={P.customStart} onChange={(e) => setP({ ...P, customStart: e.target.value })} className={cn(inp, "w-full font-mono text-xs")} /></div>
+        <div className="col-span-2"><label className="text-xs text-gray-400">Troca de camada</label><textarea rows={1} value={P.customLayerChange} onChange={(e) => setP({ ...P, customLayerChange: e.target.value })} className={cn(inp, "w-full font-mono text-xs")} /></div>
+        <div className="col-span-2"><label className="text-xs text-gray-400">End G-code extra</label><textarea rows={2} value={P.customEnd} onChange={(e) => setP({ ...P, customEnd: e.target.value })} className={cn(inp, "w-full font-mono text-xs")} /></div>
+      </Group>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Átomos
+// ═══════════════════════════════════════════════════════════════════════════
+
+const inp = "rounded-md bg-black/30 border border-white/10 focus:border-emerald-400/50 px-2 py-1 text-sm w-full"
+
+function Panel({ title, icon, subtitle, children }: { title: string; icon?: React.ReactNode; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+      <header className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold flex items-center gap-2 text-gray-100">{icon}{title}</h3>
+        {subtitle && <span className="text-xs text-gray-500">{subtitle}</span>}
+      </header>
+      {children}
     </section>
   )
+}
+
+function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
+  return (
+    <div className="inline-flex rounded-lg border border-white/10 overflow-hidden">
+      <button onClick={() => onChange("basic")} className={cn("px-3 py-1.5", mode === "basic" ? "bg-sky-500/20 text-sky-100" : "text-gray-400 hover:text-white")}>Básico</button>
+      <button onClick={() => onChange("advanced")} className={cn("px-3 py-1.5", mode === "advanced" ? "bg-violet-500/20 text-violet-100" : "text-gray-400 hover:text-white")}>Avançado</button>
+    </div>
+  )
+}
+
+function PrimBtn({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
+  return <button onClick={onClick} className="text-xs px-2 py-1.5 rounded-lg border border-white/10 hover:border-emerald-400/40 flex items-center gap-1.5 text-gray-300">{icon}{label}</button>
+}
+
+function Field({ label, tip, children }: { label: string; tip?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-1">{label}{tip && <span title={tip} className="cursor-help text-gray-600 hover:text-sky-300"><Info className="w-3 h-3" /></span>}</div>
+      {children}
+    </div>
+  )
+}
+
+function Range({ label, tip, value, min, max, step, unit, onChange, hint }: { label: string; tip?: string; value: number; min: number; max: number; step: number; unit: string; onChange: (v: number) => void; hint?: string }) {
+  return (
+    <Field label={label} tip={tip}>
+      <div className="flex items-center gap-2">
+        <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(+e.target.value)} className="flex-1 accent-emerald-400" />
+        <input type="number" min={min} max={max} step={step} value={value} onChange={(e) => onChange(+e.target.value)} className={cn(inp, "w-20")} />
+        <span className="text-xs text-gray-500 w-10">{unit}</span>
+      </div>
+      {hint && <div className="text-[11px] text-gray-500 mt-0.5">{hint}</div>}
+    </Field>
+  )
+}
+
+function Group({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <fieldset className="rounded-lg border border-white/10 p-3">
+      <legend className="px-1 text-xs uppercase tracking-wide text-gray-400">{title}</legend>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2">{children}</div>
+    </fieldset>
+  )
+}
+
+function F({ k, label, children }: { k: string; label: string; children: React.ReactNode }) {
+  const tip = PARAM_TIPS[k]
+  return (
+    <div>
+      <div className="flex items-center gap-1 text-[11px] text-gray-400 mb-0.5">{label}{tip && <span title={tip} className="cursor-help text-gray-600 hover:text-sky-300"><Info className="w-3 h-3" /></span>}</div>
+      {children}
+    </div>
+  )
+}
+
+function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "ok" | "warn" | "bad" }) {
+  return (
+    <div className={cn("rounded-lg border p-2.5", tone === "bad" ? "border-red-500/40 bg-red-500/5" : tone === "warn" ? "border-amber-500/40 bg-amber-500/5" : tone === "ok" ? "border-emerald-500/30 bg-emerald-500/5" : "border-white/10 bg-white/[0.02]")}>
+      <div className="text-[10px] uppercase tracking-wide text-gray-500">{label}</div>
+      <div className="text-base font-semibold text-gray-100">{value}</div>
+      {sub && <div className="text-[11px] text-gray-500">{sub}</div>}
+    </div>
+  )
+}
+
+function TipsBox({ tips, title }: { tips: string[]; title: string }) {
+  return (
+    <div className="mt-4 text-left rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+      <div className="text-xs font-semibold text-amber-200 flex items-center gap-1.5 mb-1.5"><Lightbulb className="w-3.5 h-3.5" /> {title}</div>
+      <ul className="text-xs text-amber-100/80 space-y-1 list-disc pl-4">{tips.map((t, i) => <li key={i}>{t}</li>)}</ul>
+    </div>
+  )
+}
+
+function fmtTime(s: number): string {
+  if (s < 60) return `${s} s`
+  const m = Math.floor(s / 60), r = s % 60
+  if (m < 60) return `${m} min ${r} s`
+  return `${Math.floor(m / 60)} h ${m % 60} min`
+}
+
+interface SR {
+  lang: string; interimResults: boolean; continuous: boolean
+  onresult: ((ev: { resultIndex: number; results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null
+  onend: (() => void) | null; onerror: (() => void) | null
+  start(): void; stop(): void
 }
