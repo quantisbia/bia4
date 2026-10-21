@@ -1,0 +1,12 @@
+/** BIA v4 · R15 · BioSlicer — barrel export */
+export * from "./types"
+export * from "./polygon-ops"
+export * from "./mesh-slice"
+export * from "./infill"
+export * from "./extrusion"
+export * from "./profiles"
+export * from "./toolpath"
+export * from "./gcode-writer"
+export * from "./slice"
+export * from "./intent"
+export * from "./primitives"

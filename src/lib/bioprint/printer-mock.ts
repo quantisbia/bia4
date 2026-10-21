@@ -33,6 +33,8 @@ export interface PrinterMockOptions {
   echoMoves?: boolean
   /** Firmware string para M115 */
   firmwareName?: string
+  /** R15: probabilidade [0–1] de simular corrupção serial em linhas numeradas (gera Resend) */
+  corruptRate?: number
 }
 
 const DEFAULT_OPTS: Required<PrinterMockOptions> = {
@@ -40,6 +42,7 @@ const DEFAULT_OPTS: Required<PrinterMockOptions> = {
   busyRate: 0,
   errorRate: 0,
   echoMoves: false,
+  corruptRate: 0,
   firmwareName: "FIRMWARE_NAME:Marlin 2.1.2 (BIA Mock) SOURCE_CODE_URL:https://github.com/MarlinFirmware/Marlin PROTOCOL_VERSION:1.0 MACHINE_TYPE:BIA Mock Bioprinter EXTRUDER_COUNT:1 UUID:bia-mock-0000",
 }
 
@@ -56,6 +59,7 @@ export class PrinterMock implements PrinterTransport {
   private bedTargetC = 0
   private feedrate = 1500
   private emergency = false
+  private lastLineNo = 0
   private autoTempInterval: ReturnType<typeof setInterval> | null = null
 
   constructor(opts: PrinterMockOptions = {}) {
@@ -101,12 +105,41 @@ export class PrinterMock implements PrinterTransport {
     }
     // Remove comentários
     const semi = clean.indexOf(";")
-    const cmdPart = (semi >= 0 ? clean.slice(0, semi) : clean).trim()
+    let cmdPart = (semi >= 0 ? clean.slice(0, semi) : clean).trim()
     if (!cmdPart) {
       await this.delay(2)
       this.emit("ok", "ok")
       return
     }
+
+    // R15: linhas numeradas com checksum (N123 G1 ... *67) — protocolo de host
+    // Marlin. Valida o checksum (XOR antes do '*'), controla a sequência e emite
+    // "Resend: N" em caso de erro, como o firmware real.
+    const framed = cmdPart.match(/^N(\d+)\s+(.*?)\s*\*(\d+)$/)
+    if (framed) {
+      const n = parseInt(framed[1], 10)
+      const body = `N${framed[1]} ${framed[2]}`
+      let cs = 0
+      for (let i = 0; i < body.length; i++) cs ^= body.charCodeAt(i)
+      cs &= 0xff
+      if (cs !== parseInt(framed[3], 10) || (this.opts.corruptRate > 0 && Math.random() < this.opts.corruptRate)) {
+        this.emit("error", `Error:checksum mismatch, Last Line: ${this.lastLineNo}`)
+        this.emit("info", `Resend: ${this.lastLineNo + 1}`)
+        this.emit("ok", "ok")
+        return
+      }
+      if (n !== this.lastLineNo + 1 && !/^M110\b/i.test(framed[2])) {
+        this.emit("error", `Error:Line Number is not Last Line Number+1, Last Line: ${this.lastLineNo}`)
+        this.emit("info", `Resend: ${this.lastLineNo + 1}`)
+        this.emit("ok", "ok")
+        return
+      }
+      this.lastLineNo = n
+      cmdPart = framed[2].trim()
+      if (!cmdPart) { this.emit("ok", "ok"); return }
+    }
+    const m110 = cmdPart.match(/^M110\s+N(\d+)/i)
+    if (m110) { this.lastLineNo = parseInt(m110[1], 10); this.emit("ok", "ok"); return }
 
     // Injeção opcional de busy/erro
     if (this.opts.busyRate > 0 && Math.random() < this.opts.busyRate) {

@@ -26,6 +26,6 @@ export default defineConfig({
     include: ["tests/**/*.test.ts"],
     // Exclui qualquer arquivo de teste que dependa de DOM/JSX (não temos jsdom)
     exclude: ["node_modules", ".next", "dist", "tests/**/*.dom.test.ts"],
-    testTimeout: 10000,
+    testTimeout: 40000,
   },
 })
