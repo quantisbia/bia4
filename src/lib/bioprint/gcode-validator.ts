@@ -41,6 +41,15 @@ export interface PrinterLimits {
   xMaxMm: number
   yMaxMm: number
   zMaxMm: number
+  /**
+   * R19 — modelo "origem no bico" (G92 X0 Y0 Z0 E0 no ponto atual).
+   * Coordenadas X/Y são RELATIVAS ao bico: negativos são normais (peça
+   * centrada). O limite passa a ser o RAIO útil ao redor da origem.
+   * Se definido, substitui a checagem 0..xMaxMm.
+   */
+  originRadiusMm?: number
+  /** Distância máxima (mm) do PRIMEIRO movimento XY em relação à origem — acima disso é "viagem na diagonal". */
+  firstMoveMaxMm?: number
   /** Limite mínimo de Z (geralmente 0 — Z negativo é colisão) */
   zMinMm: number
   /** Velocidade máxima em mm/min (F). Marlin ~12000–18000 típico, alguns custom 30000. */
@@ -57,6 +66,8 @@ export const DEFAULT_BIO_LIMITS: PrinterLimits = {
   xMaxMm: 220,
   yMaxMm: 220,
   zMaxMm: 200,
+  originRadiusMm: 90,     // mesa redonda BioEnder Ø180 → raio útil ~90 mm a partir do bico
+  firstMoveMaxMm: 40,     // primeiro XY a > 40 mm da origem = peça não está centrada no G92
   zMinMm: -0.5,           // pequena tolerância para z-offset
   feedrateMaxMmMin: 18000, // 300 mm/s
   hotendMaxC: 80,         // bioprinter, não FDM
@@ -180,6 +191,9 @@ export function validateGcode(
   let hasG21 = false, hasG20 = false, hasM112 = false
 
   let firstMoveSeen = false
+  let firstXYChecked = false   // R19
+  let sawExtrusion = false     // R19
+  let hasFullG92 = false       // R19: G92 X0 Y0 Z0 E0 antes do 1º movimento
 
   // ─── Loop por linha ──
   for (let i = 0; i < lines.length; i++) {
@@ -235,6 +249,28 @@ export function validateGcode(
         raw: raw.trim(),
       })
     }
+    // R19: G92 redefine a posição virtual (ponto zero). Rastreamos se o
+    // G92 completo (X0 Y0 Z0 E0) veio ANTES do primeiro movimento.
+    if (cmd === "G92") {
+      let gx: number | null = null, gy: number | null = null, gz: number | null = null, ge: number | null = null
+      for (const t of tokens) {
+        const T = t.toUpperCase(); const v = parseFloat(T.slice(1))
+        if (!Number.isFinite(v)) continue
+        if (T.startsWith("X")) gx = v; else if (T.startsWith("Y")) gy = v; else if (T.startsWith("Z")) gz = v; else if (T.startsWith("E")) ge = v
+      }
+      if (gx == null && gy == null && gz == null && ge == null) { x = 0; y = 0; z = 0; e = 0; hasFullG92 = true }
+      else {
+        if (gx != null) x = gx; if (gy != null) y = gy; if (gz != null) z = gz; if (ge != null) e = ge
+        if (gx === 0 && gy === 0 && ge === 0 && gz != null && Math.abs(gz) <= 1) hasFullG92 = true
+      }
+      if (firstMoveSeen && !hasFullG92) {
+        issues.push({
+          severity: "warning", line: lineNum, code: "G92_LATE",
+          message: "G92 após movimentos — o ponto zero deve ser definido ANTES do primeiro movimento.",
+          raw: raw.trim(),
+        })
+      }
+    }
     if (cmd === "M112") {
       hasM112 = true
       issues.push({
@@ -246,9 +282,18 @@ export function validateGcode(
 
     // C. Movimentos G0/G1/G2/G3
     if (cmd === "G0" || cmd === "G1" || cmd === "G2" || cmd === "G3") {
+      if (!firstMoveSeen && !hasFullG92 && !hasG28) {
+        issues.push({
+          severity: "error", line: lineNum, code: "NO_G92_ORIGIN",
+          message: "Nenhum G92 X0 Y0 Z0 E0 antes do primeiro movimento — a impressora não sabe onde é o ponto zero. Adicione G92 X0 Y0 Z0 E0 no início.",
+          raw: raw.trim(),
+        })
+      }
       firstMoveSeen = true
       let nx = x, ny = y, nz = z, ne = e
       let hasMove = false
+      let hasXY = false            // R19
+      let hasExtrusionNow = false  // R19
       for (const t of tokens) {
         const T = t.toUpperCase()
         const v = parseFloat(T.slice(1))
@@ -260,10 +305,10 @@ export function validateGcode(
           })
           continue
         }
-        if (T.startsWith("X")) { nx = absolute ? v : x + v; hasMove = true }
-        else if (T.startsWith("Y")) { ny = absolute ? v : y + v; hasMove = true }
+        if (T.startsWith("X")) { nx = absolute ? v : x + v; hasMove = true; hasXY = true }
+        else if (T.startsWith("Y")) { ny = absolute ? v : y + v; hasMove = true; hasXY = true }
         else if (T.startsWith("Z")) { nz = absolute ? v : z + v; hasMove = true }
-        else if (T.startsWith("E")) { ne = absoluteE ? v : e + v }
+        else if (T.startsWith("E")) { ne = absoluteE ? v : e + v; if ((absoluteE ? v - e : v) > 0) { hasExtrusionNow = true } }
         else if (T.startsWith("F")) {
           feedrate = v
           if (feedrate < 0) {
@@ -293,20 +338,53 @@ export function validateGcode(
       const fx = nx * scale, fy = ny * scale, fz = nz * scale
 
       // D. Out-of-volume
-      if (fx < -0.001 || fx > limits.xMaxMm) {
+      if (limits.originRadiusMm != null) {
+        // R19: origem no bico → limite é o RAIO ao redor de (0,0). Negativos OK.
+        const r = Math.hypot(fx, fy)
+        if (r > limits.originRadiusMm + 0.001) {
+          issues.push({
+            severity: "error", line: lineNum, code: "OUT_OF_VOLUME_X",
+            message: `Ponto (${fx.toFixed(1)}, ${fy.toFixed(1)}) a ${r.toFixed(1)} mm da origem — fora do raio útil (${limits.originRadiusMm} mm). Peça grande demais ou não centrada no G92.`,
+            raw: raw.trim(),
+          })
+        }
+      } else {
+        if (fx < -0.001 || fx > limits.xMaxMm) {
+          issues.push({
+            severity: "error", line: lineNum, code: "OUT_OF_VOLUME_X",
+            message: `X=${fx.toFixed(2)} mm fora do volume (0–${limits.xMaxMm})`,
+            raw: raw.trim(),
+          })
+        }
+        if (fy < -0.001 || fy > limits.yMaxMm) {
+          issues.push({
+            severity: "error", line: lineNum, code: "OUT_OF_VOLUME_Y",
+            message: `Y=${fy.toFixed(2)} mm fora do volume (0–${limits.yMaxMm})`,
+            raw: raw.trim(),
+          })
+        }
+      }
+      // R19: PRIMEIRO movimento XY longe da origem = "viagem na diagonal" após o G92.
+      if (!firstXYChecked && hasXY) {
+        firstXYChecked = true
+        const d0 = Math.hypot(fx, fy)
+        if (limits.firstMoveMaxMm != null && d0 > limits.firstMoveMaxMm) {
+          issues.push({
+            severity: "error", line: lineNum, code: "FIRST_MOVE_FAR",
+            message: `Primeiro movimento vai para (${fx.toFixed(1)}, ${fy.toFixed(1)}) — ${d0.toFixed(0)} mm da origem do G92. A peça precisa começar onde o bico está (ponto zero é ponto zero).`,
+            raw: raw.trim(),
+          })
+        }
+      }
+      // R19: "park" no fim (movimento XY longo sem extrusão após a última camada)
+      if (sawExtrusion && !hasExtrusionNow && hasXY && Math.hypot(fx - x * scale, fy - y * scale) > 60) {
         issues.push({
-          severity: "error", line: lineNum, code: "OUT_OF_VOLUME_X",
-          message: `X=${fx.toFixed(2)} mm fora do volume (0–${limits.xMaxMm})`,
+          severity: "error", line: lineNum, code: "PARK_MOVE",
+          message: `Movimento de ${Math.hypot(fx - x * scale, fy - y * scale).toFixed(0)} mm sem extrusão (park?). Em bioimpressão o bico deve ficar sobre a peça ao terminar.`,
           raw: raw.trim(),
         })
       }
-      if (fy < -0.001 || fy > limits.yMaxMm) {
-        issues.push({
-          severity: "error", line: lineNum, code: "OUT_OF_VOLUME_Y",
-          message: `Y=${fy.toFixed(2)} mm fora do volume (0–${limits.yMaxMm})`,
-          raw: raw.trim(),
-        })
-      }
+      if (hasExtrusionNow) sawExtrusion = true
       if (fz < limits.zMinMm || fz > limits.zMaxMm) {
         issues.push({
           severity: fz < limits.zMinMm ? "error" : "warning",

@@ -207,6 +207,16 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R19 — Etapa A · PONTO ZERO É PONTO ZERO (2026-10-21)
+- **Problema:** após o `G92 X0 Y0 Z0 E0` o G-code da Etapa 3 mandava o bico para (60,45) fixo (e o G-code Rápido para (110,110)) → "viagem na diagonal"; no fim, `G1 X0 Y200` (park) atravessava a mesa.
+- **Engine (Etapa 3):** peça única centrada em **(0,0) = posição do bico**. Placas 6/12/24/48/96/384: o **primeiro poço selecionado (superior-esquerdo, ex. A1) é a origem** e os demais são **offsets relativos pelo pitch** da placa; trajetória sempre começa pelo poço de referência. Cabeçalho ganha `; Origin: ...`.
+- **Fim seguro:** `M400` → `G91` → `G1 Z5` → `G90`. **Sem park, sem G28.** Bico fica sobre a peça.
+- **Skirt:** desligado por padrão (presets e UI). Vira **checkbox opt-in** na Etapa 3 com explicação.
+- **G-code Rápido:** `bedCenter` default (0,0).
+- **Validador:** modelo "origem no bico" — coordenadas negativas são normais; limite = **raio útil 90 mm**; novos erros bloqueantes **`NO_G92_ORIGIN`** (sem G92 antes do 1º movimento), **`FIRST_MOVE_FAR`** (1º XY a > 40 mm da origem), **`PARK_MOVE`** (movimento > 60 mm sem extrusão após imprimir — auto-fix comenta a linha); aviso `G92_LATE`.
+- **Pré-flight (Etapa 4):** item "Home G28" substituído por **"Bico posicionado no ponto zero"** com botão ⌂ G92 e leitura do `; Origin:` do G-code.
+- **Testes:** `tests/r19_origin_is_origin.test.ts` (11) + teste legado R12.55.1 atualizado para o modelo novo. 215 testes de G-code verdes.
+
 ### R18 — HOTFIX urgente: joystick travado (página não rola mais para o topo ao mover os eixos) (2026-10-21)
 - **Causa raiz:** o terminal da Conexão (`PrinterConnection.tsx`) e o console do BIA Host usavam `scrollIntoView()` a cada linha TX/RX → cada clique no joystick gerava log → o **browser rolava a página inteira**, levando a usuária para o topo e tirando os botões da tela.
 - **Correção:** auto-scroll passa a usar `scrollTop` **só dentro do container** do terminal (+ `overscroll-contain`); `JogBtn` e todos os botões de jog/purga/baby-Z ganham `type="button"`, `onMouseDown.preventDefault()` (não roubam foco), bloqueio das setas do teclado; wrapper `#joystick-locked`; e **trava de scroll** em `sendJog` que restaura `window.scrollY` por 400 ms se algo tentar mover a página.

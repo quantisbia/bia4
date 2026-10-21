@@ -13,6 +13,8 @@ export interface EmitOptions {
   includeHeader?: boolean
   includeFooter?: boolean
   jobMetadata?: PrintJob
+  /** R19: descrição da origem para o pré-flight ("centro da peça" | "centro do poço A1") */
+  originLabel?: string
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -40,6 +42,8 @@ export function emitHeader(
   lines.push(`; ExtrusionMultiplier: ${bioink.flowMultiplier.toFixed(2)}× (flow rate)`)
   lines.push(`; Temp: ${bioink.temperature_c}°C  |  Pressure: ${bioink.pressure_kpa} kPa`)
   lines.push(`; Cells: ${bioink.hasCells ? `YES (${bioink.cellDensity ?? "?"}×10⁶/mL)` : "NO (acellular)"}`)
+  // R19: ONDE o bico deve estar quando o G92 roda
+  lines.push(`; Origin: ${opts.originLabel ?? "centro da peça (ponto atual do bico)"}`)
   if (opts.jobMetadata) {
     const j = opts.jobMetadata
     // R12.61: emite JobName e Geometry no header. Sem eles, o coherence-check
@@ -126,10 +130,14 @@ export function emitFooter(bp: BioprinterProfile, bioink: Bioink): string[] {
   const lines: string[] = []
   lines.push("")
   lines.push("; ─── PRINT END ───────────────────────────────────────")
+  // R19: fim seguro — SÓ sobe o bico 5 mm em relativo e PARA sobre a peça.
+  // Sem "park" (G1 X0 Y200): em mesa redonda/placa de poços isso derrubava
+  // o cartucho ou arrastava o construto. A usuária move manualmente depois.
+  lines.push("M400                   ; aguarda fila de movimentos")
   lines.push("G91                    ; relative positioning")
-  lines.push("G1 Z10 F300            ; lift nozzle")
+  lines.push("G1 Z5 F300             ; sobe 5 mm (afasta o bico da peça)")
   lines.push("G90                    ; absolute positioning")
-  lines.push("G1 X0 Y200 F3000       ; park")
+  lines.push("; ⚠️ SEM park / SEM G28 — bico fica sobre a peça; mova manualmente pelo joystick")
 
   // UV crosslink final (se equipado)
   if (bp.hasUV && (bioink.material.toLowerCase().includes("gelma") || bioink.material.toLowerCase().includes("pegda"))) {

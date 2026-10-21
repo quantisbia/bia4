@@ -105,6 +105,7 @@ export const FIXABLE_CODES = new Set<string>([
   "NO_POSITIONING_MODE",
   "NO_UNITS_DECLARED",
   "G28_PRESENT",
+  "PARK_MOVE",
   "BIG_RETRACT",
   "UNKNOWN_GCODE",
   "UNKNOWN_MCODE",
@@ -117,6 +118,10 @@ export const UNFIXABLE_REASONS: Record<string, string> = {
   BAD_PARAM: "Parâmetro inválido — ambíguo demais para auto-correção segura.",
   M112_PRESENT: "M112 é parada de emergência — pode ser intencional, não removemos automaticamente.",
   GRBL_INCOMPATIBLE: "Compatibilidade GRBL exige reescrita; depende do firmware real conectado.",
+  FIRST_MOVE_FAR: "A peça não está centrada no ponto zero — regenere o G-code (Etapa 3 / BioSlicer) com origem no bico. Não deslocamos coordenadas automaticamente.",
+  NO_G92_ORIGIN: "Falta G92 X0 Y0 Z0 E0 no início — regenere o G-code pela BIA ou adicione a linha manualmente antes do primeiro movimento.",
+  G92_LATE: "G92 no meio do arquivo pode ser intencional (troca de poço) — revise manualmente.",
+  OUT_OF_VOLUME_X: "Ponto fora do raio útil ao redor do bico — reduza a peça ou centralize no G92.",
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────
@@ -435,6 +440,18 @@ export function autoFixGcode(
         bumpCount(iss.code)
         break
       }
+      // ──────────────────────────────────────────────────────────────
+      case "PARK_MOVE": {
+        // R19: park no fim é proibido — o bico fica sobre a peça.
+        const after = `; [auto-fix: park removido — bico fica sobre a peça] ${before}`
+        lines[idx] = after
+        applied.push({
+          line: iss.line, code: iss.code, before, after,
+          description: `Movimento de park removido (ponto zero é ponto zero)`,
+        })
+        bumpCount(iss.code)
+        break
+      }
       case "UNKNOWN_GCODE":
       case "UNKNOWN_MCODE":
       case "UNKNOWN_CMD": {
@@ -524,7 +541,11 @@ export const FIX_CODE_LABEL: Record<string, string> = {
   ZERO_FEED: "Velocidade F=0",
   NEG_FEED: "Velocidade negativa",
   FEED_TOO_HIGH: "Velocidade acima do máximo",
-  OUT_OF_VOLUME_X: "X fora do volume",
+  OUT_OF_VOLUME_X: "Fora do raio útil / X fora do volume",
+  FIRST_MOVE_FAR: "Primeiro movimento longe do ponto zero (G92)",
+  NO_G92_ORIGIN: "Sem G92 X0 Y0 Z0 E0 no início",
+  G92_LATE: "G92 depois de movimentos",
+  PARK_MOVE: "Movimento de park no fim (proibido)",
   OUT_OF_VOLUME_Y: "Y fora do volume",
   OUT_OF_VOLUME_Z: "Z acima do máximo",
   Z_NEGATIVE: "Z negativo (colisão)",

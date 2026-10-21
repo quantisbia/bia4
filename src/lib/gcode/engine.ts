@@ -20,7 +20,7 @@ import {
   emitGCode, travelTo, extrudeTo, retract, primeExtruder, dwell,
 } from "./core/emitter"
 import { analyzeMoves, shearStressWall_Pa, estimateViability_pct, mmsToMmMin } from "./core/kinematics"
-import { WELL_PLATES, wellCenter } from "./wellplates/catalog"
+import { WELL_PLATES, wellCenter, parseWellId } from "./wellplates/catalog"
 import { planTrajectory } from "./wellplates/trajectory-planner"
 import { getGeometryBounds } from "./slicer/geometry-bounds"
 import { generateGyroidInfill } from "./infill/parametric/gyroid-tpms"
@@ -247,13 +247,35 @@ export function generateGCodeForJob(input: EngineInput): GCodeResult {
   const warnings: string[] = []
 
   // 1) Determinar poços e trajetória
+  //
+  // R19 — PONTO ZERO É PONTO ZERO.
+  // O G-code começa com `G92 X0 Y0 Z0 E0` no ponto onde o bico ESTÁ. Portanto:
+  //   · impressão única ("direto na mesa"/Petri): peça centrada em (0,0);
+  //   · placa multi-poços: o bico é posicionado pela usuária sobre o CENTRO do
+  //     PRIMEIRO poço selecionado (o mais acima/à esquerda: menor linha, menor
+  //     coluna — ex. A1) e TODOS os outros poços viram offsets RELATIVOS a ele
+  //     (pitch da placa). Nenhuma coordenada absoluta de mesa é usada.
+  // Antes: centro fixo em (60,45) → "viagem na diagonal" após o G92.
   let selectedWells: string[]
   let wellCenters: Record<string, Point2D>
+  let referenceWell: string | null = null
   if (wellPlate && wellPlate.selectedWells.length > 0) {
     const spec = WELL_PLATES[wellPlate.format]
     selectedWells = wellPlate.selectedWells
+    // poço de referência = superior-esquerdo entre os selecionados
+    referenceWell = [...selectedWells].sort((a, b) => {
+      const pa = parseWellId(spec, a), pb = parseWellId(spec, b)
+      return pa.row - pb.row || pa.col - pb.col
+    })[0]
+    const ref = wellCenter(spec, referenceWell)
     wellCenters = {}
-    for (const w of selectedWells) wellCenters[w] = wellCenter(spec, w)
+    for (const w of selectedWells) {
+      const c = wellCenter(spec, w)
+      wellCenters[w] = { x: c.x - ref.x, y: c.y - ref.y }
+    }
+    warnings.push(
+      `📍 Origem (G92) = centro do poço ${referenceWell}. Posicione o bico sobre o centro de ${referenceWell} antes de iniciar; os demais poços são offsets de ${spec.wellSpacing_mm} mm.`,
+    )
 
     // Validar que construto cabe no poço
     const bounds = getGeometryBounds(geometryId, geometryParams)
@@ -267,20 +289,26 @@ export function generateGCodeForJob(input: EngineInput): GCodeResult {
       )
     }
   } else {
-    // impressão única no centro da plataforma
+    // impressão única: peça centrada EXATAMENTE no ponto do G92
     selectedWells = ["solo"]
-    wellCenters = { solo: { x: 60, y: 45 } }
+    wellCenters = { solo: { x: 0, y: 0 } }
   }
 
-  // 2) Planejar ordem ótima entre poços
+  // 2) Planejar ordem entre poços — SEMPRE começando pelo poço de referência
+  //    (onde o bico está). O planejador otimiza o resto a partir dele.
   let orderedWells: string[]
-  if (wellPlate && selectedWells.length > 1) {
+  if (wellPlate && selectedWells.length > 1 && referenceWell) {
     const spec = WELL_PLATES[wellPlate.format]
     const plan = planTrajectory(spec, selectedWells, {
       algorithm: "nearest_2opt",
       returnToStart: false,
+      startFrom: referenceWell,
     })
     orderedWells = plan.orderedWells
+    if (orderedWells[0] !== referenceWell) {
+      // garante o invariante mesmo que o planejador ignore startFrom
+      orderedWells = [referenceWell, ...orderedWells.filter((w) => w !== referenceWell)]
+    }
   } else {
     orderedWells = selectedWells
   }
@@ -309,7 +337,8 @@ export function generateGCodeForJob(input: EngineInput): GCodeResult {
 
   const moves: Move[] = []
 
-  // 5) SKIRT inicial (opcional) — no primeiro poço
+  // 5) SKIRT inicial — DESLIGADO por padrão (R19). Só se a usuária marcar
+  //    explicitamente skirtLoops > 0. A purga é feita pelo botão na Etapa 4.
   if (job.skirtLoops > 0 && orderedWells.length > 0) {
     const firstCenter = wellCenters[orderedWells[0]]
     const skirtR = Math.max(10, bounds.getBoundsAtZ(bounds.zMin).maxX - bounds.getBoundsAtZ(bounds.zMin).minX) / 2 + 3
@@ -437,6 +466,9 @@ export function generateGCodeForJob(input: EngineInput): GCodeResult {
     includeHeader: true,
     includeFooter: true,
     jobMetadata: job,
+    originLabel: referenceWell
+      ? `centro do poço ${referenceWell} (placa ${wellPlate!.format} poços) — demais poços são offsets relativos`
+      : "centro da peça (Petri/lâmina) — ponto atual do bico",
   })
 
   // 9) Estatísticas

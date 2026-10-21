@@ -766,8 +766,11 @@ function emitGcodeText(
   const lines: string[] = []
 
   // R12.55.1: coordenadas do centro do bed (usadas para transladar a peça).
-  const bedCx = opts.bedCenter?.x ?? 110
-  const bedCy = opts.bedCenter?.y ?? 110
+  // R19: PONTO ZERO É PONTO ZERO — a peça é centrada em (0,0) = posição do
+  // bico no G92. bedCenter só é aplicado se a usuária passar EXPLICITAMENTE
+  // (uso legado); default agora é 0,0 (antes 110,110 → viagem na diagonal).
+  const bedCx = opts.bedCenter?.x ?? 0
+  const bedCy = opts.bedCenter?.y ?? 0
 
   // ─── HEADER BIA ───
   lines.push(
@@ -790,7 +793,7 @@ function emitGcodeText(
     "; GEOMETRIA:",
     `;   Tipo:            ${geometryLabel(geom.id)}`,
     `;   Dimensões:       ${geom.width} × ${geom.depth} × ${geom.height} mm`,
-    `;   Centrado em:     X=${bedCx} mm, Y=${bedCy} mm (centro do bed)`,
+    `;   Centrado em:     X=${bedCx} mm, Y=${bedCy} mm ${bedCx === 0 && bedCy === 0 ? "(= ponto do bico no G92)" : "(offset explícito)"}`,
     `;   Camadas:         ${stats.layerCount} × ${opts.layerHeight_mm} mm`,
     `;   Paredes:         ${opts.walls}`,
     `;   Infill:          ${infillLabel(opts.infillPattern)}${opts.infillPattern !== "none" ? ` @ ${opts.infillDensity_pct}%` : ""}`,
@@ -808,8 +811,8 @@ function emitGcodeText(
       `;   Ref próxima:     ${stats.printability.closestReference.id} (Pr=${stats.printability.closestReference.Pr.toFixed(2)})`,
     ] : []),
     "; ═══════════════════════════════════════════════════════════════",
-    `; ⚠️ Peça centrada no bed (X=${bedCx}, Y=${bedCy}). Ajuste bedCenter se seu bed for diferente.`,
-    "; ⚠️ POSICIONE o bico MANUALMENTE sobre o bed antes de iniciar.",
+    "; 📍 PONTO ZERO: a peça começa EXATAMENTE onde o bico está (G92 X0 Y0 Z0 E0).",
+    "; ⚠️ POSICIONE o bico MANUALMENTE sobre o centro do alvo (Petri/poço) antes de iniciar.",
     "; ⚠️ NENHUM aquecimento de cartucho/bed/chamber é enviado.",
     "; ⚠️ NENHUM G28 (home) — preserva bandeja/cartucho.",
     "; ═══════════════════════════════════════════════════════════════",

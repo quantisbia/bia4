@@ -264,7 +264,8 @@ export default function BioprintSlicePage() {
     [infillPatternId, state.model.category, state.bioink.cellType],
   )
   const [walls, setWalls] = useState<number>(2)
-  const [skirtLoops, setSkirtLoops] = useState<number>(state.slice.skirtLoops ?? 2)
+  // R19: skirt DESLIGADO por padrão — só com a caixa marcada (a purga é feita na Etapa 4)
+  const [skirtLoops, setSkirtLoops] = useState<number>(state.slice.skirtLoops ?? 0)
   const [retractionMm, setRetractionMm] = useState<number>(state.slice.retractionMm ?? 0)
   /** R12.11: Controle térmico pode ser desabilitado (impressão à temp. ambiente) */
   const [temperatureEnabled, setTemperatureEnabled] = useState<boolean>(true)
@@ -1547,13 +1548,33 @@ function ParamsPanel(p: ParamsProps) {
             display={`${p.walls}`}
             hint="2 é padrão"
           />
-          <SliderField
-            label="Saia (skirt loops)" icon={Wrench}
-            min={0} max={5} step={1}
-            value={p.skirtLoops} onChange={p.onSkirtLoopsChange}
-            display={`${p.skirtLoops}`}
-            hint="2 ajuda a estabilizar bico"
-          />
+          {/* R19: skirt é OPT-IN. Desligado = a peça começa exatamente no ponto zero. */}
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={p.skirtLoops > 0}
+                onChange={(e) => p.onSkirtLoopsChange(e.target.checked ? 1 : 0)}
+                className="mt-0.5 accent-violet-400"
+              />
+              <span className="text-xs">
+                <span className="text-gray-100 font-medium">Imprimir saia (skirt) ao redor da peça</span>
+                <span className="block text-[10px] text-gray-500 mt-0.5">
+                  Desligado por padrão: a impressão começa <b className="text-gray-300">exatamente no ponto zero (G92)</b>. A saia afasta o bico ~3 mm antes de começar — use só se quiser escorvar na própria mesa. Purga recomendada: botão na Etapa 4.
+                </span>
+              </span>
+            </label>
+            {p.skirtLoops > 0 && (
+              <div className="mt-2 pl-6">
+                <SliderField
+                  label="Voltas da saia" icon={Wrench}
+                  min={1} max={5} step={1}
+                  value={p.skirtLoops} onChange={p.onSkirtLoopsChange}
+                  display={`${p.skirtLoops}`}
+                />
+              </div>
+            )}
+          </div>
           <SliderField
             label="Retração" icon={Wrench}
             min={0} max={2} step={0.1}
@@ -1984,7 +2005,7 @@ function WellsPanel({
                   Direto na mesa
                 </div>
                 <p className="text-[11px] text-gray-400 leading-relaxed">
-                  Bioimpressão em superfície aberta (Petri, lâmina, scaffold). 1 peça única no centro da mesa.
+                  Petri (30/60/90 mm), lâmina ou scaffold. 1 peça única, centrada <b>onde o bico está</b> no G92.
                 </p>
               </div>
             </div>
@@ -2016,7 +2037,7 @@ function WellsPanel({
                   Placa multi-poços
                 </div>
                 <p className="text-[11px] text-gray-400 leading-relaxed">
-                  Placas SBS padrão (6–384 poços) para replicar a mesma geometria. Ideal para screening, viabilidade e validação estatística.
+                  Placas SBS (6–384 poços). O bico começa no <b>centro do primeiro poço</b> (superior-esquerdo) = G92; os demais são offsets pelo pitch da placa.
                 </p>
               </div>
             </div>
@@ -2034,7 +2055,7 @@ function WellsPanel({
             <div>
               <h3 className="text-sm font-semibold text-white mb-0.5">Mesa de impressão (build plate)</h3>
               <p className="text-[11px] text-gray-400">
-                A peça será impressa no centro da mesa. Verifique se a superfície (Petri, lâmina ou scaffold) está bem fixada antes de iniciar.
+                A peça é centrada no <b>ponto zero</b>: leve o bico ao centro da Petri/lâmina pelo joystick, clique em G92 e inicie. Sem viagem inicial, sem park no fim.
               </p>
             </div>
           </div>

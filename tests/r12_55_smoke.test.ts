@@ -96,8 +96,8 @@ describe("R12.55 sanity", () => {
 
   // ─── R12.55.1: regressões para bugs reportados pelo usuário ─────────────
 
-  it("R12.55.1 Fix 1: G-code sai centrado no bed (sem X/Y negativos)", async () => {
-    const { validateGcode, DEFAULT_BIO_LIMITS } = await import("@/lib/bioprint/gcode-validator")
+  it("R12.55.1 → R19: G-code sai centrado no PONTO ZERO (bico) — X/Y negativos são normais, 0 erros", async () => {
+    const { validateGcode } = await import("@/lib/bioprint/gcode-validator")
     const geom: QuickGeometry = { id: "cube", width: 10, depth: 10, height: 5 }
     const blend: QuickMultiBioink = [{
       fraction: 1.0, materialLabel: "GelMA 10% w/v", nozzleDiameter_mm: 0.41,
@@ -108,15 +108,15 @@ describe("R12.55 sanity", () => {
       layerHeight_mm: 0.25, infillPattern: "grid", infillDensity_pct: 20, walls: 2,
     })
     const val = validateGcode(r.gcode)
-    // Bug antigo: 420 erros OUT_OF_VOLUME_X/Y. Corrigido: 0 erros.
     expect(val.verdict).toBe("safe")
     expect(val.errorCount).toBe(0)
-    expect(val.stats.bbox.minX).toBeGreaterThanOrEqual(0)
-    expect(val.stats.bbox.minY).toBeGreaterThanOrEqual(0)
-    expect(val.stats.bbox.maxX).toBeLessThanOrEqual(DEFAULT_BIO_LIMITS.xMaxMm)
-    expect(val.stats.bbox.maxY).toBeLessThanOrEqual(DEFAULT_BIO_LIMITS.yMaxMm)
-    // Header deve documentar centralização
-    expect(r.gcode).toMatch(/Centrado em:\s+X=110/)
+    // R19: peça centrada no bico → bbox simétrico ao redor de 0
+    expect(val.stats.bbox.minX).toBeCloseTo(-5, 0)
+    expect(val.stats.bbox.maxX).toBeCloseTo(5, 0)
+    expect(val.stats.bbox.minY).toBeCloseTo(-5, 0)
+    expect(val.stats.bbox.maxY).toBeCloseTo(5, 0)
+    expect(r.gcode).toMatch(/Centrado em:\s+X=0 mm, Y=0 mm/)
+    expect(r.gcode).toMatch(/PONTO ZERO/)
   })
 
   it("R12.55.1 Fix 1: bedCenter customizável", () => {

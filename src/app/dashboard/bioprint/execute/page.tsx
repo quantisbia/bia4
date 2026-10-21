@@ -303,6 +303,12 @@ export default function BioprintExecutePage() {
   // de mandar o stream. Abre quando o usuário clica em IMPRIMIR (qualquer
   // dos dois botões: o do painel principal ou o do joystick).
   const [showPreflight, setShowPreflight] = useState(false)
+  // R19: lê "; Origin: ..." do cabeçalho do G-code para orientar o pré-flight
+  const gcodeOriginLabel = useMemo(() => {
+    const m = gcodeText.match(/^;\s*Origin:\s*(.+)$/m)
+    return m ? m[1].trim() : "centro da peça (ponto onde o bico está)"
+  }, [gcodeText])
+  useEffect(() => { setZeroedHere(false) }, [gcodeText])
 
   const handleValidate = useCallback(() => {
     if (!gcodeText.trim()) {
@@ -576,6 +582,8 @@ export default function BioprintExecutePage() {
    */
   const [autoHomeOnConnect, setAutoHomeOnConnect] = useState<boolean>(true)
   const [didAutoHome, setDidAutoHome] = useState<boolean>(false)
+  // R19: a usuária zerou (G92) no ponto onde a impressão deve começar?
+  const [zeroedHere, setZeroedHere] = useState<boolean>(false)
 
   /**
    * R12.33: Pós-home — move cabeçote para o CENTRO da mesa com clearance Z.
@@ -1570,6 +1578,7 @@ export default function BioprintExecutePage() {
       // próximo comando — evita race com clique imediato no joystick.
       await controllerRef.current.sendAndWait("G92 X0 Y0 Z0 E0")
       setPosition({ x: 0, y: 0, z: 0, e: 0 })
+      setZeroedHere(true)
       loggerRef.current.ok("G92 ZERO AQUI — coordenadas zeradas no ponto atual (sem mover).")
     } catch (e) {
       loggerRef.current.error(`G92 falhou: ${e instanceof Error ? e.message : String(e)}`)
@@ -3536,12 +3545,23 @@ export default function BioprintExecutePage() {
                   label="Bioimpressora conectada"
                   detail={connected ? `Firmware: ${firmware?.family ?? "detectado"}` : "Use o painel Conexão para conectar"}
                 />
+                {/* R19: PONTO ZERO — o que importa é o bico estar sobre o alvo, não G28 */}
                 <PreflightItem
-                  ok={didAutoHome}
-                  label="Home (G28) realizado"
-                  detail={didAutoHome ? "Eixos referenciados" : "Clique em Home All antes de imprimir"}
+                  ok={zeroedHere}
+                  label="Bico posicionado no ponto zero (G92 aqui)"
+                  detail={
+                    zeroedHere
+                      ? `Zerado neste ponto · origem do G-code: ${gcodeOriginLabel}`
+                      : `Leve o bico ao ${gcodeOriginLabel} pelo joystick e clique em ⌂ (G92) — ou confirme que já está lá`
+                  }
                   warnOnly
                 />
+                {!zeroedHere && (
+                  <div className="ml-5.5 flex flex-wrap gap-1.5">
+                    <button type="button" onClick={() => { void sendZero() }} disabled={!connected} className="px-2.5 py-1 rounded-md text-[10.5px] font-semibold bg-violet-500/20 border border-violet-400/40 text-violet-100 hover:bg-violet-500/30 disabled:opacity-40">⌂ Zerar aqui (G92 X0 Y0 Z0 E0)</button>
+                    <button type="button" onClick={() => setZeroedHere(true)} className="px-2.5 py-1 rounded-md text-[10.5px] bg-white/5 border border-white/10 text-gray-300 hover:border-white/25">O bico já está no ponto zero</button>
+                  </div>
+                )}
                 <PreflightItem
                   ok={gcodeText.trim().length > 0}
                   label="G-code carregado"
