@@ -1,16 +1,26 @@
 /**
- * BIA v4 · R15 · BioSlicer — Escritor de G-code (Marlin / Klipper / RepRap)
+ * BIA v4 · R15 → R20 · BioSlicer — Escritor de G-code (Marlin / Klipper / RepRap)
  *
- * Convenções BIA (R12.64):
+ * Convenções BIA:
  *   · NUNCA G28. Origem por G92 X0 Y0 Z<offset> E0 no ponto atual do bico.
- *   · M83 (E relativo) — compatível com M221 em tempo real.
- *   · M302 S0 (cold extrusion).
- *   · ;LAYER:n, ;TYPE:…, ;Z: (Cura-like) e ;BIA_META json para o host/coherence-check.
+ *   · PONTO ZERO É PONTO ZERO: o 1º cordão nasce em (0,0) — aproximação EXTRUDADA.
+ *   · M83 (E relativo) — compatível com M221 em tempo real. M302 S0 (cold extrusion).
+ *   · Sem park no fim: só Z+5 relativo.
+ *   · ;LAYER:n, ;TYPE:…, ;Z:, ;WELL:, ;TOOL: e ;BIA_META json.
+ *
+ * R20:
+ *   · ALVO: Petri/lâmina (peça em 0,0) ou placa N poços — o 1º poço selecionado
+ *     (superior-esquerdo) é a origem; os demais são offsets pelo pitch. A peça
+ *     inteira é replicada poço a poço (Z-hop, pausa e purga opcionais entre eles).
+ *   · CABEÇOTES: 1–4 ferramentas (T0..T3). Cada papel do caminho tem uma
+ *     ferramenta; a troca emite retração → T<n> → prime → dwell. Um único G-code.
  */
 
-import type { SliceParams, ExtrusionModel, SlicedLayer, ToolPath, Vec2, SliceStats } from "./types"
+import type { SliceParams, ExtrusionModel, SlicedLayer, ToolPath, Vec2, SliceStats, PathRole } from "./types"
 import { ePerMm, volumeToE, beadArea_mm2 } from "./extrusion"
 import { dist } from "./polygon-ops"
+import { type PrintTarget, DEFAULT_TARGET, PLATES, wellOffsets, referenceWell, describeTarget } from "./target"
+import { type ToolsConfig, type ToolHead, singleTool, toolForRole, describeTools } from "./tools"
 
 const f = (n: number, d = 3) => {
   const s = n.toFixed(d)
@@ -24,40 +34,65 @@ export interface WriteOptions {
   profileId: string
   profileName: string
   meta?: Record<string, string | number | boolean | null | undefined>
+  /** R20: alvo da impressão (default Petri 60 — peça em 0,0) */
+  target?: PrintTarget
+  /** R20: cabeçotes (default 1 = extrusão X) */
+  tools?: ToolsConfig
 }
 
 export interface WriteResult {
   gcode: string
-  stats: Pick<SliceStats, "extrudeLength_mm" | "travelLength_mm" | "volume_uL" | "plungerTravel_mm" | "estimatedTime_s" | "extrusionStarts" | "totalPathLength_mm">
+  stats: Pick<SliceStats, "extrudeLength_mm" | "travelLength_mm" | "volume_uL" | "plungerTravel_mm" | "estimatedTime_s" | "extrusionStarts" | "totalPathLength_mm"> & {
+    /** µL por ferramenta (R20) */
+    volumeByTool_uL: Record<number, number>
+    toolChanges: number
+    wells: number
+  }
 }
 
 export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionModel, opt: WriteOptions): WriteResult {
+  const target = opt.target ?? DEFAULT_TARGET
+  const tools = opt.tools ?? singleTool(X)
+  const multiTool = tools.heads.length > 1
   const out: string[] = []
-  let extrude = 0, travel = 0, volume = 0, eTotal = 0, time = 0, starts = 0
+  let extrude = 0, travel = 0, volume = 0, eTotal = 0, time = 0, starts = 0, toolChanges = 0
+  const volumeByTool: Record<number, number> = {}
   const push = (s: string) => out.push(s)
 
+  // ── alvo → lista de offsets (cada um = uma cópia inteira da peça) ──
+  const copies: Array<{ id: string; dx: number; dy: number }> =
+    target.kind === "plate" && target.wells.length > 0
+      ? wellOffsets(PLATES[target.format], target.wells)
+      : [{ id: target.kind === "plate" ? "A1" : "peça", dx: 0, dy: 0 }]
+  const refWell = target.kind === "plate" && target.wells.length ? referenceWell(PLATES[target.format], target.wells) : null
+
+  // ── cabeçalho ──
   push(`; ═══════════════════════════════════════════════════════════`)
-  push(`; BIA v4 · BioSlicer R15 — ${opt.jobName}`)
+  push(`; BIA v4 · BioSlicer R20 — ${opt.jobName}`)
   push(`; Gerado: ${new Date().toISOString()}`)
   push(`; Perfil: ${opt.profileName} (${opt.profileId})`)
   if (opt.meshName) push(`; Modelo: ${opt.meshName}`)
   push(`; Firmware alvo: ${P.firmware}`)
+  push(`; Origin: ${refWell ? `centro do poço ${refWell} (placa ${(target as { format: number }).format} poços) — demais poços são offsets relativos` : "centro da peça — ponto atual do bico"}`)
+  push(`; Alvo: ${describeTarget(target)}`)
+  push(`; Cabeçotes: ${describeTools(tools)}`)
   push(`; Bico: ${f(P.nozzleDiameter_mm)} mm · Linha: ${f(P.lineWidth_mm)} mm · Camada: ${f(P.layerHeight_mm)} mm (1ª: ${f(P.firstLayerHeight_mm)})`)
   push(`; Paredes: ${P.wallCount} · Infill: ${P.infillPattern} ${P.infillDensity}%` + (P.strandSpacing_mm ? ` · espaçamento ${f(P.strandSpacing_mm)} mm` : ""))
   push(`; Velocidades (mm/s): perímetro ${P.speedPerimeter_mms} · infill ${P.speedInfill_mms} · 1ª camada ${P.speedFirstLayer_mms} · travel ${P.speedTravel_mms}`)
-  if (X.kind === "syringe_stepper" && X.syringe) {
-    push(`; Extrusão: seringa ${X.syringe.volume_mL} mL (Ø int ${f(X.syringe.innerDiameter_mm, 2)} mm) · E = mm de êmbolo · fluxo ×${f(X.flowMultiplier, 2)}`)
-  } else if (X.kind === "pneumatic") {
-    push(`; Extrusão: pneumática ${X.pressure_kPa ?? "?"} kPa · E virtual`)
-  } else {
-    push(`; Extrusão: filamento equivalente Ø${f(X.filamentDiameter_mm ?? 1.75, 2)} mm`)
+  for (const h of tools.heads) {
+    const hx = h.extrusion
+    if (hx.kind === "syringe_stepper" && hx.syringe) push(`; T${h.index} ${h.label}: seringa ${hx.syringe.volume_mL} mL (Ø int ${f(hx.syringe.innerDiameter_mm, 2)} mm) · E = mm de êmbolo · fluxo ×${f(hx.flowMultiplier, 2)}`)
+    else if (hx.kind === "pneumatic") push(`; T${h.index} ${h.label}: pneumática ${hx.pressure_kPa ?? "?"} kPa · E virtual`)
+    else push(`; T${h.index} ${h.label}: filamento equivalente Ø${f(hx.filamentDiameter_mm ?? 1.75, 2)} mm`)
   }
-  push(`; Camadas: ${layers.length}`)
-  push(`;LAYER_COUNT:${layers.length}`)
+  push(`; Camadas: ${layers.length} · Cópias: ${copies.length}`)
+  push(`;LAYER_COUNT:${layers.length * copies.length}`)
   const meta = {
-    generator: "bia-bioslicer-r15", profileId: opt.profileId, layerCount: layers.length,
+    generator: "bia-bioslicer-r20", profileId: opt.profileId, layerCount: layers.length,
     layerHeight_mm: P.layerHeight_mm, nozzle_mm: P.nozzleDiameter_mm, infill: P.infillPattern,
-    infillDensity: P.infillDensity, extruder: X.kind, syringe_mL: X.syringe?.volume_mL ?? null, ...opt.meta,
+    infillDensity: P.infillDensity, extruder: X.kind, syringe_mL: X.syringe?.volume_mL ?? null,
+    target: target.kind, wells: copies.length, tools: tools.heads.length,
+    toolLabels: tools.heads.map((h) => h.label).join("|"), ...opt.meta,
   }
   push(`;BIA_META ${JSON.stringify(meta)}`)
   push(`; Geometry: ${opt.meta?.geometryId ?? opt.meshName ?? "stl"}`)
@@ -70,10 +105,18 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
   push(`M83                    ; extrusão RELATIVA (compatível com M221 em tempo real)`)
   if (P.firmware === "marlin" || P.firmware === "reprap") push(`M302 S0                ; permitir extrusão a frio (seringa)`)
   push(`; ⚠️ NENHUM G28 (home) — bioimpressora preserva bandeja/cartucho`)
-  push(`; ⚠️ Posicione o bico MANUALMENTE sobre a origem (centro do alvo) antes de iniciar`)
+  push(`; 📍 PONTO ZERO: posicione o bico ${refWell ? `sobre o centro do poço ${refWell}` : "sobre o centro do alvo"} ANTES de iniciar`)
   push(`G92 X0 Y0 Z${f(P.zOffset_mm)} E0  ; zerar coordenadas AQUI (ponto atual = origem)`)
-  if (P.cartridgeTemp_C !== null) push(`${P.waitForTemps ? "M109" : "M104"} S${f(P.cartridgeTemp_C, 1)}  ; temperatura do cartucho`)
-  if (P.bedTemp_C !== null) push(`${P.waitForTemps ? "M190" : "M140"} S${f(P.bedTemp_C, 1)}  ; temperatura da mesa`)
+  if (multiTool) {
+    push(`T0                     ; começa no cabeçote 0`)
+    if (!tools.applyOffsetInPath) {
+      for (const h of tools.heads) if (h.index > 0 && (h.offsetX_mm || h.offsetY_mm)) push(`M218 T${h.index} X${f(h.offsetX_mm)} Y${f(h.offsetY_mm)}  ; offset do cabeçote ${h.index} (firmware)`)
+    }
+    for (const h of tools.heads) if (h.temp_C !== null) push(`M104 T${h.index} S${f(h.temp_C, 1)}  ; temperatura T${h.index} (sem esperar)`)
+  } else if (P.cartridgeTemp_C !== null) {
+    push(`M104 S${f(P.cartridgeTemp_C, 1)}  ; temperatura do cartucho (sem esperar)`)
+  }
+  if (P.bedTemp_C !== null) push(`M140 S${f(P.bedTemp_C, 1)}  ; temperatura da mesa (sem esperar — estabilize antes pelo painel)`)
   if (X.kind === "pneumatic" && X.pressure_kPa) push(`; pressão: ${X.pressure_kPa} kPa (ajuste no regulador / M-code do fabricante)`)
   push(`M220 S100              ; feedrate 100 %`)
   push(`M221 S100              ; fluxo 100 % (ajuste em tempo real durante a impressão)`)
@@ -83,29 +126,45 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
   }
   push(``)
 
+  // ── estado da máquina virtual ──
   let cur: Vec2 = { x: 0, y: 0 }
   let curZ = P.zOffset_mm
   let retracted = false
-  let firstBeadDone = false // R19.1
-  const eRetract = volumeToE(X.retractVolume_uL, X)
-  const ePrime = volumeToE(X.primeVolume_uL, X)
-  const retractF = F(X.retractSpeed_mms)
+  let firstBeadDone = false
+  let activeTool: ToolHead = tools.heads[0]
+  let XA: ExtrusionModel = activeTool.extrusion // modelo de extrusão ATIVO
+  let eRetract = volumeToE(XA.retractVolume_uL, XA)
+  let ePrime = volumeToE(XA.primeVolume_uL, XA)
+  let retractF = F(XA.retractSpeed_mms)
 
-  if (P.purgeLine_mm > 0 && layers.length) {
-    const h = layers[0].height_mm
-    const zTop = P.zOffset_mm + h
-    push(`;TYPE:SKIRT`)
-    push(`; purge line ${P.purgeLine_mm} mm`)
-    push(`G1 Z${f(zTop)} F${F(P.speedZ_mms)}`)
-    const e = ePerMm(P.lineWidth_mm * 1.5, h, X) * P.purgeLine_mm
-    push(`G1 X${f(P.purgeLine_mm)} Y0 E${f(e, 4)} F${F(P.speedFirstLayer_mms)}`)
-    cur = { x: P.purgeLine_mm, y: 0 }
-    curZ = zTop
-    firstBeadDone = true // purga explícita já saiu do ponto zero extrudando
-    extrude += P.purgeLine_mm; eTotal += e
-    volume += beadArea_mm2(P.lineWidth_mm * 1.5, h) * P.purgeLine_mm * X.flowMultiplier
-    time += P.purgeLine_mm / P.speedFirstLayer_mms
-    starts++
+  const applyOffset = (p: Vec2): Vec2 =>
+    tools.applyOffsetInPath && (activeTool.offsetX_mm || activeTool.offsetY_mm)
+      ? { x: p.x - activeTool.offsetX_mm, y: p.y - activeTool.offsetY_mm }
+      : p
+
+  const switchTool = (h: ToolHead, zTop: number) => {
+    if (h.index === activeTool.index) return
+    push(`; ─── troca de cabeçote T${activeTool.index} → T${h.index} (${h.label}) ───`)
+    // retrai o cabeçote que sai
+    const eOut = volumeToE(tools.retractBeforeSwitch_uL, XA)
+    if (eOut > 0) { push(`G1 E-${f(eOut, 4)} F${retractF}`); time += eOut / Math.max(0.1, XA.retractSpeed_mms) }
+    // sobe para não arrastar
+    const hop = Math.max(P.zHop_mm, 1)
+    push(`G0 Z${f(zTop + hop)} F${F(P.speedZ_mms)}`)
+    push(`T${h.index}`)
+    activeTool = h
+    XA = h.extrusion
+    eRetract = volumeToE(XA.retractVolume_uL, XA)
+    ePrime = volumeToE(XA.primeVolume_uL, XA)
+    retractF = F(XA.retractSpeed_mms)
+    retracted = false
+    // escorva o cabeçote que entra
+    const eIn = volumeToE(tools.primeAfterSwitch_uL, XA)
+    if (eIn > 0) { push(`G1 E${f(eIn, 4)} F${retractF}`); eTotal += eIn; time += eIn / Math.max(0.1, XA.retractSpeed_mms) }
+    if (tools.dwellAfterSwitch_s > 0) { push(`G4 S${f(tools.dwellAfterSwitch_s, 1)}`); time += tools.dwellAfterSwitch_s }
+    curZ = zTop + hop
+    toolChanges++
+    push(`;TOOL:${h.index}`)
   }
 
   const goTravel = (to: Vec2, zTop: number) => {
@@ -114,11 +173,12 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
     if (d >= P.retractMinTravel_mm && eRetract > 0 && !retracted) {
       push(`G1 E-${f(eRetract, 4)} F${retractF}`)
       retracted = true
-      time += eRetract / Math.max(0.1, X.retractSpeed_mms)
+      time += eRetract / Math.max(0.1, XA.retractSpeed_mms)
     }
     const hop = d >= P.retractMinTravel_mm ? P.zHop_mm : 0
     if (hop > 0) { push(`G0 Z${f(zTop + hop)} F${F(P.speedZ_mms)}`); time += hop / P.speedZ_mms }
-    push(`G0 X${f(to.x)} Y${f(to.y)} F${F(P.speedTravel_mms)}`)
+    const o = applyOffset(to)
+    push(`G0 X${f(o.x)} Y${f(o.y)} F${F(P.speedTravel_mms)}`)
     time += d / P.speedTravel_mms
     travel += d
     if (hop > 0 || Math.abs(zTop - curZ) > 1e-6) { push(`G0 Z${f(zTop)} F${F(P.speedZ_mms)}`); time += hop / P.speedZ_mms }
@@ -130,13 +190,13 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
     if (retracted && eRetract > 0) {
       push(`G1 E${f(eRetract, 4)} F${retractF}`)
       retracted = false
-      time += eRetract / Math.max(0.1, X.retractSpeed_mms)
+      time += eRetract / Math.max(0.1, XA.retractSpeed_mms)
     }
     if (ePrime > 0) {
       push(`G1 E${f(ePrime, 4)} F${retractF}`)
       eTotal += ePrime
-      time += ePrime / Math.max(0.1, X.retractSpeed_mms)
-      if (X.primeDwell_ms > 0) { push(`G4 P${Math.round(X.primeDwell_ms)}`); time += X.primeDwell_ms / 1000 }
+      time += ePrime / Math.max(0.1, XA.retractSpeed_mms)
+      if (XA.primeDwell_ms > 0) { push(`G4 P${Math.round(XA.primeDwell_ms)}`); time += XA.primeDwell_ms / 1000 }
     }
     starts++
   }
@@ -145,83 +205,157 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
     if (ePrime > 0) {
       push(`G1 E-${f(ePrime, 4)} F${retractF}`)
       eTotal -= ePrime
-      time += ePrime / Math.max(0.1, X.retractSpeed_mms)
+      time += ePrime / Math.max(0.1, XA.retractSpeed_mms)
     }
   }
 
-  for (const L of layers) {
-    const zTop = P.zOffset_mm + (L.z_mm - layers[0].z_mm) + layers[0].height_mm / 2 + L.height_mm / 2
-    push(``)
-    push(`;LAYER:${L.index}`)
-    push(`;Z:${f(zTop)}`)
-    if (P.verboseComments) push(`; camada ${L.index + 1}/${layers.length} · z=${f(zTop)} mm · h=${f(L.height_mm)} mm · ${L.paths.length} caminhos`)
-    if (P.customLayerChange.trim() && L.index > 0) for (const l of P.customLayerChange.split(/\r?\n/)) if (l.trim()) push(l.trim())
-    if (P.layerPause_s > 0 && L.index > 0) { push(`G4 S${f(P.layerPause_s, 1)}        ; pausa entre camadas (gelificação)`); time += P.layerPause_s }
+  const addVolume = (tp: ToolPath, hMm: number, len: number) => {
+    const v = beadArea_mm2(tp.lineWidth_mm, hMm) * len * XA.flowMultiplier
+    volume += v
+    volumeByTool[activeTool.index] = (volumeByTool[activeTool.index] ?? 0) + v
+  }
 
-    let lastRole: string | null = null
-    for (const tp of L.paths) {
-      if (tp.points.length < 2) continue
-      const role = roleTag(tp.role)
-      if (role !== lastRole) { push(`;TYPE:${role}`); lastRole = role }
-      const eMm = ePerMm(tp.lineWidth_mm, L.height_mm, X)
-      const speedF = F(tp.speed_mms)
-      let pts = tp.points
-      if (!firstBeadDone) {
-        // R19.1: PONTO ZERO É PONTO ZERO — o 1º cordão da impressão nasce no
-        // ponto onde o bico está (0,0). Rotaciona o caminho para começar no
-        // vértice mais próximo da origem e EXTRUDA a aproximação (sem travel).
-        let bi = 0, bd = Infinity
-        for (let i = 0; i < pts.length; i++) { const d = pts[i].x ** 2 + pts[i].y ** 2; if (d < bd) { bd = d; bi = i } }
-        if (tp.closed) pts = [...pts.slice(bi), ...pts.slice(0, bi)]
-        else if (bi > pts.length / 2) pts = [...pts].reverse()
-        const first = pts[0]
-        push(`G1 Z${f(zTop)} F${F(P.speedZ_mms)}        ; altura da 1ª camada, sem sair do ponto zero`)
-        curZ = zTop
-        startExtrusion()
-        const d0 = dist(cur, first)
-        if (d0 > 1e-3) {
-          const e0 = d0 * eMm
-          push(`G1 X${f(first.x)} Y${f(first.y)} E${f(e0, 5)} F${speedF}  ; aproximação extrudada a partir do ponto zero`)
-          eTotal += e0; extrude += d0; time += d0 / tp.speed_mms
-          volume += beadArea_mm2(tp.lineWidth_mm, L.height_mm) * d0 * X.flowMultiplier
+  // ── purge line (opt-in) ──
+  if (P.purgeLine_mm > 0 && layers.length) {
+    const h = layers[0].height_mm
+    const zTop = P.zOffset_mm + h
+    push(`;TYPE:SKIRT`)
+    push(`; purge line ${P.purgeLine_mm} mm`)
+    push(`G1 Z${f(zTop)} F${F(P.speedZ_mms)}`)
+    const e = ePerMm(P.lineWidth_mm * 1.5, h, XA) * P.purgeLine_mm
+    push(`G1 X${f(P.purgeLine_mm)} Y0 E${f(e, 4)} F${F(P.speedFirstLayer_mms)}`)
+    cur = { x: P.purgeLine_mm, y: 0 }
+    curZ = zTop
+    extrude += P.purgeLine_mm; eTotal += e
+    volume += beadArea_mm2(P.lineWidth_mm * 1.5, h) * P.purgeLine_mm * XA.flowMultiplier
+    time += P.purgeLine_mm / P.speedFirstLayer_mms
+    starts++
+    firstBeadDone = true
+  }
+
+  // ── cópias (poços) × camadas × caminhos ──
+  let globalLayer = 0
+  for (let ci = 0; ci < copies.length; ci++) {
+    const copy = copies[ci]
+    if (copies.length > 1 || target.kind === "plate") {
+      push(``)
+      push(`; ═══ ${refWell ? `POÇO ${copy.id}` : "PEÇA"} · offset (${f(copy.dx)}, ${f(copy.dy)}) ═══`)
+      push(`;WELL:${copy.id}`)
+    }
+    if (ci > 0 && target.kind === "plate") {
+      // travel seguro para o próximo poço: Z-hop alto, ir, descer no início da 1ª camada
+      const hop = Math.max(target.zHop_mm, 2)
+      const zTopLast = curZ
+      if (eRetract > 0 && !retracted) { push(`G1 E-${f(eRetract, 4)} F${retractF}`); retracted = true }
+      push(`G0 Z${f(zTopLast + hop)} F${F(P.speedZ_mms)}      ; z-hop entre poços`)
+      const o = applyOffset({ x: copy.dx, y: copy.dy })
+      push(`G0 X${f(o.x)} Y${f(o.y)} F${F(P.speedTravel_mms)}  ; centro do poço ${copy.id}`)
+      travel += dist(cur, { x: copy.dx, y: copy.dy }); time += dist(cur, { x: copy.dx, y: copy.dy }) / P.speedTravel_mms + hop / P.speedZ_mms
+      cur = { x: copy.dx, y: copy.dy }
+      curZ = zTopLast + hop
+      if (target.pause_s > 0) { push(`G4 S${f(target.pause_s, 1)}             ; pausa entre poços`); time += target.pause_s }
+      if (target.purge_uL > 0) { const e = volumeToE(target.purge_uL, XA); push(`G1 E${f(e, 4)} F${retractF}  ; purga ${target.purge_uL} µL`); eTotal += e; retracted = false }
+      // o 1º cordão do poço também nasce no centro do poço (sem travel seco)
+      firstBeadDone = false
+    }
+
+    for (const L of layers) {
+      const zTop = P.zOffset_mm + (L.z_mm - layers[0].z_mm) + layers[0].height_mm / 2 + L.height_mm / 2
+      push(``)
+      push(`;LAYER:${globalLayer}`)
+      push(`;Z:${f(zTop)}`)
+      if (P.verboseComments) push(`; camada ${L.index + 1}/${layers.length}${copies.length > 1 ? ` · ${copy.id}` : ""} · z=${f(zTop)} mm · h=${f(L.height_mm)} mm · ${L.paths.length} caminhos`)
+      if (P.customLayerChange.trim() && L.index > 0) for (const l of P.customLayerChange.split(/\r?\n/)) if (l.trim()) push(l.trim())
+      if (P.layerPause_s > 0 && L.index > 0) { push(`G4 S${f(P.layerPause_s, 1)}        ; pausa entre camadas (gelificação)`); time += P.layerPause_s }
+      globalLayer++
+
+      // R20: agrupa caminhos por ferramenta dentro da camada para minimizar trocas
+      const ordered = multiTool ? [...L.paths].sort((a, b) => toolForRole(tools, a.role).index - toolForRole(tools, b.role).index) : L.paths
+
+      let lastRole: string | null = null
+      for (const tp0 of ordered) {
+        if (tp0.points.length < 2) continue
+        // aplica offset do poço
+        const tp: ToolPath = copy.dx || copy.dy ? { ...tp0, points: tp0.points.map((p) => ({ x: p.x + copy.dx, y: p.y + copy.dy })) } : tp0
+        const head = toolForRole(tools, tp.role)
+        if (multiTool && head.index !== activeTool.index) {
+          if (firstBeadDone) switchTool(head, zTop)
+          else { // ainda não imprimiu nada nesta cópia: troca sem hop
+            push(`T${head.index}`); activeTool = head; XA = head.extrusion
+            eRetract = volumeToE(XA.retractVolume_uL, XA); ePrime = volumeToE(XA.primeVolume_uL, XA); retractF = F(XA.retractSpeed_mms)
+            toolChanges++; push(`;TOOL:${head.index}`)
+          }
         }
-        cur = first
-        firstBeadDone = true
-      } else {
-        goTravel(pts[0], zTop)
-        startExtrusion()
+        const role = roleTag(tp.role)
+        if (role !== lastRole) { push(`;TYPE:${role}`); lastRole = role }
+        const eMm = ePerMm(tp.lineWidth_mm, L.height_mm, XA)
+        const speedF = F(tp.speed_mms)
+        let pts = tp.points
+
+        if (!firstBeadDone) {
+          // PONTO ZERO É PONTO ZERO — o 1º cordão desta cópia nasce no centro
+          // (cur). Rotaciona o caminho para o vértice mais próximo e EXTRUDA a
+          // aproximação (sem travel seco).
+          let bi = 0, bd = Infinity
+          for (let i = 0; i < pts.length; i++) { const d = (pts[i].x - cur.x) ** 2 + (pts[i].y - cur.y) ** 2; if (d < bd) { bd = d; bi = i } }
+          if (tp.closed) pts = [...pts.slice(bi), ...pts.slice(0, bi)]
+          else if (bi > pts.length / 2) pts = [...pts].reverse()
+          const first = pts[0]
+          push(`G1 Z${f(zTop)} F${F(P.speedZ_mms)}        ; altura da 1ª camada, sem sair do ponto zero`)
+          curZ = zTop
+          startExtrusion()
+          const d0 = dist(cur, first)
+          if (d0 > 1e-3) {
+            const e0 = d0 * eMm
+            const o = applyOffset(first)
+            push(`G1 X${f(o.x)} Y${f(o.y)} E${f(e0, 5)} F${speedF}  ; aproximação extrudada a partir do ponto zero`)
+            eTotal += e0; extrude += d0; time += d0 / tp.speed_mms
+            addVolume(tp, L.height_mm, d0)
+          }
+          cur = first
+          firstBeadDone = true
+        } else {
+          goTravel(pts[0], zTop)
+          startExtrusion()
+        }
+
+        const seq = tp.closed ? [...pts, pts[0]] : pts
+        let segLen = 0
+        for (let i = 1; i < seq.length; i++) {
+          const p = seq[i]
+          const d = dist(seq[i - 1], p)
+          if (d < 1e-6) continue
+          const e = d * eMm
+          const o = applyOffset(p)
+          push(`G1 X${f(o.x)} Y${f(o.y)} E${f(e, 5)}${i === 1 ? ` F${speedF}` : ""}`)
+          segLen += d
+          eTotal += e
+          time += d / tp.speed_mms
+        }
+        extrude += segLen
+        addVolume(tp, L.height_mm, segLen)
+        endExtrusion()
+        cur = seq[seq.length - 1]
       }
-      const seq = tp.closed ? [...pts, pts[0]] : pts
-      let segLen = 0
-      for (let i = 1; i < seq.length; i++) {
-        const p = seq[i]
-        const d = dist(seq[i - 1], p)
-        if (d < 1e-6) continue
-        const e = d * eMm
-        push(`G1 X${f(p.x)} Y${f(p.y)} E${f(e, 5)}${i === 1 ? ` F${speedF}` : ""}`)
-        segLen += d
-        eTotal += e
-        time += d / tp.speed_mms
-      }
-      extrude += segLen
-      volume += beadArea_mm2(tp.lineWidth_mm, L.height_mm) * segLen * X.flowMultiplier
-      endExtrusion()
-      cur = seq[seq.length - 1]
     }
   }
 
+  // ── fim seguro: sem park ──
   push(``)
   push(`; ─── END ────────────────────────────────────────────────────`)
   if (eRetract > 0 && !retracted) push(`G1 E-${f(eRetract, 4)} F${retractF}`)
+  push(`M400                   ; aguarda fila`)
   push(`G91                    ; relativo`)
-  push(`G0 Z10 F${F(P.speedZ_mms)}            ; sobe 10 mm`)
+  push(`G0 Z5 F${F(P.speedZ_mms)}             ; sobe 5 mm (afasta o bico da peça)`)
   push(`G90                    ; absoluto`)
-  if (P.cartridgeTemp_C !== null) push(`M104 S0                ; cartucho off`)
+  if (multiTool) { for (const h of tools.heads) if (h.temp_C !== null) push(`M104 T${h.index} S0`) }
+  else if (P.cartridgeTemp_C !== null) push(`M104 S0                ; cartucho off`)
   if (P.bedTemp_C !== null) push(`M140 S0                ; mesa off`)
   if (P.customEnd.trim()) {
     push(`; custom end:`)
     for (const l of P.customEnd.split(/\r?\n/)) if (l.trim()) push(l.trim())
   }
+  push(`; ⚠️ SEM park / SEM G28 — bico fica sobre a peça; mova manualmente pelo joystick`)
   push(`; motores permanecem ligados — desligue com M84 quando retirar a peça`)
   push(`; BIA v4 · BioSlicer — fim`)
 
@@ -235,15 +369,19 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
       estimatedTime_s: Math.round(time),
       extrusionStarts: starts,
       totalPathLength_mm: round(extrude + travel),
+      volumeByTool_uL: Object.fromEntries(Object.entries(volumeByTool).map(([k, v]) => [k, round(v)])),
+      toolChanges,
+      wells: copies.length,
     },
   }
 }
 
-function roleTag(role: ToolPath["role"]): string {
+function roleTag(role: PathRole): string {
   switch (role) {
     case "wall_outer": return "WALL-OUTER"
     case "wall_inner": return "WALL-INNER"
     case "skirt": case "purge": return "SKIRT"
+    case "support": return "SUPPORT"
     default: return "FILL"
   }
 }

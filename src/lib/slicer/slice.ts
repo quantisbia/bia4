@@ -8,6 +8,8 @@ import { placeMesh, layerZs, sliceAtZ } from "./mesh-slice"
 import { planLayer } from "./toolpath"
 import { writeGCode } from "./gcode-writer"
 import { flowRate_uLs, wallShearStress_Pa, estimateViability_pct, syringeArea_mm2 } from "./extrusion"
+import { type PrintTarget, targetUsableDiameter, PLATES } from "./target"
+import type { ToolsConfig } from "./tools"
 
 export interface SliceJob {
   mesh: TriMesh
@@ -19,6 +21,10 @@ export interface SliceJob {
   rheology?: { viscosity_PaS?: number; powerLawN?: number }
   meta?: Record<string, string | number | boolean | null | undefined>
   onProgress?: (frac: number, stage: string) => void
+  /** R20: alvo (Petri/lâmina/placa N poços). Default Petri 60 — peça em (0,0). */
+  target?: PrintTarget
+  /** R20: cabeçotes/biotintas. Default 1 cabeçote com `extrusion`. */
+  tools?: ToolsConfig
 }
 
 function mulberry32(seed: number) {
@@ -83,7 +89,26 @@ export function sliceMesh(job: SliceJob): SliceResult {
   const w = writeGCode(layers, P, X, {
     jobName: job.jobName ?? mesh.name ?? "bia-print", meshName: mesh.name,
     profileId: job.profileId, profileName: job.profileName, meta: job.meta,
+    target: job.target, tools: job.tools,
   })
+
+  // R20: a peça cabe no alvo?
+  if (job.target) {
+    const usable = targetUsableDiameter(job.target)
+    const footprint = Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY)
+    if (usable !== null && footprint > usable) {
+      warnings.push({ level: "error", code: "target_too_small", message: `Peça de ${footprint.toFixed(1)} mm não cabe no alvo (útil ≈ ${usable.toFixed(1)} mm).`, hint: job.target.kind === "plate" ? `Poço da placa ${job.target.format} tem Ø${PLATES[job.target.format].wellDiameter_mm} mm. Reduza a escala ou use placa com menos poços.` : "Reduza a escala ou use uma Petri maior." })
+    }
+    if (job.target.kind === "plate") {
+      const depth = PLATES[job.target.format].wellDepth_mm
+      if (sizeZ > depth * 0.8) warnings.push({ level: "warn", code: "target_too_deep", message: `Altura ${sizeZ.toFixed(1)} mm chega perto da profundidade do poço (${depth} mm).`, hint: "O cabeçote pode bater na borda do poço vizinho ao se mover. Reduza a altura ou use Z-hop maior entre poços." })
+      if (job.target.wells.length > 1 && P.hasCells) warnings.push({ level: "info", code: "multi_well_cells", message: `${job.target.wells.length} poços com células: tempo total ×${job.target.wells.length}.`, hint: "Imprima em lotes se passar de 45–60 min fora da incubadora." })
+    }
+  }
+  if (job.tools && job.tools.heads.length > 1) {
+    const missing = job.tools.heads.filter((h) => !h.label.trim())
+    if (missing.length) warnings.push({ level: "warn", code: "tool_unlabeled", message: `${missing.length} cabeçote(s) sem biotinta definida.`, hint: "Informe a biotinta de cada cabeçote para o G-code ficar rastreável." })
+  }
 
   progress(0.95, "Calculando estatísticas")
   const avgSpeed = (P.speedPerimeter_mms + P.speedInfill_mms) / 2
@@ -138,6 +163,9 @@ export function sliceMesh(job: SliceJob): SliceResult {
       extrudeLength_mm: w.stats.extrudeLength_mm,
       travelLength_mm: w.stats.travelLength_mm,
       volume_uL: w.stats.volume_uL,
+      volumeByTool_uL: w.stats.volumeByTool_uL,
+      toolChanges: w.stats.toolChanges,
+      wells: w.stats.wells,
       plungerTravel_mm: w.stats.plungerTravel_mm,
       estimatedTime_s: w.stats.estimatedTime_s,
       avgFlow_uLs: Math.round(flow * 1000) / 1000,

@@ -149,7 +149,7 @@ export interface SliceProfile {
   references?: string[]
 }
 
-export type PathRole = "wall_outer" | "wall_inner" | "infill" | "skirt" | "purge" | "bottom" | "top"
+export type PathRole = "wall_outer" | "wall_inner" | "infill" | "skirt" | "purge" | "bottom" | "top" | "support"
 
 export interface ToolPath {
   role: PathRole
@@ -176,6 +176,10 @@ export interface SliceStats {
   volume_uL: number
   /** mm de êmbolo (ou filamento) total */
   plungerTravel_mm: number
+  /** R20: µL por cabeçote, trocas de ferramenta e nº de cópias (poços) */
+  volumeByTool_uL?: Record<number, number>
+  toolChanges?: number
+  wells?: number
   estimatedTime_s: number
   avgFlow_uLs: number
   wallShear_Pa: number | null
