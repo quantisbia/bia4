@@ -84,6 +84,14 @@ A Etapa 2 (`/dashboard/bioprint/bioink`) agora é **simples**: escolha uma bioti
 Modo **Básico** (padrão) esconde reologia, explicações e referências; **Avançado** mostra tudo. A formulação livre (clássica) continua em `/dashboard/bioprint/bioink/classic`, também sob "Opções avançadas".
 **Lib pura:** `src/lib/bioink-lab/` — `types`, `recipes` (10), `window` (janela + shear HB), `recommend` (score por objetivo/células/equipamento/experiência), `calculator` (plano de bancada), `troubleshooting`, `protocol` (Markdown + `toBioinkPatch` p/ o contexto com `formulations[0]` **e** campos legados + `slicerHint`). **Testes:** `tests/r16_bioink_lab.test.ts` (27).
 
+### 💧 Fluxo em tempo real "Está saindo biotinta?" (NOVO em R17 — v4.6)
+Problema nº 1 de bancada: ao clicar em **Bioimprimir**, o fluxo é pouco e **não sai biotinta** — a usuária precisava achar o slider e subir o M221 na mão. Agora:
+- **Fluxo inicial correto**: o multiplicador do Fatiamento voltou a **1,0×** (antes 0,6× × M221 50 % ≈ 30 % de fluxo real) e a Etapa 4 começa em **≥ 100 %** por material (alginato/gelatina 120 %, Pluronic/CNF 130 %, GelMA/colágeno 100 %).
+- **Memória por biotinta** (`src/lib/bioprint/flow-memory.ts`): ao clicar **"Saiu bem — lembrar"**, a BIA grava o M221 que funcionou para aquela biotinta e o **próximo print já começa nele**.
+- **Painel grande `FlowBoostPanel`** no topo da Etapa 4 e do BIA Host assim que a impressão começa: botão laranja **"Não está saindo — aumentar para N %"** (bump inteligente +25/+15/+10), **+10 % / +25 %**, **−10 %**, slider 10–300 %, dica contextual.
+- **Pré-flight** ganhou o bloco "Antes de imprimir: fluxo e purga" com botões de purga (+2/+5/+10 mm) e presets de fluxo (100/120/150 %).
+**Testes:** `tests/r17_flow_memory.test.ts` (6).
+
 ### 📚 Manual do Usuário (NOVO em v4.3)
 5 capítulos didáticos com racional fácil de entender:
 1. **Formulador Pro** (8 min) — Como criar formulações profissionais
@@ -198,6 +206,11 @@ GOOGLE_AI_API_KEY=...
 ---
 
 ## 🗓 Changelog Recente
+
+### R17 — Fluxo em tempo real: "Está saindo biotinta?" + memória de M221 por biotinta (2026-10-21)
+- Default de extrusão 0,6× → **1,0×** no Fatiamento/Regenerador; M221 inicial 50 % → **memória ou ≥ 100 % por material**.
+- Novo `FlowBoostPanel` (Etapa 4 + BIA Host) com botão "Não está saindo" e "Saiu bem — lembrar"; pré-flight com purga + presets de fluxo.
+- Lib `flow-memory.ts` (localStorage) + 6 testes. Total 68 testes.
 
 ### R16 — Laboratório de Biotintas guiado: decisões → receita validada → bancada calculada (2026-10-21)
 - **Problema:** página de Biotinta confusa, com dezenas de parâmetros soltos; usuário sem saber o que "dá certo".

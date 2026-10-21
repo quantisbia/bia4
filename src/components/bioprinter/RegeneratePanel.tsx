@@ -89,7 +89,7 @@ export function RegeneratePanel({
       layerHeightMm: bioprintState.slice.layerHeightMm ?? 0.3,
       infillPercent: bioprintState.slice.infillPercent ?? 20,
       printSpeedMmS: bioprintState.slice.printSpeedMmS ?? 8,
-      extrusionMultiplier: bioprintState.slice.extrusionMultiplier ?? 0.6,
+      extrusionMultiplier: bioprintState.slice.extrusionMultiplier ?? 1.0,
       walls: 2,
       cartridgeTempC: bioprintState.slice.cartridgeTempC ?? 25,
     }),

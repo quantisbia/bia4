@@ -205,13 +205,13 @@ export default function BioprintSlicePage() {
   const [pressureEnabled, setPressureEnabled] = useState<boolean>(true)
   /**
    * R12.11: Multiplicador de extrusão (flow rate, equivalente ao 'Flow' do Cura).
-   * R12.62: Default 0.6 (bioimpressoras têm fluxo inicial fraco — bico bio
-   * 200-410µm + biotinta viscosa 500-5000 cP). Usuária ajusta 0.5-2.0×
-   * conforme viscosidade real. Persistido no context para /execute reemitir
-   * M221 se ajustado em tempo real.
+   * R17: Default 1.0 (teoria volumétrica). ANTES era 0.6 e, somado ao
+   * M221 S50 do /execute, o fluxo real saía em ~30 % → "não sai biotinta".
+   * O ajuste fino agora é feito em TEMPO REAL no /execute (M221 começa
+   * ≥ 100 % e a BIA lembra o valor que funcionou por biotinta).
    */
   const [extrusionMultiplier, setExtrusionMultiplier] = useState<number>(
-    state.slice.extrusionMultiplier ?? 0.6,
+    state.slice.extrusionMultiplier ?? 1.0,
   )
   const [nozzleDiameterUm, setNozzleDiameterUm] = useState<number>(state.slice.nozzleDiameterUm ?? 410)
   const [infillPercent, setInfillPercent] = useState<number>(state.slice.infillPercent ?? 30)
@@ -1471,7 +1471,7 @@ function ParamsPanel(p: ParamsProps) {
               min={0.3} max={2.0} step={0.05}
               value={p.extrusionMultiplier} onChange={p.onExtrusionMultiplierChange}
               display={`${p.extrusionMultiplier.toFixed(2)}×`}
-              hint="Escolha antes de imprimir · será gravado no G-code (M221 + volume por passo)"
+              hint="Deixe 1.0× e ajuste o fluxo em TEMPO REAL na Etapa 4 (botão 'Não está saindo') — a BIA lembra o valor que funcionou por biotinta"
             />
             <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-amber-500/15">
               <span className="text-[10px] text-amber-300/80 font-semibold mr-1 self-center">
@@ -1499,9 +1499,9 @@ function ParamsPanel(p: ParamsProps) {
                     ? "bg-emerald-500/25 border-emerald-400/60 text-emerald-100"
                     : "bg-white/[0.03] border-white/10 text-gray-300 hover:bg-emerald-500/10 hover:border-emerald-500/30"
                 )}
-                title="Padrão para biotintas viscosas (GelMA, Alginato, Colágeno)"
+                title="Valor antigo (R12.62). Hoje recomendamos 1.0× + ajuste em tempo real"
               >
-                🧫 Bio 0.6×
+                🧫 Antigo 0.6×
               </button>
               <button
                 type="button"
@@ -1512,9 +1512,9 @@ function ParamsPanel(p: ParamsProps) {
                     ? "bg-cyan-500/25 border-cyan-400/60 text-cyan-100"
                     : "bg-white/[0.03] border-white/10 text-gray-300 hover:bg-cyan-500/10 hover:border-cyan-500/30"
                 )}
-                title="Padrão FDM clássico — filamento sólido"
+                title="Recomendado: volume teórico. Ajuste fino pelo M221 em tempo real na Etapa 4"
               >
-                🔧 FDM 1.0×
+                ✅ Padrão 1.0×
               </button>
               <button
                 type="button"

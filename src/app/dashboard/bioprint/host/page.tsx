@@ -27,6 +27,8 @@ import { PrinterMock } from "@/lib/bioprint/printer-mock"
 import { PrinterConnection, type PrinterTransport } from "@/lib/bioprint/printer-connection"
 import { SYRINGE_CATALOG, syringeArea_mm2 } from "@/lib/slicer/extrusion"
 import { useBioprintProcess } from "@/lib/bioprint/process-context"
+import { FlowBoostPanel } from "@/components/bioprint/FlowBoostPanel"
+import { suggestStartFlow, rememberGoodFlow, clampFlow, type FlowMemoryEntry } from "@/lib/bioprint/flow-memory"
 
 const HANDOFF_KEY = "bia.host.gcode.handoff"
 type LogLine = { k: "tx" | "rx" | "info" | "warn" | "error"; t: string; ts: number }
@@ -56,10 +58,21 @@ export default function BioHostPage() {
   const [eStep, setEStep] = useState(1)
   const [syringe, setSyringe] = useState(SYRINGE_CATALOG[3])
   const [flow, setFlow] = useState(100)
+  const [flowApplied, setFlowApplied] = useState<number | null>(null)
+  const [flowMemory, setFlowMemory] = useState<FlowMemoryEntry | null>(null)
+  const flowStartRef = useRef(100)
   const [speed, setSpeed] = useState(100)
   const [esteps, setEsteps] = useState(2000)
   const logEnd = useRef<HTMLDivElement>(null)
   const serialSupported = typeof navigator !== "undefined" && !!navigator.serial
+
+  // R17: fluxo inicial = memória por biotinta (ou default generoso ≥ 100 %)
+  const flowMaterialLabel = state.bioink.formulations?.[0]?.label ?? state.bioink.material ?? "biotinta genérica"
+  const flowMaterialKey = state.bioink.formulations?.[0]?.materialId ?? flowMaterialLabel
+  useEffect(() => {
+    const sgt = suggestStartFlow(flowMaterialKey)
+    setFlowMemory(sgt.entry); setFlow(sgt.percent); flowStartRef.current = sgt.percent
+  }, [flowMaterialKey])
 
   useEffect(() => {
     try {
@@ -129,8 +142,19 @@ export default function BioHostPage() {
     if (!h) { setErr("Conecte primeiro."); return }
     if (!gcode.trim()) { setErr("Carregue um G-code."); return }
     setErr(null)
-    try { await h.start(gcode) } catch (e) { setErr((e as Error).message) }
-  }, [gcode])
+    try {
+      await h.inject(`M221 S${clampFlow(flow)}`); setFlowApplied(clampFlow(flow)); flowStartRef.current = flow
+      await h.start(gcode)
+    } catch (e) { setErr((e as Error).message) }
+  }, [gcode, flow])
+
+  const applyFlow = useCallback((v: number) => {
+    const c = clampFlow(v); setFlow(c)
+    void send(`M221 S${c}`).then(() => setFlowApplied(c))
+  }, [send])
+  const confirmGoodFlow = useCallback(() => {
+    setFlowMemory(rememberGoodFlow(flowMaterialKey, flowMaterialLabel, flow, flowStartRef.current))
+  }, [flowMaterialKey, flowMaterialLabel, flow])
 
   const onFile = useCallback(async (f: File) => { setGcode(await f.text()); setGcodeName(f.name) }, [])
 
@@ -250,8 +274,12 @@ export default function BioHostPage() {
             </details>
           </Panel>
 
-          <Panel title="Tempo real" icon={<Gauge className="w-4 h-4" />}>
-            <Slider label="Fluxo (M221)" value={flow} min={30} max={200} onChange={setFlow} onCommit={(v) => send(`M221 S${v}`)} disabled={!connected} />
+          <FlowBoostPanel
+            flowPercent={flow} appliedPercent={flowApplied} connected={connected} streaming={printing}
+            materialLabel={flowMaterialLabel} memory={flowMemory} startPercent={flowStartRef.current}
+            onChange={applyFlow} onConfirmGood={confirmGoodFlow}
+          />
+          <Panel title="Velocidade" icon={<Gauge className="w-4 h-4" />}>
             <Slider label="Velocidade (M220)" value={speed} min={20} max={200} onChange={setSpeed} onCommit={(v) => send(`M220 S${v}`)} disabled={!connected} />
           </Panel>
         </div>
