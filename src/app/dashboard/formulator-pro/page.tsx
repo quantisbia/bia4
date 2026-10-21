@@ -1453,7 +1453,7 @@ function ResultView({
               if (typeof window !== "undefined") {
                 window.sessionStorage.setItem("bia.quickgcode.bioink", JSON.stringify(payload))
               }
-              window.location.href = "/dashboard/bioprint/quick-gcode"
+              window.location.href = "/dashboard/bioprint/slice"
             } catch (e) {
               console.error("Falha ao enviar para Quick G-Code:", e)
               alert("Não foi possível enviar a formulação. Tente novamente.")
@@ -1513,7 +1513,7 @@ function ResultView({
 
 /**
  * R12.12: extrai os parâmetros de impressão da ProFormulation completa
- * e devolve no formato que /dashboard/bioprint/quick-gcode espera.
+ * e devolve no formato que a Etapa 3 (/dashboard/bioprint/slice, BioSlicer) espera.
  *
  * A ProFormulation tem printingParameters: Record<string, unknown> (flexível).
  * Tentamos extrair com heurística defensiva. Se algo faltar, fallback para defaults sãos.

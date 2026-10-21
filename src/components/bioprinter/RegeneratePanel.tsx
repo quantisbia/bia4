@@ -10,8 +10,9 @@
  *    - Parâmetros de fatiamento (layer height, infill %, print speed,
  *      extrusion multiplier, walls, temperatura do cartucho)
  *
- *  ...e clicar "Regerar G-code" — que chama /api/gcode/generate com
- *  o mesmo payload usado no /slice + overrides, e substitui o gcodeText
+ *  ...e clicar "Regerar G-code" — R20: refatia LOCALMENTE com a base
+ *  BioSlicer (mesma malha salva pela Etapa 3 no IndexedDB + overrides),
+ *  cobra 6 créditos via /api/gcode/charge e substitui o gcodeText
  *  atual pelo novo. O GcodeValidatorPanel + Viewer3D imediatamente
  *  refletem o novo G-code (com marcador destacado do ponto inicial
  *  G92 X0 Y0 Z0 E0 e do 1º filamento).
@@ -29,7 +30,31 @@
  * ═══════════════════════════════════════════════════════════════════════
  */
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import {
+  sliceMesh, parseSTL, finalizeMesh, baseParams, singleTool, DEFAULT_TARGET,
+  DEFAULT_EXTRUSION_SYRINGE_10ML, type TriMesh, type InfillPattern,
+} from "@/lib/slicer"
+import { getMesh, getLastMeshId } from "@/lib/slicer/mesh-store"
+
+const INFILL_IDS: InfillPattern[] = ["rectilinear", "grid", "triangles", "honeycomb", "concentric", "gyroid", "zigzag", "none"]
+function toInfill(id: string | null | undefined): InfillPattern {
+  if (!id) return "rectilinear"
+  if ((INFILL_IDS as string[]).includes(id)) return id as InfillPattern
+  if (id === "hexagonal" || id === "honeycomb_hex") return "honeycomb"
+  if (id === "triangular") return "triangles"
+  if (id === "lines" || id === "linear") return "rectilinear"
+  return "rectilinear"
+}
+/** Escala não uniforme X/Y/Z (%) sobre a malha — BioSlicer só tem escala uniforme em params. */
+function scaleMesh(m: TriMesh, sx: number, sy: number, sz: number): TriMesh {
+  if (sx === 1 && sy === 1 && sz === 1) return m
+  const v = new Float32Array(m.vertices.length)
+  for (let i = 0; i < m.vertices.length; i += 3) {
+    v[i] = m.vertices[i] * sx; v[i + 1] = m.vertices[i + 1] * sy; v[i + 2] = m.vertices[i + 2] * sz
+  }
+  return finalizeMesh(v, m.triangleCount, m.name)
+}
 import {
   Wand2, RefreshCw, Sliders, Ruler, Layers, Droplet, Gauge,
   AlertTriangle, CheckCircle2, Loader2, Info,
@@ -40,9 +65,9 @@ import type { BioprintProcessState } from "@/lib/bioprint/process-context"
 // ─── Props ─────────────────────────────────────────────────────────────
 
 export interface RegeneratePanelProps {
-  /** Estado global do processo (model + bioink + slice). Necessário
-   *  porque o regenerador chama /api/gcode/generate com o mesmo payload
-   *  usado pela Etapa 3 (/slice) + overrides feitos aqui. */
+  /** Estado global do processo (model + bioink + slice). O regenerador
+   *  usa state.slice.* como base dos parâmetros e refatia a última malha
+   *  salva pela Etapa 3 (BioSlicer) com os overrides feitos aqui. */
   bioprintState: BioprintProcessState
   /** Callback disparado quando o novo G-code chega — atualiza o
    *  gcodeText do /execute para que o viewer + validador reflitam. */
@@ -118,113 +143,86 @@ export function RegeneratePanel({
 
   const hasChanges = hasScaleChange || hasParamChange
 
-  // Verifica se a página tem o mínimo pra regerar (geometryId + bioink)
+  // R20: precisa da malha salva pela Etapa 3 (IndexedDB) + biotinta
+  const [meshId, setMeshId] = useState<string | null>(null)
+  useEffect(() => { setMeshId(getLastMeshId()) }, [])
   const canRegenerate =
-    !!bioprintState.model.geometryId &&
+    !!meshId &&
     (!!bioprintState.bioink.material ||
      (bioprintState.bioink.formulations?.length ?? 0) > 0)
 
-  // ─── Regeneração ────────────────────────────────────────────────────
+  // ─── Regeneração (R20: base BioSlicer, local) ───────────────────────
   const handleRegenerate = async () => {
     if (!canRegenerate) {
-      setLastError("Modelo 3D ou biotinta ausente. Volte às Etapas 1/2 antes de regerar.")
-      onLog?.("warn", "Regeneração cancelada: falta modelo ou biotinta no processo.")
+      setLastError("Malha da Etapa 3 ou biotinta ausente. Fatie na Etapa 3 (BioSlicer) antes de regerar.")
+      onLog?.("warn", "Regeneração cancelada: falta malha fatiada ou biotinta no processo.")
       return
     }
 
     setRegenerating(true)
     setLastError(null)
     setLastSuccess(null)
-    onLog?.("info", "Regerando G-code com novos parâmetros/dimensões…")
+    onLog?.("info", "Regerando G-code (BioSlicer) com novos parâmetros/dimensões…")
 
     try {
-      // ─ Geometry params com escala aplicada ─
-      // Muitas geometrias paramétricas têm campos como "width", "depth",
-      // "height", "diameter" etc. Aqui multiplicamos cada param numérico
-      // conhecido pela escala apropriada. Para IDs desconhecidos, apenas
-      // passamos os params originais (backward compat).
-      const geomParams: Record<string, number> = {}
-      if (bioprintState.model.params) {
-        for (const [k, v] of Object.entries(bioprintState.model.params)) {
-          if (typeof v !== "number") continue
-          // Heurística: campos que ampliam em X/Y/Z conhecidos
-          const kl = k.toLowerCase()
-          let scaled = v
-          if (kl.includes("width") || kl.includes("x") || kl.includes("diameter")) {
-            scaled = v * (overrides.scaleXPct / 100)
-          } else if (kl.includes("depth") || kl.includes("y")) {
-            scaled = v * (overrides.scaleYPct / 100)
-          } else if (kl.includes("height") || kl.includes("z") || kl.includes("thickness")) {
-            scaled = v * (overrides.scaleZPct / 100)
-          }
-          geomParams[k] = scaled
-        }
-      }
+      const stored = meshId ? await getMesh(meshId) : null
+      if (!stored) throw new Error("Malha da Etapa 3 não encontrada neste navegador. Refaça o fatiamento na Etapa 3.")
+      const base = parseSTL(stored.bytes, stored.name)
+      const mesh = scaleMesh(base, overrides.scaleXPct / 100, overrides.scaleYPct / 100, overrides.scaleZPct / 100)
 
-      // ─ Bioink payload (idêntico ao /slice — R12.62) ─
-      const bioinkPayload = {
-        material: bioprintState.bioink.material ?? "Custom",
-        concentration: bioprintState.bioink.concentration ?? 5,
-        hasCells: !!bioprintState.bioink.cellType,
-        cellDensity: bioprintState.bioink.cellDensityMillionMl ?? undefined,
-        viscosity_cP: bioprintState.bioink.rheology?.viscosityPaS
-          ? bioprintState.bioink.rheology.viscosityPaS * 1000
-          : 1500,
-        crosslinker: bioprintState.bioink.crosslinker ?? undefined,
-        temperature_c: overrides.cartridgeTempC,
-        pressure_kpa: bioprintState.slice.pressureKPa ?? 60,
-        shearStressMax_Pa: 50,
-        nozzleDiameter_um: bioprintState.slice.nozzleDiameterUm ?? 410,
+      const sl = bioprintState.slice
+      const nozzle = (sl.nozzleDiameterUm ?? 410) / 1000
+      const P = baseParams(nozzle)
+      P.layerHeight_mm = overrides.layerHeightMm
+      P.firstLayerHeight_mm = Math.round(overrides.layerHeightMm * 0.9 * 100) / 100
+      P.wallCount = Math.max(1, overrides.walls)
+      P.infillPattern = toInfill(sl.infillPatternId)
+      P.infillDensity = overrides.infillPercent
+      P.speedPerimeter_mms = overrides.printSpeedMmS
+      P.speedInfill_mms = overrides.printSpeedMmS
+      P.speedFirstLayer_mms = Math.max(2, overrides.printSpeedMmS * 0.7)
+      P.skirtLoops = sl.skirtLoops ?? 0
+      P.cartridgeTemp_C = overrides.cartridgeTempC
+      P.hasCells = !!bioprintState.bioink.cellType
+
+      const X = {
+        ...DEFAULT_EXTRUSION_SYRINGE_10ML,
         flowMultiplier: overrides.extrusionMultiplier,
-        retraction_mm: bioprintState.slice.retractionMm ?? 0,
-        printSpeed_mms: overrides.printSpeedMmS,
-        travelSpeed_mms: 50,
+        pressure_kPa: sl.pressureKPa ?? undefined,
       }
-
-      const body = {
-        geometry: { id: bioprintState.model.geometryId, params: geomParams },
-        infill: {
-          algorithm: bioprintState.slice.infillPatternId ?? "gyroid",
-          infillPercent: overrides.infillPercent,
-          macroPorosity: {
-            density: 1 - overrides.infillPercent / 100,
-            poreSize_um: 450,
-          },
-        },
-        bioink: bioinkPayload,
-        bioprinterId: bioprintState.slice.bioprinterId ?? "bioender_bioedtech",
-        layerHeight_mm: overrides.layerHeightMm,
-        walls: Math.max(1, overrides.walls),
-        skirtLoops: bioprintState.slice.skirtLoops ?? 2,
-        tissue: bioprintState.model.category ?? "tecido",
-        application: "scaffold",
-        jobName: `bia_regen_${bioprintState.model.geometryId}_${Date.now()}`,
-      }
-
-      const res = await fetch("/api/gcode/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+      const material = bioprintState.bioink.material ?? bioprintState.bioink.formulations?.[0]?.material ?? "Biotinta"
+      const r = sliceMesh({
+        mesh, params: P, extrusion: X,
+        profileId: "regenerate", profileName: "Regenerado (pré-execução)",
+        jobName: `bia_regen_${bioprintState.model.geometryId ?? stored.name}_${Date.now()}`,
+        rheology: { viscosity_PaS: bioprintState.bioink.rheology?.viscosityPaS },
+        meta: { material, regenerated: true },
+        target: DEFAULT_TARGET,
+        tools: singleTool(X, material),
       })
+      const fatal = r.warnings.find((w) => w.level === "error")
+      if (fatal) throw new Error(fatal.message)
 
+      // R20: todo G-code gerado cobra 6 créditos (admin isento)
+      const res = await fetch("/api/gcode/charge", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ summary: {
+          jobName: "regenerate", profileId: "regenerate", infill: P.infillPattern, infillDensity: P.infillDensity,
+          layerCount: r.stats.layerCount, volume_uL: Math.round(r.stats.volume_uL), time_s: r.stats.estimatedTime_s,
+          target: "petri", wells: 1, tools: 1, meshName: stored.name,
+          geometryId: bioprintState.model.geometryId ?? undefined, gcodeLines: r.gcode.split("\n").length,
+        } }),
+      })
       if (!res.ok) {
-        let msg = `HTTP ${res.status}`
-        try {
-          const errData = await res.json()
-          msg = errData.error ?? errData.message ?? msg
-        } catch { /* keep default */ }
+        let msg = res.status === 402 ? "Créditos insuficientes para gerar G-code." : `Falha na cobrança (HTTP ${res.status})`
+        try { const j = await res.json(); msg = j.error ?? msg } catch { /* keep */ }
         throw new Error(msg)
       }
 
-      const data = await res.json()
-      if (!data.gcode || typeof data.gcode !== "string") {
-        throw new Error("Resposta do engine não trouxe G-code válido.")
-      }
-
-      const nLines = data.gcode.split("\n").length
-      setLastSuccess(`✓ Novo G-code (${nLines.toLocaleString()} linhas) — visualize acima.`)
-      onLog?.("ok", `Regeneração OK — ${nLines} linhas, ${data.layerCount ?? "?"} camadas.`)
-      onRegenerated(data.gcode, {
+      const nLines = r.gcode.split("\n").length
+      setLastSuccess(`✓ Novo G-code (${nLines.toLocaleString()} linhas · ${r.stats.layerCount} camadas) — visualize acima.`)
+      onLog?.("ok", `Regeneração OK — ${nLines} linhas, ${r.stats.layerCount} camadas.`)
+      onRegenerated(r.gcode, {
         source: "RegeneratePanel(execute)",
         params: { ...overrides },
       })
@@ -293,10 +291,10 @@ export function RegeneratePanel({
         <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 flex items-start gap-2 text-xs text-amber-100">
           <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
           <div>
-            <div className="font-semibold">Falta modelo ou biotinta no fluxo.</div>
+            <div className="font-semibold">Falta malha fatiada ou biotinta no fluxo.</div>
             <div className="text-amber-200/80 text-[11px] mt-0.5">
-              Para regerar aqui, você precisa ter passado pelas Etapas 1 (Modelo)
-              e 2 (Biotinta) antes. Se você importou um G-code direto (upload/paste
+              Para regerar aqui, você precisa ter fatiado na Etapa 3 (BioSlicer)
+              e definido a biotinta na Etapa 2 antes. Se você importou um G-code direto (upload/paste
               no /execute), pode alterar os parâmetros no próprio arquivo.
             </div>
           </div>

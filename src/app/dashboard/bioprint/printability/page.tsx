@@ -27,12 +27,11 @@
  */
 
 import { useState, useMemo, useCallback } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
   Beaker, FlaskConical, ShieldCheck, Download, Loader2, Info,
   CheckCircle2, ArrowRight, Camera, Microscope, Ruler, BookOpen,
-  Sparkles, AlertCircle, ChevronRight, Layers, Zap, FileCode2,
+  Sparkles, AlertCircle, ChevronRight, Layers, FileCode2,
   Droplets, Printer,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
@@ -43,65 +42,56 @@ import {
   BIOMIMETIC_GEOMETRIES, type BiomimeticGeometry,
 } from "@/lib/stl/biomimetic-tissues"
 import {
-  generateQuickGcode,
-  type QuickGeometry, type QuickBioinkParams, type QuickGcodeOptions,
-  type QuickGcodeResult,
-} from "@/lib/bioprint/quick-gcode"
+  sliceMesh, finalizeMesh, baseParams, singleTool, DEFAULT_TARGET,
+  DEFAULT_EXTRUSION_SYRINGE_10ML, defaultLayerHeight,
+  type TriMesh, type SliceResult, type InfillPattern,
+} from "@/lib/slicer"
+import { sendToExecute } from "@/lib/bioprint/execute-handoff"
 
-// Handoff key (mesmo que /execute lê)
-const EXECUTE_HANDOFF_KEY = "bia.execute.gcode.handoff"
+/** R20: triângulos do gerador de STL → malha do BioSlicer (fatiamento REAL da peça de teste). */
+function trianglesToMesh(tris: Triangle[], name: string): TriMesh {
+  const v = new Float32Array(tris.length * 9)
+  let k = 0
+  for (const t of tris) {
+    v[k++] = t.v1[0]; v[k++] = t.v1[1]; v[k++] = t.v1[2]
+    v[k++] = t.v2[0]; v[k++] = t.v2[1]; v[k++] = t.v2[2]
+    v[k++] = t.v3[0]; v[k++] = t.v3[1]; v[k++] = t.v3[2]
+  }
+  return finalizeMesh(v, tris.length, name)
+}
 
-// ─── Mapeamento dos 8 testes para Quick G-code ─────────────────────────────
-// Cada teste vira uma QuickGeometry simples + params de impressão razoáveis.
+
+// ─── Parâmetros de fatiamento por teste (R20: BioSlicer fatia o STL REAL) ──
+// Antes (quick-gcode) cada teste era aproximado por caixa/disco/grade. Agora a
+// malha gerada em "Gerar STL" é a mesma que vai pro fatiador — o que você vê é
+// o que imprime. Aqui ficam só altura de camada / paredes / infill sugeridos.
 interface QuickMapping {
-  buildGeometry: (params: GeometryParams) => QuickGeometry
   defaultLayerHeight_mm: number
   defaultWalls: number
-  defaultInfillPattern: "rectilinear" | "concentric" | "none"
+  defaultInfillPattern: InfillPattern
   defaultInfillDensity_pct: number
   note: string  // explicação do que esse teste vai imprimir
 }
 
 const TEST_QUICK_MAPPING: Record<string, QuickMapping> = {
-  // 1. Linha — 5 filamentos paralelos. Quick não tem isso, mas grid passa perto.
-  // R12.46: pattern=rectilinear para gerar as linhas internas (a grade é o teste).
+  // 1. Linha — 5 filamentos paralelos (STL real fatiado).
   test_line: {
-    buildGeometry: (p) => ({
-      id: "grid",
-      width: Number(p.length ?? 20),
-      depth: 10,
-      height: 0.5,
-      pitch: 2,
-    }),
     defaultLayerHeight_mm: 0.25,
     defaultWalls: 1,
     defaultInfillPattern: "rectilinear",
     defaultInfillDensity_pct: 50,
-    note: "5 linhas paralelas (grade fina). Mede CV de largura.",
+    note: "5 filamentos paralelos de larguras crescentes. Mede CV de largura.",
   },
   // 2. Grade Pf — Ouyang 2016
-  // R12.46: precisa das linhas cruzadas — esse é o teste do Pf.
   test_grid: {
-    buildGeometry: (p) => ({
-      id: "grid",
-      width: Number(p.width ?? 20),
-      depth: Number(p.width ?? 20),
-      height: 0.4,
-      pitch: Number(p.width ?? 20) / Number(p.segments ?? 5),
-    }),
     defaultLayerHeight_mm: 0.2,
     defaultWalls: 1,
     defaultInfillPattern: "rectilinear",
     defaultInfillDensity_pct: 50,
     note: "Grade cruzada para cálculo de Pf = P²/(16·A). Padrão-ouro Ouyang 2016.",
   },
-  // 3. Ponte de Colapso — torres+pontes. Aproxima como grade larga.
-  // R12.46: pattern=rectilinear pra ter os vãos da grade (= as pontes do teste).
+  // 3. Ponte de Colapso — torres+pontes (STL real).
   test_collapse_bridge: {
-    buildGeometry: () => ({
-      id: "grid",
-      width: 30, depth: 8, height: 3, pitch: 5,
-    }),
     defaultLayerHeight_mm: 0.25,
     defaultWalls: 1,
     defaultInfillPattern: "rectilinear",
@@ -110,24 +100,14 @@ const TEST_QUICK_MAPPING: Record<string, QuickMapping> = {
   },
   // 4. Torre de Empilhamento — disco fino N camadas
   test_stacking_tower: {
-    buildGeometry: (p) => ({
-      id: "disk",
-      width: Number(p.radius ?? 3) * 2,
-      depth: Number(p.radius ?? 3) * 2,
-      height: 4,  // 20 camadas de 0.2mm
-    }),
     defaultLayerHeight_mm: 0.2,
     defaultWalls: 2,
     defaultInfillPattern: "concentric",
     defaultInfillDensity_pct: 40,
     note: "Torre cilíndrica. Mede altura máxima do bioink sem deformação.",
   },
-  // 5. Escada Z — cubo curto com 5 alturas (quick faz com altura única, OK)
+  // 5. Escada Z — 5 degraus de altura decrescente (STL real).
   test_z_staircase: {
-    buildGeometry: () => ({
-      id: "cube",
-      width: 15, depth: 8, height: 0.4,
-    }),
     defaultLayerHeight_mm: 0.1,
     defaultWalls: 1,
     defaultInfillPattern: "concentric",
@@ -136,12 +116,6 @@ const TEST_QUICK_MAPPING: Record<string, QuickMapping> = {
   },
   // 6. Leque de ângulos
   test_angle_fan: {
-    buildGeometry: (p) => ({
-      id: "patch",
-      width: Number(p.length ?? 15) * 2,
-      depth: Number(p.length ?? 15),
-      height: 1,
-    }),
     defaultLayerHeight_mm: 0.25,
     defaultWalls: 1,
     defaultInfillPattern: "concentric",
@@ -150,23 +124,14 @@ const TEST_QUICK_MAPPING: Record<string, QuickMapping> = {
   },
   // 7. Estrela — disco
   test_star: {
-    buildGeometry: () => ({
-      id: "disk",
-      width: 20, depth: 20, height: 1,
-    }),
     defaultLayerHeight_mm: 0.25,
     defaultWalls: 1,
     defaultInfillPattern: "concentric",
     defaultInfillDensity_pct: 0,
-    note: "Estrela aproximada por disco. Para forma exata baixe o STL.",
+    note: "Estrela com braços em balanço — fatiada a partir do STL real.",
   },
   // 8. Fidelidade — grade densa
-  // R12.46: pattern=rectilinear pra preencher a malha densa (esse é o teste).
   test_fidelity_biotinta: {
-    buildGeometry: () => ({
-      id: "grid",
-      width: 15.4, depth: 15.4, height: 0.8, pitch: 1.5,
-    }),
     defaultLayerHeight_mm: 0.1,
     defaultWalls: 1,
     defaultInfillPattern: "rectilinear",
@@ -229,7 +194,6 @@ const DIFFICULTY_CLASSES: Record<string, string> = {
 }
 
 export default function PrintabilityTestsPage() {
-  const router = useRouter()
 
   // ─── Estado: teste selecionado + params do STL ──
   const [selectedId, setSelectedId] = useState<string>("test_grid") // default: Pf (mais útil)
@@ -254,7 +218,7 @@ export default function PrintabilityTestsPage() {
 
   // ─── Estado: G-code geração ──
   const [generatingGcode, setGeneratingGcode] = useState(false)
-  const [gcodeResult, setGcodeResult] = useState<QuickGcodeResult | null>(null)
+  const [gcodeResult, setGcodeResult] = useState<SliceResult | null>(null)
   const [gcodeError, setGcodeError] = useState<string | null>(null)
 
   const selected = useMemo(
@@ -303,39 +267,81 @@ export default function PrintabilityTestsPage() {
     downloadSTL(cachedTris, fname, true)
   }
 
-  // ─── Geração de G-code direto (sem precisar passar pelo /slice) ──
+  // ─── Geração de G-code direto — R20: mesma base BioSlicer do /slice ──
+  // Fatia o STL REAL do teste (gera se ainda não gerou). Origem = ponto zero
+  // (bico), Petri 60 default, 1 cabeçote. Sem cobrança aqui? NÃO: todo G-code
+  // gerado cobra 6 créditos (decisão R20) — ver /api/gcode/charge abaixo.
+  const [chargeMsg, setChargeMsg] = useState<string | null>(null)
+  const [chargeOk, setChargeOk] = useState<boolean>(false)
   const handleGenerateGcode = useCallback(() => {
     if (!selected) return
     const mapping = TEST_QUICK_MAPPING[selected.id]
     if (!mapping) {
-      setGcodeError(`Sem mapeamento de G-code para ${selected.id}`)
+      setGcodeError(`Sem parâmetros de fatiamento para ${selected.id}`)
       return
     }
 
     setGeneratingGcode(true)
     setGcodeError(null)
+    setChargeMsg(null)
+    setChargeOk(false)
 
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
-        const geom: QuickGeometry = mapping.buildGeometry(params)
-        const bioink: QuickBioinkParams = {
-          materialLabel: bioinkMaterial,
-          nozzleDiameter_mm: nozzleDiameterMm,
-          viscosity_PaS: viscosityPaS,
-          printSpeed_mms: printSpeedMmS,
-          travelSpeed_mms: 50,
-          pressure_kpa: pressureKPa,
-          hasCells: false,
-        }
-        const opts: QuickGcodeOptions = {
-          layerHeight_mm: mapping.defaultLayerHeight_mm,
-          infillPattern: mapping.defaultInfillPattern,
-          infillDensity_pct: mapping.defaultInfillDensity_pct,
-          walls: mapping.defaultWalls,
+        const tris = cachedTris.length > 0 ? cachedTris : generateGeometry(selected.id, params)
+        if (cachedTris.length === 0) { setCachedTris(tris); setTriCount(tris.length); setGenerated(true) }
+        const mesh = trianglesToMesh(tris, `printability_${selected.id}`)
+
+        const P = baseParams(nozzleDiameterMm)
+        P.layerHeight_mm = Math.min(mapping.defaultLayerHeight_mm, defaultLayerHeight(nozzleDiameterMm))
+        P.firstLayerHeight_mm = Math.round(P.layerHeight_mm * 0.9 * 100) / 100
+        P.wallCount = mapping.defaultWalls
+        P.infillPattern = mapping.defaultInfillPattern
+        P.infillDensity = mapping.defaultInfillDensity_pct
+        P.speedPerimeter_mms = printSpeedMmS
+        P.speedInfill_mms = printSpeedMmS
+        P.speedFirstLayer_mms = Math.max(2, printSpeedMmS * 0.7)
+        P.skirtLoops = 0 // R19: 1º cordão nasce no ponto zero
+
+        const X = { ...DEFAULT_EXTRUSION_SYRINGE_10ML, flowMultiplier: 1.0, pressure_kPa: pressureKPa }
+        const result = sliceMesh({
+          mesh, params: P, extrusion: X,
+          profileId: "printability", profileName: `Teste · ${selected.label}`,
           jobName: `printability_${selected.id}`,
-        }
-        const result = generateQuickGcode(geom, bioink, opts)
+          rheology: { viscosity_PaS: viscosityPaS },
+          meta: { material: bioinkMaterial, test: selected.id },
+          target: DEFAULT_TARGET,
+          tools: singleTool(X, bioinkMaterial),
+        })
+        const fatal = result.warnings.find((w) => w.level === "error")
+        if (fatal) throw new Error(fatal.message)
         setGcodeResult(result)
+
+        // Cobrança por G-code gerado (R20) — gate de download / handoff
+        try {
+          const res = await fetch("/api/gcode/charge", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ summary: {
+              jobName: `printability_${selected.id}`, profileId: "printability",
+              infill: P.infillPattern, infillDensity: P.infillDensity,
+              layerCount: result.stats.layerCount, volume_uL: result.stats.volume_uL,
+              time_s: result.stats.estimatedTime_s, target: "petri60", wells: 1, tools: 1,
+              geometryId: selected.id, gcodeLines: result.gcode.split("\n").length,
+            } }),
+          })
+          if (res.ok) {
+            const j = await res.json()
+            setChargeOk(true)
+            setChargeMsg(j.charged ? `${j.charged} créditos debitados` : "sem cobrança (admin)")
+          } else {
+            const j = await res.json().catch(() => ({}))
+            setChargeOk(false)
+            setChargeMsg(j.error ?? (res.status === 402 ? "Créditos insuficientes" : `Falha na cobrança (${res.status})`))
+          }
+        } catch {
+          setChargeOk(false)
+          setChargeMsg("Sem conexão para cobrar o G-code — tente novamente")
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         setGcodeError(msg)
@@ -345,12 +351,13 @@ export default function PrintabilityTestsPage() {
       }
     }, 40)
   }, [
-    selected, params, bioinkMaterial, nozzleDiameterMm,
+    selected, params, cachedTris, bioinkMaterial, nozzleDiameterMm,
     viscosityPaS, printSpeedMmS, pressureKPa,
   ])
 
   const handleDownloadGcode = () => {
     if (!selected || !gcodeResult) return
+    if (!chargeOk) { setGcodeError(chargeMsg ?? "G-code não cobrado — gere novamente"); return }
     const blob = new Blob([gcodeResult.gcode], { type: "text/plain" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
@@ -363,14 +370,13 @@ export default function PrintabilityTestsPage() {
   // ─── ENVIO direto pro /execute (sem passar pelo /slice ou pelas etapas) ──
   const handleSendToExecute = () => {
     if (!selected || !gcodeResult) return
+    if (!chargeOk) { setGcodeError(chargeMsg ?? "G-code não cobrado — gere novamente"); return }
     try {
-      const payload = {
+      sendToExecute({
         gcode: gcodeResult.gcode,
         name: `Teste de imprimibilidade · ${selected.label}`,
         from: "/dashboard/bioprint/printability",
-      }
-      sessionStorage.setItem(EXECUTE_HANDOFF_KEY, JSON.stringify(payload))
-      router.push("/dashboard/bioprint/execute")
+      }) // já navega para /execute
     } catch (e) {
       console.error("[BIA printability] falha enviando pro /execute:", e)
     }
@@ -417,7 +423,7 @@ export default function PrintabilityTestsPage() {
                 📥 STL pronto em 1 clique
               </span>
               <span className="px-2 py-1 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-200">
-                ⚡ G-code rápido (prefill no /slice)
+                ⚡ G-code pela base BioSlicer (6 créditos)
               </span>
               <span className="px-2 py-1 rounded bg-violet-500/10 border border-violet-500/30 text-violet-200">
                 🔬 Protocolo de análise junto
@@ -745,8 +751,8 @@ export default function PrintabilityTestsPage() {
                   </div>
                 </div>
                 <p className="text-[10.5px] text-gray-400 leading-snug">
-                  Geração <strong className="text-violet-200">direta</strong> ({"<"} 100 ms) — sem precisar passar
-                  por modelo / biotinta / fatiamento.
+                  Fatiamento <strong className="text-violet-200">direto</strong> do STL do teste pela mesma base
+                  BioSlicer da Etapa 3 — origem no bico (ponto zero), Petri 60, 1 cabeçote. Cobra 6 créditos por G-code.
                   {TEST_QUICK_MAPPING[selectedId]?.note && (
                     <span className="block mt-1 text-violet-200/80 italic">
                       ℹ️ {TEST_QUICK_MAPPING[selectedId].note}
@@ -791,16 +797,21 @@ export default function PrintabilityTestsPage() {
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-emerald-300 shrink-0" />
                       <div className="flex-1 text-[11px] text-emerald-100">
-                        <strong>G-code pronto.</strong> {gcodeResult.layerCount} camadas ·{" "}
-                        {gcodeResult.moveCount.toLocaleString("pt-BR")} moves ·{" "}
-                        {gcodeResult.bioinkVolume_uL.toFixed(1)} µL ·{" "}
-                        ~{gcodeResult.estimatedTime_min.toFixed(1)} min
+                        <strong>G-code pronto (BioSlicer).</strong> {gcodeResult.stats.layerCount} camadas ·{" "}
+                        {gcodeResult.stats.extrudeLength_mm.toFixed(0)} mm de cordão ·{" "}
+                        {gcodeResult.stats.volume_uL.toFixed(1)} µL ·{" "}
+                        ~{(gcodeResult.stats.estimatedTime_s / 60).toFixed(1)} min
+                        {chargeMsg && (
+                          <span className={cn("ml-2 px-1.5 py-0.5 rounded border text-[10px]", chargeOk ? "border-emerald-400/30 text-emerald-200" : "border-rose-400/30 text-rose-200 bg-rose-500/10")}>
+                            {chargeMsg}
+                          </span>
+                        )}
                       </div>
                     </div>
                     {gcodeResult.warnings.length > 0 && (
                       <div className="text-[10px] text-amber-200/90 leading-snug pl-6 border-l border-amber-500/30 ml-2">
                         {gcodeResult.warnings.slice(0, 2).map((w, i) => (
-                          <div key={i}>⚠️ {w}</div>
+                          <div key={i}>⚠️ {w.message}</div>
                         ))}
                       </div>
                     )}
