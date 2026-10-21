@@ -207,6 +207,10 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R18 — HOTFIX urgente: joystick travado (página não rola mais para o topo ao mover os eixos) (2026-10-21)
+- **Causa raiz:** o terminal da Conexão (`PrinterConnection.tsx`) e o console do BIA Host usavam `scrollIntoView()` a cada linha TX/RX → cada clique no joystick gerava log → o **browser rolava a página inteira**, levando a usuária para o topo e tirando os botões da tela.
+- **Correção:** auto-scroll passa a usar `scrollTop` **só dentro do container** do terminal (+ `overscroll-contain`); `JogBtn` e todos os botões de jog/purga/baby-Z ganham `type="button"`, `onMouseDown.preventDefault()` (não roubam foco), bloqueio das setas do teclado; wrapper `#joystick-locked`; e **trava de scroll** em `sendJog` que restaura `window.scrollY` por 400 ms se algo tentar mover a página.
+
 ### R17 — Fluxo em tempo real: "Está saindo biotinta?" + memória de M221 por biotinta (2026-10-21)
 - Default de extrusão 0,6× → **1,0×** no Fatiamento/Regenerador; M221 inicial 50 % → **memória ou ≥ 100 % por material**.
 - Novo `FlowBoostPanel` (Etapa 4 + BIA Host) com botão "Não está saindo" e "Saiu bem — lembrar"; pré-flight com purga + presets de fluxo.

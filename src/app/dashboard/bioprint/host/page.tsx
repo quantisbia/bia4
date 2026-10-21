@@ -89,7 +89,8 @@ export default function BioHostPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => { logEnd.current?.scrollIntoView({ block: "end" }) }, [log])
+  // R18: rola só o console (scrollTop) — scrollIntoView rolava a página inteira
+  useEffect(() => { const b = logEnd.current?.parentElement; if (b) b.scrollTop = b.scrollHeight }, [log])
 
   const pushLog = useCallback((k: LogLine["k"], t: string) => {
     setLog((l) => { const n = [...l, { k, t, ts: Date.now() }]; return n.length > 600 ? n.slice(-600) : n })
@@ -299,7 +300,7 @@ export default function BioHostPage() {
           )}
 
           <Panel title="Console" icon={<Terminal className="w-4 h-4" />} subtitle={<label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={showTx} onChange={(e) => setShowTx(e.target.checked)} /> mostrar TX do stream</label>}>
-            <div className="h-80 overflow-auto rounded-lg bg-black/50 p-2 font-mono text-[11px] leading-relaxed">
+            <div className="h-80 overflow-auto overscroll-contain rounded-lg bg-black/50 p-2 font-mono text-[11px] leading-relaxed">
               {log.length === 0 && <div className="text-gray-600">— sem mensagens —</div>}
               {log.map((l, i) => (
                 <div key={i} className={cn(l.k === "tx" ? "text-emerald-300/80" : l.k === "rx" ? "text-gray-300" : l.k === "info" ? "text-sky-300" : l.k === "warn" ? "text-amber-300" : "text-red-300")}>

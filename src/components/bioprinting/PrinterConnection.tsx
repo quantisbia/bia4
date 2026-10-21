@@ -262,6 +262,7 @@ export function PrinterConnection({
   const writerRef = useRef<WritableStreamDefaultWriter<Uint8Array> | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const logEndRef = useRef<HTMLDivElement>(null)
+  const logBoxRef = useRef<HTMLDivElement>(null)
 
   const BAUDS = [9600, 19200, 38400, 57600, 115200, 230400, 250000]
 
@@ -288,8 +289,12 @@ export function PrinterConnection({
   }, [])
 
   // ── Auto-scroll do terminal ──
+  // R18: rola SÓ o container do terminal (scrollTop), nunca a página.
+  // scrollIntoView rolava a janela inteira a cada linha TX/RX → ao usar o
+  // joystick a página "pulava" para cima e a usuária perdia os botões.
   useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
+    const box = logBoxRef.current
+    if (box) box.scrollTop = box.scrollHeight
   }, [log])
 
   // ── Notifica externamente quando conecta/desconecta ──
@@ -880,7 +885,7 @@ export function PrinterConnection({
             Limpar
           </button>
         </div>
-        <div className="h-56 overflow-y-auto p-2 font-mono text-[11px] leading-tight">
+        <div ref={logBoxRef} className="h-56 overflow-y-auto overscroll-contain p-2 font-mono text-[11px] leading-tight">
           {log.length === 0 ? (
             <div className="text-gray-600 italic p-2">
               Terminal vazio. Conecte a impressora para ver as mensagens...

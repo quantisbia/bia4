@@ -1451,7 +1451,32 @@ export default function BioprintExecutePage() {
   const [extrudeStep, setExtrudeStep] = useState<number>(1)
   const [position, setPosition] = useState({ x: 0, y: 0, z: 0, e: 0 })
 
+  /**
+   * R18: trava anti-"pulo" da página durante o jog.
+   * Captura window.scrollY no clique e, se nos ~400 ms seguintes a página
+   * subir sozinha (scrollIntoView de log, re-render, foco), devolve para o
+   * mesmo ponto. Não interfere com rolagem intencional do usuário.
+   */
+  const scrollLockRef = useRef<{ y: number; until: number } | null>(null)
+  const lockScroll = useCallback(() => {
+    if (typeof window === "undefined") return
+    const y = window.scrollY
+    scrollLockRef.current = { y, until: performance.now() + 400 }
+    const tick = () => {
+      const l = scrollLockRef.current
+      if (!l) return
+      if (performance.now() > l.until) { scrollLockRef.current = null; return }
+      if (Math.abs(window.scrollY - l.y) > 40) window.scrollTo({ top: l.y, behavior: "instant" as ScrollBehavior })
+      requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  }, [])
+
   const sendJog = useCallback(async (axis: "X" | "Y" | "Z" | "E", delta: number) => {
+    // R18: TRAVA DE SCROLL — qualquer re-render/log durante o jog não pode
+    // levar a página para o topo. Guardamos a posição e restauramos nos
+    // próximos frames (cobre scrollIntoView/âncora/focus de terceiros).
+    lockScroll()
     if (!controllerRef.current || !connected) {
       loggerRef.current.warn("Conecte para usar o joystick.")
       return
@@ -1536,7 +1561,7 @@ export default function BioprintExecutePage() {
     } catch (e) {
       loggerRef.current.error(`Jog ${axis}${delta} falhou: ${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [connected, controllerState, isHandshaking])
+  }, [connected, controllerState, isHandshaking, lockScroll])
 
   const sendZero = useCallback(async () => {
     if (!controllerRef.current || !connected) return
@@ -2590,6 +2615,8 @@ export default function BioprintExecutePage() {
                   {[0.05, 0.1, 0.2, 0.5].map((d) => (
                     <button
                       key={`babyz-down-${d}`}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => sendJog("Z", -d)}
                       disabled={!connected}
                       title={`Desce ${d} mm — use se está saindo gap entre filamentos`}
@@ -2606,6 +2633,8 @@ export default function BioprintExecutePage() {
                   {[0.05, 0.1, 0.2, 0.5].map((d) => (
                     <button
                       key={`babyz-up-${d}`}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => sendJog("Z", +d)}
                       disabled={!connected}
                       title={`Sobe ${d} mm — use se está esmagando o filamento`}
@@ -2877,6 +2906,9 @@ export default function BioprintExecutePage() {
                 </div>
               </div>
             )}
+            {/* R18: wrapper anti-scroll — nenhum botão aqui ganha foco por mouse,
+                então o browser não tenta "scroll-into-view" o elemento focado. */}
+            <div id="joystick-locked" className="select-none" onMouseDown={(e) => { if ((e.target as HTMLElement).closest("button")) e.preventDefault() }}>
             {/* Step size — R12.20: contraste reforçado p/ light mode + log no console técnico */}
             <div className="mb-2">
               <div className="flex items-center justify-between mb-1">
@@ -2955,6 +2987,8 @@ export default function BioprintExecutePage() {
                 {[0.05, 0.1, 0.2].map((d) => (
                   <button
                     key={`zfine-down-${d}`}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => sendJog("Z", -d)}
                     disabled={!connected}
                     title={`Desce ${d} mm (mais perto da mesa) — bom se está saindo gap entre filamentos`}
@@ -2966,6 +3000,8 @@ export default function BioprintExecutePage() {
                 {[0.05, 0.1, 0.2].map((d) => (
                   <button
                     key={`zfine-up-${d}`}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => sendJog("Z", +d)}
                     disabled={!connected}
                     title={`Sobe ${d} mm (mais longe da mesa) — bom se está esmagando o filamento`}
@@ -3056,6 +3092,8 @@ export default function BioprintExecutePage() {
                 {[1, 2, 5, 10].map((bolus) => (
                   <button
                     key={`purge-${bolus}`}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => sendJog("E", +bolus)}
                     disabled={!connected}
                     title={`Purga rápida +${bolus} mm (não muda o passo do joystick)`}
@@ -3142,6 +3180,7 @@ export default function BioprintExecutePage() {
                 )
               })()}
             </div>
+            </div>{/* /joystick-locked */}
           </Panel>
 
           {/* ── R17: Fluxo da biotinta (M221) — painel grande "Está saindo biotinta?" ── */}
@@ -3406,7 +3445,7 @@ export default function BioprintExecutePage() {
           >
             <div
               ref={terminalRef}
-              className="h-64 overflow-y-auto bg-black/60 rounded-lg border border-white/5 p-2 font-mono text-[10px] leading-tight"
+              className="h-64 overflow-y-auto overscroll-contain bg-black/60 rounded-lg border border-white/5 p-2 font-mono text-[10px] leading-tight"
             >
               {logEntries.length === 0 ? (
                 <div className="text-gray-600 italic">Aguardando…</div>
@@ -3813,11 +3852,16 @@ function JogBtn({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
+      // R18: trava anti-scroll — não rouba foco/âncora nem deixa o browser
+      // rolar a página ao clicar/segurar; cliques repetidos ficam no lugar.
+      onMouseDown={(e) => e.preventDefault()}
+      onKeyDown={(e) => { if (e.key.startsWith("Arrow") || e.key === " ") e.preventDefault() }}
       disabled={disabled}
       title={title}
       className={cn(
-        "px-2 py-2 rounded-lg text-xs font-bold border transition-colors disabled:opacity-30 disabled:cursor-not-allowed",
+        "px-2 py-2 rounded-lg text-xs font-bold border transition-colors disabled:opacity-30 disabled:cursor-not-allowed select-none touch-manipulation",
         variant === "default" && "bg-cyan-500/15 hover:bg-cyan-500/25 border-cyan-500/40 text-cyan-100",
         variant === "warn" && "bg-amber-500/15 hover:bg-amber-500/25 border-amber-500/40 text-amber-100",
         variant === "zero" && "bg-violet-500/20 hover:bg-violet-500/30 border-violet-500/40 text-violet-100",
