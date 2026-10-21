@@ -21,7 +21,7 @@ import Link from "next/link"
 import {
   Upload, Sparkles, FlaskConical, Heart, Bone, Activity, Hexagon,
   ShieldCheck, Brain, CheckCircle2, AlertTriangle, ArrowRight, Box,
-  Download, Loader2, FileCode2, Info, XCircle, Lock
+  Download, Loader2, Info, XCircle, Lock
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import {
@@ -40,6 +40,12 @@ import {
 // travar / não fechar mesh. Por padrão só as básicas aparecem; usuário
 // pode habilitar as experimentais via toggle na sidebar.
 import { BASIC_GEOMETRY_IDS } from "@/lib/gcode/slicer/geometry-bounds"
+
+/** R21: geometrias paramétricas da Etapa 1 que têm versão anatômica REAL na biblioteca da Etapa 3 */
+const ANATOMICAL_FOR_GEOMETRY: Record<string, string> = {
+  meniscus: "meniscus_real", ear: "ear_real", nose: "nose_real", kidney: "kidney_real", heart: "heart_real",
+  femur: "femur_real", vessel: "vessel_segment_real", vessel_y_branch: "vessel_segment_real", test_fidelity_biotinta: "fidelity_real",
+}
 
 // ─── Mapeamento das 5 categorias ──────────────────────────────────────────
 //
@@ -829,6 +835,18 @@ function GeneratePanel({
                 </div>
               </div>
             </div>
+
+            {/* R21: versão anatômica REAL (malha curva) disponível na Mesa da Etapa 3 */}
+            {ANATOMICAL_FOR_GEOMETRY[selectedGeo.id] && (
+              <Link href={`/dashboard/bioprint/slice?anat=${ANATOMICAL_FOR_GEOMETRY[selectedGeo.id]}`}
+                className="mb-4 flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/[0.06] px-3 py-2.5 text-[12px] text-emerald-100 hover:bg-emerald-500/10 transition">
+                <span className="text-base leading-none">🧬</span>
+                <span>
+                  <b>Modelo anatômico real disponível</b> — malha curva (não facetada), você escolhe só a dimensão, vê na mesa e gira a peça antes de fatiar.
+                  <span className="block text-emerald-300/80 mt-0.5">Abrir na Mesa da Etapa 3 →</span>
+                </span>
+              </Link>
+            )}
 
             {/* Parâmetros */}
             <div className="mb-4">

@@ -234,3 +234,76 @@ export function layerZs(bbox: BBox3, layerHeight: number, firstLayerHeight: numb
   }
   return zs
 }
+
+// ─── R21 · Arrumar na mesa: rotação livre X/Y/Z + escala + apoiar em Z=0 ──
+export interface Orientation { rotX_deg: number; rotY_deg: number; rotZ_deg: number; scale: number }
+export const IDENTITY_ORIENTATION: Orientation = { rotX_deg: 0, rotY_deg: 0, rotZ_deg: 0, scale: 1 }
+
+/**
+ * Aplica rotação (ordem X → Y → Z, em torno do centro da malha), escala
+ * uniforme, re-centra em XY e apoia a face mais baixa em Z=0 ("drop to bed").
+ */
+export function orientMesh(mesh: TriMesh, o: Orientation): TriMesh {
+  const { bbox } = mesh
+  const cx = (bbox.minX + bbox.maxX) / 2, cy = (bbox.minY + bbox.maxY) / 2, cz = (bbox.minZ + bbox.maxZ) / 2
+  const r = (d: number) => (d * Math.PI) / 180
+  const [ax, ay, az] = [r(o.rotX_deg), r(o.rotY_deg), r(o.rotZ_deg)]
+  const cxr = Math.cos(ax), sxr = Math.sin(ax), cyr = Math.cos(ay), syr = Math.sin(ay), czr = Math.cos(az), szr = Math.sin(az)
+  const n = mesh.triangleCount * 9
+  const out = new Float32Array(n)
+  for (let i = 0; i < n; i += 3) {
+    let x = (mesh.vertices[i] - cx) * o.scale
+    let y = (mesh.vertices[i + 1] - cy) * o.scale
+    let z = (mesh.vertices[i + 2] - cz) * o.scale
+    // Rx
+    let y1 = y * cxr - z * sxr, z1 = y * sxr + z * cxr; y = y1; z = z1
+    // Ry
+    let x1 = x * cyr + z * syr; z1 = -x * syr + z * cyr; x = x1; z = z1
+    // Rz
+    x1 = x * czr - y * szr; y1 = x * szr + y * czr; x = x1; y = y1
+    out[i] = x; out[i + 1] = y; out[i + 2] = z
+  }
+  // re-centra XY e apoia em Z=0
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity
+  for (let i = 0; i < n; i += 3) {
+    if (out[i] < minX) minX = out[i]; if (out[i] > maxX) maxX = out[i]
+    if (out[i + 1] < minY) minY = out[i + 1]; if (out[i + 1] > maxY) maxY = out[i + 1]
+    if (out[i + 2] < minZ) minZ = out[i + 2]
+  }
+  const dx = (minX + maxX) / 2, dy = (minY + maxY) / 2
+  for (let i = 0; i < n; i += 3) { out[i] -= dx; out[i + 1] -= dy; out[i + 2] -= minZ }
+  return finalizeMesh(out, mesh.triangleCount, mesh.name)
+}
+
+/**
+ * Sugere a rotação que deixa a peça MAIS BAIXA (maior área de apoio) na mesa,
+ * testando as 6 orientações principais (±90° em X/Y). Retorna a melhor.
+ */
+export function suggestLayFlat(mesh: TriMesh): Orientation {
+  const cands: Orientation[] = [
+    { rotX_deg: 0, rotY_deg: 0, rotZ_deg: 0, scale: 1 },
+    { rotX_deg: 90, rotY_deg: 0, rotZ_deg: 0, scale: 1 },
+    { rotX_deg: -90, rotY_deg: 0, rotZ_deg: 0, scale: 1 },
+    { rotX_deg: 0, rotY_deg: 90, rotZ_deg: 0, scale: 1 },
+    { rotX_deg: 0, rotY_deg: -90, rotZ_deg: 0, scale: 1 },
+    { rotX_deg: 180, rotY_deg: 0, rotZ_deg: 0, scale: 1 },
+  ]
+  let best = cands[0], bestScore = -Infinity
+  for (const c of cands) {
+    const m = orientMesh(mesh, c)
+    const h = m.bbox.maxZ - m.bbox.minZ
+    // área de apoio: triângulos com z ≈ 0 e normal para baixo
+    let base = 0
+    const v = m.vertices
+    for (let t = 0; t < m.triangleCount; t++) {
+      const k = t * 9
+      if (v[k + 2] < 0.05 && v[k + 5] < 0.05 && v[k + 8] < 0.05) {
+        const ax = v[k + 3] - v[k], ay = v[k + 4] - v[k + 1], bx = v[k + 6] - v[k], by = v[k + 7] - v[k + 1]
+        base += Math.abs(ax * by - ay * bx) / 2
+      }
+    }
+    const score = base * 10 - h
+    if (score > bestScore) { bestScore = score; best = c }
+  }
+  return best
+}

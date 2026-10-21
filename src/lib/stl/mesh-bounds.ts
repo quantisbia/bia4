@@ -62,12 +62,9 @@ export const STL_PREPROCESS_MAP: Record<string, MeshPreprocess> = {
     rotate: { axis: "x", degrees: 90 },
   },
 
-  // Fêmur: vem em unidades muito pequenas (bbox 2.1 × 1.25 × 9.06)
-  // Fêmur adulto real ~450 mm de comprimento → escala ~50× para virar
-  // 105×62×453 mm aproximadamente.
-  "femur-real.stl": {
-    scale: 50,
-  },
+  // Fêmur (R21): o STL em /public já está em mm reais (104 × 62 × 450 mm,
+  // decimado para 40 k tri, centrado em XY, base Z=0). Sem transformação.
+  "femur-real.stl": {},
 
   // Rim (R12.51): bbox cru 38.6 × 19.7 × 12.7 mm com eixo longo em X.
   // Rim humano adulto: ~120 × 60 × 30 mm com eixo longo VERTICAL (Z).

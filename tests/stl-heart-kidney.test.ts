@@ -117,10 +117,10 @@ describe("coração — STL real (R12.51)", () => {
     clearMeshCache()
   })
 
-  it("tem ~22.37 MB e 447378 triângulos (mesh pesada — alerta perf!)", () => {
-    expect(heartBuffer.byteLength).toBe(22368984)
+  it("R21: ~2.4 MB e 48254 triângulos (decimado da fonte 3MF de 447378 — leve para o browser)", () => {
+    expect(heartBuffer.byteLength).toBe(84 + 50 * 48254)
     const mesh = parseBinaryStl(heartBuffer)
-    expect(mesh.triangleCount).toBe(447378)
+    expect(mesh.triangleCount).toBe(48254)
   })
 
   it("bbox antes da escala: ~28.83 × 34.11 × 35.97 mm (mesh em mm)", () => {

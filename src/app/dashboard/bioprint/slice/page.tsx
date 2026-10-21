@@ -13,7 +13,7 @@
  * ═══════════════════════════════════════════════════════════════════════
  */
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import {
   Upload, Mic, MicOff, Wand2, Layers, Download, Send, Settings2, Sparkles, AlertTriangle,
@@ -34,6 +34,9 @@ import { ToolsPanel, type BioinkOption } from "@/components/slicer/ToolsPanel"
 import { sendToExecute } from "@/lib/bioprint/execute-handoff"
 import { Target, Palette, ShieldCheck, X as XIcon } from "lucide-react"
 import { LayerPreview } from "@/components/slicer/LayerPreview"
+import { BedStage } from "@/components/slicer/BedStage"
+import { type Orientation, IDENTITY_ORIENTATION, orientMesh } from "@/lib/slicer/mesh-slice"
+import { ANATOMICAL_MODELS, type AnatomicalModel, uniformScaleFor } from "@/lib/slicer/anatomical-library"
 import { previewLayers } from "@/lib/slicer/slice"
 import { INFILL_PATTERN_LABELS, BASIC_INFILL_PATTERNS, ADVANCED_INFILL_PATTERNS } from "@/lib/slicer/infill-advanced"
 import { useSearchParams } from "next/navigation"
@@ -56,6 +59,12 @@ function BioSlicerInner() {
 
   const [mesh, setMesh] = useState<TriMesh | null>(null)
   const [meshSource, setMeshSource] = useState<string>("")
+  // R21: arrumar na mesa — rotação X/Y/Z + escala uniforme; o que vai pro fatiador é a malha ORIENTADA
+  const [orientation, setOrientation] = useState<Orientation>(IDENTITY_ORIENTATION)
+  const [anat, setAnat] = useState<AnatomicalModel | null>(null)
+  const [anatDim, setAnatDim] = useState<number>(0)
+  const [anatLoading, setAnatLoading] = useState<string | null>(null)
+  const oriented = useMemo(() => (mesh ? orientMesh(mesh, orientation) : null), [mesh, orientation])
   const [stored, setStored] = useState<Array<{ id: string; name: string; sizeKb: number; source: string }>>([])
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -116,8 +125,37 @@ function BioSlicerInner() {
 
   const loadStored = useCallback(async (id: string) => {
     const m = await getMesh(id)
-    if (m) { setMesh(parseSTL(m.bytes, m.name)); setMeshSource(`${m.source}: ${m.name}`); setResult(null) }
+    if (m) { setMesh(parseSTL(m.bytes, m.name)); setMeshSource(`${m.source}: ${m.name}`); setResult(null); setAnat(null); setOrientation(IDENTITY_ORIENTATION) }
   }, [])
+
+  // R21: biblioteca anatômica real — baixa o STL de /public/stl, escala pela dimensão escolhida
+  const loadAnatomical = useCallback(async (m: AnatomicalModel) => {
+    setError(null); setAnatLoading(m.id)
+    try {
+      const res = await fetch(m.file)
+      if (!res.ok) throw new Error(`Não foi possível carregar ${m.label} (${res.status})`)
+      const buf = await res.arrayBuffer()
+      const tm = parseSTL(buf, `${m.id}.stl`)
+      setMesh(tm); setMeshSource(`anatômico: ${m.label}`); setResult(null)
+      setAnat(m); setAnatDim(m.range.default)
+      setOrientation({ rotX_deg: m.suggestedRotation?.x ?? 0, rotY_deg: m.suggestedRotation?.y ?? 0, rotZ_deg: m.suggestedRotation?.z ?? 0, scale: uniformScaleFor(m, m.range.default) })
+      try { await putMesh({ id: newMeshId("anat"), name: `${m.id}.stl`, bytes: buf, format: "stl", createdAt: Date.now(), source: "anatomical", meta: { dim: m.range.default } }); await refreshStored() } catch { /* noop */ }
+    } catch (e) { setError(e instanceof Error ? e.message : "Falha ao carregar modelo anatômico") }
+    finally { setAnatLoading(null) }
+  }, [refreshStored])
+  // ?anat=<id> vindo da Etapa 1 → carrega o modelo anatômico real
+  const anatParamDone = useRef(false)
+  useEffect(() => {
+    if (anatParamDone.current) return
+    const id = searchParams?.get("anat")
+    if (!id) return
+    const m = ANATOMICAL_MODELS.find((x) => x.id === id)
+    if (m) { anatParamDone.current = true; void loadAnatomical(m) }
+  }, [searchParams, loadAnatomical])
+  const setAnatDimension = useCallback((v: number) => {
+    setAnatDim(v)
+    if (anat) setOrientation((o) => ({ ...o, scale: uniformScaleFor(anat, v) }))
+  }, [anat])
 
   const onFile = useCallback(async (file: File) => {
     setError(null)
@@ -125,7 +163,7 @@ function BioSlicerInner() {
       const buf = await file.arrayBuffer()
       const m = parseSTL(buf, file.name)
       if (m.triangleCount === 0) throw new Error("STL sem triângulos válidos.")
-      setMesh(m); setMeshSource(`upload: ${file.name}`); setResult(null)
+      setMesh(m); setMeshSource(`upload: ${file.name}`); setResult(null); setAnat(null); setOrientation(IDENTITY_ORIENTATION)
       await putMesh({ id: newMeshId("upload"), name: file.name, bytes: buf, format: "stl", createdAt: Date.now(), source: "upload" })
       await refreshStored()
     } catch (e) { setError(e instanceof Error ? e.message : "Falha ao ler STL") }
@@ -135,7 +173,7 @@ function BioSlicerInner() {
     const prim = PRIMITIVE_CATALOG.find((c) => c.id === id)
     if (!prim) return
     const m = prim.make(p)
-    setMesh(m); setMeshSource(`primitiva: ${prim.label}`); setResult(null)
+    setMesh(m); setMeshSource(`primitiva: ${prim.label}`); setResult(null); setAnat(null); setOrientation(IDENTITY_ORIENTATION)
     try {
       await putMesh({ id: newMeshId("prim"), name: `${m.name}.stl`, bytes: triMeshToSTL(m.vertices, m.triangleCount, `BIA ${prim.label}`), format: "stl", createdAt: Date.now(), source: "primitive", meta: p })
       await refreshStored()
@@ -207,13 +245,13 @@ function BioSlicerInner() {
   }, [listening, runIntent])
 
   const doSlice = useCallback(async () => {
-    if (!mesh) { setError("Carregue um STL ou gere uma primitiva primeiro."); return }
+    if (!mesh || !oriented) { setError("Carregue um STL ou gere uma primitiva primeiro."); return }
     setError(null); setBusy("Preparando…")
     await new Promise((r) => setTimeout(r, 20))
     try {
       let params = P
-      if (intent?.targetSize_mm && P.scale === 1) {
-        const bb = mesh.bbox
+      if (intent?.targetSize_mm && P.scale === 1 && !anat) {
+        const bb = oriented.bbox
         const sx = bb.maxX - bb.minX, sy = bb.maxY - bb.minY, sz = bb.maxZ - bb.minZ
         const c: number[] = []
         if (intent.targetSize_mm.x && sx > 0) c.push(intent.targetSize_mm.x / sx)
@@ -222,10 +260,10 @@ function BioSlicerInner() {
         if (c.length) { params = { ...P, scale: Math.min(...c) }; setP(params) }
       }
       const r = sliceMesh({
-        mesh, params, extrusion: X, profileId: profile.id, profileName: profile.name, rheology,
+        mesh: oriented, params, extrusion: X, profileId: profile.id, profileName: profile.name, rheology,
         jobName: mesh.name ?? "bia-print",
         target, tools,
-        meta: { geometryId: state.model.geometryId ?? mesh.name ?? "stl", tissue: intent?.tissue ?? state.control.tissueType ?? null, material: intent?.material ?? state.bioink.material ?? null, intent: intentText || null },
+        meta: { geometryId: anat?.id ?? state.model.geometryId ?? mesh.name ?? "stl", tissue: anat?.tissue ?? intent?.tissue ?? state.control.tissueType ?? null, material: intent?.material ?? state.bioink.material ?? null, intent: intentText || null, orientation: `X${orientation.rotX_deg} Y${orientation.rotY_deg} Z${orientation.rotZ_deg} ×${orientation.scale.toFixed(3)}` },
         onProgress: (f, s) => setBusy(`${s} (${Math.round(f * 100)}%)`),
       })
       setResult(r)
@@ -253,7 +291,7 @@ function BioSlicerInner() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao fatiar")
     } finally { setBusy(null) }
-  }, [mesh, P, X, profile, rheology, intent, intentText, state, updateSlice, target, tools])
+  }, [mesh, oriented, orientation, anat, P, X, profile, rheology, intent, intentText, state, updateSlice, target, tools])
 
   const download = useCallback(() => {
     if (!result) return
@@ -279,7 +317,7 @@ function BioSlicerInner() {
     sendToExecute({ gcode: result.gcode, name: `${(mesh?.name ?? "bia").replace(/\.stl$/i, "")}.gcode`, from: "slicer" })
   }, [result, mesh, charged])
 
-  const meshSize = mesh ? { x: mesh.bbox.maxX - mesh.bbox.minX, y: mesh.bbox.maxY - mesh.bbox.minY, z: mesh.bbox.maxZ - mesh.bbox.minZ } : null
+  const meshSize = oriented ? { x: oriented.bbox.maxX - oriented.bbox.minX, y: oriented.bbox.maxY - oriented.bbox.minY, z: oriented.bbox.maxZ - oriented.bbox.minZ } : null
   const errors = result?.warnings.filter((w) => w.level === "error") ?? []
 
   return (
@@ -339,6 +377,19 @@ function BioSlicerInner() {
               </div>
             )}
             <div className="mt-3">
+              <div className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">Modelos anatômicos reais (malha curva) — escolha e ajuste só a dimensão</div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {ANATOMICAL_MODELS.map((m) => (
+                  <button key={m.id} onClick={() => loadAnatomical(m)} disabled={!!anatLoading} title={m.description}
+                    className={cn("text-left text-xs px-2 py-1.5 rounded-lg border flex items-center gap-1.5 transition disabled:opacity-50", anat?.id === m.id ? "border-emerald-400/50 bg-emerald-500/10" : "border-white/10 hover:border-white/25")}>
+                    <span className="text-base leading-none">{m.icon}</span>
+                    <span className="min-w-0"><span className="block truncate text-gray-100">{m.label}</span><span className="block text-[10px] text-gray-500">{anatLoading === m.id ? "carregando…" : `${(m.tris / 1000).toFixed(0)} k tri · ${m.tissue}`}</span></span>
+                  </button>
+                ))}
+              </div>
+              {anat && <div className="mt-1.5 text-[11px] text-gray-400">{anat.description}{anat.reference ? ` · ${anat.reference}` : ""}</div>}
+            </div>
+            <div className="mt-3">
               <div className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">Ou gere uma primitiva</div>
               <div className="grid grid-cols-2 gap-1.5">
                 <PrimBtn icon={<Box className="w-3.5 h-3.5" />} label="Bloco 10×10×3" onClick={() => makePrimitive("box", { x: 10, y: 10, z: 3 })} />
@@ -354,6 +405,21 @@ function BioSlicerInner() {
               </div>
             )}
           </Panel>
+
+          {mesh && (
+            <Panel title="Mesa · ver e arrumar a peça" icon={<Target className="w-4 h-4" />} subtitle="o que você vê aqui é o que será fatiado">
+              <BedStage
+                mesh={mesh} orientation={orientation} onOrientation={setOrientation} target={target}
+                primary={anat ? { label: anat.primaryLabel, value_mm: anatDim, min: anat.range.min, max: anat.range.max, onChange: setAnatDimension } : undefined}
+              />
+              {!anat && (
+                <div className="mt-2 flex items-center gap-2 text-xs">
+                  <span className="text-gray-400">Escala uniforme</span>
+                  <input type="number" step={0.05} min={0.05} value={orientation.scale} onChange={(e) => setOrientation({ ...orientation, scale: Math.max(0.01, +e.target.value || 1) })} className="w-20 px-2 py-1 rounded bg-white/5 border border-white/10 text-gray-100" />×
+                </div>
+              )}
+            </Panel>
+          )}
 
           <Panel title="2 · Objetivo (texto ou voz)" icon={<Wand2 className="w-4 h-4" />}>
             <div className="flex gap-2">
@@ -413,14 +479,14 @@ function BioSlicerInner() {
           </Panel>
 
           <Panel title="5 · Onde imprimir (ponto zero)" icon={<Target className="w-4 h-4" />}>
-            <TargetPanel target={target} onChange={setTarget} footprint_mm={meshSize ? Math.max(meshSize.x, meshSize.y) * P.scale : null} />
+            <TargetPanel target={target} onChange={setTarget} footprint_mm={meshSize ? Math.max(meshSize.x, meshSize.y) : null} />
           </Panel>
 
           <Panel title="6 · Cabeçotes e biotintas" icon={<Palette className="w-4 h-4" />}>
             <ToolsPanel tools={tools} onChange={setTools} bioinks={bioinkOptions} baseExtrusion={X} />
           </Panel>
 
-          <button onClick={() => { if (mesh) { try { setPreview(previewLayers({ mesh, params: P }, 3)) } catch { setPreview(null) } } setConfirmOpen(true) }} disabled={!mesh || !!busy} className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-emerald-500 to-cyan-500 text-black disabled:opacity-40 flex items-center justify-center gap-2">
+          <button onClick={() => { if (oriented) { try { setPreview(previewLayers({ mesh: oriented, params: P }, 3)) } catch { setPreview(null) } } setConfirmOpen(true) }} disabled={!mesh || !!busy} className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-emerald-500 to-cyan-500 text-black disabled:opacity-40 flex items-center justify-center gap-2">
             {busy ? <><RefreshCw className="w-4 h-4 animate-spin" /> {busy}</> : <><Layers className="w-4 h-4" /> Fatiar e gerar G-code (6 créditos)</>}
           </button>
           {error && <div className="text-sm text-red-300 flex gap-2"><AlertTriangle className="w-4 h-4 shrink-0" />{error}</div>}

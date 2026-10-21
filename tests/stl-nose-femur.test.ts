@@ -21,7 +21,7 @@ import {
 //
 // Cobre:
 //   - Parsing dos dois STLs novos (11974 + 118860 triângulos)
-//   - Transformações: nariz rotaciona 90° X (Y→Z), fêmur escala 50×
+//   - Transformações: nariz rotaciona 90° X (Y→Z); fêmur (R21) já em mm
 //   - Integração ao engine via geometryBoundsFromMesh
 // ═══════════════════════════════════════════════════════════════════
 
@@ -46,10 +46,11 @@ describe("STL_PREPROCESS_MAP — configuração das transformações por arquivo
     expect(p.rotate?.degrees).toBe(90)
   })
 
-  it("femur-real.stl: escala 50× (vem em unidades pequenas)", () => {
+  it("femur-real.stl (R21): já em mm — sem escala nem rotação", () => {
     const p = STL_PREPROCESS_MAP["femur-real.stl"]
     expect(p).toBeDefined()
-    expect(p.scale).toBe(50)
+    expect(p.scale).toBeUndefined()
+    expect(p.rotate).toBeUndefined()
   })
 })
 
@@ -154,31 +155,27 @@ describe("fêmur — STL real (R12.50)", () => {
     clearMeshCache()
   })
 
-  it("tem ~5.94 MB e 118860 triângulos", () => {
-    expect(femurBuffer.byteLength).toBe(5943084)
+  it("R21: ~2.0 MB e 40442 triângulos (decimado da fonte de 118860)", () => {
+    expect(femurBuffer.byteLength).toBe(84 + 50 * 40442)
     const mesh = parseBinaryStl(femurBuffer)
-    expect(mesh.triangleCount).toBe(118860)
+    expect(mesh.triangleCount).toBe(40442)
   })
 
-  it("bbox antes da escala: dimensões muito pequenas (~2×1×9)", () => {
+  it("R21: bbox já em mm reais (~104 × 62 × 450), Z é o eixo longo", () => {
     const mesh = parseBinaryStl(femurBuffer)
     const W = mesh.bbox.maxX - mesh.bbox.minX
     const D = mesh.bbox.maxY - mesh.bbox.minY
     const H = mesh.bbox.maxZ - mesh.bbox.minZ
-    expect(W).toBeLessThan(5)
-    expect(D).toBeLessThan(5)
-    expect(H).toBeLessThan(15)
-    // Z já é o eixo longo (fêmur "em pé")
+    expect(H).toBeGreaterThan(440); expect(H).toBeLessThan(460)
     expect(H).toBeGreaterThan(W)
     expect(H).toBeGreaterThan(D)
   })
 
-  it("após registerMesh: bbox escalado para tamanho anatômico real (~450 mm)", () => {
+  it("após registerMesh: sem transformação — altura segue ~450 mm", () => {
     const raw = parseBinaryStl(femurBuffer)
     registerMesh("femur-real.stl", raw)
 
     const bounds = geometryBoundsFromMesh("femur-real.stl", { x: 0, y: 0 })
-    // Escala 50× sobre H=9.06 → ~453 mm
     expect(bounds.height_mm).toBeGreaterThan(400)
     expect(bounds.height_mm).toBeLessThan(500)
   })

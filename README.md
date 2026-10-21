@@ -207,6 +207,17 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R21 — Modelos anatômicos REAIS + Mesa: escolha a dimensão, veja na mesa, gire e arrume antes de fatiar (2026-10-21)
+
+**Mandato:** *"o menisco possui arestas retas e não curvilíneas… com fêmur e orelha também… deixar apenas a dimensão para ser escolhida e poder ver o arquivo na mesa preview e poder rodar o arquivo, arrumando ele corretamente na mesa de impressão."*
+
+- **Biblioteca anatômica** (`src/lib/slicer/anatomical-library.ts` + `/public/stl/*-real.stl`, normalizados: centro XY, base Z=0): menisco meia-lua (4,9 k tri), orelha (4,4 k), nariz (12 k), rim (8 k), coração (3MF → 48 k, decimado), fêmur (40 k, em mm reais 450 mm), segmento vascular ramificado (51 k), grade de fidelidade 15,4 mm (67 k). Todas **malhas curvas de verdade** — nada de "C" facetado.
+- **Só a dimensão**: cada modelo expõe UMA medida principal (ex.: comprimento do menisco, altura da orelha) com faixa típica; a escala é **uniforme** (anatomia preservada). Grade de fidelidade travada em 15,4 mm pelo protocolo.
+- **Mesa (`BedStage`)**: vista de cima sobre o alvo (Petri/lâmina/poço) + vista 3D em relevo (canvas 2D, sem WebGL). Mostra o **ponto zero (bico)**, grade 10 mm, dimensões resultantes e se a peça **cabe** no alvo (verde/vermelho).
+- **Arrumar na mesa**: Tombar X / Tombar Y / Girar Z (±15°, ±90°), **"Deitar na mesa"** (`suggestLayFlat` — testa 6 orientações e escolhe a de maior apoio/menor altura), zerar. `orientMesh` sempre re-centra em XY e apoia em Z=0. **O que está na mesa é exatamente o que vai para o fatiador** (prévia e G-code usam a malha orientada).
+- Etapa 1: geometrias paramétricas com equivalente real (menisco, orelha, nariz, rim, coração, fêmur, vaso, fidelidade) mostram o atalho **"Modelo anatômico real disponível → abrir na Mesa da Etapa 3"** (`/slice?anat=<id>`).
+- Testes `r21_anatomical_bed` (8): STLs presentes e com dimensões/normalização corretas; menisco curvo (≥200 normais distintas) e côncavo (vazio no centro); escala uniforme; `orientMesh` 90° em Y deita barra e apoia; `suggestLayFlat`; fêmur deitado pela sugestão; menisco anatômico fatia com `G92` e sem `G28`.
+
 ### R20 — UMA só ferramenta de fatiamento: BioSlicer é a base; tudo mais é caminho (2026-10-21)
 
 **Mandato:** *"precisamos manter apenas 1 ferramenta de fatiamento e bioimpressão… as demais serão apenas caminhos para essa base."*
