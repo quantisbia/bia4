@@ -59,6 +59,19 @@ e `/bioprinter-control`. Estado compartilhado via `BioprintProcessContext` (Reac
 `src/components/bioprinter/{Joystick3D,ExtrusionPanel,TissueViabilityPanel,PostBioprintingPanel}.tsx`
 **API principal:** `POST /api/gcode/generate` (6 créditos)
 
+### 🔪 BioSlicer + BIA Host (NOVO em R15 — v4.5)
+Fatiador **real** de STL para bioimpressão por extrusão (seringa/pneumático, estilo Ender/BioEnder/Enderstruder)
+e **host serial profissional** no padrão Printrun/OctoPrint — tudo no browser, sem servidor.
+
+| Rota | Função |
+|------|--------|
+| `/dashboard/bioprint/slicer` | **BioSlicer** — STL (Etapa 1, Studio, upload ou primitiva) → G-code. Modo **Básico** (4 perfis "que dão certo": alginato/gelatina, GelMA, Pluronic, calibração) e **Avançado** (7 perfis por objetivo: osso woodpile, cartilagem concêntrico+gyroid, pele, canal vascular, FRESH, teste Pr de Ouyang, domo de organoide) com todos os parâmetros + dicas. **Objetivo por texto ou voz** (pt-BR): "scaffold ósseo 10x10x4 mm, poro 400 µm, alginato com HAp, agulha 18G" → perfil montado com decisões explicadas. Preview 2D por camada (camada anterior sobreposta p/ conferir 0/90), estatísticas bio (volume, mm de êmbolo, vazão, shear, viabilidade Blaeser 2016), avisos (capacidade da seringa, fusão de filamentos Ribeiro 2017, tempo com células, mesa redonda 180 mm). |
+| `/dashboard/bioprint/host` | **BIA Host** — USB Web Serial (Chrome/Edge) ou simulador. Linhas numeradas + checksum + **Resend**, janela de envio (1–6), autoreport M155/polling M105, M114, progresso por camada, ETA, pausa com script (M400→retrai→Z+5) e retomada na posição, cancel com footer de segurança, M112. Jog XYZ/E, **Zerar origem (G92)** sem G28, macros de seringa (prime/retract/purge em µL, calibração de E-steps M92+M500, M302), fluxo M221 e velocidade M220 em tempo real. |
+
+**Libs puras (testáveis em Node):** `src/lib/slicer/` — `polygon-ops`, `mesh-slice` (plane–mesh + costura por hash espacial, STL binário/ASCII), `infill` (rectilinear/woodpile alinhado globalmente, zigzag contínuo, grid, triângulos, honeycomb, gyroid 2D, concêntrico), `extrusion` (E = mm de êmbolo via área da seringa; catálogo BD 1–20 mL, agulhas 14–30G; Hagen-Poiseuille + power-law), `profiles`, `intent` (parser pt-BR → auto-profile), `toolpath`, `gcode-writer` (M83, M302, G92 X0 Y0 Z0 E0, `;LAYER`, `;TYPE`, `;BIA_META`), `slice`, `mesh-store` (IndexedDB). `src/lib/host/marlin-host.ts` — MarlinHost.
+**Testes:** `tests/r15_bioslicer.test.ts` (35) + `tests/r15_marlin_host.test.ts` (11, inclui recuperação com 15 % de corrupção serial).
+**Referências:** Ribeiro 2017 · Ouyang 2016 · Blaeser 2016 · Compaired 2025 (IJB) · Cordova 2024 (Enderstruder) · Hinton 2015 / Lee 2019 (FRESH) · Allevi GelMA.
+
 ### 📚 Manual do Usuário (NOVO em v4.3)
 5 capítulos didáticos com racional fácil de entender:
 1. **Formulador Pro** (8 min) — Como criar formulações profissionais

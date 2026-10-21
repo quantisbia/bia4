@@ -273,6 +273,13 @@ function UploadPanel({
         throw new Error("O arquivo não contém triângulos válidos.")
       }
       setTriangles(tris)
+      // R15: persiste o STL original no IndexedDB para o BioSlicer
+      if (ext === "stl") {
+        try {
+          const { putMesh, newMeshId } = await import("@/lib/slicer/mesh-store")
+          await putMesh({ id: newMeshId("upload"), name: file.name, bytes: buffer, format: "stl", createdAt: Date.now(), source: "etapa-1" })
+        } catch { /* IndexedDB indisponível */ }
+      }
       // Validar mesh (skip se muito grande pra evitar travar UI)
       const report = tris.length > 200_000
         ? null

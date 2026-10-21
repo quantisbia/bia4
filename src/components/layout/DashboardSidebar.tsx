@@ -8,7 +8,7 @@ import { useSession } from "next-auth/react"
 import {
   LayoutDashboard, GitBranch, CircleDot,
   FileText, BookOpen, MessageSquare, CreditCard, Settings,
-  LogOut, Zap, ChevronRight, Menu, X, Printer, ClipboardCheck, BookMarked,
+  LogOut, Zap, ChevronRight, Menu, X, Printer, ClipboardCheck, BookMarked, Layers, Cpu,
   Crown, Wrench, Info, Map, Atom, Library, GraduationCap,
   Lightbulb, Beaker, ShieldCheck, UserCircle, ChevronDown,
   Microscope, Sparkles,
@@ -145,6 +145,10 @@ export const NAV_GROUPS: NavGroup[] = [
         info: "Upload de STL ou geração a partir de 20+ geometrias prontas (biomiméticas + testes)." },
       { href: "/dashboard/bioprint/quick-gcode", label: "G-code Rápido", labelKey: "term_gcode", icon: Zap,
         info: "Atalho: gera G-code otimizado em 60 segundos a partir de um modelo + biotinta." },
+      { href: "/dashboard/bioprint/slicer", label: "BioSlicer (STL → G-code)", icon: Layers,
+        info: "Fatiador real de STL para bioimpressão: extrusão volumétrica por seringa, infills de scaffold, perfis Básico/Avançado e objetivo por texto/voz.", badge: "novo" },
+      { href: "/dashboard/bioprint/host", label: "BIA Host (impressora)", icon: Cpu,
+        info: "Host serial profissional: USB Web Serial, checksum/reenvio, temperaturas, jog, macros de seringa, pausa segura.", badge: "novo" },
     ],
   },
   {

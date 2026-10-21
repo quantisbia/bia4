@@ -308,6 +308,12 @@ export function StudioClient({ userName }: { userName: string }) {
       }
       const blob = await res.blob()
       setStlBlob(blob)
+      // R15: persiste o STL no IndexedDB para o BioSlicer (/dashboard/bioprint/slicer)
+      try {
+        const { putMesh, newMeshId } = await import("@/lib/slicer/mesh-store")
+        const bytes = await blob.arrayBuffer()
+        await putMesh({ id: newMeshId("studio"), name: `bia-studio-${Date.now()}.stl`, bytes, format: "stl", createdAt: Date.now(), source: "studio" })
+      } catch { /* IndexedDB indisponível — segue sem persistir */ }
       const h = res.headers
       const warnings = h.get("x-bia-warnings")
       const parsed: GenerationStats = {
