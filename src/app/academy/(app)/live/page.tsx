@@ -275,7 +275,7 @@ export default async function AcademyLivePage() {
       )}
 
       {/* Feed de atualizações */}
-      <section className="space-y-4" data-testid="academy-updates-feed">
+      <section id="academy-updates-feed" className="space-y-4" data-testid="academy-updates-feed">
         <h2 className="text-base font-bold text-white flex items-center gap-2">
           <Rss className="w-4 h-4 text-amber-300" />
           Atualizações da área

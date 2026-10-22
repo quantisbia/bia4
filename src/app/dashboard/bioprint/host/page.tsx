@@ -190,11 +190,13 @@ export default function BioHostPage() {
     <div className="space-y-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
+          <div className="text-[10px] uppercase tracking-[0.25em] text-amber-300/80 font-semibold mb-1">Fase 4 / 6 · Bioimpressão · modo avançado (host serial)</div>
           <h2 className="text-xl font-bold flex items-center gap-2"><Cpu className="w-5 h-5 text-emerald-300" /> BIA Host — controle da bioimpressora</h2>
           <p className="text-sm text-gray-400 mt-1 max-w-3xl">Host serial profissional (linhas numeradas + checksum + reenvio, janela de envio, autoreport de temperatura, pausa com script). Compatível com Ender/BioEnder (Marlin) e Klipper via USB.</p>
         </div>
         <div className="flex items-center gap-2 text-xs">
-          <Link href="/dashboard/bioprint/slicer" className="px-3 py-1.5 rounded-lg border border-white/10 hover:border-emerald-400/40 text-gray-300">← BioSlicer</Link>
+          <Link href="/dashboard/bioprint/slice" className="px-3 py-1.5 rounded-lg border border-white/10 hover:border-emerald-400/40 text-gray-300">← Fase 3 · Fatiar</Link>
+          <Link href="/dashboard/bioprint/execute" className="px-3 py-1.5 rounded-lg border border-amber-400/30 hover:border-amber-400/60 text-amber-200">Fase 4 · modo guiado (validador + viewer 3D)</Link>
           <StatePill s={hs} />
         </div>
       </header>

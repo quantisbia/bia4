@@ -39,8 +39,9 @@ export const ACADEMY_NAV_ITEMS = [
     info: "Lista completa dos módulos publicados. Cada módulo tem um conjunto de aulas em vídeo, quiz opcional e biaHook para abrir a BIA." },
   { href: "/academy/library",    label: "Biblioteca",    icon: Library,         exact: false,
     info: "Materiais das aulas (PDFs, STL/G-code, links), 65 papers e patentes curados do Knowledge Engine e os white papers da Quantis — tudo em um só lugar, com busca e filtros." },
+  // R24.6 · /academy/project redireciona para o Notebook da BIA.
   { href: "/academy/project",    label: "Meu Projeto",   icon: FolderKanban,    exact: false,
-    info: "Seu \"Projeto de Biofabricação\" — vive num NotebookEntry do R12.66, com versionamento V1/V2/V3 automático conforme você responde os desafios. Chega em R13.07." },
+    info: "Seu \"Projeto de Biofabricação\" vive no Notebook da BIA (versionamento V1/V2/V3 conforme você responde os desafios)." },
   { href: "/academy/live",       label: "Encontros",     icon: Video,           exact: false,
     info: "Os 3 encontros online ao vivo com a Dra. Kamila: abertura, discussão de projetos e fechamento. Datas confirmadas (podem sofrer alterações), link do Zoom aparece 48h antes + e-mail. Gravações ficam disponíveis depois. Inclui feed de atualizações da área (protocolos, artigos, aulas extras)." },
   { href: "/academy/certificate",label: "Certificado",   icon: Award,           exact: false,

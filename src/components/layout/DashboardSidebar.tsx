@@ -55,7 +55,7 @@ export const NAV_ITEMS = [
     info: "Guia passo-a-passo: do problema clínico ao tecido funcional impresso. Use este roteiro se for sua primeira vez ou se quiser seguir o caminho recomendado pela equipe Quantis." },
   { href: "/dashboard/pipeline",           label: "Pipeline",             icon: GitBranch,       exact: false,
     info: "Pipeline de Engenharia de Tecidos em 12 etapas — da definição do problema clínico até pré-clínico/clínico. Use para guiar o seu projeto do zero ao protocolo validado. Custo: 5 créditos/etapa." },
-  { href: "/dashboard/formulator-pro",     label: "Formulador Pro",       icon: Atom,            exact: false,
+  { href: "/dashboard/bioprint/bioink?mode=pro", label: "Formulador Pro",  icon: Atom,            exact: false,
     info: "Versão profissional: monte formulações multi-componente livremente (até 8 biomateriais — catálogo OU customizados), defina objetivo clínico (cicatrização, osso, gengiva, implante mamário…), especificações viscoelásticas e a IA gera análise científica completa: score, incompatibilidades, protocolo, ISO/ANVISA. Custo: 10 créditos." },
   { href: "/dashboard/bioprint",           label: "Bioimpressão",         icon: Printer,         exact: false,
     info: "Processo de bioimpressão em 6 fases: (1) Modelo de tecido — o que você vai imprimir, sem STL; (2) Biotinta — receita validada + células; (3) Fatiamento — o único lugar de modelos 3D (anatômico, primitiva, upload, desenho) → G-code; (4) Bioimpressão — BIA Host USB com viabilidade live; (5) Análise — nota + relato fecham o laço e ajustam o próximo G-code; (6) Maturação & caracterizações. Custo: 6 créditos por G-code." },
@@ -125,8 +125,8 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/dashboard/pipeline",       label: "Pipeline",         labelKey: "nav_pipeline",   icon: GitBranch,
         info: "Fluxo guiado em 12 etapas: do problema clínico ao protocolo validado." },
-      { href: "/dashboard/formulator-pro", label: "Formulador Pro",   labelKey: "nav_formulator", icon: Atom,
-        info: "Monte formulações de biotintas com até 8 componentes. 807 biomateriais + reologia em tempo real." },
+      // R24.6 · O Formulador Pro deixou de ser item separado: é um modo da
+      // Fase 2 · Biotinta (grupo Bioimprimir). Uma ferramenta, um lugar.
     ],
   },
   {
@@ -139,6 +139,8 @@ export const NAV_GROUPS: NavGroup[] = [
         info: "1 Modelo de tecido → 2 Biotinta → 3 Fatiamento (único lugar de STL) → 4 Bioimpressão (Host) → 5 Análise → 6 Maturação & caracterizações.", badge: "principal" },
       { href: "/dashboard/bioprint/model", label: "Fase 1 · Modelo de tecido", icon: CircleDot,
         info: "O que você vai bioimprimir: tecido-alvo, aplicação, tamanho, células. Sem STL — a BIA sugere modelo, perfil e biotinta para as próximas fases." },
+      { href: "/dashboard/bioprint/bioink", label: "Fase 2 · Biotinta", icon: Atom,
+        info: "ÚNICO lugar de biotintas: receitas validadas (18), laboratório guiado, formular do zero (807 biomateriais, reologia, multi-material) e Formulador Pro (IA)." },
       { href: "/dashboard/bioprint/slice", label: "Fase 3 · Fatiar (STL → G-code)", icon: Zap,
         info: "BioSlicer — o ÚNICO lugar de modelos 3D da BIA: anatômico real, primitiva, upload, desenho ou teste de imprimibilidade → G-code (ponto zero no bico, alvo Petri/placa, 1–4 cabeçotes, infills honestos)." },
       { href: "/dashboard/bioprint/draw", label: "Fase 3 · Desenhar & Imprimir", icon: Pencil,
@@ -147,6 +149,8 @@ export const NAV_GROUPS: NavGroup[] = [
         info: "Host serial profissional: USB Web Serial, checksum/reenvio, temperaturas, jog, macros de seringa, pausa segura." },
       { href: "/dashboard/bioprint/review", label: "Fase 5 · Análise", icon: ClipboardCheck,
         info: "Laço fechado: nota 1–5 + relato → a BIA ajusta o próximo G-code. Histórico de impressões.", badge: "novo" },
+      { href: "/dashboard/bioprint/post", label: "Fase 6 · Maturação & caracterizações", icon: Microscope,
+        info: "Depois de imprimir: cultivo, maturação e caracterizações (viabilidade, histologia, mecânica) do construto." },
     ],
   },
   {

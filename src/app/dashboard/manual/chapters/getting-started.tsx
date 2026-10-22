@@ -91,7 +91,7 @@ export function ChapterGettingStarted() {
           <NavRow label="Visão Geral"          path="/dashboard"                  what="Resumo + atalhos" />
           <NavRow label="Roteiro Profissional" path="/dashboard/roadmap"          what="Planejamento de 10 fases" />
           <NavRow label="Pipeline"             path="/dashboard/pipeline"         what="Seus projetos científicos" />
-          <NavRow label="Formulador Pro"       path="/dashboard/formulator-pro"   what="Combinar biomateriais (IA)" />
+          <NavRow label="Formulador Pro"       path="/dashboard/bioprint/bioink?mode=pro" what="Modo IA da Fase 2 · Biotinta" />
           <NavRow label="Bioimpressão"         path="/dashboard/bioprint"         what="Modelo → Tinta → Fatiar → Imprimir" />
           <NavRow label="Organoid Builder"     path="/dashboard/organoids"        what="Desenhar organoides 3D" />
           <NavRow label="Protocolos GLP/GMP"   path="/dashboard/protocols"        what="Protocolos validados" />

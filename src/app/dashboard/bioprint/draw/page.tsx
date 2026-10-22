@@ -149,8 +149,8 @@ function DrawPrintInner() {
               {result.warnings.map((w, i) => <div key={i} className="text-xs text-amber-200 flex gap-2"><AlertTriangle className="w-4 h-4 shrink-0" />{w}</div>)}
               <div className="flex flex-wrap gap-2">
                 <button onClick={download} className="px-4 py-2 rounded-lg border border-white/15 hover:border-emerald-400/40 text-sm flex items-center gap-2"><Download className="w-4 h-4" /> Baixar .gcode</button>
-                <button onClick={toHost} className="px-4 py-2 rounded-lg bg-emerald-500/20 border border-emerald-400/40 hover:bg-emerald-500/30 text-sm flex items-center gap-2"><Send className="w-4 h-4" /> Enviar ao Host</button>
-                <button onClick={toStep4} className="px-4 py-2 rounded-lg border border-white/15 hover:border-white/30 text-sm">Fase 4 (Bioimpressão · Host) →</button>
+                <button onClick={toHost} className="px-4 py-2 rounded-lg border border-white/15 hover:border-white/30 text-sm flex items-center gap-2"><Send className="w-4 h-4" /> Fase 4 · modo avançado (BIA Host)</button>
+                <button onClick={toStep4} className="px-4 py-2 rounded-lg bg-emerald-500/20 border border-emerald-400/40 hover:bg-emerald-500/30 text-sm">Fase 4 · Bioimprimir →</button>
                 {charged && <span className={cn("text-xs self-center px-2 py-1 rounded border", charged.ok ? "text-emerald-200 border-emerald-400/30 bg-emerald-500/10" : "text-rose-200 border-rose-400/30 bg-rose-500/10")}>{charged.msg}</span>}
               </div>
               <pre className="text-[11px] font-mono max-h-60 w-full max-w-full overflow-auto bg-black/40 rounded-lg p-3 text-gray-300 whitespace-pre">{result.gcode.slice(0, 12000)}{result.gcode.length > 12000 ? "\n… (truncado)" : ""}</pre>

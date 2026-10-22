@@ -8,7 +8,7 @@
  * Schwarz P, Diamond, Voronoi e Perlin como preenchimentos honestos.
  *
  * Esta rota permanece apenas como redirecionamento para não quebrar links
- * antigos (manual, academy, favoritos). O componente StudioClient continua no
+ * antigos (manual, academy, favoritos). R24.6: StudioClient.tsx foi removido;
  * repositório (não roteado) para referência/reativação futura.
  */
 import { redirect } from "next/navigation"

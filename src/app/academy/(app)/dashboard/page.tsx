@@ -265,7 +265,7 @@ export default async function AcademyDashboardPage() {
               </p>
             </div>
             <Link
-              href="/academy/updates"
+              href="/academy/live#academy-updates-feed"
               className="text-[10px] font-semibold uppercase tracking-wider text-fuchsia-300 hover:text-fuchsia-200"
             >
               Ver todas →

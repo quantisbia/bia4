@@ -2041,3 +2041,11 @@ Janaina Dernowsek (CEO/Founder)
 - **Fase 2 · Biotinta**: catálogo de **18 receitas validadas** (+ CELLINK SKIN 3 camadas, GelMA+Alginato dupla reticulação, CNF+GelMA+HAp osso, Agarose+Alginato, dECM+GelMA, PCL+HAp fusão, Gelatina sacrificial, Alg/Gel/Fibrina cardíaco) com **filtro por objetivo** (pré-selecionado pelo tecido da Fase 1).
 - **BIA Host**: ao terminar a impressão, marca a Fase 4 como pronta e abre o modal **"Ficou como você esperava? nota 1–5 + o que mudar"** (banner com botão "Avaliar impressão" e link para a Fase 5).
 - Testes: `r24_draw_bands.test.ts` (5); `r16_bioink_lab` ajustado para ≥10 receitas.
+
+## R24.6 · Auditoria "uma ferramenta, um lugar"
+- **Fase 2 · Biotinta** é o ÚNICO lugar de formulação, com 4 modos (`?mode=`): `recipes` (18 validadas), `lab` (Laboratório guiado), `free` (Formular do zero · 807 biomateriais · reologia · multi-material), `pro` (Formulador Pro IA). `/bioink/classic`, `/bioink/lab` e `/formulator-pro` redirecionam (query do Academy preservada). Componentes em `src/components/bioink/`.
+- **Fase 3 · BioSlicer** é o ÚNICO lugar de STL: os 8 testes de imprimibilidade entraram como fonte de modelo (`src/lib/slicer/printability-tests.ts`, deep-link `?test=<id>`). `/printability` → `/slice?test=`, `/toolpath` → `/execute`.
+- **Fase 4**: `/execute` é a entrada (guiada: validador + viewer 3D); BIA Host é o "modo avançado" (links e botões uniformizados em Fatiar/Desenhar).
+- Hub: removidos os cards duplicados "Execução USB direta", "G-code Hub", "BTIE". Sidebar: Fase 2 e Fase 6 no grupo Bioimprimir; "Formulador Pro" avulso removido.
+- Links quebrados corrigidos: `/dashboard/formulator` (quick-actions/banner), `/dashboard/subscription`→`/billing`, `/academy/project`, `/academy/profile` (novas rotas redirect), `/academy/updates`→`/academy/live#academy-updates-feed`.
+- Código morto removido: `StudioClient.tsx`, `model/_legacy/`, `BioinkMultiMaterialFormulator.tsx`. Testes: 1773 verdes (`tests/r24_6_consolidation.test.ts`).

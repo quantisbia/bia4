@@ -41,6 +41,7 @@ import { LayerPreview } from "@/components/slicer/LayerPreview"
 import { BedStage } from "@/components/slicer/BedStage"
 import { type Orientation, IDENTITY_ORIENTATION, orientMesh } from "@/lib/slicer/mesh-slice"
 import { ANATOMICAL_MODELS, type AnatomicalModel, uniformScaleFor } from "@/lib/slicer/anatomical-library"
+import { PRINTABILITY_TESTS, getPrintabilityTest, makePrintabilityTestMesh, type PrintabilityTestDef } from "@/lib/slicer/printability-tests"
 // R23: laço fechado — ajustes aprendidos do último feedback (nota ≤ 3)
 import { pendingAdjustments, applyLearned, markConsumed, type LearnedAdjustment, type PrintFeedback } from "@/lib/bioprint/print-feedback"
 import { previewLayers } from "@/lib/slicer/slice"
@@ -70,6 +71,9 @@ function BioSlicerInner() {
   const [anat, setAnat] = useState<AnatomicalModel | null>(null)
   const [anatDim, setAnatDim] = useState<number>(0)
   const [anatLoading, setAnatLoading] = useState<string | null>(null)
+  // R24.6: testes de imprimibilidade (ex-/printability) são só mais uma fonte de modelo
+  const [ptest, setPtest] = useState<PrintabilityTestDef | null>(null)
+  const [ptestParams, setPtestParams] = useState<Record<string, number>>({})
   const oriented = useMemo(() => (mesh ? orientMesh(mesh, orientation) : null), [mesh, orientation])
   // R23: aprendizado pendente (último feedback com nota ≤ 3)
   const [learned, setLearned] = useState<{ feedback: PrintFeedback | null; adjustments: LearnedAdjustment[] }>({ feedback: null, adjustments: [] })
@@ -138,7 +142,7 @@ function BioSlicerInner() {
 
   const loadStored = useCallback(async (id: string) => {
     const m = await getMesh(id)
-    if (m) { setMesh(parseSTL(m.bytes, m.name)); setMeshSource(`${m.source}: ${m.name}`); setResult(null); setAnat(null); setOrientation(IDENTITY_ORIENTATION) }
+    if (m) { setMesh(parseSTL(m.bytes, m.name)); setMeshSource(`${m.source}: ${m.name}`); setResult(null); setAnat(null); setPtest(null); setOrientation(IDENTITY_ORIENTATION) }
   }, [])
 
   // R21: biblioteca anatômica real — baixa o STL de /public/stl, escala pela dimensão escolhida
@@ -149,7 +153,7 @@ function BioSlicerInner() {
       if (!res.ok) throw new Error(`Não foi possível carregar ${m.label} (${res.status})`)
       const buf = await res.arrayBuffer()
       const tm = parseSTL(buf, `${m.id}.stl`)
-      setMesh(tm); setMeshSource(`anatômico: ${m.label}`); setResult(null)
+      setMesh(tm); setMeshSource(`anatômico: ${m.label}`); setResult(null); setPtest(null)
       setAnat(m); setAnatDim(m.range.default)
       setOrientation({ rotX_deg: m.suggestedRotation?.x ?? 0, rotY_deg: m.suggestedRotation?.y ?? 0, rotZ_deg: m.suggestedRotation?.z ?? 0, scale: uniformScaleFor(m, m.range.default) })
       try { await putMesh({ id: newMeshId("anat"), name: `${m.id}.stl`, bytes: buf, format: "stl", createdAt: Date.now(), source: "anatomical", meta: { dim: m.range.default } }); await refreshStored() } catch { /* noop */ }
@@ -184,7 +188,7 @@ function BioSlicerInner() {
       const buf = await file.arrayBuffer()
       const m = parseSTL(buf, file.name)
       if (m.triangleCount === 0) throw new Error("STL sem triângulos válidos.")
-      setMesh(m); setMeshSource(`upload: ${file.name}`); setResult(null); setAnat(null); setOrientation(IDENTITY_ORIENTATION)
+      setMesh(m); setMeshSource(`upload: ${file.name}`); setResult(null); setAnat(null); setPtest(null); setOrientation(IDENTITY_ORIENTATION)
       await putMesh({ id: newMeshId("upload"), name: file.name, bytes: buf, format: "stl", createdAt: Date.now(), source: "upload" })
       await refreshStored()
     } catch (e) { setError(e instanceof Error ? e.message : "Falha ao ler STL") }
@@ -194,7 +198,7 @@ function BioSlicerInner() {
     const prim = PRIMITIVE_CATALOG.find((c) => c.id === id)
     if (!prim) return
     const m = prim.make(p)
-    setMesh(m); setMeshSource(`primitiva: ${prim.label}`); setResult(null); setAnat(null); setOrientation(IDENTITY_ORIENTATION)
+    setMesh(m); setMeshSource(`primitiva: ${prim.label}`); setResult(null); setAnat(null); setPtest(null); setOrientation(IDENTITY_ORIENTATION)
     try {
       await putMesh({ id: newMeshId("prim"), name: `${m.name}.stl`, bytes: triMeshToSTL(m.vertices, m.triangleCount, `BIA ${prim.label}`), format: "stl", createdAt: Date.now(), source: "primitive", meta: p })
       await refreshStored()
@@ -207,6 +211,35 @@ function BioSlicerInner() {
     setX({ ...pf.extrusion, syringe: pf.extrusion.syringe ? { ...pf.extrusion.syringe } : undefined })
     setResult(null)
   }, [])
+
+  /** R24.6 · Teste de imprimibilidade → malha + parâmetros de fatiamento recomendados. */
+  const loadPrintabilityTest = useCallback(async (t: PrintabilityTestDef, params?: Record<string, number>) => {
+    setError(null)
+    try {
+      const prm = { ...(t.defaultParams as Record<string, number>), ...(params ?? {}) }
+      const m = makePrintabilityTestMesh(t.id, prm)
+      setMesh(m); setMeshSource(`teste: ${t.label}`); setResult(null); setAnat(null); setOrientation(IDENTITY_ORIENTATION)
+      setPtest(t); setPtestParams(prm)
+      // parâmetros do teste (sem trocar o perfil/biotinta escolhidos)
+      setP((prev) => ({ ...prev, layerHeight_mm: t.slice.layerHeight_mm, firstLayerHeight_mm: Math.round(t.slice.layerHeight_mm * 0.9 * 100) / 100, wallCount: t.slice.wallCount, infillPattern: t.slice.infillPattern, infillDensity: t.slice.infillDensity, skirtLoops: 0 }))
+      try {
+        await putMesh({ id: newMeshId("test"), name: `${m.name}.stl`, bytes: triMeshToSTL(m.vertices, m.triangleCount, `BIA ${t.label}`), format: "stl", createdAt: Date.now(), source: "printability", meta: prm })
+        await refreshStored()
+      } catch { /* noop */ }
+    } catch (e) { setError(e instanceof Error ? e.message : "Falha ao gerar teste") }
+  }, [refreshStored])
+
+  // R24.6 · ?test=<id> (deep-link do antigo /printability e da Fase 1 "Teste de imprimibilidade")
+  const testParamDone = useRef(false)
+  useEffect(() => {
+    if (testParamDone.current) return
+    const id = searchParams?.get("test")
+    if (!id) return
+    const t = getPrintabilityTest(id)
+    if (!t) return
+    testParamDone.current = true
+    void loadPrintabilityTest(t)
+  }, [searchParams, loadPrintabilityTest])
 
   // R24 · Brief da Fase 1 → ?prim=&size=&profile=&infill=&target=
   const briefParamDone = useRef(false)
@@ -330,7 +363,7 @@ function BioSlicerInner() {
         mesh: oriented, params, extrusion: Xeff, profileId: profile.id, profileName: profile.name, rheology,
         jobName: mesh.name ?? "bia-print",
         target, tools,
-        meta: { geometryId: anat?.id ?? state.model.geometryId ?? mesh.name ?? "stl", tissue: anat?.tissue ?? intent?.tissue ?? state.control.tissueType ?? null, material: intent?.material ?? state.bioink.material ?? null, intent: intentText || null, orientation: `X${orientation.rotX_deg} Y${orientation.rotY_deg} Z${orientation.rotZ_deg} ×${orientation.scale.toFixed(3)}` },
+        meta: { geometryId: anat?.id ?? ptest?.id ?? state.model.geometryId ?? mesh.name ?? "stl", test: ptest?.id ?? null, tissue: anat?.tissue ?? (ptest ? "Calibração" : null) ?? intent?.tissue ?? state.control.tissueType ?? null, material: intent?.material ?? state.bioink.material ?? null, intent: intentText || null, orientation: `X${orientation.rotX_deg} Y${orientation.rotY_deg} Z${orientation.rotZ_deg} ×${orientation.scale.toFixed(3)}` },
         onProgress: (f, s) => setBusy(`${s} (${Math.round(f * 100)}%)`),
       })
       if (learnedNotes.length > 0) {
@@ -364,7 +397,7 @@ function BioSlicerInner() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao fatiar")
     } finally { setBusy(null) }
-  }, [mesh, oriented, orientation, anat, P, X, profile, rheology, intent, intentText, state, updateSlice, target, tools, learned, useLearned])
+  }, [mesh, oriented, orientation, anat, ptest, P, X, profile, rheology, intent, intentText, state, updateSlice, target, tools, learned, useLearned])
 
   const download = useCallback(() => {
     if (!result) return
@@ -485,6 +518,39 @@ function BioSlicerInner() {
                 <PrimBtn icon={<Sparkles className="w-3.5 h-3.5" />} label="Domo Ø6×2.5" onClick={() => makePrimitive("dome", { d: 6, z: 2.5 })} />
               </div>
             </div>
+            <details className="mt-3 group" open={!!ptest}>
+              <summary className="cursor-pointer list-none text-[11px] uppercase tracking-wide text-gray-500 hover:text-gray-300 flex items-center gap-1">
+                <span className="transition-transform group-open:rotate-90">▸</span> Ou um teste de imprimibilidade da biotinta ({PRINTABILITY_TESTS.length})
+              </summary>
+              <p className="text-[11px] text-gray-500 mt-1 mb-1.5">Qualifique a biotinta antes do construto: linha, Pf (Ouyang 2016), colapso, torre, escada Z, leque, estrela, fidelidade. O teste vira STL e é fatiado aqui mesmo.</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {PRINTABILITY_TESTS.map((t) => (
+                  <button key={t.id} onClick={() => loadPrintabilityTest(t)} title={`${t.description}\n\n${t.rationale}`}
+                    className={cn("text-left text-xs px-2 py-1.5 rounded-lg border flex items-center gap-1.5 transition", ptest?.id === t.id ? "border-amber-400/50 bg-amber-500/10" : "border-white/10 hover:border-white/25")}>
+                    <span className="text-base leading-none">{t.icon}</span>
+                    <span className="min-w-0"><span className="block truncate text-gray-100">{t.label}</span><span className="block text-[10px] text-gray-500">{t.difficulty}</span></span>
+                  </button>
+                ))}
+              </div>
+              {ptest && (
+                <div className="mt-2 rounded-lg border border-amber-400/20 bg-amber-500/5 p-2.5 text-[11px] text-gray-300 space-y-1.5">
+                  <div><b className="text-amber-200">{ptest.label}</b> — {ptest.rationale}</div>
+                  {Object.keys(ptest.paramLabels).length > 0 && (
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {Object.entries(ptest.paramLabels).map(([k, lbl]) => (
+                        <label key={k} className="flex flex-col gap-0.5 text-[10px] text-gray-400">
+                          {lbl}
+                          <input type="number" step={0.1} value={ptestParams[k] ?? ""} onChange={(e) => setPtestParams({ ...ptestParams, [k]: +e.target.value })}
+                            onBlur={() => loadPrintabilityTest(ptest, ptestParams)} className="px-2 py-1 rounded bg-white/5 border border-white/10 text-gray-100" />
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  <div className="text-gray-500">Fatiamento sugerido: camada {ptest.slice.layerHeight_mm} mm · {ptest.slice.wallCount} parede(s) · {ptest.slice.infillPattern} {ptest.slice.infillDensity}% — {ptest.slice.note}</div>
+                  {ptest.analysisProtocol && <div className="text-gray-500"><b className="text-gray-400">Como analisar:</b> {ptest.analysisProtocol}</div>}
+                </div>
+              )}
+            </details>
             {mesh && meshSize && (
               <div className="mt-3 text-xs rounded-lg bg-emerald-500/5 border border-emerald-500/20 p-2.5">
                 <div className="flex items-center gap-1.5 text-emerald-200"><CheckCircle2 className="w-3.5 h-3.5" /> {meshSource}</div>
@@ -618,8 +684,8 @@ function BioSlicerInner() {
 
               <div className="flex flex-wrap gap-2">
                 <button onClick={download} className="px-4 py-2 rounded-lg border border-white/15 hover:border-emerald-400/40 text-sm flex items-center gap-2"><Download className="w-4 h-4" /> Baixar .gcode</button>
-                <button onClick={sendToHost} disabled={errors.length > 0} className="px-4 py-2 rounded-lg bg-emerald-500/20 border border-emerald-400/40 hover:bg-emerald-500/30 text-sm flex items-center gap-2 disabled:opacity-40"><Send className="w-4 h-4" /> Enviar ao Host (imprimir)</button>
-                <button onClick={sendToStep4} disabled={errors.length > 0} className="px-4 py-2 rounded-lg border border-white/15 hover:border-white/30 text-sm disabled:opacity-40">Fase 4 (Bioimpressão · Host) →</button>
+                <button onClick={sendToStep4} disabled={errors.length > 0} className="px-4 py-2 rounded-lg bg-emerald-500/20 border border-emerald-400/40 hover:bg-emerald-500/30 text-sm flex items-center gap-2 disabled:opacity-40"><Send className="w-4 h-4" /> Fase 4 · Bioimprimir →</button>
+                <button onClick={sendToHost} disabled={errors.length > 0} title="Host serial avançado: checksum/reenvio, jog, macros de seringa" className="px-4 py-2 rounded-lg border border-white/15 hover:border-white/30 text-sm disabled:opacity-40">Fase 4 · modo avançado (BIA Host)</button>
                 {charged && <span className={cn("text-xs self-center px-2 py-1 rounded border", charged.ok ? "text-emerald-200 border-emerald-400/30 bg-emerald-500/10" : "text-rose-200 border-rose-400/30 bg-rose-500/10")}>{charged.msg}</span>}
               </div>
               {errors.length > 0 && <div className="text-xs text-red-300">Resolva os erros acima antes de enviar ao host.</div>}

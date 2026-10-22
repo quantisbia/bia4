@@ -91,7 +91,7 @@ const PHASES: Phase[] = [
     title: "Selecionar e Formular o Biomaterial",
     goal: "Escolher a bioink que melhor atende suas specs — equilibrando imprimibilidade, biocompatibilidade, propriedades mecânicas e custo. Use o Formulador Bio para screening rápido (catálogo) ou o Formulador Pro para combinações multi-componente customizadas com análise científica completa.",
     duration: "5–10 dias (com testes)",
-    module: { name: "Formulador Pro", href: "/dashboard/formulator-pro", icon: FlaskConical },
+    module: { name: "Fase 2 · Biotinta (Formulador Pro)", href: "/dashboard/bioprint/bioink?mode=pro", icon: FlaskConical },
     color: "from-emerald-500 to-teal-500",
     steps: [
       "📚 Antes de começar, leia o capítulo \"Formulador Pro\" no Manual do Usuário (5 min) para entender o racional.",
@@ -401,7 +401,7 @@ export default function RoadmapPage() {
               <Link href="/dashboard/manual" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-400 text-white text-xs font-semibold transition-colors">
                 <BookOpen className="w-3.5 h-3.5" /> Abrir Manual
               </Link>
-              <Link href="/dashboard/formulator-pro" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-gray-300 hover:bg-white/10 transition-colors">
+              <Link href="/dashboard/bioprint/bioink?mode=pro" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-gray-300 hover:bg-white/10 transition-colors">
                 <Sparkles className="w-3.5 h-3.5" /> Tentar Formulador Pro →
               </Link>
             </div>

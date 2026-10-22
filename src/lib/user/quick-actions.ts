@@ -73,7 +73,7 @@ export const ALL_QUICK_ACTIONS: QuickAction[] = [
     titleClinical: "Laboratório de Biotintas",
     desc: "Biotintas com até 8 componentes",
     descClinical: "Monte sua tinta de células passo-a-passo",
-    href: "/dashboard/formulator",
+    href: "/dashboard/bioprint/bioink?mode=pro",
     iconName: "FlaskConical",
     color: "fuchsia",
   },

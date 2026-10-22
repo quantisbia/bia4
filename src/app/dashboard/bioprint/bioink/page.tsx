@@ -1,26 +1,98 @@
 "use client"
 
 /**
- * BIA v4 · R16.3 · Etapa 2 — Biotinta (versão simples)
- * ─────────────────────────────────────────────────────
- * Escolha rápida entre biotintas validadas + células → segue para o fatiamento.
- * O Laboratório de Biotintas guiado (/bioink/lab) e o modo clássico
- * (/bioink/classic) ficam atrás de "Opções avançadas", sem poluir a etapa.
+ * BIA v4 · R24.6 · Fase 2 — Biotinta (LUGAR ÚNICO de formulação)
+ * ─────────────────────────────────────────────────────────────────
+ * Antes havia 4 formuladores espalhados (/bioink, /bioink/lab, /bioink/classic,
+ * /formulator-pro) + 1 dentro do toolpath. Agora é UMA página com 4 modos:
+ *   · Receitas validadas (padrão)  — 18 biotintas da literatura + células
+ *   · Laboratório guiado           — objetivo → receita → bancada (3 passos)
+ *   · Formular do zero             — material/concentração/crosslinker, reologia,
+ *                                    catálogo de 807 biomateriais, multi-material
+ *   · Formulador Pro (IA)          — multi-componente com análise científica
+ * As rotas antigas redirecionam para cá com ?mode=…
  */
 
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { Droplets, ArrowRight, Check, Sun, Thermometer, CircleDot, ChevronDown, FlaskConical, SlidersHorizontal, Microscope, Info } from "lucide-react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Droplets, ArrowRight, Check, Sun, Thermometer, CircleDot, ChevronDown, FlaskConical, Microscope, BookOpenCheck, Beaker, Atom } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { useBioprintProcess } from "@/lib/bioprint/process-context"
 import { RECIPES, CELL_LABELS, GOAL_LABELS, toBioinkPatch, getRecipe, type CellTypeId, type Recipe } from "@/lib/bioink-lab"
+import { BioinkGuidedLab } from "@/components/bioink/BioinkGuidedLab"
+import { BioinkFreeFormulator } from "@/components/bioink/BioinkFreeFormulator"
+import { FormulatorPro } from "@/components/bioink/FormulatorPro"
+
+export type BioinkMode = "recipes" | "lab" | "free" | "pro"
+const MODES: Array<{ id: BioinkMode; label: string; hint: string; icon: typeof Droplets }> = [
+  { id: "recipes", label: "Receitas validadas", hint: "18 biotintas da literatura, com parâmetros que funcionam. Comece aqui.", icon: BookOpenCheck },
+  { id: "lab",     label: "Laboratório guiado", hint: "Diga o objetivo → a BIA devolve receita, janela de biofabricação e protocolo de bancada.", icon: FlaskConical },
+  { id: "free",    label: "Formular do zero",   hint: "Material, concentração, crosslinker, reologia em tempo real, catálogo de 807 biomateriais, multi-material.", icon: Beaker },
+  { id: "pro",     label: "Formulador Pro (IA)", hint: "Até 8 componentes (catálogo ou custom) + análise científica por IA. 10 créditos.", icon: Atom },
+]
+const MODE_KEY = "bia:bioink-mode"
+function parseMode(v: string | null | undefined): BioinkMode | null {
+  return v === "recipes" || v === "lab" || v === "free" || v === "pro" ? v : null
+}
 
 const ORDER: Record<Recipe["level"], number> = { starter: 0, intermediate: 1, advanced: 2 }
 const CELL_ORDER: CellTypeId[] = ["none", "fibroblast", "keratinocyte", "chondrocyte", "osteoblast", "msc", "huvec", "hepatocyte", "cardiomyocyte", "neuron", "ipsc", "tumor"]
 const PICK_KEY = "bia:bioink-pick"
 
 export default function BioinkStepPage() {
+  return <Suspense fallback={<div className="p-6 text-sm text-gray-400">Carregando Fase 2…</div>}><BioinkStepInner /></Suspense>
+}
+
+function BioinkStepInner() {
+  const searchParams = useSearchParams()
+  const [mode, setModeState] = useState<BioinkMode>(() => parseMode(searchParams?.get("mode")) ?? "recipes")
+  useEffect(() => {
+    const q = parseMode(searchParams?.get("mode"))
+    if (q) { setModeState(q); return }
+    try { const saved = parseMode(sessionStorage.getItem(MODE_KEY)); if (saved) setModeState(saved) } catch { /* noop */ }
+  }, [searchParams])
+  const setMode = (m: BioinkMode) => {
+    setModeState(m)
+    try { sessionStorage.setItem(MODE_KEY, m) } catch { /* noop */ }
+    try { window.history.replaceState(null, "", m === "recipes" ? "/dashboard/bioprint/bioink" : `/dashboard/bioprint/bioink?mode=${m}`) } catch { /* noop */ }
+  }
+  const { state } = useBioprintProcess()
+  const ready = state.bioink.status === "ready" && state.bioink.material
+
+  return (
+    <div className="bia-bioink-step flex flex-col min-h-full bg-[#0a0a0f] text-gray-200">
+      {/* Seletor de modo — único lugar de formulação de biotintas */}
+      <nav aria-label="Modo de formulação" className="px-4 sm:px-6 pt-4 flex items-center gap-2 flex-wrap">
+        <span className="text-[10px] uppercase tracking-[0.25em] text-cyan-300/80 font-semibold mr-1">Fase 2 / 6 · Biotinta</span>
+        {MODES.map((m) => {
+          const Icon = m.icon
+          return (
+            <button key={m.id} onClick={() => setMode(m.id)} title={m.hint}
+              className={cn("inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors",
+                mode === m.id ? "bg-cyan-500/15 border-cyan-400/50 text-cyan-100" : "border-white/10 text-gray-300 hover:border-white/25")}>
+              <Icon className="w-3.5 h-3.5" /> {m.label}
+            </button>
+          )
+        })}
+        <span className="flex-1" />
+        {ready && mode !== "recipes" && (
+          <Link href="/dashboard/bioprint/slice" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-200 text-xs">
+            Fase 3 · Fatiar <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        )}
+      </nav>
+      <p className="px-4 sm:px-6 pt-1.5 text-[11px] text-gray-500">{MODES.find((m) => m.id === mode)?.hint}</p>
+
+      {mode === "recipes" && <RecipesMode onOpenMode={setMode} />}
+      {mode === "lab" && <BioinkGuidedLab />}
+      {mode === "free" && <BioinkFreeFormulator />}
+      {mode === "pro" && <FormulatorPro />}
+    </div>
+  )
+}
+
+function RecipesMode({ onOpenMode }: { onOpenMode: (m: BioinkMode) => void }) {
   const router = useRouter()
   const { state, updateBioink } = useBioprintProcess()
   const [recipeId, setRecipeId] = useState<string>("alg_gel_starter")
@@ -63,11 +135,10 @@ export default function BioinkStepPage() {
   const ready = state.bioink.status === "ready" && state.bioink.material
 
   return (
-    <div className="bia-bioink-step flex flex-col min-h-full bg-[#0a0a0f] text-gray-200">
+    <div className="flex flex-col min-h-full">
       <header className="px-4 sm:px-6 py-5 border-b border-white/5">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.25em] text-cyan-300/80 font-semibold mb-1">Fase 2 / 6 · Bioimpressão</div>
             <h1 className="text-lg sm:text-2xl font-bold text-white flex items-center gap-2"><Droplets className="w-5 h-5 text-cyan-400" /> Biotinta</h1>
             <p className="text-xs sm:text-sm text-gray-400 mt-1 max-w-2xl">Escolha uma biotinta já testada e validada na literatura. Os parâmetros de impressão que funcionam vêm junto.</p>
           </div>
@@ -123,7 +194,7 @@ export default function BioinkStepPage() {
               <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showAll && "rotate-180")} /> {showAll ? "Ocultar receitas avançadas" : `Mostrar receitas avançadas (${byGoal.length - visible.length})`}
             </button>
           )}
-          {visible.length === 0 && <div className="text-xs text-gray-500 mt-2">Nenhuma receita para este objetivo — escolha “Todas” ou monte a sua no Laboratório (Opções avançadas).</div>}
+          {visible.length === 0 && <div className="text-xs text-gray-500 mt-2">Nenhuma receita para este objetivo — escolha “Todas” ou monte a sua no Laboratório guiado / Formular do zero (modos acima).</div>}
         </section>
 
         {/* Células */}
@@ -153,22 +224,15 @@ export default function BioinkStepPage() {
           <button onClick={confirm} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-400 text-black font-semibold text-sm hover:bg-cyan-300">Usar esta biotinta e continuar <ArrowRight className="w-4 h-4" /></button>
         </section>
 
-        {/* Avançado — discreto */}
-        <details className="group pt-2">
-          <summary className="cursor-pointer text-xs text-gray-500 hover:text-gray-300 inline-flex items-center gap-1.5 list-none">
-            <SlidersHorizontal className="w-3.5 h-3.5" /> Opções avançadas <ChevronDown className="w-3.5 h-3.5 transition-transform group-open:rotate-180" />
-          </summary>
-          <div className="mt-3 grid sm:grid-cols-2 gap-2">
-            <Link href="/dashboard/bioprint/bioink/lab" className="p-3 rounded-xl border border-white/8 bg-white/2 hover:border-emerald-400/40 block">
-              <div className="text-sm text-gray-100 font-medium flex items-center gap-1.5"><FlaskConical className="w-4 h-4 text-emerald-300" /> Laboratório de Biotintas</div>
-              <div className="text-[11px] text-gray-500 mt-1">Recomendação por objetivo/células/equipamento, janela de biofabricação, quantidades de bancada calculadas, preparo passo a passo, troubleshooting e protocolo exportável.</div>
-            </Link>
-            <Link href="/dashboard/bioprint/bioink/classic" className="p-3 rounded-xl border border-white/8 bg-white/2 hover:border-white/25 block">
-              <div className="text-sm text-gray-100 font-medium flex items-center gap-1.5"><Info className="w-4 h-4 text-gray-400" /> Formulação livre (clássico)</div>
-              <div className="text-[11px] text-gray-500 mt-1">Material, concentração, crosslinker, aditivos e reologia em tempo real; catálogo de 807 biomateriais; multi-material.</div>
-            </Link>
-          </div>
-        </details>
+        {/* Outros modos — mesma página, sem duplicar ferramentas */}
+        <div className="pt-2 text-xs text-gray-500 flex flex-wrap gap-x-3 gap-y-1 items-center">
+          <span>Não achou a sua?</span>
+          <button onClick={() => onOpenMode("lab")} className="text-emerald-300 hover:underline inline-flex items-center gap-1"><FlaskConical className="w-3.5 h-3.5" /> Laboratório guiado</button>
+          <span className="text-white/15">·</span>
+          <button onClick={() => onOpenMode("free")} className="text-gray-300 hover:underline inline-flex items-center gap-1"><Beaker className="w-3.5 h-3.5" /> Formular do zero (807 biomateriais)</button>
+          <span className="text-white/15">·</span>
+          <button onClick={() => onOpenMode("pro")} className="text-blue-300 hover:underline inline-flex items-center gap-1"><Atom className="w-3.5 h-3.5" /> Formulador Pro (IA)</button>
+        </div>
       </main>
     </div>
   )

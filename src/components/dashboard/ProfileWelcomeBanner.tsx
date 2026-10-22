@@ -84,7 +84,7 @@ const PROFILE_PRIMARY_CTA: Record<string, { label: string; href: string }> = {
   dentist:        { label: "Imprimir enxerto alveolar",          href: "/dashboard/bioprint" },
   postgrad:       { label: "Iniciar novo Pipeline",              href: "/dashboard/pipeline" },
   undergrad:      { label: "Começar pelo guia passo-a-passo",    href: "/dashboard/manual" },
-  researcher:     { label: "Abrir Formulador Pro",               href: "/dashboard/formulator" },
+  researcher:     { label: "Abrir Formulador Pro",               href: "/dashboard/bioprint/bioink?mode=pro" },
 }
 
 /* ──────────────────────────────────────────────────────────────────────

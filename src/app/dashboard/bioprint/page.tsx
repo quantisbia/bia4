@@ -19,8 +19,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   Box, Droplets, Layers, Gamepad2, Beaker, ClipboardCheck,
-  ArrowRight, RotateCcw, Sparkles, Info, CheckCircle2, Circle,
-  Brain, BookOpen, Zap,
+  ArrowRight, RotateCcw, Info, CheckCircle2, Circle,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import {
@@ -147,7 +146,7 @@ export default function BioprintHubPage() {
       <section className="rounded-2xl bg-gradient-to-br from-emerald-500/8 via-cyan-500/8 to-violet-500/8 border border-emerald-500/20 p-5">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
-            <Sparkles className="w-5 h-5 text-emerald-300" />
+            <Beaker className="w-5 h-5 text-emerald-300" />
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-base font-bold text-white mb-1">
@@ -226,9 +225,9 @@ export default function BioprintHubPage() {
       )}
 
       {/*
-        R24: testes de imprimibilidade vivem na Fase 1 (tecido "Teste de
-        imprimibilidade") → Fase 3 (modelo fidelity / grade). A página
-        /dashboard/bioprint/printability continua acessível por deep-link.
+        R24.6: testes de imprimibilidade são uma fonte de modelo DENTRO do
+        BioSlicer (Fase 3 → "Ou um teste de imprimibilidade"). /printability
+        redireciona para /slice?test=<id>.
       */}
 
       {/* ─── Cards das 6 fases ────────────────────────────────────── */}
@@ -249,204 +248,9 @@ export default function BioprintHubPage() {
         })}
       </section>
 
-      {/* ─── Execução USB direta (R12.15) ─ acesso sem gating ───────────── */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
-          <span className="text-[10px] uppercase tracking-[0.25em] text-amber-300/80 font-semibold flex items-center gap-1.5">
-            <Zap className="w-3 h-3" />
-            Execução USB direta · Pipeline real R12.15
-          </span>
-          <div className="h-px flex-1 bg-gradient-to-r from-amber-500/40 via-transparent to-transparent" />
-        </div>
-
-        <Link
-          href="/dashboard/bioprint/execute"
-          className="group block rounded-2xl bg-gradient-to-br from-amber-500/[0.10] via-emerald-500/[0.06] to-cyan-500/[0.08] border border-amber-500/30 hover:border-amber-400/60 p-5 transition-all hover:scale-[1.005]"
-        >
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-              <Zap className="w-6 h-6 text-amber-300" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] uppercase tracking-wider text-amber-300/90 font-semibold">
-                  Execução · R12.15 · Pipeline USB real
-                </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 font-semibold uppercase tracking-wider">
-                  🔌 Web Serial
-                </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-violet-500/20 border border-violet-500/40 text-violet-200 font-semibold uppercase tracking-wider">
-                  🧪 Mock mode
-                </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-200 font-semibold uppercase tracking-wider">
-                  ⚡ Sem gating
-                </span>
-              </div>
-              <h3 className="text-base font-bold text-white mt-0.5 group-hover:text-amber-100 transition-colors">
-                Enviar G-code para a bioimpressora — USB / Web Serial (Marlin)
-              </h3>
-              <p className="text-[11.5px] text-gray-300 mt-1.5 leading-relaxed">
-                Acesso <strong className="text-amber-200">direto</strong> à Fase 4, sem precisar passar pelas fases anteriores.
-                Cole/upload/importe G-code → validador → preview 3D profissional → handshake M115 →
-                stream linha-a-linha com <strong className="text-emerald-200">ok-handshake</strong> →
-                pause/resume/cancel/<strong className="text-rose-200">M112 emergency</strong>. Modo MOCK funciona
-                em qualquer navegador (Firefox, Safari, sandbox) — modo REAL pede Chrome/Edge 89+.
-              </p>
-              <div className="flex flex-wrap gap-1.5 mt-3">
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-200">
-                  ✓ ok-handshake Marlin
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-200">
-                  🛡 Validador estático
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-violet-200">
-                  🧪 Mock simulator
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-200">
-                  🎮 Joystick lateral
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-200">
-                  🔴 M112 Emergency
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-200">
-                  👁 Preview 3D pro
-                </span>
-              </div>
-            </div>
-            <ArrowRight className="w-5 h-5 text-amber-300/60 group-hover:text-amber-200 group-hover:translate-x-0.5 transition-all shrink-0 mt-1" />
-          </div>
-        </Link>
-      </section>
-
-      {/* ─── G-code Hub · 3 níveis (R12.14) ─────────────────────────────── */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-fuchsia-500/30 to-transparent" />
-          <span className="text-[10px] uppercase tracking-[0.25em] text-fuchsia-300/70 font-semibold flex items-center gap-1.5">
-            <Zap className="w-3 h-3" />
-            G-code · 3 níveis · biologia → trajetória imprimível
-          </span>
-          <div className="h-px flex-1 bg-gradient-to-r from-fuchsia-500/30 via-transparent to-transparent" />
-        </div>
-
-        <Link
-          href="/dashboard/bioprint/gcode"
-          className="group block rounded-2xl bg-gradient-to-br from-fuchsia-500/[0.08] via-cyan-500/[0.06] to-violet-500/[0.08] border border-fuchsia-500/25 hover:border-fuchsia-400/50 p-5 transition-all hover:scale-[1.005]"
-        >
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-fuchsia-500/15 border border-fuchsia-500/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-              <Zap className="w-6 h-6 text-fuchsia-300" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] uppercase tracking-wider text-fuchsia-300/80 font-semibold">
-                  G-code Hub · R12.14
-                </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-fuchsia-500/20 border border-fuchsia-500/40 text-fuchsia-200 font-semibold uppercase tracking-wider">
-                  ⚡ Básico
-                </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-200 font-semibold uppercase tracking-wider">
-                  🧬 Médico
-                </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-violet-500/20 border border-violet-500/40 text-violet-200 font-semibold uppercase tracking-wider">
-                  🌐 Avançado · NAATIV3
-                </span>
-              </div>
-              <h3 className="text-base font-bold text-white mt-0.5 group-hover:text-fuchsia-100 transition-colors">
-                Geração de G-code em 3 níveis — biologia como controle de trajetória
-              </h3>
-              <p className="text-[11.5px] text-gray-300 mt-1.5 leading-relaxed">
-                Fluxo profissional que vai do <strong className="text-fuchsia-200">G-code rápido</strong> de geometrias paramétricas
-                até o <strong className="text-violet-200">NAATIV3 vector field</strong> com helicoidal transmural, multi-material
-                e canais sacrificiais. No nível <strong className="text-cyan-200">Médico</strong> a BIA mapeia 16 tecidos
-                (pele, miocárdio, osso, organoide…) em toolpaths biologicamente corretos, com preview conceitual em ~10 ms
-                antes de gerar o G-code final. Cada nível tem racional, análise Nelson 2021 e download .gcode pronto para a impressora.
-              </p>
-              <div className="flex flex-wrap gap-1.5 mt-3">
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-200">
-                  ⚡ Básico &lt; 100 ms
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-200">
-                  🧬 16 tecidos · safe/advanced/experimental
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-200">
-                  🧪 Placas SBS 6/12/24/96
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-violet-200">
-                  🌐 NAATIV3 vector field
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-200">
-                  ❤️ Helicoidal transmural
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-200">
-                  👁 Preview antes do G-code
-                </span>
-              </div>
-            </div>
-            <ArrowRight className="w-5 h-5 text-fuchsia-300/60 group-hover:text-fuchsia-200 group-hover:translate-x-0.5 transition-all shrink-0 mt-1" />
-          </div>
-        </Link>
-      </section>
-
-      {/* ─── Ferramentas auxiliares · BTIE ────────────────────────────── */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-violet-500/30 to-transparent" />
-          <span className="text-[10px] uppercase tracking-[0.25em] text-violet-300/70 font-semibold flex items-center gap-1.5">
-            <Sparkles className="w-3 h-3" />
-            Ferramentas Auxiliares · BTIE
-          </span>
-          <div className="h-px flex-1 bg-gradient-to-r from-violet-500/30 via-transparent to-transparent" />
-        </div>
-
-        <Link
-          href="/dashboard/bioprint/toolpath"
-          className="group block rounded-2xl bg-gradient-to-br from-violet-500/[0.08] via-cyan-500/[0.04] to-violet-500/[0.02] border border-violet-500/25 hover:border-violet-400/50 p-5 transition-all hover:scale-[1.005]"
-        >
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-violet-500/15 border border-violet-500/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-              <Brain className="w-6 h-6 text-violet-300" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] uppercase tracking-wider text-violet-300/80 font-semibold">
-                  Engine proprietário · R12.8
-                </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-200 font-semibold uppercase tracking-wider flex items-center gap-1">
-                  <BookOpen className="w-2.5 h-2.5" /> 5 papers
-                </span>
-              </div>
-              <h3 className="text-base font-bold text-white mt-0.5 group-hover:text-violet-100 transition-colors">
-                Biofabrication Toolpath Intelligence Engine
-              </h3>
-              <p className="text-[11.5px] text-gray-300 mt-1.5 leading-relaxed">
-                Visualizador 3D científico · análise de shear (Hagen-Poiseuille) · predição de falhas · geração
-                de scaffolds biomiméticos (Gyroid TPMS, Voronoi, Concentric perfusable, Vector-field NAATIV3).
-                Engine fundamentado em 5 papers canônicos de bioimpressão.
-              </p>
-              <div className="flex flex-wrap gap-1.5 mt-3">
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-violet-200">
-                  📊 Viewer 3D Canvas2D
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-200">
-                  🧬 Shear · Viabilidade
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-200">
-                  🎯 Predição de falhas
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-200">
-                  🔬 Infill biomimético
-                </span>
-                <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-200">
-                  📚 Base científica
-                </span>
-              </div>
-            </div>
-            <ArrowRight className="w-5 h-5 text-violet-300/60 group-hover:text-violet-200 group-hover:translate-x-0.5 transition-all shrink-0 mt-1" />
-          </div>
-        </Link>
-      </section>
+      {/* R24.6: os cards "Execução USB direta", "G-code Hub" e "BTIE" foram
+          removidos — eram atalhos para ferramentas que já são as Fases 3 e 4.
+          Uma ferramenta, um lugar: G-code na Fase 3, impressão na Fase 4. */}
 
       {/* ─── Ações secundárias ─────────────────────────────────────── */}
       <section className="rounded-2xl bg-white/[0.02] border border-white/5 p-4 flex flex-wrap items-center gap-3">

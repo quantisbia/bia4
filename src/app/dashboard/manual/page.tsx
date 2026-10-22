@@ -460,7 +460,7 @@ function ChapterFormulatorPro() {
           A IA analisa compatibilidade química, calcula propriedades, gera protocolo passo-a-passo e cita referências reais.
         </p>
         <div className="flex flex-wrap gap-2 mt-4">
-          <Link href="/dashboard/formulator-pro"
+          <Link href="/dashboard/bioprint/bioink?mode=pro"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-400 text-white text-xs font-semibold">
             <Rocket className="w-3.5 h-3.5" /> Abrir Formulador Pro
           </Link>
@@ -774,7 +774,7 @@ function ChapterFormulatorPro() {
           <li><strong className="text-white">~30 s</strong> — Leia score, warnings, exporte JSON+MD para sua pasta</li>
         </ol>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Link href="/dashboard/formulator-pro" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-400 text-white text-xs font-semibold">
+          <Link href="/dashboard/bioprint/bioink?mode=pro" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-400 text-white text-xs font-semibold">
             <Atom className="w-3.5 h-3.5" /> Começar agora
           </Link>
           <Link href="/dashboard/roadmap" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-gray-300 hover:bg-white/10">
@@ -1545,7 +1545,7 @@ function ChapterPrintAnalysis() {
           <li><strong>Grid Test (Pf)</strong> → quantifica printabilidade (alvo Pf ≈ 1).</li>
           <li><strong>Collapse Bridge</strong> → vão máximo (proxy de G').</li>
           <li>Se 3 testes ✅ → imprimir constructo biomimético com confiança.</li>
-          <li>Se algum ❌ → voltar ao <Link href="/dashboard/formulator-pro" className="text-emerald-300 hover:underline">Formulador Pro</Link> e ajustar formulação.</li>
+          <li>Se algum ❌ → voltar ao <Link href="/dashboard/bioprint/bioink?mode=pro" className="text-emerald-300 hover:underline">Formulador Pro</Link> e ajustar formulação.</li>
         </ol>
         <p className="text-xs text-emerald-300 mt-3">
           ⏱️ <strong>Tempo total:</strong> 3 testes × 20 min impressão + 10 min foto/análise = ~90 min para validar um bioink antes de usar em experimento real.

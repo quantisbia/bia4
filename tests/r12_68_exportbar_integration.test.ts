@@ -479,7 +479,7 @@ describe("R12.68.F · Pipeline page instalou ExportBar corretamente", () => {
 
 // ─────────────────────────────────────────────────────────────────────
 describe("R12.68.G · Formulator Pro instalou ExportBar E removeu handleSaveProtocol antigo", () => {
-  const src = readSrc("src/app/dashboard/formulator-pro/page.tsx")
+  const src = readSrc("src/components/bioink/FormulatorPro.tsx")
 
   it("Importa ExportBar + buildContentFromProFormulation", () => {
     expect(src).toMatch(/import\s*\{\s*ExportBar\s*\}\s*from\s*["']@\/components\/notebook\/ExportBar["']/)
@@ -511,7 +511,7 @@ describe("R12.68.G · Formulator Pro instalou ExportBar E removeu handleSaveProt
 // ─────────────────────────────────────────────────────────────────────
 describe("R12.68.H · Bioink instalou ExportBar com dropdown de escopo (opção C)", () => {
   // R16.3: a formulação livre (com ExportBar) vive em /bioink/classic; /bioink virou a Etapa 2 simples.
-  const src = readSrc("src/app/dashboard/bioprint/bioink/classic/page.tsx")
+  const src = readSrc("src/components/bioink/BioinkFreeFormulator.tsx")
 
   it("Importa ExportBar + buildContentFromBioinkDrafts", () => {
     expect(src).toMatch(/import\s*\{\s*ExportBar\s*\}\s*from\s*["']@\/components\/notebook\/ExportBar["']/)
@@ -621,7 +621,7 @@ describe("R12.68.K · Sanidade global", () => {
   it("Nenhuma página R12.68 vaza secret hardcoded", () => {
     const pages = [
       "src/app/dashboard/pipeline/page.tsx",
-      "src/app/dashboard/formulator-pro/page.tsx",
+      "src/components/bioink/FormulatorPro.tsx",
       "src/app/dashboard/bioprint/bioink/page.tsx",
       "src/app/dashboard/chat/page.tsx",
       "scripts/migrate-protocols-to-notebook.ts",
