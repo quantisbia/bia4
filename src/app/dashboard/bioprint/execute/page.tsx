@@ -334,7 +334,7 @@ export default function BioprintExecutePage() {
         loadAndValidate(
           bioprintState.slice.gcode,
           `${modelName}.gcode`,
-          "fluxo Bioprint (Etapa 3 · Fatiamento)",
+          "fluxo Bioprint (Fase 3 · Fatiamento)",
         )
       }
     } catch {}
@@ -1490,7 +1490,7 @@ export default function BioprintExecutePage() {
    */
   const handleRequestPrint = useCallback(() => {
     if (!gcodeText.trim()) {
-      loggerRef.current.warn("Sem G-code carregado. Volte para a Etapa 3 (Fatiamento) ou carregue um G-code antes de imprimir.")
+      loggerRef.current.warn("Sem G-code carregado. Volte para a Fase 3 (Fatiamento) ou carregue um G-code antes de imprimir.")
       return
     }
     if (!connected) {
@@ -1919,9 +1919,9 @@ export default function BioprintExecutePage() {
           <div className="w-px h-5 bg-white/10" />
           <h1 className="text-base font-bold text-white flex items-center gap-2">
             <Zap className="w-4 h-4 text-amber-300" />
-            Execução da Bioimpressão
+            Fase 4 / 6 · Bioimpressão (Host)
             <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-200 font-semibold">
-              R12.15 · Pipeline USB
+              USB · Web Serial
             </span>
           </h1>
 
@@ -3479,12 +3479,21 @@ export default function BioprintExecutePage() {
             <TissueViabilityPanel state={advTissue} onChange={setAdvTissue} onGcode={(g) => { loggerRef.current.info(g, "advanced"); if (connected && controllerRef.current) void controllerRef.current.sendAndWait(g) }} />
           </CollapsibleSection>
 
-          {/* ── R22 · Etapa 5 ───────────────────────────────────────────── */}
+          {/* ── R24 · Fase 5 (análise) e Fase 6 (maturação) ─────────────── */}
+          <Link href="/dashboard/bioprint/review" className="block rounded-2xl border border-sky-500/30 bg-gradient-to-br from-sky-500/[0.08] to-violet-500/[0.04] p-4 hover:border-sky-500/60 transition-all group">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.2em] text-sky-300/80 font-semibold">Próxima · Fase 5 / 6</div>
+                <div className="text-sm font-bold text-white">Análise da bioimpressão: nota + relato → a BIA ajusta o próximo G-code</div>
+              </div>
+              <ArrowRight className="w-5 h-5 text-sky-300 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
           <Link href="/dashboard/bioprint/post" className="block rounded-2xl border border-rose-500/30 bg-gradient-to-br from-rose-500/[0.08] to-amber-500/[0.04] p-4 hover:border-rose-500/60 transition-all group">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-[10px] uppercase tracking-[0.2em] text-rose-300/80 font-semibold">Próxima · Etapa 5</div>
-                <div className="text-sm font-bold text-white">Pós-bioimpressão: crosslink · cultura · biorreator · validação</div>
+                <div className="text-[10px] uppercase tracking-[0.2em] text-rose-300/80 font-semibold">Depois · Fase 6 / 6</div>
+                <div className="text-sm font-bold text-white">Maturação & caracterizações: crosslink · cultura · biorreator · ensaios</div>
               </div>
               <ArrowRight className="w-5 h-5 text-rose-300 group-hover:translate-x-1 transition-transform" />
             </div>

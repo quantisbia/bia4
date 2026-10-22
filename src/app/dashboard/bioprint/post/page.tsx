@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * BIA — Etapa 5 / 5 · Pós-Bioimpressão
+ * BIA — Fase 6 / 6 · Maturação do tecido & caracterizações (R24; antes "Etapa 5 · Pós-Bioimpressão")
  *
  * Cultura → Crosslink → Biorreator → Validação (assays)
  *
@@ -35,8 +35,24 @@ import { InfoButton } from "@/components/ui/InfoButton"
 // ═══════════════════════════════════════════════════════════════════════════
 const TISSUE_TYPES: string[] = POST_PROCESSING.map((p) => p.tissueType)
 
-// state.model.category → sugestão de tecido alvo
-function mapCategoryToTissue(category: string | null): string {
+// R24: brief da Fase 1 (tecido) → tecido alvo dos protocolos de maturação
+function mapBriefToTissue(tissue: string | null | undefined): string | null {
+  if (!tissue) return null
+  const t = tissue.toLowerCase()
+  if (t.startsWith("cartil")) return "Cartilagem"
+  if (t.startsWith("pele")) return "Pele"
+  if (t.startsWith("osso") || t.startsWith("óss") || t.startsWith("oss")) return "Ósseo"
+  if (t.startsWith("vasc")) return "Vaso sanguíneo"
+  if (t.startsWith("mioc") || t.startsWith("card")) return "Cardíaco (patch)"
+  if (t.startsWith("hep")) return "Hepático (mini-fígado)"
+  if (t.startsWith("neur") || t.startsWith("nerv")) return "Nervo periférico"
+  return null
+}
+
+// state.model.category → sugestão de tecido alvo (legado) ou brief da Fase 1
+function mapCategoryToTissue(category: string | null, briefTissue?: string | null): string {
+  const fromBrief = mapBriefToTissue(briefTissue)
+  if (fromBrief) return fromBrief
   if (!category) return "Cardíaco (patch)"
   switch (category) {
     case "rigid-tissue":      return "Ósseo"
@@ -62,7 +78,7 @@ export default function BioprintPostPage() {
   const effectiveTissue: string =
     state.postBio.tissueType ??
     state.control.tissueType ??
-    mapCategoryToTissue(state.model.category)
+    mapCategoryToTissue(state.model.category, state.model.brief?.tissue)
 
   // Garantir que postBio.tissueType esteja preenchido na primeira visita
   useEffect(() => {
@@ -113,10 +129,10 @@ export default function BioprintPostPage() {
               </div>
               <div className="min-w-0">
                 <h1 className="text-base sm:text-lg font-semibold text-white truncate">
-                  Etapa 5 / 5 · Pós-Bioimpressão
+                  Fase 6 / 6 · Maturação & caracterizações
                 </h1>
                 <p className="text-xs text-gray-400 truncate">
-                  Cultura → Biorreator → Validação
+                  Cultura → Biorreator → Caracterizações
                 </p>
               </div>
             </div>
@@ -133,7 +149,7 @@ export default function BioprintPostPage() {
           <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-6 text-center">
             <Lock className="w-10 h-10 text-amber-300 mx-auto mb-3" />
             <h2 className="text-lg font-semibold text-amber-100 mb-2">
-              Etapa 4 (Execução) ainda não concluída
+              Fase 4 (Bioimpressão · Host) ainda não concluída
             </h2>
             <p className="text-sm text-amber-200/80 mb-5">
               Você precisa executar a bioimpressão antes de configurar a
@@ -143,7 +159,7 @@ export default function BioprintPostPage() {
               href="/dashboard/bioprint/execute"
               className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-100 text-sm font-semibold rounded-lg transition-colors"
             >
-              <ArrowRight className="w-4 h-4" /> Ir para Etapa 4 (Execução)
+              <ArrowRight className="w-4 h-4" /> Ir para a Fase 4 (Bioimpressão · Host)
             </Link>
           </div>
         </main>
@@ -165,10 +181,10 @@ export default function BioprintPostPage() {
             </div>
             <div className="min-w-0">
               <h1 className="text-base sm:text-lg font-semibold text-white truncate">
-                Etapa 5 / 5 · Pós-Bioimpressão
+                Fase 6 / 6 · Maturação do tecido & caracterizações
               </h1>
               <p className="text-xs text-gray-400 truncate">
-                Cultura → Biorreator → Validação · construct → tecido funcional
+                Cultura → Biorreator → Caracterizações · construto → tecido funcional
               </p>
             </div>
             <InfoButton title="O que é a Pós-Bioimpressão?" size="sm">
@@ -197,7 +213,7 @@ export default function BioprintPostPage() {
               href="/dashboard/bioprint/execute"
               className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 text-xs font-medium rounded-lg transition-colors"
             >
-              <ArrowLeft className="w-3.5 h-3.5" /> Etapa 4
+              <ArrowLeft className="w-3.5 h-3.5" /> Fase 5 · Análise
             </Link>
             <Link
               href="/dashboard/bioprint"
@@ -221,7 +237,7 @@ export default function BioprintPostPage() {
               <p className="text-xs text-gray-400">
                 {stagesConfirmed}/3 estágios confirmados ·{" "}
                 {allConfirmed
-                  ? "Etapa 5 pronta · processo completo"
+                  ? "Fase 6 pronta · processo completo"
                   : "Confirme cada estágio abaixo conforme avança em laboratório"}
               </p>
             </div>
@@ -278,15 +294,15 @@ export default function BioprintPostPage() {
               </ul>
               <p className="mt-2 text-xs text-gray-400">
                 Sugestão automática vem da categoria do modelo
-                (Etapa 1). Pode ser sobrescrita aqui.
+                (Fase 1 · Modelo de tecido). Pode ser sobrescrita aqui.
               </p>
             </InfoButton>
           </div>
 
           <p className="text-xs text-gray-400">
-            Sugestão a partir da Etapa 1 (Modelo 3D):{" "}
+            Sugestão a partir da Fase 1 (Modelo de tecido):{" "}
             <span className="text-gray-200 font-medium">
-              {mapCategoryToTissue(state.model.category)}
+              {mapCategoryToTissue(state.model.category, state.model.brief?.tissue)}
             </span>
             {state.postBio.tissueType && state.postBio.tissueType !== mapCategoryToTissue(state.model.category) && (
               <>
@@ -319,7 +335,7 @@ export default function BioprintPostPage() {
                 (não é apenas decoração) e libera o status final do processo.
               </p>
               <p className="mt-2 text-xs text-gray-400">
-                Quando os 3 estágios estiverem confirmados, a Etapa 5 fica
+                Quando os 3 estágios estiverem confirmados, a Fase 6 fica
                 marcada como concluída no hub.
               </p>
             </InfoButton>
@@ -385,7 +401,7 @@ export default function BioprintPostPage() {
             <div className="mt-3 rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-2 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
               <p className="text-xs text-amber-200">
-                A Etapa 4 (Execução) ainda não está marcada como concluída.
+                A Fase 4 (Bioimpressão · Host) ainda não está marcada como concluída.
                 Você pode planejar a pós-bioimpressão aqui, mas o construct
                 precisa estar realmente impresso para que o checklist faça sentido.
               </p>
@@ -457,17 +473,17 @@ export default function BioprintPostPage() {
             <>
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
               <span className="text-emerald-300 font-medium shrink-0">
-                Etapa 5/5:
+                Fase 6/6:
               </span>
               <span className="text-gray-300 truncate">
-                Pós-bioimpressão concluída · {effectiveTissue}
+                Maturação & caracterizações concluídas · {effectiveTissue}
               </span>
             </>
           ) : (
             <>
               <Info className="w-4 h-4 text-gray-500 shrink-0" />
               <span className="text-gray-400 text-xs">
-                Etapa 5 · {stagesConfirmed}/3 estágios confirmados ·{" "}
+                Fase 6 · {stagesConfirmed}/3 estágios confirmados ·{" "}
                 Tecido alvo: {effectiveTissue}
               </span>
             </>

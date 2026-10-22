@@ -35,14 +35,15 @@ export interface QuickAction {
 }
 
 export const ALL_QUICK_ACTIONS: QuickAction[] = [
-  // R14.3 · BIA Studio (prioridade máxima pra médicos sem CAD)
+  // R24 · Fase 1 do racional de 6 fases (substitui o atalho do BIA Studio:
+  // geometria 3D agora vive só na Fase 3 · Fatiamento)
   {
     id: "studio-scaffold",
-    title: "BIA Studio",
-    titleClinical: "Gerar Scaffold por Voz",
-    desc: "STL de scaffold TPMS por texto/voz",
-    descClinical: "Fale o que você quer — a BIA gera o STL",
-    href: "/dashboard/studio",
+    title: "Modelo de tecido",
+    titleClinical: "O que vou imprimir",
+    desc: "Fase 1: tecido-alvo → sugestão de modelo, perfil e biotinta",
+    descClinical: "Diga o tecido — a BIA monta o caminho",
+    href: "/dashboard/bioprint/model",
     iconName: "Sparkles",
     color: "fuchsia",
   },
@@ -60,7 +61,7 @@ export const ALL_QUICK_ACTIONS: QuickAction[] = [
     id: "bioprint-model",
     title: "Imprimir Modelo 3D",
     titleClinical: "Imprimir Tecido 3D",
-    desc: "STL → G-code → impressão",
+    desc: "6 fases: tecido → biotinta → fatiar → host → análise → maturação",
     descClinical: "Do arquivo pronto à bioimpressora",
     href: "/dashboard/bioprint",
     iconName: "Printer",

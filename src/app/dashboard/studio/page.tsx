@@ -1,28 +1,20 @@
 /**
- * ═══════════════════════════════════════════════════════════════════════
- *  BIA v4 · R14.3 · BIA Studio — Geração de scaffolds TPMS por voz/texto
- *  ─────────────────────────────────────────────────────────────────────
- *  Página principal do novo módulo BIA Studio. Permite ao usuário:
- *    🎤 Botão de voz (Web Speech API nativa pt-BR, zero deps)
- *    📝 Prompt textual com templates clínicos
- *    👁️ Preview 3D interativo (Three.js via CDN)
- *    💾 Download direto do STL binário
- *    🔁 Edição fine-grained de porosidade/células via sliders
+ * BIA v4 · /dashboard/studio
  *
- *  Server component que renderiza o shell + boot do client component.
+ * R24 · Racional de 6 fases — "um só lugar de STL".
+ * O BIA Studio (gerador de scaffolds TPMS por voz/texto, R14.3) deixou de ser
+ * um destino próprio: toda geometria 3D (anatômica, primitiva, upload, desenho,
+ * scaffold) vive na Fase 3 · Fatiamento (BioSlicer), que já oferece gyroid,
+ * Schwarz P, Diamond, Voronoi e Perlin como preenchimentos honestos.
  *
- *  Janaina Dernowsek / Quantis Biotechnology — Out/2026
- * ═══════════════════════════════════════════════════════════════════════
+ * Esta rota permanece apenas como redirecionamento para não quebrar links
+ * antigos (manual, academy, favoritos). O componente StudioClient continua no
+ * repositório (não roteado) para referência/reativação futura.
  */
-import { auth } from "@/lib/auth/config"
 import { redirect } from "next/navigation"
-import { StudioClient } from "./StudioClient"
 
 export const dynamic = "force-dynamic"
 
-export default async function StudioPage() {
-  const session = await auth()
-  if (!session?.user?.id) redirect("/auth/login?callbackUrl=/dashboard/studio")
-
-  return <StudioClient userName={session.user.name?.split(" ")[0] ?? "Pesquisador"} />
+export default function StudioPage() {
+  redirect("/dashboard/bioprint/slice?tab=advanced&from=studio")
 }

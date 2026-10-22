@@ -2,14 +2,18 @@
 
 /**
  * ═══════════════════════════════════════════════════════════════════════
- *  BIA v4 · R15→R20 · /dashboard/bioprint/slice — BioSlicer (Etapa 3 oficial, fatiador único)
+ *  BIA v4 · R15→R24 · /dashboard/bioprint/slice — BioSlicer (Fase 3 / 6, fatiador único)
  *  ─────────────────────────────────────────────────────────────────────
- *  1. Modelo: STL da Etapa 1 (IndexedDB), upload direto, ou primitiva.
+ *  R24: este é o ÚNICO lugar de modelos 3D/STL da BIA. A Fase 1 (Modelo de
+ *  tecido) não tem geometria — ela chega aqui por query-string:
+ *    ?anat=<id> | ?prim=<box|cylinder|tube|dome>  &size=<mm>
+ *    &profile=<SliceProfile.id> &infill=<InfillPattern> &target=<petri|plate24|plate96|slide>
+ *  1. Modelo: anatômico real, primitiva, malha salva (IndexedDB) ou upload.
  *  2. Objetivo: texto/voz → auto-profile com decisões explicadas — ou
  *     perfil manual Básico / Avançado.
  *  3. Parâmetros: Básico (poucos campos) ou Avançado (todos + dicas).
  *  4. Fatiar → preview por camada, estatísticas bio, avisos.
- *  5. Exportar .gcode / enviar ao Host / Etapa 4.
+ *  5. Exportar .gcode / enviar ao Host (Fase 4).
  * ═══════════════════════════════════════════════════════════════════════
  */
 
@@ -152,19 +156,27 @@ function BioSlicerInner() {
     } catch (e) { setError(e instanceof Error ? e.message : "Falha ao carregar modelo anatômico") }
     finally { setAnatLoading(null) }
   }, [refreshStored])
-  // ?anat=<id> vindo da Etapa 1 → carrega o modelo anatômico real
+  const setAnatDimension = useCallback((v: number) => {
+    setAnatDim(v)
+    if (anat) setOrientation((o) => ({ ...o, scale: uniformScaleFor(anat, v) }))
+  }, [anat])
+  // ?anat=<id>&size=<mm> vindo da Fase 1 → carrega o modelo anatômico real já na dimensão pedida
   const anatParamDone = useRef(false)
   useEffect(() => {
     if (anatParamDone.current) return
     const id = searchParams?.get("anat")
     if (!id) return
     const m = ANATOMICAL_MODELS.find((x) => x.id === id)
-    if (m) { anatParamDone.current = true; void loadAnatomical(m) }
+    if (!m) return
+    anatParamDone.current = true
+    const size = Number(searchParams?.get("size"))
+    void loadAnatomical(m).then(() => {
+      if (Number.isFinite(size) && size > 0) {
+        const v = Math.min(m.range.max, Math.max(m.range.min, size))
+        setAnatDim(v); setOrientation((o) => ({ ...o, scale: uniformScaleFor(m, v) }))
+      }
+    })
   }, [searchParams, loadAnatomical])
-  const setAnatDimension = useCallback((v: number) => {
-    setAnatDim(v)
-    if (anat) setOrientation((o) => ({ ...o, scale: uniformScaleFor(anat, v) }))
-  }, [anat])
 
   const onFile = useCallback(async (file: File) => {
     setError(null)
@@ -195,6 +207,44 @@ function BioSlicerInner() {
     setX({ ...pf.extrusion, syringe: pf.extrusion.syringe ? { ...pf.extrusion.syringe } : undefined })
     setResult(null)
   }, [])
+
+  // R24 · Brief da Fase 1 → ?prim=&size=&profile=&infill=&target=
+  const briefParamDone = useRef(false)
+  useEffect(() => {
+    if (briefParamDone.current || !searchParams) return
+    const prim = searchParams.get("prim"); const profileId = searchParams.get("profile")
+    const infill = searchParams.get("infill"); const tgt = searchParams.get("target")
+    if (!prim && !profileId && !infill && !tgt) return
+    briefParamDone.current = true
+    const size = Number(searchParams.get("size"))
+    const S = Number.isFinite(size) && size > 0 ? size : 10
+    if (prim) {
+      const dims: Record<string, Record<string, number>> = {
+        box: { x: S, y: S, z: Math.max(1, Math.round(S * 0.3 * 10) / 10) },
+        cylinder: { d: S, z: Math.max(0.6, Math.round(S * 0.12 * 10) / 10) },
+        tube: { d: S, di: Math.max(0.5, Math.round(S * 0.6 * 10) / 10), z: Math.max(2, Math.round(S * 0.8 * 10) / 10) },
+        dome: { d: S, z: Math.max(0.5, Math.round(S * 0.4 * 10) / 10) },
+      }
+      if (dims[prim]) void makePrimitive(prim, dims[prim])
+    }
+    if (profileId) {
+      const pf = [...BASIC_PROFILES, ...ADVANCED_PROFILES].find((x) => x.id === profileId)
+      if (pf) {
+        applyProfile(pf)
+        if (pf.tier === "advanced") setMode("advanced")
+        if (infill && INFILL_PATTERN_LABELS[infill as InfillPattern]) {
+          setP({ ...pf.params, infillPattern: infill as InfillPattern })
+          if (!(BASIC_INFILL_PATTERNS as readonly string[]).includes(infill)) setMode("advanced")
+        }
+      }
+    } else if (infill && INFILL_PATTERN_LABELS[infill as InfillPattern]) {
+      setP((prev) => ({ ...prev, infillPattern: infill as InfillPattern }))
+    }
+    if (tgt === "petri") setTarget({ kind: "petri", diameter_mm: 60 })
+    else if (tgt === "slide") setTarget({ kind: "slide" })
+    else if (tgt === "plate24") setTarget({ kind: "plate", format: 24, wells: ["A1"], zHop_mm: 20, pause_s: 0, purge_uL: 0 })
+    else if (tgt === "plate96") setTarget({ kind: "plate", format: 96, wells: ["A1"], zHop_mm: 15, pause_s: 0, purge_uL: 0 })
+  }, [searchParams, makePrimitive, applyProfile])
 
   const runIntent = useCallback((text: string) => {
     if (!text.trim()) return
@@ -347,10 +397,10 @@ function BioSlicerInner() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.25em] text-emerald-300/80 font-semibold mb-1">Etapa 3 / 4 · Bioimpressão</div>
+          <div className="text-[10px] uppercase tracking-[0.25em] text-emerald-300/80 font-semibold mb-1">Fase 3 / 6 · Bioimpressão</div>
           <h2 className="text-xl font-bold flex items-center gap-2"><Layers className="w-5 h-5 text-emerald-300" /> Fatiamento — BioSlicer</h2>
           <p className="text-sm text-gray-400 mt-1 max-w-3xl">
-            O único fatiador da BIA: STL da Etapa 1, Studio, upload ou primitiva → G-code Marlin/Klipper com extrusão volumétrica por seringa,
+            <b className="text-gray-200">O único lugar de modelos 3D da BIA.</b> Modelo anatômico real, primitiva, malha salva, upload ou desenho → G-code Marlin/Klipper com extrusão volumétrica por seringa,
             preenchimentos honestos (linhas, grid, triangular, hexagonal, ondas, concêntrico, zigzag, gyroid; e no Avançado: Schwarz P, Diamond, Voronoi, Perlin, gradiente), alvo (Petri/placa de poços) e 1–4 cabeçotes.
             <b className="text-gray-200"> Ponto zero é ponto zero</b>: o 1º cordão nasce onde o bico está. Sem <code>G28</code>, sem park.
           </p>
@@ -366,10 +416,10 @@ function BioSlicerInner() {
         <div className="rounded-xl bg-amber-500/8 border border-amber-500/30 p-3 flex items-start gap-3 text-xs">
           <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
           <div className="flex-1 text-amber-100">
-            {!modelReady && !bioinkReady ? "Etapas 1 (Modelo) e 2 (Biotinta) ainda não foram concluídas." : !modelReady ? "Etapa 1 (Modelo 3D) ainda não foi concluída — você pode carregar um STL ou primitiva aqui mesmo." : "Etapa 2 (Biotinta) ainda não foi concluída — os cabeçotes vão usar uma biotinta genérica."}
+            {!modelReady && !bioinkReady ? "Fases 1 (Modelo de tecido) e 2 (Biotinta) ainda não foram concluídas — você pode fatiar mesmo assim." : !modelReady ? "Fase 1 (Modelo de tecido) ainda não foi concluída — escolha o modelo 3D aqui mesmo." : "Fase 2 (Biotinta) ainda não foi concluída — os cabeçotes vão usar uma biotinta genérica."}
           </div>
           <div className="flex gap-1.5">
-            {!modelReady && <Link href="/dashboard/bioprint/model" className="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-100 whitespace-nowrap">→ Modelo</Link>}
+            {!modelReady && <Link href="/dashboard/bioprint/model" className="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-100 whitespace-nowrap">→ Fase 1</Link>}
             {!bioinkReady && <Link href="/dashboard/bioprint/bioink" className="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-100 whitespace-nowrap">→ Biotinta</Link>}
           </div>
         </div>
@@ -403,7 +453,7 @@ function BioSlicerInner() {
             </div>
             {stored.length > 0 && (
               <div className="mt-3">
-                <div className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">Malhas salvas (Etapa 1 / Studio / uploads)</div>
+                <div className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">Malhas salvas (uploads, primitivas, anatômicos, desenhos)</div>
                 <div className="flex flex-col gap-1 max-h-32 overflow-auto">
                   {stored.slice(0, 8).map((m) => (
                     <button key={m.id} onClick={() => loadStored(m.id)} className="text-left text-xs px-2 py-1 rounded hover:bg-white/5 flex justify-between gap-2">
@@ -569,7 +619,7 @@ function BioSlicerInner() {
               <div className="flex flex-wrap gap-2">
                 <button onClick={download} className="px-4 py-2 rounded-lg border border-white/15 hover:border-emerald-400/40 text-sm flex items-center gap-2"><Download className="w-4 h-4" /> Baixar .gcode</button>
                 <button onClick={sendToHost} disabled={errors.length > 0} className="px-4 py-2 rounded-lg bg-emerald-500/20 border border-emerald-400/40 hover:bg-emerald-500/30 text-sm flex items-center gap-2 disabled:opacity-40"><Send className="w-4 h-4" /> Enviar ao Host (imprimir)</button>
-                <button onClick={sendToStep4} disabled={errors.length > 0} className="px-4 py-2 rounded-lg border border-white/15 hover:border-white/30 text-sm disabled:opacity-40">Etapa 4 (Execução) →</button>
+                <button onClick={sendToStep4} disabled={errors.length > 0} className="px-4 py-2 rounded-lg border border-white/15 hover:border-white/30 text-sm disabled:opacity-40">Fase 4 (Bioimpressão · Host) →</button>
                 {charged && <span className={cn("text-xs self-center px-2 py-1 rounded border", charged.ok ? "text-emerald-200 border-emerald-400/30 bg-emerald-500/10" : "text-rose-200 border-rose-400/30 bg-rose-500/10")}>{charged.msg}</span>}
               </div>
               {errors.length > 0 && <div className="text-xs text-red-300">Resolva os erros acima antes de enviar ao host.</div>}

@@ -3,8 +3,10 @@
 /**
  * BIA — Hub do Processo de Bioimpressão
  *
- * Ponto de entrada do fluxo de 4 etapas. Mostra:
- *  - Visão geral do processo (cards das 4 etapas com status)
+ * Ponto de entrada do fluxo de 6 fases (R24). Mostra:
+ *  - Visão geral do processo (cards das 6 fases com status)
+ *  - Racional: 1 Modelo de tecido · 2 Biotinta · 3 Fatiamento (ÚNICO lugar de STL)
+ *    · 4 Bioimpressão (Host) · 5 Análise da bioimpressão · 6 Maturação & caracterizações
  *  - Botão "Começar / Continuar" que leva à próxima etapa pendente
  *  - Resumo do que já foi configurado (se houver)
  *  - Opção de resetar tudo
@@ -16,17 +18,19 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
-  Box, Droplets, Layers, Gamepad2, Beaker,
+  Box, Droplets, Layers, Gamepad2, Beaker, ClipboardCheck,
   ArrowRight, RotateCcw, Sparkles, Info, CheckCircle2, Circle,
   Brain, BookOpen, Zap,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import {
-  useBioprintProcess, isStepUnlocked, STEP_LABELS,
-  type BioprintProcessState, type StepStatus,
+  useBioprintProcess, isStepUnlocked, STEP_LABELS, STEP_ROUTES,
+  type BioprintProcessState, type StepStatus, type PhaseKey,
 } from "@/lib/bioprint/process-context"
+import { listFeedback } from "@/lib/bioprint/print-feedback"
+import { useEffect, useState } from "react"
 
-type StepKey = keyof BioprintProcessState
+type StepKey = PhaseKey
 
 interface StepCardDef {
   key: StepKey
@@ -36,19 +40,19 @@ interface StepCardDef {
   description: string
   icon: React.ElementType
   route: string
-  color: "emerald" | "cyan" | "violet" | "amber" | "rose"
+  color: "emerald" | "cyan" | "violet" | "amber" | "rose" | "sky"
 }
 
 const STEP_CARDS: StepCardDef[] = [
   {
     key: "model",
     number: 1,
-    title: "Modelo 3D",
+    title: "Modelo de tecido",
     short: STEP_LABELS.model,
     description:
-      "Upload de STL/OBJ/PLY OU geração de geometria a partir de 5 categorias: tecidos moles, rígidos, biomiméticos (TPMS), testes de imprimibilidade e organoides/vascularização.",
+      "O que você vai bioimprimir: tecido-alvo (cartilagem, pele, osso, vaso, miocárdio, renal, hepático, neural ou teste), aplicação, tamanho e se leva células. Aqui não há STL — a BIA traduz a intenção em sugestão de modelo, perfil, biotinta e alvo para as próximas fases.",
     icon: Box,
-    route: "/dashboard/bioprint/model",
+    route: STEP_ROUTES.model,
     color: "emerald",
   },
   {
@@ -57,42 +61,53 @@ const STEP_CARDS: StepCardDef[] = [
     title: "Biotinta",
     short: STEP_LABELS.bioink,
     description:
-      "Escolha uma biotinta validada (alginato-gelatina, GelMA, Pluronic, FRESH...) e as células. Os parâmetros que funcionam vêm junto. Laboratório avançado e formulação livre ficam em Opções avançadas.",
+      "Escolha uma biotinta validada (alginato-gelatina, GelMA, Pluronic, FRESH, CELLINK SKIN...) e as células. Os parâmetros que funcionam vêm junto. Laboratório avançado e formulação livre ficam em Opções avançadas.",
     icon: Droplets,
-    route: "/dashboard/bioprint/bioink",
+    route: STEP_ROUTES.bioink,
     color: "cyan",
   },
   {
     key: "slice",
     number: 3,
-    title: "Fatiamento",
+    title: "Fatiamento — BioSlicer",
     short: STEP_LABELS.slice,
     description:
-      "BioSlicer — o único fatiador da BIA: STL → G-code com extrusão volumétrica por seringa, infills honestos (linhas, grid, hexagonal, ondas, gyroid; avançado: Schwarz P, Diamond, Voronoi, Perlin, gradiente), alvo Petri/placa 6–96 poços, 1–4 cabeçotes. Ponto zero = bico. Prévia grátis; 6 créditos por G-code.",
+      "O ÚNICO lugar de STL e geometria 3D da BIA: modelo anatômico real, primitiva, upload, desenho ou teste de imprimibilidade → G-code com extrusão volumétrica por seringa, infills honestos (básico + Schwarz P, Diamond, Voronoi, Perlin, gradiente), Mesa (deitar/girar), alvo Petri/placa e 1–4 cabeçotes. Ponto zero = bico. Prévia grátis; 6 créditos por G-code.",
     icon: Layers,
-    route: "/dashboard/bioprint/slice",
+    route: STEP_ROUTES.slice,
     color: "violet",
   },
   {
     key: "control",
     number: 4,
-    title: "Execução",
+    title: "Bioimpressão (Host)",
     short: STEP_LABELS.control,
     description:
-      "Painel de controle da bioimpressora: joystick 3D em primeiro plano, conexão USB (Web Serial / Marlin), extrusão fluida (avançado), viabilidade celular live (Blaeser 2016).",
+      "BIA Host: conexão USB (Web Serial / Marlin), joystick, stream do G-code com ok-handshake, pausa/retomar/cancelar/M112, viabilidade celular live. Ao terminar, você dá a nota e conta o que viu — isso alimenta a Fase 5.",
     icon: Gamepad2,
-    route: "/dashboard/bioprint/execute",
+    route: STEP_ROUTES.control,
     color: "amber",
   },
   {
-    key: "postBio",
+    key: "review",
     number: 5,
-    title: "Pós-Bioimpressão",
+    title: "Análise da bioimpressão",
+    short: STEP_LABELS.review,
+    description:
+      "Laço fechado: nota 1–5, relato livre, sintomas interpretados (fios, colapso, sub/sobre-extrusão, descolamento…) e os ajustes que a BIA aplica no próximo G-code. Histórico de impressões e decisão: repetir na Fase 3 ou seguir para maturação.",
+    icon: ClipboardCheck,
+    route: STEP_ROUTES.review,
+    color: "sky",
+  },
+  {
+    key: "postBio",
+    number: 6,
+    title: "Maturação & caracterizações",
     short: STEP_LABELS.postBio,
     description:
-      "Tipo de tecido alvo + protocolos pós-impressão: cultura, crosslink, biorreator (perfusão/agitação) e validação (Live/Dead, AlamarBlue, immunostaining). Protocolos por tecido: cardíaco · ósseo · cartilagem · vaso · pele · nervo · hepático.",
+      "Do construto ao tecido: cultura, crosslink, biorreator (perfusão/agitação) e caracterizações (Live/Dead, AlamarBlue, histologia, immunostaining, mecânica). Protocolos por tecido: cardíaco · ósseo · cartilagem · vaso · pele · nervo · hepático.",
     icon: Beaker,
-    route: "/dashboard/bioprint/post",
+    route: STEP_ROUTES.postBio,
     color: "rose",
   },
 ]
@@ -101,18 +116,27 @@ export default function BioprintHubPage() {
   const router = useRouter()
   const { state, nextStep, resetAll } = useBioprintProcess()
 
-  // Quantas etapas já estão prontas?
-  const readyCount = (Object.keys(state) as StepKey[]).filter(
-    (k) => state[k].status === "ready"
-  ).length
+  // Fase 5 (análise) não tem estado no processo: considera "pronta" quando
+  // existe ao menos um feedback salvo no laço fechado (localStorage).
+  const [reviewCount, setReviewCount] = useState(0)
+  useEffect(() => { setReviewCount(listFeedback().length) }, [])
+
+  const statusOf = (k: StepKey): StepStatus =>
+    k === "review" ? (reviewCount > 0 ? "ready" : "empty") : state[k].status
+
+  // Quantas fases já estão prontas?
+  const readyCount = STEP_CARDS.filter((c) => statusOf(c.key) === "ready").length
   const totalSteps = STEP_CARDS.length
   const progressPercent = Math.round((readyCount / totalSteps) * 100)
 
-  const nextStepDef = STEP_CARDS.find((s) => s.key === nextStep)
+  // Ordem das 6 fases: a primeira que não está pronta é a próxima.
+  const nextStepDef =
+    STEP_CARDS.find((s) => statusOf(s.key) !== "ready") ??
+    STEP_CARDS.find((s) => s.key === nextStep)
   const allReady = readyCount === totalSteps
 
   const handleReset = () => {
-    if (confirm("Deseja realmente reiniciar o processo? Todas as configurações das 5 etapas serão apagadas (sem afetar arquivos salvos).")) {
+    if (confirm("Deseja realmente reiniciar o processo? As configurações das 6 fases serão apagadas (sem afetar arquivos salvos nem o histórico de análises).")) {
       resetAll()
     }
   }
@@ -127,15 +151,16 @@ export default function BioprintHubPage() {
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-base font-bold text-white mb-1">
-              Bioimpressão de ponta a ponta — em 5 etapas
+              Bioimpressão de ponta a ponta — em 6 fases
             </h2>
             <p className="text-xs text-gray-300 leading-relaxed">
-              Este é o processo unificado de bioimpressão da BIA. Cada etapa alimenta a próxima:
-              o <strong className="text-emerald-200">modelo 3D</strong> define a geometria,
-              a <strong className="text-cyan-200">biotinta</strong> define propriedades reológicas e celulares,
-              o <strong className="text-violet-200">fatiamento</strong> gera o G-code respeitando ambos,
-              a <strong className="text-amber-200">execução</strong> controla a impressora com viabilidade live,
-              e a <strong className="text-rose-200">pós-bioimpressão</strong> cuida do tecido até maturar (cultura, biorreator, assays).
+              Um racional só, do tecido ao tecido. Cada fase alimenta a próxima:
+              o <strong className="text-emerald-200">modelo de tecido</strong> diz o que você quer construir (sem STL),
+              a <strong className="text-cyan-200">biotinta</strong> define reologia e células,
+              o <strong className="text-violet-200">fatiamento</strong> é o único lugar onde geometria 3D vira G-code,
+              a <strong className="text-amber-200">bioimpressão</strong> envia ao Host com viabilidade live,
+              a <strong className="text-sky-200">análise</strong> fecha o laço (nota + relato → próximo G-code melhor),
+              e a <strong className="text-rose-200">maturação</strong> cuida do construto até virar tecido (cultura, biorreator, caracterizações).
             </p>
           </div>
         </div>
@@ -144,7 +169,7 @@ export default function BioprintHubPage() {
         <div className="mt-4">
           <div className="flex items-center justify-between text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">
             <span>Progresso do processo</span>
-            <span>{readyCount} de {totalSteps} etapas prontas</span>
+            <span>{readyCount} de {totalSteps} fases prontas</span>
           </div>
           <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
             <div
@@ -166,7 +191,7 @@ export default function BioprintHubPage() {
               Próximo passo sugerido
             </div>
             <div className="text-sm font-semibold text-white">
-              {readyCount === 0 ? "Comece pela Etapa" : "Continue na Etapa"} {nextStepDef.number} — {nextStepDef.title}
+              {readyCount === 0 ? "Comece pela Fase" : "Continue na Fase"} {nextStepDef.number} — {nextStepDef.title}
             </div>
           </div>
           <button
@@ -188,40 +213,37 @@ export default function BioprintHubPage() {
               Tudo pronto
             </div>
             <div className="text-sm font-semibold text-white">
-              Todas as 5 etapas estão configuradas. Você pode imprimir agora.
+              As 6 fases estão concluídas. Você pode repetir a impressão ou iniciar um novo tecido.
             </div>
           </div>
           <button
             onClick={() => router.push("/dashboard/bioprint/execute")}
             className="px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-400 hover:bg-emerald-500/30 text-emerald-100 text-xs font-semibold transition-colors flex items-center gap-1.5"
           >
-            Ir para Execução <ArrowRight className="w-3.5 h-3.5" />
+            Ir para a Bioimpressão (Host) <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </section>
       )}
 
       {/*
-        ─── R12.62: Card destacado de "Pré-etapa · Testes de imprimibilidade"
-        foi REMOVIDO daqui e integrado ao fluxo normal de bioimpressão.
-        Agora a usuária acessa selecionando a categoria "printability-test"
-        na Etapa 1 (Modelo) — decisão fica dentro do processo, não fora dele.
-        A página /dashboard/bioprint/printability continua acessível via
-        deep-link direto (mantida por compat), mas não é mais promovida
-        no hub — evita duplicar caminhos e confundir a ordem lógica.
+        R24: testes de imprimibilidade vivem na Fase 1 (tecido "Teste de
+        imprimibilidade") → Fase 3 (modelo fidelity / grade). A página
+        /dashboard/bioprint/printability continua acessível por deep-link.
       */}
 
-      {/* ─── Cards das 4 etapas ────────────────────────────────────── */}
+      {/* ─── Cards das 6 fases ────────────────────────────────────── */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {STEP_CARDS.map((card) => {
-          const stepState = state[card.key]
           const unlocked = isStepUnlocked(card.key, state)
           return (
             <StepCard
               key={card.key}
               card={card}
-              status={stepState.status}
+              status={statusOf(card.key)}
               unlocked={unlocked}
-              summary={summaryFor(card.key, state)}
+              summary={card.key === "review"
+                ? (reviewCount > 0 ? `${reviewCount} ${reviewCount === 1 ? "análise salva" : "análises salvas"}` : null)
+                : summaryFor(card.key, state)}
             />
           )
         })}
@@ -265,7 +287,7 @@ export default function BioprintHubPage() {
                 Enviar G-code para a bioimpressora — USB / Web Serial (Marlin)
               </h3>
               <p className="text-[11.5px] text-gray-300 mt-1.5 leading-relaxed">
-                Acesso <strong className="text-amber-200">direto</strong>, sem precisar passar pelas 5 etapas.
+                Acesso <strong className="text-amber-200">direto</strong> à Fase 4, sem precisar passar pelas fases anteriores.
                 Cole/upload/importe G-code → validador → preview 3D profissional → handshake M115 →
                 stream linha-a-linha com <strong className="text-emerald-200">ok-handshake</strong> →
                 pause/resume/cancel/<strong className="text-rose-200">M112 emergency</strong>. Modo MOCK funciona
@@ -430,7 +452,7 @@ export default function BioprintHubPage() {
       <section className="rounded-2xl bg-white/[0.02] border border-white/5 p-4 flex flex-wrap items-center gap-3">
         <Info className="w-4 h-4 text-gray-400 shrink-0" />
         <p className="text-xs text-gray-400 flex-1 min-w-0">
-          O estado das 5 etapas é mantido na sua sessão (sessionStorage). Fechar a aba reinicia tudo.
+          O estado das 6 fases é mantido na sua sessão (sessionStorage). Fechar a aba reinicia o processo — o histórico de análises (Fase 5) fica no navegador.
         </p>
         {readyCount > 0 && (
           <button
@@ -461,11 +483,8 @@ function StepCard({
     violet:  { bg: "from-violet-500/8 to-violet-500/2",   border: "border-violet-500/20",   iconBg: "bg-violet-500/15 border-violet-500/30",    iconText: "text-violet-300",   title: "group-hover:text-violet-100",  num: "text-violet-200/70" },
     amber:   { bg: "from-amber-500/8 to-amber-500/2",     border: "border-amber-500/20",    iconBg: "bg-amber-500/15 border-amber-500/30",      iconText: "text-amber-300",    title: "group-hover:text-amber-100",   num: "text-amber-200/70" },
     rose:    { bg: "from-rose-500/8 to-rose-500/2",       border: "border-rose-500/20",     iconBg: "bg-rose-500/15 border-rose-500/30",        iconText: "text-rose-300",     title: "group-hover:text-rose-100",    num: "text-rose-200/70" },
+    sky:     { bg: "from-sky-500/8 to-sky-500/2",         border: "border-sky-500/20",      iconBg: "bg-sky-500/15 border-sky-500/30",          iconText: "text-sky-300",      title: "group-hover:text-sky-100",     num: "text-sky-200/70" },
   }[card.color]
-
-  const wrapper = unlocked ? (
-    <Link href={card.route} className="block" />
-  ) : null
 
   const inner = (
     <div className={cn(
@@ -486,7 +505,7 @@ function StepCard({
         </div>
         <div className="flex-1 min-w-0 pr-12">
           <div className={cn("text-[10px] uppercase tracking-wider font-semibold", colorMap.num)}>
-            Etapa {card.number}
+            Fase {card.number} / 6
           </div>
           <h3 className={cn("text-base font-bold text-white transition-colors", colorMap.title)}>
             {card.title}
@@ -507,7 +526,7 @@ function StepCard({
 
       {!unlocked && (
         <div className="mt-3 pt-3 border-t border-white/5 text-[10px] text-gray-500">
-          🔒 Conclua a etapa anterior para desbloquear
+          🔒 Conclua a fase anterior para desbloquear
         </div>
       )}
     </div>
@@ -559,7 +578,8 @@ function summaryFor(key: StepKey, state: BioprintProcessState): string | null {
       const m = state.model
       if (!m.name) return null
       const parts = [m.name]
-      if (m.stats?.triangles) parts.push(`${m.stats.triangles.toLocaleString()} tri`)
+      if (m.brief?.targetSize_mm) parts.push(`${m.brief.targetSize_mm} mm`)
+      else if (m.stats?.triangles) parts.push(`${m.stats.triangles.toLocaleString()} tri`)
       return parts.join(" · ")
     }
     case "bioink": {
@@ -583,6 +603,11 @@ function summaryFor(key: StepKey, state: BioprintProcessState): string | null {
       const c = state.control
       if (!c.tissueType) return null
       return c.tissueType + (c.connected ? " · 🟢 conectada" : " · 🔘 simulação")
+    }
+    case "review": return null
+    case "postBio": {
+      const p = state.postBio
+      return p.status === "ready" ? "Protocolo definido" : null
     }
   }
 }

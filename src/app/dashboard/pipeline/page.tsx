@@ -364,15 +364,15 @@ export default function PipelinePage() {
                   </div>
                   <p className="text-xs text-gray-400 mb-3 leading-relaxed">
                     {analysis.stage === 6
-                      ? "Esta é a etapa de Bioimpressão/Fabricação. Gere o arquivo STL/OBJ da geometria do seu tecido agora."
-                      : "Gere o arquivo STL/OBJ 3D do seu tecido para usar no slicer de bioimpressão."}
+                      ? "Esta é a etapa de Bioimpressão/Fabricação. Escolha a geometria do seu tecido (anatômica, primitiva, upload) e gere o G-code na Fase 3 · Fatiamento."
+                      : "Toda geometria 3D da BIA vive em um único lugar: a Fase 3 · Fatiamento (BioSlicer). Escolha o modelo e gere o G-code lá."}
                   </p>
                   <a
-                    href="/dashboard/bioprint/model"
+                    href="/dashboard/bioprint/slice"
                     className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition-all shadow-lg shadow-violet-500/20"
                   >
                     <Box className="w-4 h-4" />
-                    Abrir Bioimpressão · Etapa 1 (Modelo 3D)
+                    Abrir Bioimpressão · Fase 3 (Fatiamento — modelos 3D)
                     <ExternalLink className="w-3.5 h-3.5" />
                   </a>
                 </div>

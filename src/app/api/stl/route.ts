@@ -33,11 +33,11 @@ export async function POST(req: NextRequest) {
 
   // Return info that client should generate locally (STL is generated client-side)
   return NextResponse.json({
-    message: "STL gerado no cliente via /dashboard/bioprint/model",
+    message: "STL gerado no cliente via /dashboard/bioprint/slice (Fase 3 · Fatiamento)",
     geometry: parsed.data.geometry,
     format: fmt,
     params: parsed.data.params,
-    instructions: "Use a página /dashboard/bioprint/model (Bioimpressão · Etapa 1) para gerar e baixar arquivos STL/OBJ diretamente no navegador.",
+    instructions: "Use a página /dashboard/bioprint/slice (Bioimpressão · Fase 3 — o único lugar de modelos 3D) para escolher/gerar geometria e fatiar diretamente no navegador.",
   })
 }
 

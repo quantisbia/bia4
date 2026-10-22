@@ -1,0 +1,1561 @@
+"use client"
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════
+ *  BIA — Etapa 1 / 4 · Modelo 3D
+ *  ───────────────────────────────────────────────────────────────────────
+ *  Unifica três fontes para o arquivo 3D que será bioimpresso:
+ *    A. UPLOAD     — STL/OBJ/PLY com validação topológica do mesh
+ *    B. GERAÇÃO    — biblioteca paramétrica organizada em 5 categorias
+ *    C. IA (beta)  — prompt textual (placeholder, descrito como roadmap)
+ *
+ *  Esta página substitui /dashboard/stl + /dashboard/bioprinting/dual-porosity
+ *  e escreve no `state.model` do BioprintProcessContext.
+ *
+ *  Janaina Dernowsek / Quantis Biotechnology — 2026
+ * ═══════════════════════════════════════════════════════════════════════
+ */
+
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import Link from "next/link"
+import {
+  Upload, Sparkles, FlaskConical, Heart, Bone, Activity, Hexagon,
+  ShieldCheck, Brain, CheckCircle2, AlertTriangle, ArrowRight, Box,
+  Download, Loader2, Info, XCircle, Lock
+} from "lucide-react"
+import { cn } from "@/lib/utils/helpers"
+import {
+  GEOMETRIES, generateGeometry, downloadSTL, downloadOBJ, downloadPLY,
+  estimateFileSize, type GeometryParams, type STLGeometry, type Triangle
+} from "@/lib/stl/generator"
+import { BIOMIMETIC_GEOMETRIES } from "@/lib/stl/biomimetic-tissues"
+import {
+  validateMesh, formatVolume, formatArea, type ValidationReport
+} from "@/lib/stl/mesh-validator"
+import {
+  useBioprintProcess,
+  type ModelCategory,
+} from "@/lib/bioprint/process-context"
+// R12.57 — separa geometrias "prontas para uso" das "experimentais" que podem
+// travar / não fechar mesh. Por padrão só as básicas aparecem; usuário
+// pode habilitar as experimentais via toggle na sidebar.
+import { BASIC_GEOMETRY_IDS } from "@/lib/gcode/slicer/geometry-bounds"
+
+/** R21: geometrias paramétricas da Etapa 1 que têm versão anatômica REAL na biblioteca da Etapa 3 */
+const ANATOMICAL_FOR_GEOMETRY: Record<string, string> = {
+  meniscus: "meniscus_real", ear: "ear_real", nose: "nose_real", kidney: "kidney_real", heart: "heart_real",
+  femur: "femur_real", vessel: "vessel_segment_real", vessel_y_branch: "vessel_segment_real", test_fidelity_biotinta: "fidelity_real",
+}
+
+// ─── Mapeamento das 5 categorias ──────────────────────────────────────────
+//
+// Distribui as 25 geometrias da biblioteca BIA nas 5 categorias do processo.
+// O usuário enxerga só uma categoria por vez (clean) — sem perder nada do
+// que já existia em /dashboard/stl.
+
+interface CategoryDef {
+  id: ModelCategory
+  label: string
+  description: string
+  icon: typeof Heart
+  accent: "rose" | "stone" | "violet" | "amber" | "cyan"
+  geometryIds: string[]
+}
+
+const CATEGORY_DEFS: CategoryDef[] = [
+  {
+    id: "soft-tissue",
+    label: "Tecidos moles",
+    description: "Pele, vaso, miocárdio, hepático, córnea, cartilagem, rim",
+    icon: Heart,
+    accent: "rose",
+    // R12.51: liver_anatomical removido do catálogo a pedido da Janaina.
+    geometryIds: [
+      "membrane", "disk", "skin_cylinder", "cube_tissue", "vessel", "hexagonal_liver",
+      "nose", "meniscus", "cornea", "lens", "ear", "heart", "kidney",
+      "skin_3layer", "cardiac_patch", "cornea_curved", "cartilage_zonal",
+    ],
+  },
+  {
+    id: "rigid-tissue",
+    label: "Tecidos rígidos",
+    description: "Osso trabecular, fêmur, cortical+trabecular, mão (esqueleto)",
+    icon: Bone,
+    accent: "stone",
+    geometryIds: [
+      "bone_block", "femur", "hand",
+      "bone_cortical_trabecular",
+    ],
+  },
+  {
+    id: "biomimetic-tpms",
+    label: "Biomiméticos (TPMS)",
+    description: "Gyroid, Schwarz P, Diamond — superfícies mínimas triplamente periódicas",
+    icon: Hexagon,
+    accent: "violet",
+    geometryIds: ["tpms_gyroid", "tpms_schwarz", "tpms_diamond"],
+  },
+  {
+    id: "printability-test",
+    label: "Testes de imprimibilidade",
+    description: "Linha, grade, ponte, estrela, torre, escada Z, leque de ângulos — calibração da biotinta",
+    icon: ShieldCheck,
+    accent: "amber",
+    geometryIds: [
+      "test_line", "test_grid", "test_collapse_bridge", "test_star",
+      "test_stacking_tower", "test_z_staircase", "test_angle_fan",
+      "test_fidelity_biotinta",  // R12.35: STL exato do usuário, dimensões travadas (15.4×15.4×0.8 mm)
+    ],
+  },
+  {
+    id: "organoid-vascular",
+    label: "Organoides e vascularização",
+    description: "Esferoide, cápsula porosa, vaso bifurcado, conduíte nervoso multicanal, dual-porosity",
+    icon: Brain,
+    accent: "cyan",
+    geometryIds: [
+      "organoid_sphere", "spheroid_capsule", "vessel_y_branch", "nerve_conduit",
+    ],
+  },
+]
+
+const ALL_GEOMETRIES: STLGeometry[] = [...GEOMETRIES, ...BIOMIMETIC_GEOMETRIES]
+
+function getGeometryById(id: string): STLGeometry | undefined {
+  return ALL_GEOMETRIES.find(g => g.id === id)
+}
+
+// R12.57 — Set imutável dos IDs "verificados" (não experimentais).
+// Tudo o que NÃO está aqui é considerado experimental e fica escondido por
+// padrão. Inclui as 13 geometrias BASIC + qualquer ID que exista no catálogo
+// mas não esteja em ADVANCED_GEOMETRY_IDS (defensivo — evita esconder por
+// engano formas triviais recém-adicionadas).
+const BASIC_ID_SET: ReadonlySet<string> = new Set(BASIC_GEOMETRY_IDS)
+
+function isVerifiedGeometry(id: string): boolean {
+  return BASIC_ID_SET.has(id)
+}
+
+const ACCENT_CLASSES: Record<CategoryDef["accent"], { ring: string; text: string; bg: string; border: string }> = {
+  rose:   { ring: "ring-rose-500/40",   text: "text-rose-300",   bg: "bg-rose-500/10",   border: "border-rose-500/30"   },
+  stone:  { ring: "ring-stone-400/40",  text: "text-stone-300",  bg: "bg-stone-500/10",  border: "border-stone-500/30"  },
+  violet: { ring: "ring-violet-500/40", text: "text-violet-300", bg: "bg-violet-500/10", border: "border-violet-500/30" },
+  amber:  { ring: "ring-amber-500/40",  text: "text-amber-300",  bg: "bg-amber-500/10",  border: "border-amber-500/30"  },
+  cyan:   { ring: "ring-cyan-500/40",   text: "text-cyan-300",   bg: "bg-cyan-500/10",   border: "border-cyan-500/30"   },
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN PAGE
+// ═══════════════════════════════════════════════════════════════════════════
+export default function BioprintModelPage() {
+  const { state, updateModel } = useBioprintProcess()
+  const [source, setSource] = useState<"upload" | "generate" | "ai">(
+    state.model.source === "upload" ? "upload" :
+    state.model.source === "ai-prompt" ? "ai" :
+    "generate"
+  )
+
+  return (
+    <div className="bia-model-page flex flex-col min-h-full bg-[#0a0a0f]">
+      {/* Cabeçalho da etapa */}
+      <header className="px-4 sm:px-6 py-5 border-b border-white/5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.25em] text-emerald-300/80 font-semibold mb-1">
+              Etapa 1 / 4 · Bioimpressão
+            </div>
+            <h1 className="text-lg sm:text-2xl font-bold text-white flex items-center gap-2">
+              <Box className="w-5 h-5 text-emerald-400" />
+              Modelo 3D
+            </h1>
+            <p className="text-xs sm:text-sm text-gray-400 mt-1 max-w-2xl">
+              Defina o arquivo 3D que será bioimpresso — escolha entre fazer upload de um STL próprio,
+              gerar uma das 25 geometrias paramétricas, ou descrever via IA (em breve).
+            </p>
+          </div>
+
+          {state.model.status === "ready" && (
+            <Link
+              href="/dashboard/bioprint/bioink"
+              className="hidden sm:inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/15 hover:bg-emerald-500/25
+                border border-emerald-500/40 text-emerald-200 text-sm font-medium rounded-xl transition-colors"
+            >
+              Continuar para Biotinta <ArrowRight className="w-4 h-4" />
+            </Link>
+          )}
+        </div>
+
+        {/* Tabs de fonte */}
+        <div className="mt-5 flex gap-1.5 bg-white/3 border border-white/8 rounded-xl p-1 w-fit max-w-full overflow-x-auto">
+          <SourceTab id="upload"   label="Upload"       icon={Upload}      active={source === "upload"}   onClick={() => setSource("upload")} />
+          <SourceTab id="generate" label="Gerar"        icon={FlaskConical} active={source === "generate"} onClick={() => setSource("generate")} />
+          <SourceTab id="ai"       label="IA (beta)"    icon={Sparkles}    active={source === "ai"}       onClick={() => setSource("ai")} />
+        </div>
+      </header>
+
+      {/* Conteúdo dinâmico por fonte */}
+      <main className="flex-1 px-4 sm:px-6 py-6">
+        {source === "upload"   && <UploadPanel   onSelected={updateModel} currentName={state.model.name} />}
+        {source === "generate" && <GeneratePanel onSelected={updateModel} currentGeometry={state.model.geometryId} currentParams={state.model.params} />}
+        {source === "ai"       && <AIPanel onSelected={updateModel} />}
+      </main>
+
+      {/* Rodapé fixo com status + CTA quando pronto */}
+      {state.model.status === "ready" && (
+        <footer className="sticky bottom-0 z-10 bg-[#0a0a0f]/95 backdrop-blur border-t border-emerald-500/20 px-4 sm:px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span className="text-emerald-300 font-medium">Modelo pronto:</span>
+            <span className="text-gray-300 truncate max-w-[40vw]">{state.model.name ?? "—"}</span>
+          </div>
+          <Link
+            href="/dashboard/bioprint/bioink"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-sm font-semibold rounded-lg transition-colors"
+          >
+            Etapa 2 · Biotinta <ArrowRight className="w-4 h-4" />
+          </Link>
+        </footer>
+      )}
+    </div>
+  )
+}
+
+// ─── Tab da fonte ─────────────────────────────────────────────────────────
+function SourceTab({
+  label, icon: Icon, active, onClick,
+}: {
+  id: string; label: string; icon: typeof Upload; active: boolean; onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "px-3.5 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap",
+        active
+          ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-500/40"
+          : "text-gray-400 hover:text-gray-200 hover:bg-white/5"
+      )}
+    >
+      <Icon className="w-4 h-4" />
+      {label}
+    </button>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PAINEL A — UPLOAD
+// ═══════════════════════════════════════════════════════════════════════════
+function UploadPanel({
+  onSelected,
+  currentName,
+}: {
+  onSelected: ReturnType<typeof useBioprintProcess>["updateModel"]
+  currentName: string | null
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [parsing, setParsing] = useState(false)
+  const [fileName, setFileName] = useState<string | null>(currentName)
+  const [fileSizeKb, setFileSizeKb] = useState<number>(0)
+  const [triangles, setTriangles] = useState<Triangle[] | null>(null)
+  const [validation, setValidation] = useState<ValidationReport | null>(null)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  const handleFile = useCallback(async (file: File) => {
+    setErrorMsg(null)
+    setParsing(true)
+    setFileName(file.name)
+    setFileSizeKb(Math.round(file.size / 1024))
+    setTriangles(null)
+    setValidation(null)
+
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? ""
+      if (!["stl", "obj", "ply"].includes(ext)) {
+        throw new Error("Formato não suportado. Use STL, OBJ ou PLY.")
+      }
+      const buffer = await file.arrayBuffer()
+      const tris = parseUploadedMesh(buffer, ext)
+      if (tris.length === 0) {
+        throw new Error("O arquivo não contém triângulos válidos.")
+      }
+      setTriangles(tris)
+      // R15: persiste o STL original no IndexedDB para o BioSlicer
+      if (ext === "stl") {
+        try {
+          const { putMesh, newMeshId } = await import("@/lib/slicer/mesh-store")
+          await putMesh({ id: newMeshId("upload"), name: file.name, bytes: buffer, format: "stl", createdAt: Date.now(), source: "etapa-1" })
+        } catch { /* IndexedDB indisponível */ }
+      }
+      // Validar mesh (skip se muito grande pra evitar travar UI)
+      const report = tris.length > 200_000
+        ? null
+        : validateMesh(tris, { nozzleDiameterMm: 0.4, application: "bioprinting" })
+      setValidation(report)
+
+      // Persiste no context
+      onSelected({
+        status: "ready",
+        source: "upload",
+        name: file.name,
+        category: null,
+        geometryId: null,
+        params: null,
+        stats: {
+          triangles: tris.length,
+          volumeMm3: report?.stats.volumeMm3,
+          surfaceMm2: report?.stats.surfaceAreaMm2,
+          bboxMm: report ? {
+            x: report.stats.bbox.size[0],
+            y: report.stats.bbox.size[1],
+            z: report.stats.bbox.size[2],
+          } : undefined,
+        },
+        validation: report ? {
+          isManifold: report.stats.isManifold,
+          hasDegenerate: report.stats.boundaryEdges > 0,
+          issues: report.issues.map(i => i.title),
+        } : null,
+      })
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erro ao processar arquivo."
+      setErrorMsg(msg)
+      onSelected({ status: "empty", source: null, name: null })
+    } finally {
+      setParsing(false)
+    }
+  }, [onSelected])
+
+  const handleClick = () => inputRef.current?.click()
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    const file = e.dataTransfer.files?.[0]
+    if (file) handleFile(file)
+  }
+  const handleDragOver = (e: React.DragEvent) => e.preventDefault()
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-5">
+      {/* Drop zone */}
+      <div
+        onClick={handleClick}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        className={cn(
+          "rounded-2xl border-2 border-dashed p-10 text-center cursor-pointer transition-all",
+          fileName
+            ? "border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/8"
+            : "border-white/10 bg-white/3 hover:border-emerald-500/30 hover:bg-emerald-500/5"
+        )}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".stl,.obj,.ply"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) handleFile(file)
+          }}
+        />
+        {parsing ? (
+          <div className="flex flex-col items-center gap-3 text-gray-300">
+            <Loader2 className="w-10 h-10 animate-spin text-emerald-400" />
+            <div className="text-sm">Processando mesh…</div>
+          </div>
+        ) : fileName ? (
+          <div className="flex flex-col items-center gap-2">
+            <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+            <div className="text-sm font-medium text-white">{fileName}</div>
+            <div className="text-xs text-gray-500">{fileSizeKb} KB · clique para trocar</div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            <Upload className="w-10 h-10 text-gray-500" />
+            <div className="text-sm font-medium text-gray-200">Solte um arquivo STL, OBJ ou PLY aqui</div>
+            <div className="text-xs text-gray-500">ou clique para selecionar do disco</div>
+            <div className="text-[11px] text-gray-600 mt-2">
+              Aceita STL binário/ASCII · OBJ Wavefront · PLY ASCII · max ~50 MB
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Erro */}
+      {errorMsg && (
+        <div className="rounded-xl bg-rose-500/10 border border-rose-500/30 p-4 flex items-start gap-3">
+          <XCircle className="w-5 h-5 text-rose-400 mt-0.5 shrink-0" />
+          <div>
+            <div className="text-sm font-semibold text-rose-300">Não foi possível processar o arquivo</div>
+            <div className="text-xs text-rose-200/80 mt-0.5">{errorMsg}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Validação */}
+      {triangles && validation && (
+        <div className={cn(
+          "rounded-2xl border p-5",
+          validation.printable
+            ? "bg-emerald-500/[0.04] border-emerald-500/20"
+            : "bg-amber-500/[0.04] border-amber-500/30"
+        )}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              {validation.printable
+                ? <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                : <AlertTriangle className="w-5 h-5 text-amber-400" />}
+              <h3 className="text-sm font-semibold text-white">
+                {validation.printable ? "Mesh válido para bioimpressão" : "Mesh tem avisos"}
+              </h3>
+            </div>
+            <div className={cn(
+              "text-sm font-bold",
+              validation.qualityScore >= 90 ? "text-emerald-400" :
+              validation.qualityScore >= 70 ? "text-amber-400" : "text-rose-400"
+            )}>
+              {validation.qualityScore}/100
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <Stat label="Triângulos"  value={triangles.length.toLocaleString("pt-BR")} />
+            <Stat label="Volume"      value={formatVolume(validation.stats.volumeMm3)} />
+            <Stat label="Área"        value={formatArea(validation.stats.surfaceAreaMm2)} />
+            <Stat label="BBox (mm)"   value={`${validation.stats.bbox.size[0].toFixed(0)}×${validation.stats.bbox.size[1].toFixed(0)}×${validation.stats.bbox.size[2].toFixed(0)}`} mono />
+          </div>
+
+          {validation.issues.length > 0 && (
+            <div className="space-y-2 pt-3 border-t border-white/5">
+              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Avisos</div>
+              {validation.issues.slice(0, 4).map((issue, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs">
+                  <span className={cn(
+                    "w-1.5 h-1.5 rounded-full mt-1.5 shrink-0",
+                    issue.severity === "error"   ? "bg-rose-400" :
+                    issue.severity === "warning" ? "bg-amber-400" : "bg-blue-400"
+                  )} />
+                  <div className="flex-1">
+                    <span className="text-gray-200 font-medium">{issue.title}</span>
+                    <span className="text-gray-500"> — {issue.suggestion}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Skip de validação para meshes grandes */}
+      {triangles && !validation && (
+        <div className="rounded-xl bg-blue-500/10 border border-blue-500/30 p-4 flex items-start gap-3">
+          <Info className="w-5 h-5 text-blue-400 mt-0.5 shrink-0" />
+          <div className="text-xs text-blue-100/90">
+            Mesh muito grande ({triangles.length.toLocaleString("pt-BR")} triângulos) — validação topológica pulada
+            para preservar performance. Você pode prosseguir para a próxima etapa.
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PAINEL B — GERAR (5 categorias)
+// ═══════════════════════════════════════════════════════════════════════════
+function GeneratePanel({
+  onSelected,
+  currentGeometry,
+  currentParams,
+}: {
+  onSelected: ReturnType<typeof useBioprintProcess>["updateModel"]
+  currentGeometry: string | null
+  currentParams: Record<string, number | string | boolean> | null
+}) {
+  // Determinar categoria inicial baseada na seleção atual (se houver)
+  const initialCategory: ModelCategory = useMemo(() => {
+    if (currentGeometry) {
+      const cat = CATEGORY_DEFS.find(c => c.geometryIds.includes(currentGeometry))
+      if (cat) return cat.id
+    }
+    return "soft-tissue"
+  }, [currentGeometry])
+
+  const [category, setCategory] = useState<ModelCategory>(initialCategory)
+  const [selectedGeoId, setSelectedGeoId] = useState<string | null>(currentGeometry)
+  const [params, setParams] = useState<GeometryParams>(() => {
+    if (currentGeometry && currentParams) return currentParams as GeometryParams
+    const firstGeo = getGeometryById(CATEGORY_DEFS[0].geometryIds[0])
+    return firstGeo ? { ...firstGeo.defaultParams } : {}
+  })
+  const [generating, setGenerating] = useState(false)
+  const [generated, setGenerated] = useState(false)
+  const [triangleCount, setTriangleCount] = useState(0)
+  const [validation, setValidation] = useState<ValidationReport | null>(null)
+  const [cachedTris, setCachedTris] = useState<Triangle[]>([])
+
+  // R12.57 — Toggle experimental (padrão OFF). Persiste em localStorage.
+  // Quando OFF: só formas verificadas (BASIC_GEOMETRY_IDS) aparecem.
+  // Quando ON: todas as formas aparecem, com badge "🧪 experimental".
+  // Se a geometria atual já for experimental, força o toggle inicial para ON
+  // (senão o usuário abriria a etapa e não veria mais o que já tinha escolhido).
+  const [showExperimental, setShowExperimental] = useState<boolean>(() => {
+    if (currentGeometry && !isVerifiedGeometry(currentGeometry)) return true
+    if (typeof window !== "undefined") {
+      return window.localStorage.getItem("bia:showExperimentalGeometries") === "true"
+    }
+    return false
+  })
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("bia:showExperimentalGeometries", String(showExperimental))
+    }
+  }, [showExperimental])
+
+  const currentCategoryDef = CATEGORY_DEFS.find(c => c.id === category)!
+  const accent = ACCENT_CLASSES[currentCategoryDef.accent]
+
+  // R12.57 — Total (todas as formas cadastradas) vs. visíveis (após filtro).
+  const allCategoryGeometries = currentCategoryDef.geometryIds
+    .map(id => getGeometryById(id))
+    .filter((g): g is STLGeometry => g !== undefined)
+  const categoryGeometries = showExperimental
+    ? allCategoryGeometries
+    : allCategoryGeometries.filter(g => isVerifiedGeometry(g.id))
+  const hiddenCount = allCategoryGeometries.length - categoryGeometries.length
+
+  // Se a categoria selecionada não tem nenhuma geometria verificada e o
+  // toggle está OFF, migra automaticamente para a primeira categoria que
+  // tenha ao menos 1 forma verificada (evita "sem geometrias").
+  useEffect(() => {
+    if (showExperimental) return
+    if (categoryGeometries.length > 0) return
+    const fallback = CATEGORY_DEFS.find(c =>
+      c.geometryIds.some(id => isVerifiedGeometry(id))
+    )
+    if (fallback && fallback.id !== category) {
+      setCategory(fallback.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showExperimental, category])
+
+  const selectedGeo = selectedGeoId ? getGeometryById(selectedGeoId) : null
+
+  // Quando muda categoria, limpa seleção
+  const handleCategoryChange = (cat: ModelCategory) => {
+    setCategory(cat)
+    setSelectedGeoId(null)
+    setGenerated(false)
+    setTriangleCount(0)
+    setValidation(null)
+    setCachedTris([])
+  }
+
+  const handleSelectGeo = (geo: STLGeometry) => {
+    setSelectedGeoId(geo.id)
+    setParams({ ...geo.defaultParams })
+    setGenerated(false)
+    setTriangleCount(0)
+    setValidation(null)
+    setCachedTris([])
+  }
+
+  const handleParamChange = (key: string, val: number) => {
+    setParams(prev => ({ ...prev, [key]: val }))
+    setGenerated(false)
+    setValidation(null)
+  }
+
+  const handleGenerate = useCallback(() => {
+    if (!selectedGeo) return
+    setGenerating(true)
+    setTimeout(() => {
+      const tris = generateGeometry(selectedGeo.id, params)
+      setCachedTris(tris)
+      setTriangleCount(tris.length)
+      // Validar (skip se muito grande)
+      let report: ValidationReport | null = null
+      try {
+        report = tris.length > 200_000
+          ? null
+          : validateMesh(tris, { nozzleDiameterMm: 0.4, application: "bioprinting" })
+      } catch (e) {
+        console.error("[BIA] Validation error", e)
+      }
+      setValidation(report)
+      setGenerated(true)
+      setGenerating(false)
+
+      // R22: persiste a malha gerada no IndexedDB para a Mesa da Etapa 3 abrir já com ela
+      void (async () => {
+        try {
+          const { putMesh, newMeshId } = await import("@/lib/slicer/mesh-store")
+          const { trianglesToBinarySTL } = await import("@/lib/stl/generator")
+          await putMesh({ id: newMeshId("etapa1"), name: `${selectedGeo.id}.stl`, bytes: trianglesToBinarySTL(tris), format: "stl", createdAt: Date.now(), source: "etapa-1", meta: params as Record<string, number | string | boolean> })
+        } catch { /* IndexedDB indisponível */ }
+      })()
+
+      // Persiste no context
+      onSelected({
+        status: "ready",
+        source: "generated",
+        name: `${selectedGeo.label} (${selectedGeo.id})`,
+        category,
+        geometryId: selectedGeo.id,
+        params: params as Record<string, number | string | boolean>,
+        stats: {
+          triangles: tris.length,
+          volumeMm3: report?.stats.volumeMm3,
+          surfaceMm2: report?.stats.surfaceAreaMm2,
+          bboxMm: report ? {
+            x: report.stats.bbox.size[0],
+            y: report.stats.bbox.size[1],
+            z: report.stats.bbox.size[2],
+          } : undefined,
+        },
+        validation: report ? {
+          isManifold: report.stats.isManifold,
+          hasDegenerate: report.stats.boundaryEdges > 0,
+          issues: report.issues.map(i => i.title),
+        } : null,
+      })
+    }, 80)
+  }, [selectedGeo, params, category, onSelected])
+
+  const handleDownload = (kind: "stl-bin" | "stl-ascii" | "obj" | "ply") => {
+    if (!selectedGeo) return
+    const tris = cachedTris.length > 0 ? cachedTris : generateGeometry(selectedGeo.id, params)
+    const fname = `BIA_${selectedGeo.id}_${Date.now()}`
+    if (kind === "stl-bin")   downloadSTL(tris, `${fname}.stl`, true)
+    if (kind === "stl-ascii") downloadSTL(tris, `${fname}.stl`, false)
+    if (kind === "obj")       downloadOBJ(tris, `${fname}.obj`)
+    if (kind === "ply")       downloadPLY(tris, `${fname}.ply`)
+  }
+
+  const sizes = useMemo(() => estimateFileSize(cachedTris), [cachedTris])
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-5 max-w-6xl mx-auto">
+      {/* Sidebar de categorias */}
+      <aside className="space-y-2">
+        <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-semibold mb-2 px-1">
+          Categoria
+        </div>
+        {CATEGORY_DEFS.map(cat => {
+          const Ic = cat.icon
+          const isActive = cat.id === category
+          const a = ACCENT_CLASSES[cat.accent]
+          // R12.57 — mostra N/M quando o toggle experimental está OFF e há
+          // formas escondidas nesta categoria (ex: "5/17 verificadas").
+          const total = cat.geometryIds.length
+          const verified = cat.geometryIds.filter(isVerifiedGeometry).length
+          const showRatio = !showExperimental && verified < total
+          return (
+            <button
+              key={cat.id}
+              onClick={() => handleCategoryChange(cat.id)}
+              className={cn(
+                "w-full text-left rounded-xl border p-3 transition-all flex items-start gap-3",
+                isActive
+                  ? `${a.bg} ${a.border} ring-1 ${a.ring}`
+                  : "bg-white/3 border-white/8 hover:bg-white/5 hover:border-white/15"
+              )}
+            >
+              <Ic className={cn("w-5 h-5 mt-0.5 shrink-0", isActive ? a.text : "text-gray-500")} />
+              <div className="min-w-0 flex-1">
+                <div className={cn("text-sm font-semibold flex items-center gap-1.5", isActive ? a.text : "text-gray-200")}>
+                  <span>{cat.label}</span>
+                  {/*
+                    R12.62 — badge "🧪 Recomendado 1º" na categoria de testes
+                    de imprimibilidade. Card destacado do hub foi removido;
+                    agora essa é a única entrada visível, então precisa se
+                    destacar dentro do fluxo normal da Etapa 1.
+                  */}
+                  {cat.id === "printability-test" && (
+                    <span className="text-[8.5px] px-1.5 py-0.5 rounded-full bg-amber-500/25 border border-amber-400/50 text-amber-100 font-bold uppercase tracking-wider whitespace-nowrap">
+                      🧪 Recomendado 1º
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11px] text-gray-500 mt-0.5 leading-snug">
+                  {cat.description}
+                </div>
+                <div className="text-[10px] text-gray-600 mt-1">
+                  {showRatio
+                    ? `${verified}/${total} verificada${total === 1 ? "" : "s"}`
+                    : `${total} geometria${total === 1 ? "" : "s"}`}
+                </div>
+              </div>
+            </button>
+          )
+        })}
+
+        {/* R12.57 — Toggle "mostrar experimentais" */}
+        <div className="mt-3 rounded-xl border border-white/8 bg-white/[0.02] p-3">
+          <label className="flex items-start gap-2.5 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={showExperimental}
+              onChange={(e) => setShowExperimental(e.target.checked)}
+              className="mt-0.5 w-4 h-4 shrink-0 rounded border-white/20 bg-white/5 text-amber-500 focus:ring-1 focus:ring-amber-500/40 focus:ring-offset-0 cursor-pointer"
+            />
+            <div className="min-w-0 flex-1">
+              <div className="text-[11px] font-semibold text-gray-200 group-hover:text-white transition-colors flex items-center gap-1">
+                <span>🧪</span>
+                <span>Mostrar experimentais</span>
+              </div>
+              <div className="text-[10px] text-gray-500 mt-0.5 leading-snug">
+                {showExperimental
+                  ? "Geometrias anatômicas complexas e TPMS visíveis — podem falhar ou levar mais tempo."
+                  : "Só formas verificadas. Ative para ver anatômicas (coração, fêmur…) e TPMS."}
+              </div>
+            </div>
+          </label>
+        </div>
+
+        {/* R12.43 — Aviso de página dedicada para testes de imprimibilidade */}
+        {category === "printability-test" && (
+          <Link
+            href="/dashboard/bioprint/printability"
+            className="block mt-2 rounded-xl border border-amber-500/40 bg-amber-500/[0.08] hover:bg-amber-500/[0.12] p-3 transition-colors group"
+          >
+            <div className="flex items-center gap-2 text-xs font-semibold text-amber-200">
+              <Sparkles className="w-4 h-4" />
+              Página dedicada disponivel
+            </div>
+            <div className="text-[11px] text-amber-100/80 mt-1 leading-snug">
+              Para testar a biotinta sem passar pelo fluxo das 5 etapas, use a
+              pre-etapa standalone /printability — STL + G-code + protocolo de
+              analise em uma so pagina.
+            </div>
+            <div className="text-[10px] text-amber-300/80 mt-1.5 flex items-center gap-1 group-hover:gap-2 transition-all">
+              Abrir testes de imprimibilidade <ArrowRight className="w-3 h-3" />
+            </div>
+          </Link>
+        )}
+
+        {/* Estratégia avançada — dual-porosity (consolidada nesta página, categoria organoid-vascular) */}
+        {category === "organoid-vascular" && (
+          <div className="block mt-2 rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-cyan-300">
+              <Activity className="w-4 h-4" />
+              Dual-porosity (avançado)
+            </div>
+            <div className="text-[11px] text-cyan-100/70 mt-1 leading-snug">
+              Estratégia de vascularização com poros macro+micro para organoides perfundíveis.
+              Disponível nas geometrias <strong>Vascular Tree</strong> e <strong>Organoid Cluster</strong> abaixo.
+            </div>
+          </div>
+        )}
+      </aside>
+
+      {/* Main area: lista de geometrias + config + preview */}
+      <div className="space-y-4">
+        {/* Lista de geometrias da categoria */}
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-semibold mb-2 px-1 flex items-center gap-1.5 flex-wrap">
+            <span>{currentCategoryDef.label}</span>
+            <span className="text-gray-700">·</span>
+            <span>{categoryGeometries.length} disponíve{categoryGeometries.length === 1 ? "l" : "is"}</span>
+            {hiddenCount > 0 && (
+              <>
+                <span className="text-gray-700">·</span>
+                <button
+                  type="button"
+                  onClick={() => setShowExperimental(true)}
+                  className="text-amber-400/80 hover:text-amber-300 normal-case tracking-normal underline decoration-dotted underline-offset-2"
+                  title="Ativar toggle experimental para revelar essas formas"
+                >
+                  🧪 {hiddenCount} experimental{hiddenCount === 1 ? "" : "is"} oculta{hiddenCount === 1 ? "" : "s"}
+                </button>
+              </>
+            )}
+          </div>
+          {categoryGeometries.length === 0 ? (
+            <div className="rounded-xl border border-white/8 bg-white/[0.02] p-6 text-center text-xs text-gray-400">
+              Nenhuma geometria verificada nesta categoria.
+              {hiddenCount > 0 && (
+                <>
+                  <br />
+                  <button
+                    type="button"
+                    onClick={() => setShowExperimental(true)}
+                    className="mt-2 inline-flex items-center gap-1 text-amber-300 hover:text-amber-200 underline decoration-dotted underline-offset-2"
+                  >
+                    🧪 Ativar experimentais para ver {hiddenCount} forma{hiddenCount === 1 ? "" : "s"}
+                  </button>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+              {categoryGeometries.map(geo => {
+                const isExperimental = !isVerifiedGeometry(geo.id)
+                return (
+                  <button
+                    key={geo.id}
+                    onClick={() => handleSelectGeo(geo)}
+                    className={cn(
+                      "rounded-xl border p-3 text-left transition-all relative",
+                      selectedGeoId === geo.id
+                        ? `${accent.bg} ${accent.border} ring-1 ${accent.ring}`
+                        : "bg-white/3 border-white/8 hover:border-white/20 hover:bg-white/5"
+                    )}
+                  >
+                    {isExperimental && (
+                      <span
+                        className="absolute top-1.5 right-1.5 text-[8px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                        title="Geometria experimental — pode falhar ou levar mais tempo"
+                      >
+                        🧪 exp
+                      </span>
+                    )}
+                    <div className="text-2xl mb-1.5">{geo.icon}</div>
+                    <div className={cn(
+                      "text-xs font-semibold leading-tight",
+                      selectedGeoId === geo.id ? accent.text : "text-gray-200"
+                    )}>
+                      {geo.label}
+                    </div>
+                    <div className="text-[10px] text-gray-500 mt-1 leading-tight line-clamp-2">
+                      {geo.tissue}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Configuração + gerar */}
+        {selectedGeo && (
+          <div className="rounded-2xl border border-white/8 bg-white/3 p-5">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="text-3xl">{selectedGeo.icon}</div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold text-white">{selectedGeo.label}</h3>
+                <p className="text-xs text-gray-400 mt-0.5">{selectedGeo.description}</p>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  <span className={cn("text-[10px] px-2 py-0.5 rounded-full border", accent.border, accent.bg, accent.text)}>
+                    {selectedGeo.tissue}
+                  </span>
+                  <span className="text-[10px] bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2 py-0.5 rounded-full">
+                    {selectedGeo.application}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* R21: versão anatômica REAL (malha curva) disponível na Mesa da Etapa 3 */}
+            {ANATOMICAL_FOR_GEOMETRY[selectedGeo.id] && (
+              <Link href={`/dashboard/bioprint/slice?anat=${ANATOMICAL_FOR_GEOMETRY[selectedGeo.id]}`}
+                className="mb-4 flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/[0.06] px-3 py-2.5 text-[12px] text-emerald-100 hover:bg-emerald-500/10 transition">
+                <span className="text-base leading-none">🧬</span>
+                <span>
+                  <b>Modelo anatômico real disponível</b> — malha curva (não facetada), você escolhe só a dimensão, vê na mesa e gira a peça antes de fatiar.
+                  <span className="block text-emerald-300/80 mt-0.5">Abrir na Mesa da Etapa 3 →</span>
+                </span>
+              </Link>
+            )}
+
+            {/* Parâmetros */}
+            <div className="mb-4">
+              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Parâmetros</div>
+              {Object.keys(selectedGeo.paramLabels).length === 0 ? (
+                /* R12.35: geometrias com paramLabels vazio têm dimensões TRAVADAS (STL exato) */
+                <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2.5 text-[12px] text-amber-200/90 flex items-start gap-2">
+                  <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-400/80" />
+                  <div>
+                    <span className="font-semibold text-amber-200">Dimensões fixas — STL exato.</span>
+                    {selectedGeo.id === "test_fidelity_biotinta" ? (
+                      <> Geometria fornecida em mesh real (15,4 × 15,4 × 0,8 mm, 67.220 triângulos). Sem ajustes possíveis: preservação 1:1 garantida para validação de fidelidade.</>
+                    ) : (
+                      <> Este modelo usa coordenadas nativas pré-definidas — não há parâmetros editáveis.</>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {Object.entries(selectedGeo.paramLabels).map(([key, label]) => (
+                    <div key={key}>
+                      <label className="text-[11px] text-gray-400 block mb-1">{label}</label>
+                      <input
+                        type="number"
+                        value={(params as Record<string, number>)[key] ?? selectedGeo.defaultParams[key as keyof GeometryParams] ?? 0}
+                        onChange={e => handleParamChange(key, parseFloat(e.target.value) || 0)}
+                        step={key.includes("Percent") || key.includes("infill") ? 5 : 0.5}
+                        min={key.includes("Percent") ? 10 : 0.1}
+                        max={key.includes("Percent") ? 100 : key.includes("segments") ? 128 : 500}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white
+                          focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Botão gerar */}
+            <button
+              onClick={handleGenerate}
+              disabled={generating}
+              className={cn(
+                "w-full py-3 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2",
+                "bg-emerald-500 hover:bg-emerald-400 text-emerald-950",
+                "disabled:opacity-60 disabled:cursor-not-allowed"
+              )}
+            >
+              {generating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Gerando geometria…
+                </>
+              ) : generated ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  Regenerar
+                </>
+              ) : (
+                <>
+                  <FlaskConical className="w-4 h-4" />
+                  Gerar geometria
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Resultado / validação / download */}
+        {generated && (
+          <div className={cn(
+            "rounded-2xl border p-5",
+            validation?.printable !== false
+              ? "bg-emerald-500/[0.04] border-emerald-500/20"
+              : "bg-amber-500/[0.04] border-amber-500/30"
+          )}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span className="text-sm font-semibold text-emerald-300">Geometria gerada</span>
+              </div>
+              {validation && (
+                <div className={cn(
+                  "text-sm font-bold",
+                  validation.qualityScore >= 90 ? "text-emerald-400" :
+                  validation.qualityScore >= 70 ? "text-amber-400" : "text-rose-400"
+                )}>
+                  {validation.qualityScore}/100
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              <Stat label="Triângulos" value={triangleCount.toLocaleString("pt-BR")} />
+              <Stat label="STL binário" value={`${sizes.stlBinary} KB`} />
+              <Stat label="OBJ"        value={`${sizes.obj} KB`} />
+              <Stat label="PLY"        value={`${sizes.ply} KB`} />
+            </div>
+
+            {validation && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4 pt-3 border-t border-white/5">
+                <Stat label="Volume" value={formatVolume(validation.stats.volumeMm3)} />
+                <Stat label="Área"   value={formatArea(validation.stats.surfaceAreaMm2)} />
+                <Stat label="BBox"   value={`${validation.stats.bbox.size[0].toFixed(0)}×${validation.stats.bbox.size[1].toFixed(0)}×${validation.stats.bbox.size[2].toFixed(0)} mm`} mono />
+              </div>
+            )}
+
+            {/* Downloads */}
+            <div className="flex flex-wrap gap-2 pt-3 border-t border-white/5">
+              <DownloadBtn label="STL Bin"   onClick={() => handleDownload("stl-bin")} />
+              <DownloadBtn label="STL ASCII" onClick={() => handleDownload("stl-ascii")} />
+              <DownloadBtn label="OBJ"       onClick={() => handleDownload("obj")} />
+              <DownloadBtn label="PLY"       onClick={() => handleDownload("ply")} />
+            </div>
+
+            {validation && validation.issues.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-white/5 space-y-1.5">
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Avisos</div>
+                {validation.issues.slice(0, 3).map((issue, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs">
+                    <span className={cn(
+                      "w-1.5 h-1.5 rounded-full mt-1.5 shrink-0",
+                      issue.severity === "error" ? "bg-rose-400" :
+                      issue.severity === "warning" ? "bg-amber-400" : "bg-blue-400"
+                    )} />
+                    <div className="flex-1">
+                      <span className="text-gray-200 font-medium">{issue.title}</span>
+                      <span className="text-gray-500"> — {issue.suggestion}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PAINEL C — IA (R12.56 · Sprint A · Claude Sonnet 4.5)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Resposta enviada pelo endpoint /api/bioprint/model/ai-generate */
+interface AiGenerateApiResult {
+  geometryId: "cube_tissue" | "skin_cylinder" | "disk" | "membrane" | "vessel"
+  geometryLabel: string
+  dims: { x: number; y: number; z: number }
+  bioinkSuggestion: {
+    material: string
+    concentration_pct: number
+    crosslinker: string | null
+    crosslinkerConc: string | null
+    rationale: string
+  }
+  processParams: {
+    printSpeed_mms: number
+    layerHeight_mm: number
+    infillPercent: number
+    needleDiameter_um: number
+  }
+  rationale: string
+  dois: string[]
+  warnings: string[]
+  originalPrompt: string
+}
+
+interface AiGenerateApiMeta {
+  latencyMs: number
+  model: string
+  inputTokens: number
+  outputTokens: number
+  stopReason: string | null
+}
+
+const PROMPT_EXAMPLES = [
+  "Scaffold poroso para regeneração óssea cortical de 20×15×10 mm, com canais para vascularização",
+  "Córnea artificial 11 mm de diâmetro, 0.8 mm de espessura, com viabilidade celular alta",
+  "Vaso sanguíneo tubular 6 mm de diâmetro interno e 20 mm de altura",
+  "Patch de miocárdio 25×15×2 mm para regeneração pós-infarto com hidrogel biomimético",
+] as const
+
+/** Mapeia geometryId da IA (5 formas do Modo Básico) → params default do generator. */
+function buildParamsFromAi(result: AiGenerateApiResult): Record<string, number | string | boolean> {
+  const { geometryId, dims, processParams } = result
+  const common = {
+    width_mm: dims.x,
+    depth_mm: dims.y,
+    height_mm: dims.z,
+    infill_percent: processParams.infillPercent,
+    layer_height_mm: processParams.layerHeight_mm,
+  }
+  if (geometryId === "disk" || geometryId === "skin_cylinder") {
+    return { ...common, diameter_mm: dims.x, thickness_mm: dims.z }
+  }
+  if (geometryId === "vessel") {
+    return {
+      ...common,
+      outer_diameter_mm: dims.x,
+      inner_diameter_mm: Math.max(dims.x - 2, 3),
+      length_mm: dims.z,
+    }
+  }
+  if (geometryId === "membrane") {
+    return { ...common, thickness_mm: Math.min(dims.z, 3) }
+  }
+  return common
+}
+
+function AIPanel({
+  onSelected,
+}: {
+  onSelected: ReturnType<typeof useBioprintProcess>["updateModel"]
+}) {
+  const [prompt, setPrompt] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<AiGenerateApiResult | null>(null)
+  const [meta, setMeta] = useState<AiGenerateApiMeta | null>(null)
+  const [applied, setApplied] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    return () => abortRef.current?.abort()
+  }, [])
+
+  const handleGenerate = async () => {
+    const trimmed = prompt.trim()
+    if (trimmed.length < 5) {
+      setError("Descreva o tecido em pelo menos 5 caracteres.")
+      return
+    }
+    setLoading(true)
+    setError(null)
+    setResult(null)
+    setMeta(null)
+    setApplied(false)
+
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    try {
+      const res = await fetch("/api/bioprint/model/ai-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: trimmed }),
+        signal: controller.signal,
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(
+          data?.message
+            ?? (data?.error === "api_key_missing"
+              ? "Chave da IA não configurada no servidor. Defina ANTHROPIC_API_KEY em .env.local"
+              : data?.error === "resposta_invalida"
+                ? `Resposta inválida do modelo: ${data.details ?? "desconhecida"}`
+                : `Erro ${res.status}`),
+        )
+        return
+      }
+      setResult(data.result)
+      setMeta(data.meta)
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return
+      setError(`Falha na chamada: ${(err as Error).message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleApply = () => {
+    if (!result) return
+    onSelected({
+      status: "ready",
+      source: "ai-prompt",
+      name: `IA: ${result.geometryLabel} · ${result.bioinkSuggestion.material} ${result.bioinkSuggestion.concentration_pct}%`,
+      category: null,
+      geometryId: result.geometryId,
+      params: buildParamsFromAi(result),
+      stats: {
+        bboxMm: { x: result.dims.x, y: result.dims.y, z: result.dims.z },
+      },
+      validation: null,
+    })
+    setApplied(true)
+  }
+
+  const handleUseExample = (ex: string) => {
+    setPrompt(ex)
+    setError(null)
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-4">
+      {/* Painel principal — input */}
+      <div className="rounded-2xl bg-gradient-to-br from-violet-500/8 to-fuchsia-500/8 border border-violet-500/20 p-6">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-violet-500/15 border border-violet-500/30 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-violet-300" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-base font-bold text-white">Geração por IA</h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Descreva o tecido alvo em linguagem natural — a BIA vai propor a geometria, parâmetros e racional científico.
+            </p>
+          </div>
+          <span className="text-[10px] font-semibold bg-violet-500/20 text-violet-200 px-2 py-1 rounded-full border border-violet-500/30">
+            BETA · Claude Sonnet 4.5
+          </span>
+        </div>
+
+        <textarea
+          value={prompt}
+          onChange={(e) => { setPrompt(e.target.value); setError(null) }}
+          disabled={loading}
+          placeholder="Ex: Quero um scaffold poroso para regeneração óssea cortical de 20×15×10 mm, porosidade ≥70%, com canais para vascularização passiva…"
+          className="w-full h-32 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-gray-200
+            placeholder:text-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/40
+            disabled:opacity-50 disabled:cursor-not-allowed"
+          maxLength={2000}
+        />
+
+        <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
+          <div className="text-[11px] text-gray-500">
+            {prompt.length}/2000 caracteres · Modo Básico (5 geometrias verificadas)
+          </div>
+          <button
+            onClick={handleGenerate}
+            disabled={loading || prompt.trim().length < 5}
+            className="px-4 py-2 bg-violet-500/40 hover:bg-violet-500/60 border border-violet-400/40
+              text-white text-sm rounded-lg font-medium disabled:opacity-40 disabled:cursor-not-allowed
+              transition-colors flex items-center gap-2"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Gerando…
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                Gerar com IA
+              </>
+            )}
+          </button>
+        </div>
+
+        {!result && !loading && (
+          <div className="mt-4 pt-4 border-t border-white/5">
+            <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">
+              Exemplos rápidos
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {PROMPT_EXAMPLES.map((ex, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleUseExample(ex)}
+                  className="text-[11px] px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10
+                    text-gray-300 rounded-full transition-colors"
+                >
+                  {ex.slice(0, 60)}{ex.length > 60 ? "…" : ""}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-3 rounded-lg bg-rose-500/10 border border-rose-500/30 p-3 flex items-start gap-2">
+            <XCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+            <div className="text-xs text-rose-200">{error}</div>
+          </div>
+        )}
+      </div>
+
+      {/* Card de resultado */}
+      {result && (
+        <div className="rounded-2xl bg-gradient-to-br from-emerald-500/8 to-cyan-500/8 border border-emerald-500/25 p-6">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.2em] text-emerald-300/80 font-semibold mb-1">
+                Proposta da IA
+              </div>
+              <h3 className="text-base font-bold text-white">{result.geometryLabel}</h3>
+              <div className="text-xs text-gray-400 mt-0.5">
+                {result.dims.x} × {result.dims.y} × {result.dims.z} mm
+              </div>
+            </div>
+            {meta && (
+              <div className="text-right text-[10px] text-gray-500">
+                <div>{meta.latencyMs}ms · {meta.outputTokens} tokens</div>
+                <div className="opacity-60">{meta.model}</div>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 pb-4 border-b border-white/5">
+            <Stat label="Biotinta" value={`${result.bioinkSuggestion.material} ${result.bioinkSuggestion.concentration_pct}%`} />
+            <Stat label="Crosslinker" value={result.bioinkSuggestion.crosslinker ?? "—"} />
+            <Stat label="Velocidade" value={`${result.processParams.printSpeed_mms} mm/s`} />
+            <Stat label="Layer" value={`${result.processParams.layerHeight_mm} mm`} />
+            <Stat label="Infill" value={`${result.processParams.infillPercent}%`} />
+            <Stat label="Agulha" value={`${result.processParams.needleDiameter_um} µm`} />
+          </div>
+
+          <div className="mb-4">
+            <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">
+              Racional da biotinta
+            </div>
+            <p className="text-xs text-gray-300 leading-relaxed">
+              {result.bioinkSuggestion.rationale}
+            </p>
+          </div>
+
+          <div className="mb-4">
+            <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">
+              Racional científico
+            </div>
+            <p className="text-xs text-gray-300 leading-relaxed whitespace-pre-line">
+              {result.rationale}
+            </p>
+          </div>
+
+          {result.dois.length > 0 && (
+            <div className="mb-4">
+              <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">
+                Referências ({result.dois.length})
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {result.dois.map((doi, i) => (
+                  <a
+                    key={i}
+                    href={`https://doi.org/${doi.replace(/^doi:/i, "").replace(/^https?:\/\/(dx\.)?doi\.org\//i, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-mono px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10
+                      text-cyan-300 rounded-md transition-colors"
+                  >
+                    {doi}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {result.warnings.length > 0 && (
+            <div className="mb-4 rounded-lg bg-amber-500/10 border border-amber-500/25 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-amber-400 font-semibold mb-1.5 flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Ajustes automáticos ({result.warnings.length})
+              </div>
+              <ul className="text-[11px] text-amber-200/90 space-y-0.5">
+                {result.warnings.map((w, i) => (
+                  <li key={i}>• {w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-4 border-t border-white/5 gap-3">
+            <div className="text-[11px] text-gray-500">
+              A sugestão será registrada em <code className="font-mono text-emerald-300">state.model</code> com fonte <code className="font-mono text-emerald-300">ai-prompt</code>.
+            </div>
+            {applied ? (
+              <div className="flex items-center gap-2 text-sm text-emerald-300 font-medium">
+                <CheckCircle2 className="w-4 h-4" />
+                Aplicado
+              </div>
+            ) : (
+              <button
+                onClick={handleApply}
+                className="px-4 py-2 bg-emerald-500/25 hover:bg-emerald-500/40 border border-emerald-500/40
+                  text-emerald-100 text-sm rounded-lg font-medium transition-colors flex items-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Aplicar sugestão
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-xl bg-white/3 border border-white/8 p-4">
+        <div className="text-xs font-semibold text-gray-300 mb-2 flex items-center gap-2">
+          <Info className="w-4 h-4 text-blue-400" />
+          Como funciona (R12.56 · Sprint A)
+        </div>
+        <p className="text-xs text-gray-400 leading-relaxed">
+          A IA escolhe entre 5 geometrias verificadas (<strong className="text-emerald-300">cubo, cilindro, disco, membrana, tubo</strong>) e 10 materiais
+          canônicos do banco BIA. Toda saída passa por validação server-side (whitelist + clamp de dimensões).
+          Prompts em português ou inglês. O rationale sempre em pt-BR.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPERS DE UI
+// ═══════════════════════════════════════════════════════════════════════════
+function Stat({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div>
+      <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">{label}</div>
+      <div className={cn("text-sm font-semibold text-white", mono && "font-mono text-xs")}>{value}</div>
+    </div>
+  )
+}
+
+function DownloadBtn({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20
+        text-xs font-medium text-gray-200 rounded-lg transition-all flex items-center gap-1.5"
+    >
+      <Download className="w-3 h-3" />
+      {label}
+    </button>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PARSERS DE UPLOAD (STL / OBJ / PLY)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function parseUploadedMesh(buffer: ArrayBuffer, ext: string): Triangle[] {
+  if (ext === "stl") return parseSTL(buffer)
+  if (ext === "obj") return parseOBJ(new TextDecoder().decode(buffer))
+  if (ext === "ply") return parsePLY(new TextDecoder().decode(buffer))
+  return []
+}
+
+/** STL parser — detecta automaticamente binário vs ASCII */
+function parseSTL(buffer: ArrayBuffer): Triangle[] {
+  // STL binário: header 80 bytes + uint32 count + 50 bytes/triangle
+  // Heurística: se size == 84 + count*50 → binário; caso contrário tenta ASCII
+  if (buffer.byteLength > 84) {
+    const view = new DataView(buffer)
+    const count = view.getUint32(80, true)
+    const expected = 84 + count * 50
+    if (count > 0 && expected === buffer.byteLength) {
+      return parseSTLBinary(buffer, count)
+    }
+  }
+  // ASCII fallback
+  try {
+    return parseSTLAscii(new TextDecoder().decode(buffer))
+  } catch {
+    return []
+  }
+}
+
+function parseSTLBinary(buffer: ArrayBuffer, count: number): Triangle[] {
+  const view = new DataView(buffer)
+  const tris: Triangle[] = []
+  let offset = 84
+  for (let i = 0; i < count; i++) {
+    const nx = view.getFloat32(offset, true); offset += 4
+    const ny = view.getFloat32(offset, true); offset += 4
+    const nz = view.getFloat32(offset, true); offset += 4
+    const v1x = view.getFloat32(offset, true); offset += 4
+    const v1y = view.getFloat32(offset, true); offset += 4
+    const v1z = view.getFloat32(offset, true); offset += 4
+    const v2x = view.getFloat32(offset, true); offset += 4
+    const v2y = view.getFloat32(offset, true); offset += 4
+    const v2z = view.getFloat32(offset, true); offset += 4
+    const v3x = view.getFloat32(offset, true); offset += 4
+    const v3y = view.getFloat32(offset, true); offset += 4
+    const v3z = view.getFloat32(offset, true); offset += 4
+    offset += 2 // attribute byte count
+    tris.push({
+      normal: [nx, ny, nz],
+      v1: [v1x, v1y, v1z],
+      v2: [v2x, v2y, v2z],
+      v3: [v3x, v3y, v3z],
+    })
+  }
+  return tris
+}
+
+function parseSTLAscii(text: string): Triangle[] {
+  const tris: Triangle[] = []
+  const lines = text.split(/\r?\n/)
+  let i = 0
+  while (i < lines.length) {
+    const line = lines[i].trim()
+    if (line.startsWith("facet normal")) {
+      const nParts = line.split(/\s+/)
+      const nx = parseFloat(nParts[2]) || 0
+      const ny = parseFloat(nParts[3]) || 0
+      const nz = parseFloat(nParts[4]) || 0
+      // expect: outer loop, vertex×3, endloop, endfacet
+      const verts: number[][] = []
+      for (let k = 0; k < 5; k++) {
+        i++
+        const l = lines[i]?.trim() ?? ""
+        if (l.startsWith("vertex")) {
+          const vParts = l.split(/\s+/)
+          verts.push([
+            parseFloat(vParts[1]) || 0,
+            parseFloat(vParts[2]) || 0,
+            parseFloat(vParts[3]) || 0,
+          ])
+        }
+        if (verts.length === 3) break
+      }
+      if (verts.length === 3) {
+        tris.push({
+          normal: [nx, ny, nz],
+          v1: verts[0] as [number, number, number],
+          v2: verts[1] as [number, number, number],
+          v3: verts[2] as [number, number, number],
+        })
+      }
+    }
+    i++
+  }
+  return tris
+}
+
+/** OBJ parser (apenas vertices+faces — ignora texturas/normais) */
+function parseOBJ(text: string): Triangle[] {
+  const vertices: [number, number, number][] = []
+  const tris: Triangle[] = []
+  const lines = text.split(/\r?\n/)
+  for (const line of lines) {
+    const t = line.trim()
+    if (t.startsWith("v ")) {
+      const p = t.split(/\s+/)
+      vertices.push([parseFloat(p[1]) || 0, parseFloat(p[2]) || 0, parseFloat(p[3]) || 0])
+    } else if (t.startsWith("f ")) {
+      const p = t.split(/\s+/).slice(1)
+      // Triangulação em fan a partir do primeiro vértice
+      const idxs = p.map(s => parseInt(s.split("/")[0], 10) - 1) // OBJ é 1-based
+      for (let k = 1; k < idxs.length - 1; k++) {
+        const a = vertices[idxs[0]]
+        const b = vertices[idxs[k]]
+        const c = vertices[idxs[k + 1]]
+        if (a && b && c) {
+          tris.push({ normal: computeNormal(a, b, c), v1: a, v2: b, v3: c })
+        }
+      }
+    }
+  }
+  return tris
+}
+
+/** PLY parser ASCII (apenas vertices+face com vertex_indices) */
+function parsePLY(text: string): Triangle[] {
+  const lines = text.split(/\r?\n/)
+  let vertexCount = 0
+  let faceCount = 0
+  let headerEnd = 0
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i].trim()
+    if (l.startsWith("element vertex")) vertexCount = parseInt(l.split(/\s+/)[2], 10) || 0
+    if (l.startsWith("element face"))   faceCount   = parseInt(l.split(/\s+/)[2], 10) || 0
+    if (l === "end_header") { headerEnd = i + 1; break }
+  }
+  const vertices: [number, number, number][] = []
+  for (let i = 0; i < vertexCount; i++) {
+    const p = (lines[headerEnd + i] ?? "").trim().split(/\s+/)
+    vertices.push([parseFloat(p[0]) || 0, parseFloat(p[1]) || 0, parseFloat(p[2]) || 0])
+  }
+  const tris: Triangle[] = []
+  for (let i = 0; i < faceCount; i++) {
+    const p = (lines[headerEnd + vertexCount + i] ?? "").trim().split(/\s+/)
+    const n = parseInt(p[0], 10) || 0
+    if (n < 3) continue
+    const idxs = p.slice(1, 1 + n).map(s => parseInt(s, 10))
+    // Triangulação em fan
+    for (let k = 1; k < idxs.length - 1; k++) {
+      const a = vertices[idxs[0]]
+      const b = vertices[idxs[k]]
+      const c = vertices[idxs[k + 1]]
+      if (a && b && c) {
+        tris.push({ normal: computeNormal(a, b, c), v1: a, v2: b, v3: c })
+      }
+    }
+  }
+  return tris
+}
+
+function computeNormal(
+  a: [number, number, number],
+  b: [number, number, number],
+  c: [number, number, number]
+): [number, number, number] {
+  const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2]
+  const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2]
+  const nx = uy * vz - uz * vy
+  const ny = uz * vx - ux * vz
+  const nz = ux * vy - uy * vx
+  const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1
+  return [nx / len, ny / len, nz / len]
+}
+
+// Nota: modelCategoryLabel é importado direto de @/lib/bioprint/process-context
+// (não pode ser re-exportado daqui — Next.js só aceita default/metadata em pages)

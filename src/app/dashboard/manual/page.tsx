@@ -98,7 +98,7 @@ const CHAPTERS: Chapter[] = [
   },
   {
     id: "bioprint-model",
-    title: "Bioimpressão — Etapa 1: Modelo 3D",
+    title: "Bioimpressão — Fase 1: Modelo de tecido (sem STL)",
     subtitle: "Modelo paramétrico, upload STL ou biblioteca anatômica",
     icon: Box,
     color: "from-blue-500 to-purple-600",
@@ -107,7 +107,7 @@ const CHAPTERS: Chapter[] = [
   },
   {
     id: "bioprint-bioink",
-    title: "Bioimpressão — Etapa 2: Biotinta",
+    title: "Bioimpressão — Fase 2: Biotinta",
     subtitle: "807 biomateriais, reologia em tempo real, células e score",
     icon: FlaskConical,
     color: "from-emerald-500 to-teal-600",
@@ -116,7 +116,7 @@ const CHAPTERS: Chapter[] = [
   },
   {
     id: "bioprint-slice",
-    title: "Bioimpressão — Etapa 3: Fatiamento (G-code)",
+    title: "Bioimpressão — Fase 3: Fatiamento (único lugar de STL → G-code)",
     subtitle: "11 algoritmos, parâmetros-chave e modo Apenas Contorno",
     icon: Layers,
     color: "from-amber-500 to-orange-600",
@@ -125,7 +125,7 @@ const CHAPTERS: Chapter[] = [
   },
   {
     id: "bioprint-execute",
-    title: "Bioimpressão — Etapa 4: Executar",
+    title: "Bioimpressão — Fase 4: Bioimpressão (Host) · Fase 5: Análise · Fase 6: Maturação",
     subtitle: "USB, joystick, extrusão, Speed/Flow, pausa, retomada (R12.40)",
     icon: PlayCircle,
     color: "from-rose-500 to-red-600",
@@ -824,8 +824,8 @@ function ChapterSTLGenerator() {
           fêmur, nariz, menisco, córnea, esfera, orelha, coração, rim, fígado, mão. <strong className="text-white">Saída em STL
           binário/ASCII e OBJ Wavefront</strong>, unidades em mm.
         </p>
-        <Link href="/dashboard/bioprint/model" className="inline-flex items-center gap-1.5 mt-4 px-3 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-400 text-white text-xs font-semibold">
-          <Rocket className="w-3.5 h-3.5" /> Abrir Bioimpressão · Etapa 1 (Modelo 3D)
+        <Link href="/dashboard/bioprint/slice" className="inline-flex items-center gap-1.5 mt-4 px-3 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-400 text-white text-xs font-semibold">
+          <Rocket className="w-3.5 h-3.5" /> Abrir Bioimpressão · Fase 3 (Fatiamento — modelos 3D)
         </Link>
       </div>
 
@@ -1544,8 +1544,8 @@ function ChapterPrintAnalysis() {
       <div className="rounded-xl bg-gradient-to-br from-amber-500/10 to-rose-500/10 border border-amber-500/20 p-4 mt-6">
         <p className="text-xs text-gray-300 leading-relaxed">
           🔗 <strong className="text-amber-300">Próximo passo:</strong> abrir o {" "}
-          <Link href="/dashboard/bioprint/model" className="text-amber-200 hover:underline font-semibold">Bioimpressão · Etapa 1 (Modelo 3D)</Link> {" "}
-          e baixar os testes de printabilidade na seção "Testes Printabilidade" (badge amarelo). Imprima primeiro,
+          <Link href="/dashboard/bioprint/slice" className="text-amber-200 hover:underline font-semibold">Bioimpressão · Fase 3 (Fatiamento)</Link> {" "}
+          e escolher o modelo de teste de fidelidade (ou a grade de imprimibilidade). Imprima primeiro,
           fotografe, analise no ImageJ seguindo este protocolo. Anote tudo no {" "}
           <Link href="/dashboard/notebook" className="text-amber-200 hover:underline font-semibold">Notebook</Link>.
         </p>

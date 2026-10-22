@@ -603,17 +603,23 @@ describe("R14.3 · K) Arquivos de UI/API presentes", () => {
     expect(src).toContain("stl_upload")
   })
 
-  it("DashboardSidebar inclui BIA Studio no grupo 'project'", () => {
+  // R24 · racional de 6 fases: geometria 3D vive SÓ na Fase 3 (BioSlicer).
+  // O Studio saiu do sidebar e /dashboard/studio redireciona para a Fase 3.
+  it("R24: DashboardSidebar NÃO promove mais o BIA Studio (um só lugar de STL)", () => {
     const src = read("src/components/layout/DashboardSidebar.tsx")
-    expect(src).toContain("/dashboard/studio")
-    expect(src).toContain("BIA Studio")
-    expect(src).toContain("Sparkles")
+    expect(src).not.toContain("/dashboard/studio")
+    expect(src).toContain("/dashboard/bioprint/slice")
   })
 
-  it("QuickActions tem 'studio-scaffold' no catálogo", () => {
+  it("R24: /dashboard/studio redireciona para a Fase 3 · Fatiamento", () => {
+    const src = read("src/app/dashboard/studio/page.tsx")
+    expect(src).toContain('redirect("/dashboard/bioprint/slice')
+  })
+
+  it("QuickActions mantém o id 'studio-scaffold' (agora aponta para a Fase 1 · Modelo de tecido)", () => {
     const src = read("src/lib/user/quick-actions.ts")
     expect(src).toContain('id: "studio-scaffold"')
-    expect(src).toContain("/dashboard/studio")
+    expect(src).toContain("/dashboard/bioprint/model")
   })
 
   it("Perfis clínicos destacam BIA Studio nos highlightedActions", () => {

@@ -59,7 +59,7 @@ export default function BioinkStepPage() {
       <header className="px-4 sm:px-6 py-5 border-b border-white/5">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.25em] text-cyan-300/80 font-semibold mb-1">Etapa 2 / 4 · Bioimpressão</div>
+            <div className="text-[10px] uppercase tracking-[0.25em] text-cyan-300/80 font-semibold mb-1">Fase 2 / 6 · Bioimpressão</div>
             <h1 className="text-lg sm:text-2xl font-bold text-white flex items-center gap-2"><Droplets className="w-5 h-5 text-cyan-400" /> Biotinta</h1>
             <p className="text-xs sm:text-sm text-gray-400 mt-1 max-w-2xl">Escolha uma biotinta já testada e validada na literatura. Os parâmetros de impressão que funcionam vêm junto.</p>
           </div>

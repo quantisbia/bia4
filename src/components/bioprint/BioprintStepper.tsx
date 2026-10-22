@@ -1,28 +1,31 @@
 "use client"
 
 /**
- * BIA — Stepper visual das 4 etapas de bioimpressão
+ * BIA — Stepper visual das 6 fases de bioimpressão (R24)
+ *   1 Modelo de tecido · 2 Biotinta · 3 Fatiamento · 4 Bioimpressão (Host)
+ *   · 5 Análise da bioimpressão · 6 Maturação & caracterizações
  *
  * Mostra o progresso atual + permite navegar entre etapas que já estão
  * desbloqueadas. Etapas bloqueadas (sem etapa anterior pronta) ficam
  * desabilitadas com tooltip explicando o porquê.
  *
- * Visual: 4 círculos numerados conectados por linhas. Cada um tem:
+ * Visual: 6 círculos numerados conectados por linhas. Cada um tem:
  * - cor por status: empty (cinza) · draft (âmbar) · ready (esmeralda)
  * - destaque azul se for a etapa ativa
  * - badge minúsculo com nome do item escolhido (ex.: "esferoide.stl")
  */
 
 import { usePathname, useRouter } from "next/navigation"
-import { useMemo } from "react"
-import { Box, Droplets, Layers, Gamepad2, Check, Lock } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { Box, Droplets, Layers, Gamepad2, ClipboardCheck, Beaker, Check, Lock } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import {
-  useBioprintProcess, isStepUnlocked,
-  type BioprintProcessState, type StepStatus,
+  useBioprintProcess, isStepUnlocked, STEP_ROUTES,
+  type BioprintProcessState, type StepStatus, type PhaseKey,
 } from "@/lib/bioprint/process-context"
+import { listFeedback } from "@/lib/bioprint/print-feedback"
 
-type StepKey = keyof BioprintProcessState
+type StepKey = PhaseKey
 
 interface StepDef {
   key: StepKey
@@ -34,31 +37,42 @@ interface StepDef {
 }
 
 const STEPS: StepDef[] = [
-  { key: "model",   number: 1, label: "Modelo 3D",  shortLabel: "Modelo",    icon: Box,      route: "/dashboard/bioprint/model"   },
-  { key: "bioink",  number: 2, label: "Biotinta",   shortLabel: "Biotinta",  icon: Droplets, route: "/dashboard/bioprint/bioink"  },
-  { key: "slice",   number: 3, label: "Fatiamento", shortLabel: "Fatiar",    icon: Layers,   route: "/dashboard/bioprint/slice"   },
-  { key: "control", number: 4, label: "Execução",   shortLabel: "Executar",  icon: Gamepad2, route: "/dashboard/bioprint/execute" },
+  { key: "model",   number: 1, label: "Modelo de tecido",   shortLabel: "Tecido",    icon: Box,            route: STEP_ROUTES.model   },
+  { key: "bioink",  number: 2, label: "Biotinta",           shortLabel: "Biotinta",  icon: Droplets,       route: STEP_ROUTES.bioink  },
+  { key: "slice",   number: 3, label: "Fatiamento",         shortLabel: "Fatiar",    icon: Layers,         route: STEP_ROUTES.slice   },
+  { key: "control", number: 4, label: "Bioimpressão (Host)", shortLabel: "Host",     icon: Gamepad2,       route: STEP_ROUTES.control },
+  { key: "review",  number: 5, label: "Análise",            shortLabel: "Análise",   icon: ClipboardCheck, route: STEP_ROUTES.review  },
+  { key: "postBio", number: 6, label: "Maturação",          shortLabel: "Maturação", icon: Beaker,         route: STEP_ROUTES.postBio },
 ]
+
+/** Rotas que também contam como "estou na Fase 3" (todas vivem no BioSlicer). */
+const SLICE_ALIASES = ["/dashboard/bioprint/draw", "/dashboard/bioprint/printability"]
 
 export function BioprintStepper() {
   const router = useRouter()
   const pathname = usePathname()
   const { state } = useBioprintProcess()
 
-  // Determinar etapa ativa baseado na URL
+  // Fase 5 não tem estado no processo: pronta quando há análise salva.
+  const [hasReview, setHasReview] = useState(false)
+  useEffect(() => { setHasReview(listFeedback().length > 0) }, [pathname])
+
+  // Determinar fase ativa baseado na URL
   const activeStep: StepKey | null = useMemo(() => {
     for (const s of STEPS) {
       if (pathname?.startsWith(s.route)) return s.key
     }
+    if (SLICE_ALIASES.some((r) => pathname?.startsWith(r))) return "slice"
     return null
   }, [pathname])
 
   return (
-    <nav aria-label="Etapas do processo de bioimpressão" className="w-full">
+    <nav aria-label="Fases do processo de bioimpressão" className="w-full">
       <ol className="flex items-center gap-1 sm:gap-2">
         {STEPS.map((step, idx) => {
-          const stepState = state[step.key]
-          const status: StepStatus = stepState.status
+          const status: StepStatus = step.key === "review"
+            ? (hasReview ? "ready" : "empty")
+            : state[step.key].status
           const isActive = activeStep === step.key
           const unlocked = isStepUnlocked(step.key, state)
           const isLast = idx === STEPS.length - 1
@@ -86,7 +100,7 @@ export function BioprintStepper() {
                 )}
                 title={
                   !unlocked
-                    ? `Conclua a etapa ${step.number - 1} primeiro`
+                    ? `Conclua a fase ${step.number - 1} primeiro`
                     : isActive
                       ? `Você está em: ${step.label}`
                       : `Ir para: ${step.label}`
@@ -102,7 +116,7 @@ export function BioprintStepper() {
                 />
 
                 {/* Texto */}
-                <div className="hidden sm:flex flex-col items-start min-w-0">
+                <div className="hidden lg:flex flex-col items-start min-w-0">
                   <span
                     className={cn(
                       "text-[11px] font-semibold leading-tight",
@@ -127,7 +141,7 @@ export function BioprintStepper() {
                 </div>
 
                 {/* Label mobile (só o curto) */}
-                <span className="sm:hidden text-[10px] font-semibold text-gray-300">
+                <span className="lg:hidden text-[10px] font-semibold text-gray-300">
                   {step.shortLabel}
                 </span>
               </button>
@@ -202,5 +216,7 @@ function pickItemLabel(key: StepKey, state: BioprintProcessState): string | null
       ? `${state.slice.estimate.totalLayers} camadas`
       : state.slice.gcode ? "G-code pronto" : null
     case "control": return state.control.tissueType
+    case "review":  return null
+    case "postBio": return state.postBio.status === "ready" ? "protocolo" : null
   }
 }

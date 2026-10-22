@@ -533,14 +533,14 @@ export default function BioprintBioinkPage() {
           <div className="flex-1">
             <div className="text-sm font-semibold text-amber-200">Etapa 1 (Modelo 3D) ainda não foi concluída</div>
             <div className="text-xs text-amber-100/70 mt-0.5">
-              Você pode preparar a formulação aqui, mas para avançar é necessário ter um modelo 3D pronto.
+              Você pode preparar a formulação aqui, mas para avançar é necessário definir o modelo de tecido na Fase 1.
             </div>
           </div>
           <Link
             href="/dashboard/bioprint/model"
             className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-100 transition-colors"
           >
-            Voltar à Etapa 1
+            Voltar à Fase 1
           </Link>
         </div>
       )}

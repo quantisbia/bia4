@@ -752,7 +752,7 @@ export default function PrintabilityTestsPage() {
                 </div>
                 <p className="text-[10.5px] text-gray-400 leading-snug">
                   Fatiamento <strong className="text-violet-200">direto</strong> do STL do teste pela mesma base
-                  BioSlicer da Etapa 3 — origem no bico (ponto zero), Petri 60, 1 cabeçote. Cobra 6 créditos por G-code.
+                  BioSlicer da Fase 3 — origem no bico (ponto zero), Petri 60, 1 cabeçote. Cobra 6 créditos por G-code.
                   {TEST_QUICK_MAPPING[selectedId]?.note && (
                     <span className="block mt-1 text-violet-200/80 italic">
                       ℹ️ {TEST_QUICK_MAPPING[selectedId].note}

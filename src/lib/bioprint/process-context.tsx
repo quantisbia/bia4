@@ -34,7 +34,7 @@ export type ModelCategory =
   | "organoid-vascular"    // Organoides + estratégias de vascularização
 
 /** Fonte do modelo 3D */
-export type ModelSource = "upload" | "generated" | "ai-prompt"
+export type ModelSource = "upload" | "generated" | "ai-prompt" | "tissue-brief" | "anatomical" | "draw"
 
 export interface ModelStepState {
   status: StepStatus
@@ -45,6 +45,15 @@ export interface ModelStepState {
   category: ModelCategory | null
   /** ID interno (chave em BIOMIMETIC_GEOMETRIES ou geometria clássica) */
   geometryId: string | null
+  /** R24 · Fase 1 = o QUÊ (sem STL): tecido, aplicação e dimensão-alvo. O COMO (malha) vive na Fase 3. */
+  brief?: {
+    tissue: string            // ex.: "cartilagem", "pele", "osso", "vascular", "miocárdio", "renal", "hepático", "neural", "teste"
+    application: string       // ex.: "scaffold para cultura", "implante", "modelo de doença", "teste de imprimibilidade"
+    targetSize_mm: number     // dimensão principal desejada
+    withCells: boolean
+    suggestedModelId?: string // id da biblioteca anatômica / primitiva / catálogo sugerido para a Fase 3
+    notes?: string
+  } | null
   /** Parâmetros usados na geração (se gerado) */
   params: Record<string, number | string | boolean> | null
   /** Stats opcionais do mesh */
@@ -417,17 +426,31 @@ export function modelCategoryLabel(c: ModelCategory): string {
 }
 
 /** Retorna label visual de cada etapa */
+/** R24 · Racional de 6 fases (um só lugar de STL: a Fase 3). */
 export const STEP_LABELS = {
-  model:   "Modelo 3D",
+  model:   "Modelo de tecido",
   bioink:  "Biotinta",
   slice:   "Fatiamento",
-  control: "Execução",
-  postBio: "Pós-Bioimpressão",
+  control: "Bioimpressão",
+  review:  "Análise da bioimpressão",
+  postBio: "Maturação & caracterizações",
+} as const
+
+export const STEP_ROUTES = {
+  model:   "/dashboard/bioprint/model",
+  bioink:  "/dashboard/bioprint/bioink",
+  slice:   "/dashboard/bioprint/slice",
+  control: "/dashboard/bioprint/execute",
+  review:  "/dashboard/bioprint/review",
+  postBio: "/dashboard/bioprint/post",
 } as const
 
 /** Retorna se a etapa anterior está pronta (gate para avançar) */
+export type PhaseKey = keyof typeof STEP_LABELS
+export const PHASE_ORDER: PhaseKey[] = ["model", "bioink", "slice", "control", "review", "postBio"]
+
 export function isStepUnlocked(
-  step: keyof BioprintProcessState,
+  step: PhaseKey,
   state: BioprintProcessState
 ): boolean {
   switch (step) {
@@ -435,6 +458,10 @@ export function isStepUnlocked(
     case "bioink":  return state.model.status === "ready"
     case "slice":   return state.bioink.status === "ready"
     case "control": return state.slice.status === "ready"
+    // Fase 5 (análise) e Fase 6 (maturação) abrem depois da bioimpressão.
+    // A análise não tem estado próprio no processo: ela lê o laço fechado
+    // (print-feedback) e o histórico de resultados (learning-store).
+    case "review":  return state.control.status === "ready"
     case "postBio": return state.control.status === "ready"
   }
 }

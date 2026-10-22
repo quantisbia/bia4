@@ -110,7 +110,7 @@ function DrawPrintInner() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.25em] text-emerald-300/80 font-semibold mb-1">Etapa 3 / 4 · Bioimpressão · caminho alternativo</div>
+          <div className="text-[10px] uppercase tracking-[0.25em] text-emerald-300/80 font-semibold mb-1">Fase 3 / 6 · Bioimpressão · caminho alternativo do Fatiamento</div>
           <h2 className="text-xl font-bold flex items-center gap-2"><Pencil className="w-5 h-5 text-emerald-300" /> Desenhar & Imprimir</h2>
           <p className="text-sm text-gray-400 mt-1 max-w-3xl">
             Desenhe com o dedo, caneta ou mouse sobre a mesa. <b className="text-gray-200">Cada traço é um caminho de extrusão</b> do cabeçote escolhido
@@ -150,7 +150,7 @@ function DrawPrintInner() {
               <div className="flex flex-wrap gap-2">
                 <button onClick={download} className="px-4 py-2 rounded-lg border border-white/15 hover:border-emerald-400/40 text-sm flex items-center gap-2"><Download className="w-4 h-4" /> Baixar .gcode</button>
                 <button onClick={toHost} className="px-4 py-2 rounded-lg bg-emerald-500/20 border border-emerald-400/40 hover:bg-emerald-500/30 text-sm flex items-center gap-2"><Send className="w-4 h-4" /> Enviar ao Host</button>
-                <button onClick={toStep4} className="px-4 py-2 rounded-lg border border-white/15 hover:border-white/30 text-sm">Etapa 4 (Execução) →</button>
+                <button onClick={toStep4} className="px-4 py-2 rounded-lg border border-white/15 hover:border-white/30 text-sm">Fase 4 (Bioimpressão · Host) →</button>
                 {charged && <span className={cn("text-xs self-center px-2 py-1 rounded border", charged.ok ? "text-emerald-200 border-emerald-400/30 bg-emerald-500/10" : "text-rose-200 border-rose-400/30 bg-rose-500/10")}>{charged.msg}</span>}
               </div>
               <pre className="text-[11px] font-mono max-h-60 overflow-auto bg-black/40 rounded-lg p-3 text-gray-300 whitespace-pre">{result.gcode.slice(0, 12000)}{result.gcode.length > 12000 ? "\n… (truncado)" : ""}</pre>

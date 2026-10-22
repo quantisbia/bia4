@@ -80,9 +80,9 @@ export const UI_TERMS: Record<string, TermPair> = {
 
   // ─── Etapas da bioimpressão ───────────────────────────────────────
   step_model: {
-    researcher: "Modelo 3D (STL/mesh)",
-    clinical: "Formato do Tecido",
-    hint: "Suba um arquivo STL ou escolha um modelo pronto",
+    researcher: "Fase 1 · Modelo de tecido",
+    clinical: "Fase 1 · O que vou imprimir",
+    hint: "Tecido-alvo, aplicação e tamanho — sem STL (a geometria vive na Fase 3)",
   },
   step_bioink: {
     researcher: "Biotinta / Bioink",
@@ -90,19 +90,24 @@ export const UI_TERMS: Record<string, TermPair> = {
     hint: "Formulação com biomateriais e células",
   },
   step_slice: {
-    researcher: "Fatiamento / Toolpath",
-    clinical: "Caminho da Impressão",
-    hint: "Gera o G-code otimizado",
+    researcher: "Fase 3 · Fatiamento (STL → G-code)",
+    clinical: "Fase 3 · Caminho da Impressão",
+    hint: "Único lugar de modelos 3D: anatômico, primitiva, upload, desenho → G-code",
   },
   step_execute: {
-    researcher: "Execução / Controle",
-    clinical: "Imprimir Agora",
+    researcher: "Fase 4 · Bioimpressão (Host)",
+    clinical: "Fase 4 · Imprimir Agora",
     hint: "Controle ao vivo da bioimpressora",
   },
+  step_review: {
+    researcher: "Fase 5 · Análise da bioimpressão",
+    clinical: "Fase 5 · Como ficou?",
+    hint: "Nota + relato → ajustes no próximo G-code",
+  },
   step_post: {
-    researcher: "Pós-Processamento",
-    clinical: "Cuidados Após Impressão",
-    hint: "Crosslinking, cultivo, maturação",
+    researcher: "Fase 6 · Maturação & caracterizações",
+    clinical: "Fase 6 · Cuidados após a impressão",
+    hint: "Crosslinking, cultivo, biorreator, caracterizações",
   },
 
   // ─── Termos técnicos recorrentes ─────────────────────────────────
