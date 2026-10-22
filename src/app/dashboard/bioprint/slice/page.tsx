@@ -473,7 +473,7 @@ function BioSlicerInner() {
 
       <div className="grid lg:grid-cols-[380px_minmax(0,1fr)] gap-6">
         <div className="space-y-5 min-w-0">
-          <Panel title="1 · Modelo 3D" icon={<Box className="w-4 h-4" />}>
+          <Panel title="1. Modelo tridimensional" icon={<Box className="w-4 h-4" />}>
             <div
               onClick={() => fileRef.current?.click()}
               onDragOver={(e) => e.preventDefault()}
@@ -481,12 +481,12 @@ function BioSlicerInner() {
               className="rounded-lg border border-dashed border-white/15 hover:border-emerald-400/40 p-4 text-center cursor-pointer text-sm text-gray-300"
             >
               <Upload className="w-5 h-5 mx-auto mb-1 text-emerald-300" />
-              Arraste um <b>.stl</b> (binário ou ASCII) ou clique
+              Arraste um arquivo <b>.stl</b> (binário ou ASCII) ou clique para selecionar
               <input ref={fileRef} type="file" accept=".stl" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f) }} />
             </div>
             {stored.length > 0 && (
               <div className="mt-3">
-                <div className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">Malhas salvas (uploads, primitivas, anatômicos, desenhos)</div>
+                <div className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">Malhas armazenadas (uploads, primitivas, modelos anatômicos, desenhos, testes)</div>
                 <div className="flex flex-col gap-1 max-h-32 overflow-auto">
                   {stored.slice(0, 8).map((m) => (
                     <button key={m.id} onClick={() => loadStored(m.id)} className="text-left text-xs px-2 py-1 rounded hover:bg-white/5 flex justify-between gap-2">
@@ -497,7 +497,7 @@ function BioSlicerInner() {
               </div>
             )}
             <div className="mt-3">
-              <div className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">Modelos anatômicos reais (malha curva) — escolha e ajuste só a dimensão</div>
+              <div className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">Modelos anatômicos (malha real) — selecione e defina apenas a dimensão</div>
               <div className="grid grid-cols-2 gap-1.5">
                 {ANATOMICAL_MODELS.map((m) => (
                   <button key={m.id} onClick={() => loadAnatomical(m)} disabled={!!anatLoading} title={m.description}
@@ -510,7 +510,7 @@ function BioSlicerInner() {
               {anat && <div className="mt-1.5 text-[11px] text-gray-400">{anat.description}{anat.reference ? ` · ${anat.reference}` : ""}</div>}
             </div>
             <div className="mt-3">
-              <div className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">Ou gere uma primitiva</div>
+              <div className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">Geometrias primitivas</div>
               <div className="grid grid-cols-2 gap-1.5">
                 <PrimBtn icon={<Box className="w-3.5 h-3.5" />} label="Bloco 10×10×3" onClick={() => makePrimitive("box", { x: 10, y: 10, z: 3 })} />
                 <PrimBtn icon={<Circle className="w-3.5 h-3.5" />} label="Disco Ø10×2" onClick={() => makePrimitive("cylinder", { d: 10, z: 2 })} />
@@ -520,9 +520,9 @@ function BioSlicerInner() {
             </div>
             <details className="mt-3 group" open={!!ptest}>
               <summary className="cursor-pointer list-none text-[11px] uppercase tracking-wide text-gray-500 hover:text-gray-300 flex items-center gap-1">
-                <span className="transition-transform group-open:rotate-90">▸</span> Ou um teste de imprimibilidade da biotinta ({PRINTABILITY_TESTS.length})
+                <span className="transition-transform group-open:rotate-90">▸</span> Testes de imprimibilidade da biotinta ({PRINTABILITY_TESTS.length})
               </summary>
-              <p className="text-[11px] text-gray-500 mt-1 mb-1.5">Qualifique a biotinta antes do construto: linha, Pf (Ouyang 2016), colapso, torre, escada Z, leque, estrela, fidelidade. O teste vira STL e é fatiado aqui mesmo.</p>
+              <p className="text-[11px] text-gray-500 mt-1 mb-1.5">Qualifique a biotinta antes do construto: linha, Pf (Ouyang 2016), colapso, torre, escada Z, leque, estrela e fidelidade. A geometria de teste é gerada como STL e fatiada nesta mesma etapa.</p>
               <div className="grid grid-cols-2 gap-1.5">
                 {PRINTABILITY_TESTS.map((t) => (
                   <button key={t.id} onClick={() => loadPrintabilityTest(t)} title={`${t.description}\n\n${t.rationale}`}
@@ -546,7 +546,7 @@ function BioSlicerInner() {
                       ))}
                     </div>
                   )}
-                  <div className="text-gray-500">Fatiamento sugerido: camada {ptest.slice.layerHeight_mm} mm · {ptest.slice.wallCount} parede(s) · {ptest.slice.infillPattern} {ptest.slice.infillDensity}% — {ptest.slice.note}</div>
+                  <div className="text-gray-500">Parâmetros de fatiamento recomendados: camada {ptest.slice.layerHeight_mm} mm · {ptest.slice.wallCount} parede(s) · {ptest.slice.infillPattern} {ptest.slice.infillDensity}% — {ptest.slice.note}</div>
                   {ptest.analysisProtocol && <div className="text-gray-500"><b className="text-gray-400">Como analisar:</b> {ptest.analysisProtocol}</div>}
                 </div>
               )}
@@ -560,7 +560,7 @@ function BioSlicerInner() {
           </Panel>
 
           {mesh && (
-            <Panel title="Mesa · ver e arrumar a peça" icon={<Target className="w-4 h-4" />} subtitle="o que você vê aqui é o que será fatiado">
+            <Panel title="Mesa de impressão · orientação da peça" icon={<Target className="w-4 h-4" />} subtitle="a visualização corresponde exatamente ao que será fatiado">
               <BedStage
                 mesh={mesh} orientation={orientation} onOrientation={setOrientation} target={target}
                 primary={anat ? { label: anat.primaryLabel, value_mm: anatDim, min: anat.range.min, max: anat.range.max, onChange: setAnatDimension } : undefined}
@@ -574,19 +574,19 @@ function BioSlicerInner() {
             </Panel>
           )}
 
-          <Panel title="2 · Objetivo (texto ou voz)" icon={<Wand2 className="w-4 h-4" />}>
+          <Panel title="2. Objetivo da impressão (texto ou voz)" icon={<Wand2 className="w-4 h-4" />}>
             <div className="flex gap-2">
               <textarea
                 value={intentText} onChange={(e) => setIntentText(e.target.value)}
-                placeholder="Ex.: scaffold ósseo 10x10x4 mm, poro 400 µm, alginato com HAp, agulha 18G"
+                placeholder="Ex.: scaffold ósseo 10×10×4 mm, poro de 400 µm, alginato com hidroxiapatita, agulha 18G"
                 rows={3}
                 className="flex-1 text-sm rounded-lg bg-black/30 border border-white/10 focus:border-emerald-400/50 p-2 resize-none"
               />
               <div className="flex flex-col gap-1.5">
-                <button onClick={toggleVoice} title="Falar objetivo (pt-BR)" className={cn("p-2 rounded-lg border", listening ? "bg-red-500/20 border-red-400/40 animate-pulse" : "border-white/10 hover:border-emerald-400/40")}>
+                <button onClick={toggleVoice} title="Ditar o objetivo (pt-BR)" className={cn("p-2 rounded-lg border", listening ? "bg-red-500/20 border-red-400/40 animate-pulse" : "border-white/10 hover:border-emerald-400/40")}>
                   {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                 </button>
-                <button onClick={() => runIntent(intentText)} title="Montar perfil" className="p-2 rounded-lg bg-emerald-500/20 border border-emerald-400/40 hover:bg-emerald-500/30"><Wand2 className="w-4 h-4" /></button>
+                <button onClick={() => runIntent(intentText)} title="Gerar perfil de fatiamento" className="p-2 rounded-lg bg-emerald-500/20 border border-emerald-400/40 hover:bg-emerald-500/30"><Wand2 className="w-4 h-4" /></button>
               </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-1">
@@ -614,7 +614,7 @@ function BioSlicerInner() {
             )}
           </Panel>
 
-          <Panel title={`3 · Perfil ${mode === "basic" ? "Básico" : "Avançado"}`} icon={<Settings2 className="w-4 h-4" />}>
+          <Panel title={`3. Perfil de fatiamento · ${mode === "basic" ? "Básico" : "Avançado"}`} icon={<Settings2 className="w-4 h-4" />}>
             <div className="grid grid-cols-1 gap-1.5">
               {(mode === "basic" ? BASIC_PROFILES : [...BASIC_PROFILES, ...ADVANCED_PROFILES]).map((pf) => (
                 <button key={pf.id} onClick={() => applyProfile(pf)} className={cn("text-left rounded-lg border p-2 text-xs transition", profile.id === pf.id ? "border-emerald-400/50 bg-emerald-500/10" : "border-white/10 hover:border-white/25")}>
@@ -625,17 +625,17 @@ function BioSlicerInner() {
             </div>
           </Panel>
 
-          <Panel title="4 · Parâmetros" icon={<Gauge className="w-4 h-4" />}>
+          <Panel title="4. Parâmetros de fatiamento" icon={<Gauge className="w-4 h-4" />}>
             {mode === "basic"
               ? <BasicParams P={P} setP={setP} X={X} setX={setX} />
               : <AdvancedParams P={P} setP={setP} X={X} setX={setX} rheology={rheology} setRheology={setRheology} />}
           </Panel>
 
-          <Panel title="5 · Onde imprimir (ponto zero)" icon={<Target className="w-4 h-4" />}>
+          <Panel title="5. Substrato de impressão (ponto zero)" icon={<Target className="w-4 h-4" />}>
             <TargetPanel target={target} onChange={setTarget} footprint_mm={meshSize ? Math.max(meshSize.x, meshSize.y) : null} />
           </Panel>
 
-          <Panel title="6 · Cabeçotes e biotintas" icon={<Palette className="w-4 h-4" />}>
+          <Panel title="6. Cabeçotes e biotintas" icon={<Palette className="w-4 h-4" />}>
             <ToolsPanel tools={tools} onChange={setTools} bioinks={bioinkOptions} baseExtrusion={X} />
           </Panel>
 
@@ -649,14 +649,14 @@ function BioSlicerInner() {
           {!result && (
             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-8 text-center text-gray-400 text-sm">
               <Layers className="w-10 h-10 mx-auto mb-3 text-gray-600" />
-              Carregue um modelo, descreva o objetivo (ou escolha um perfil) e clique em <b>Fatiar</b>.<br />
-              O preview mostra camada a camada: paredes, infill e skirt — com a camada anterior sobreposta para conferir o alinhamento 0/90.
+              Carregue um modelo, descreva o objetivo (ou selecione um perfil) e acione <b>Fatiar</b>.<br />
+              A pré-visualização apresenta cada camada — paredes, preenchimento e skirt — com a camada anterior sobreposta para verificação do alinhamento 0/90°.
               <TipsBox tips={profile.tips} title={`Dicas do perfil "${profile.name}"`} />
             </div>
           )}
           {result && (
             <>
-              <Panel title="Preview por camada" icon={<Layers className="w-4 h-4" />}>
+              <Panel title="Pré-visualização por camada" icon={<Layers className="w-4 h-4" />}>
                 <LayerPreview layers={result.layers} bbox={result.meshBBox} lineWidth_mm={P.lineWidth_mm} />
               </Panel>
 
@@ -685,10 +685,10 @@ function BioSlicerInner() {
               <div className="flex flex-wrap gap-2">
                 <button onClick={download} className="px-4 py-2 rounded-lg border border-white/15 hover:border-emerald-400/40 text-sm flex items-center gap-2"><Download className="w-4 h-4" /> Baixar .gcode</button>
                 <button onClick={sendToStep4} disabled={errors.length > 0} className="px-4 py-2 rounded-lg bg-emerald-500/20 border border-emerald-400/40 hover:bg-emerald-500/30 text-sm flex items-center gap-2 disabled:opacity-40"><Send className="w-4 h-4" /> Fase 4 · Bioimprimir →</button>
-                <button onClick={sendToHost} disabled={errors.length > 0} title="Host serial avançado: checksum/reenvio, jog, macros de seringa" className="px-4 py-2 rounded-lg border border-white/15 hover:border-white/30 text-sm disabled:opacity-40">Fase 4 · modo avançado (BIA Host)</button>
+                <button onClick={sendToHost} disabled={errors.length > 0} title="Host serial avançado: checksum e reenvio, jog manual, macros de seringa" className="px-4 py-2 rounded-lg border border-white/15 hover:border-white/30 text-sm disabled:opacity-40">Fase 4 · modo avançado (BIA Host)</button>
                 {charged && <span className={cn("text-xs self-center px-2 py-1 rounded border", charged.ok ? "text-emerald-200 border-emerald-400/30 bg-emerald-500/10" : "text-rose-200 border-rose-400/30 bg-rose-500/10")}>{charged.msg}</span>}
               </div>
-              {errors.length > 0 && <div className="text-xs text-red-300">Resolva os erros acima antes de enviar ao host.</div>}
+              {errors.length > 0 && <div className="text-xs text-red-300">Corrija os erros indicados acima antes de enviar à bioimpressora.</div>}
               {(result.stats.wells ?? 1) > 1 || (result.stats.toolChanges ?? 0) > 0 ? (
                 <div className="text-xs text-gray-400 flex flex-wrap gap-3">
                   {(result.stats.wells ?? 1) > 1 && <span>🧫 {result.stats.wells} poços replicados</span>}

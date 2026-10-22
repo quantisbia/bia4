@@ -159,8 +159,7 @@ export function ChapterBioprintSlice() {
 
       <StepCard n={8} title="Enviar para a Fase 4" icon={Download} accent="cyan">
         <p>
-          <strong className="text-white">Baixar .gcode</strong>, <strong className="text-white">Enviar ao Host</strong> (impressão direta) ou <strong className="text-white">Fase 4 (Bioimpressão · Host)</strong> — que é uma única página:
-          conexão USB, pré-flight (“bico posicionado no ponto zero”), joystick, fluxo da biotinta (M221), validador visual, regenerador e modo avançado.
+          <strong className="text-white">Baixar .gcode</strong>, <strong className="text-white">Fase 4 · Bioimprimir</strong> (entrada guiada: validador, pré-visualização 3D, conexão USB, pré-flight com agulha no ponto zero, movimentação manual, fluxo M221 e regenerador) ou <strong className="text-white">Fase 4 · modo avançado (BIA Host)</strong> (host serial com checksum, reenvio e macros de seringa). Ambos recebem o mesmo G-code.
         </p>
       </StepCard>
 
@@ -191,15 +190,18 @@ export function ChapterBioprintSlice() {
 
       <Box2 icon={Layers} title="Testes de imprimibilidade" tone="cyan">
         <p>
-          Em <em>Testes de imprimibilidade</em> os 8 testes (linha, grade Pf, ponte de colapso, torre, escada Z, leque, estrela, fidelidade) são fatiados a partir do
-          <strong className="text-white"> STL real</strong> de cada teste pela mesma base — o que você vê é o que imprime.
+          No painel <em>1. Modelo tridimensional</em>, a seção <em>Testes de imprimibilidade da biotinta</em> disponibiliza os 8 testes
+          (linha, grade Pf de Ouyang 2016, ponte de colapso, torre de empilhamento, escada Z, leque de ângulos, estrela e fidelidade 15,4 mm).
+          Cada teste é gerado como <strong className="text-white">STL paramétrico</strong>, carrega os parâmetros de fatiamento recomendados
+          (altura de camada, paredes, preenchimento) e é fatiado pela mesma base dos demais modelos. O protocolo de análise pós-impressão
+          é exibido junto ao teste selecionado.
         </p>
       </Box2>
 
       {/* ── FAQ ───────────────────────────────────────────────────────── */}
       <h2 className="text-lg font-bold text-white pt-2">Perguntas frequentes</h2>
-      <FaqItem q="Onde foram parar o 'G-code Rápido', o 'médico' e o 'avançado'?">
-        Viraram caminhos para o BioSlicer. As rotas antigas (inclusive o BIA Studio e “Modelos 3D (STL)”) redirecionam para a Fase 3 (o “avançado” abre direto na aba Avançado). Os padrões Voronoi/Perlin/TPMS continuam existindo — agora honestos e na mesma base.
+      <FaqItem q="Onde estão o G-code rápido, o médico, o avançado, o BIA Studio e os testes de imprimibilidade?">
+        Foram consolidados no BioSlicer, único local de geometria da BIA. As rotas antigas (<code>/quick-gcode</code>, <code>/gcode/*</code>, <code>/studio</code>, <code>/printability</code>, <code>/toolpath</code>) redirecionam para a Fase 3 — o “avançado” abre na aba Avançado e <code>/printability</code> abre o teste correspondente (<code>?test=test_grid</code>). Os padrões Voronoi, Perlin e TPMS permanecem disponíveis, na mesma base de fatiamento.
       </FaqItem>
       <FaqItem q="A prévia cobra créditos?">
         Não. A prévia de 3 camadas no modal é grátis. Só a geração do G-code completo (ao confirmar) debita 6 créditos.
@@ -215,7 +217,7 @@ export function ChapterBioprintSlice() {
       </FaqItem>
 
       <div className="flex items-center gap-2 text-xs text-emerald-200 pt-2">
-        <CheckCircle2 className="w-4 h-4" /> Próximo capítulo: Fase 4 · Bioimpressão (Host).
+        <CheckCircle2 className="w-4 h-4" /> Próximo capítulo: Fase 4 · Bioimpressão.
       </div>
     </article>
   )

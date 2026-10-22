@@ -26,10 +26,10 @@ import { FormulatorPro } from "@/components/bioink/FormulatorPro"
 
 export type BioinkMode = "recipes" | "lab" | "free" | "pro"
 const MODES: Array<{ id: BioinkMode; label: string; hint: string; icon: typeof Droplets }> = [
-  { id: "recipes", label: "Receitas validadas", hint: "18 biotintas da literatura, com parâmetros que funcionam. Comece aqui.", icon: BookOpenCheck },
-  { id: "lab",     label: "Laboratório guiado", hint: "Diga o objetivo → a BIA devolve receita, janela de biofabricação e protocolo de bancada.", icon: FlaskConical },
-  { id: "free",    label: "Formular do zero",   hint: "Material, concentração, crosslinker, reologia em tempo real, catálogo de 807 biomateriais, multi-material.", icon: Beaker },
-  { id: "pro",     label: "Formulador Pro (IA)", hint: "Até 8 componentes (catálogo ou custom) + análise científica por IA. 10 créditos.", icon: Atom },
+  { id: "recipes", label: "Formulações validadas", hint: "18 formulações validadas na literatura, com parâmetros de impressão correspondentes. Ponto de partida recomendado.", icon: BookOpenCheck },
+  { id: "lab",     label: "Laboratório guiado", hint: "Informe o objetivo; a BIA retorna a formulação, a janela de biofabricação e o protocolo de bancada.", icon: FlaskConical },
+  { id: "free",    label: "Formulação livre",   hint: "Material, concentração, agente de reticulação, reologia em tempo real, catálogo de 807 biomateriais e configuração multimaterial.", icon: Beaker },
+  { id: "pro",     label: "Formulador Pro (IA)", hint: "Formulação multicomponente (até 8) com análise científica assistida por IA. 10 créditos.", icon: Atom },
 ]
 const MODE_KEY = "bia:bioink-mode"
 function parseMode(v: string | null | undefined): BioinkMode | null {
@@ -140,11 +140,11 @@ function RecipesMode({ onOpenMode }: { onOpenMode: (m: BioinkMode) => void }) {
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <h1 className="text-lg sm:text-2xl font-bold text-white flex items-center gap-2"><Droplets className="w-5 h-5 text-cyan-400" /> Biotinta</h1>
-            <p className="text-xs sm:text-sm text-gray-400 mt-1 max-w-2xl">Escolha uma biotinta já testada e validada na literatura. Os parâmetros de impressão que funcionam vêm junto.</p>
+            <p className="text-xs sm:text-sm text-gray-400 mt-1 max-w-2xl">Selecione uma formulação validada na literatura científica. Os parâmetros de impressão correspondentes são carregados automaticamente.</p>
           </div>
           {ready && (
             <Link href="/dashboard/bioprint/slice" className="hidden sm:inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-200 text-sm font-medium rounded-xl">
-              Continuar para Fatiamento <ArrowRight className="w-4 h-4" />
+              Avançar para o Fatiamento <ArrowRight className="w-4 h-4" />
             </Link>
           )}
         </div>
@@ -155,13 +155,13 @@ function RecipesMode({ onOpenMode }: { onOpenMode: (m: BioinkMode) => void }) {
           <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/5 px-4 py-3 text-sm flex items-center gap-2 flex-wrap">
             <Check className="w-4 h-4 text-emerald-300" />
             <span className="text-gray-200">Biotinta atual: <b>{state.bioink.material}</b>{state.bioink.cellType ? ` · ${state.bioink.cellType} ${state.bioink.cellDensityMillionMl ?? ""} M/mL` : " · acelular"}</span>
-            <span className="text-gray-500 text-xs">— escolha outra abaixo para substituir</span>
+            <span className="text-gray-500 text-xs">— selecione outra formulação abaixo para substituí-la</span>
           </div>
         )}
 
         {/* Receitas */}
         <section id="bioink-recipes">
-          <h2 className="text-sm font-semibold text-white mb-2">1 · Qual biotinta? <span className="text-xs font-normal text-gray-500">({recipes.length} receitas validadas)</span></h2>
+          <h2 className="text-sm font-semibold text-white mb-2">1. Qual formulação de biotinta será utilizada? <span className="text-xs font-normal text-gray-500">({recipes.length} receitas validadas)</span></h2>
           <div className="flex flex-wrap gap-1.5 mb-3">
             <button onClick={() => setGoal("all")} className={cn("px-2.5 py-1 rounded-lg border text-xs", goal === "all" ? "border-cyan-400/50 bg-cyan-500/15 text-cyan-100" : "border-white/10 text-gray-300 hover:border-white/25")}>Todas</button>
             {Object.entries(GOAL_LABELS).map(([id, g]) => (
@@ -199,8 +199,8 @@ function RecipesMode({ onOpenMode }: { onOpenMode: (m: BioinkMode) => void }) {
 
         {/* Células */}
         <section id="bioink-cells">
-          <h2 className="text-sm font-semibold text-white mb-1">2 · Com células?</h2>
-          <p className="text-[11px] text-gray-500 mb-3">{canCells ? "Sem células é o melhor começo para validar a forma. Só aparecem as células compatíveis com a receita." : "Esta receita é acelular (treino ou tinta sacrificial)."}</p>
+          <h2 className="text-sm font-semibold text-white mb-1">2. O construto será celularizado?</h2>
+          <p className="text-[11px] text-gray-500 mb-3">{canCells ? "A impressão acelular é recomendada para validar a geometria. São exibidos apenas os tipos celulares compatíveis com a formulação." : "Esta formulação é acelular (calibração ou tinta sacrificial)."}</p>
           <div className="flex flex-wrap gap-2">
             {CELL_ORDER.filter((c) => c === "none" || (canCells && recipe.cellsOk.includes(c))).map((c) => (
               <button key={c} onClick={() => setCell(c)} title={CELL_LABELS[c].note} className={cn("px-3 py-1.5 rounded-full border text-xs", cell === c ? "bg-cyan-500/20 border-cyan-400/50 text-cyan-100" : "bg-white/3 border-white/10 text-gray-300 hover:border-white/25")}>{CELL_LABELS[c].label}</button>
@@ -221,15 +221,15 @@ function RecipesMode({ onOpenMode }: { onOpenMode: (m: BioinkMode) => void }) {
             <div className="text-white font-semibold truncate">{recipe.name}</div>
             <div className="text-xs text-gray-400">{cellOk ? `${CELL_LABELS[cell].label} · ${dens} M/mL` : "acelular"} · {recipe.pipelineCrosslinker} · agulha {recipe.startParams.nozzle_mm} mm · {recipe.startParams.speed_mms} mm/s · camada {recipe.startParams.layerHeight_mm} mm</div>
           </div>
-          <button onClick={confirm} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-400 text-black font-semibold text-sm hover:bg-cyan-300">Usar esta biotinta e continuar <ArrowRight className="w-4 h-4" /></button>
+          <button onClick={confirm} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-400 text-black font-semibold text-sm hover:bg-cyan-300">Confirmar biotinta e avançar <ArrowRight className="w-4 h-4" /></button>
         </section>
 
         {/* Outros modos — mesma página, sem duplicar ferramentas */}
         <div className="pt-2 text-xs text-gray-500 flex flex-wrap gap-x-3 gap-y-1 items-center">
-          <span>Não achou a sua?</span>
+          <span>Não encontrou a formulação desejada?</span>
           <button onClick={() => onOpenMode("lab")} className="text-emerald-300 hover:underline inline-flex items-center gap-1"><FlaskConical className="w-3.5 h-3.5" /> Laboratório guiado</button>
           <span className="text-white/15">·</span>
-          <button onClick={() => onOpenMode("free")} className="text-gray-300 hover:underline inline-flex items-center gap-1"><Beaker className="w-3.5 h-3.5" /> Formular do zero (807 biomateriais)</button>
+          <button onClick={() => onOpenMode("free")} className="text-gray-300 hover:underline inline-flex items-center gap-1"><Beaker className="w-3.5 h-3.5" /> Formulação livre (807 biomateriais)</button>
           <span className="text-white/15">·</span>
           <button onClick={() => onOpenMode("pro")} className="text-blue-300 hover:underline inline-flex items-center gap-1"><Atom className="w-3.5 h-3.5" /> Formulador Pro (IA)</button>
         </div>

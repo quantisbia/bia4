@@ -8,7 +8,7 @@ import {
   Droplet, FlaskConical, Beaker, Atom, AlertTriangle,
   Sparkles, Search, CheckCircle2, Sliders, TrendingUp,
 } from "lucide-react"
-import { Box2, StepCard, MiniCard, ProTip, Pitfall, ChapterCover, WhereIs, FaqItem } from "./_components"
+import { Box2, StepCard, MiniCard, ProTip, Pitfall, ChapterCover, FaqItem } from "./_components"
 
 export function ChapterBioprintBioink() {
   return (
@@ -23,20 +23,53 @@ export function ChapterBioprintBioink() {
         hrefLabel="Abrir Biotinta"
         lead={
           <>
-            Aqui você define <strong className="text-white">o que vai sair da seringa</strong> — a
-            composição da biotinta. Tem três caminhos: usar uma <em>formulação salva</em> do
-            Formulador Pro, escolher do <em>catálogo BIA</em> (807 biomateriais) ou criar uma
-            <em> nova combinação</em> e testar a viscosidade em tempo real.
+            Nesta fase define-se a <strong className="text-white">composição da biotinta</strong> — o material que
+            será extrudado pela seringa. A Fase 2 é o <strong className="text-white">único local de formulação</strong> da BIA
+            e oferece quatro modos, selecionáveis no topo da página: <em>Formulações validadas</em>,
+            <em>Laboratório guiado</em>, <em>Formulação livre</em> (catálogo de 807 biomateriais e reologia em tempo real)
+            e <em>Formulador Pro</em> (análise científica assistida por IA).
           </>
         }
         readMin={7}
       />
 
-      <Box2 icon={Sparkles} title="O que esta etapa decide?" tone="info">
+      <Box2 icon={FlaskConical} title="Os quatro modos da Fase 2" tone="cyan">
         <p className="mb-2">
-          A biotinta determina <strong className="text-white">quase tudo</strong> que vem depois: pressão
-          de extrusão, velocidade da impressão, fidelidade de forma, viabilidade celular. Errar
-          aqui é o motivo mais comum de impressão falhar.
+          Todos os modos gravam o resultado no mesmo estado do processo e conduzem à Fase 3 · Fatiamento.
+          Rotas antigas (<code>/bioink/lab</code>, <code>/bioink/classic</code>, <code>/formulator-pro</code>) redirecionam para o modo correspondente.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+          <MiniCard title="1. Formulações validadas (padrão)" items={[
+            "18 biotintas descritas na literatura (alginato-gelatina, GelMA, Pluronic, FRESH, CELLINK SKIN, dECM…)",
+            "Filtro por objetivo: pele, cartilagem, osso, vascular, hepático, neural, cardíaco",
+            "Parâmetros de impressão correspondentes carregados automaticamente",
+            "Seleção de tipo celular e densidade dentro da faixa validada",
+          ]} />
+          <MiniCard title="2. Laboratório guiado" items={[
+            "Três passos: objetivo e equipamento → formulação recomendada → protocolo de bancada",
+            "Janela de biofabricação e quantidades calculadas",
+            "Preparo passo a passo, troubleshooting e protocolo exportável",
+          ]} />
+          <MiniCard title="3. Formulação livre" items={[
+            "Material, concentração, agente de reticulação e aditivos",
+            "Catálogo de 807 biomateriais com filtros e comparação",
+            "Reologia em tempo real (viscosidade, shear-thinning, yield stress)",
+            "Configuração multimaterial (até 4 cabeçotes) e exportação ao Notebook",
+          ]} />
+          <MiniCard title="4. Formulador Pro (IA)" items={[
+            "Até 8 componentes, do catálogo ou personalizados",
+            "Objetivo clínico e especificações viscoelásticas",
+            "Análise científica: score, incompatibilidades, protocolo, ISO/ANVISA",
+            "Custo: 10 créditos por análise",
+          ]} />
+        </div>
+      </Box2>
+
+      <Box2 icon={Sparkles} title="O que esta fase determina?" tone="info">
+        <p className="mb-2">
+          A biotinta condiciona <strong className="text-white">praticamente todas as variáveis subsequentes</strong>: pressão
+          de extrusão, velocidade de impressão, fidelidade geométrica e viabilidade celular. Uma formulação
+          inadequada é a causa mais frequente de falha na bioimpressão.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">
           <MiniCard title="O que você define" items={[
@@ -60,15 +93,15 @@ export function ChapterBioprintBioink() {
         </div>
       </Box2>
 
-      <Box2 icon={Search} title="Como navegar nos 807 biomateriais" tone="cyan">
+      <Box2 icon={Search} title="Catálogo de 807 biomateriais (modo Formulação livre)" tone="cyan">
         <p className="mb-2">
-          O catálogo é <strong className="text-white">enorme</strong> de propósito — cobre desde clássicos
-          (alginato, GelMA) até nichos (proteínas de seda, DNA). Para não se perder:
+          O catálogo é intencionalmente <strong className="text-white">abrangente</strong> — de materiais consolidados
+          (alginato, GelMA) a nichos (proteínas de seda, DNA). Recursos de navegação:
         </p>
         <ul className="space-y-1.5 list-disc list-inside text-[13px]">
           <li><strong>Filtros à esquerda</strong>: por <em>classe</em> (polissacarídeo, proteína, sintético),
             por <em>origem</em> (mamífero, vegetal, microbiano), por <em>função</em> (estrutural, célula-suporte, releasing).</li>
-          <li><strong>Busca textual</strong>: digite parte do nome ou fórmula química (ex: "GelMA", "alginato 2%", "PEG").</li>
+          <li><strong>Busca textual</strong>: digite parte do nome ou fórmula química (ex.: “GelMA”, “alginato 2%”, “PEG”).</li>
           <li><strong>Tags clínicas</strong>: clique nas tags coloridas (osso, gengiva, vaso…) para ver só os
             biomateriais já usados naquele tipo de aplicação.</li>
           <li><strong>Comparar</strong>: marque até 4 com checkbox e clique <em>Comparar</em> para ver lado-a-lado
@@ -76,7 +109,7 @@ export function ChapterBioprintBioink() {
         </ul>
         <ProTip>
           Para começar projetos novos, prefira biomateriais com <strong className="text-emerald-300">selo
-          "Validado BIA"</strong> — significa que tem pelo menos 3 artigos peer-reviewed e parâmetros
+          “Validado BIA”</strong> — significa que tem pelo menos 3 artigos peer-reviewed e parâmetros
           reológicos confirmados. Reduz risco de surpresa no laboratório.
         </ProTip>
       </Box2>
@@ -190,24 +223,24 @@ export function ChapterBioprintBioink() {
         </p>
       </Box2>
 
-      <Box2 icon={AlertTriangle} title="FAQ rápida da Biotinta" tone="warn">
+      <Box2 icon={AlertTriangle} title="Perguntas frequentes" tone="warn">
         <div className="space-y-2.5">
-          <FaqItem q="Posso pular esta etapa se já tenho biotinta pronta?">
-            Sim — clique em <em>Pular para Fatiamento</em>. Mas perde a otimização automática de
-            parâmetros de impressão na próxima etapa. Recomendamos pelo menos preencher
-            "viscosidade aproximada" no formulário rápido.
+          <FaqItem q="Já possuo uma biotinta pronta. É possível omitir esta fase?">
+            A Fase 3 não bloqueia o fatiamento, mas sem a Fase 2 os parâmetros iniciais (agulha, velocidade,
+            altura de camada, temperatura) não são pré-preenchidos. Recomenda-se, no mínimo, selecionar a
+            formulação validada mais próxima no modo padrão.
           </FaqItem>
-          <FaqItem q="Como uso uma formulação que fiz no Formulador Pro?">
-            No topo da página, botão <em>Importar do Formulador Pro</em>. Aparece a lista das suas
-            últimas 10 formulações; clique para carregar todos os parâmetros automaticamente.
+          <FaqItem q="Onde está o Formulador Pro?">
+            É o quarto modo da Fase 2 (botão <em>Formulador Pro (IA)</em> no topo da página, ou
+            <code> /dashboard/bioprint/bioink?mode=pro</code>). O resultado pode ser enviado diretamente à Fase 3.
           </FaqItem>
           <FaqItem q="O catálogo tem alginato de Macrocystis vs. Laminaria?">
             Sim — o catálogo separa por espécie e fornecedor (Sigma, Merck, FMC). Cada um tem
             massa molecular, M/G ratio e pureza específicos. Importa muito para reprodutibilidade.
           </FaqItem>
-          <FaqItem q="Preciso saber reologia para usar isto?">
-            Não. Os números aparecem para o usuário avançado, mas o <strong>Score de
-            printabilidade</strong> resume tudo. Se está verde, pode imprimir.
+          <FaqItem q="É necessário dominar reologia para utilizar esta fase?">
+            Não. Os parâmetros reológicos são exibidos para o usuário avançado; o <strong>score de
+            imprimibilidade</strong> sintetiza a avaliação. Indicador verde significa formulação apta à impressão.
           </FaqItem>
         </div>
       </Box2>

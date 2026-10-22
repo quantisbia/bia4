@@ -2049,3 +2049,9 @@ Janaina Dernowsek (CEO/Founder)
 - Hub: removidos os cards duplicados "Execução USB direta", "G-code Hub", "BTIE". Sidebar: Fase 2 e Fase 6 no grupo Bioimprimir; "Formulador Pro" avulso removido.
 - Links quebrados corrigidos: `/dashboard/formulator` (quick-actions/banner), `/dashboard/subscription`→`/billing`, `/academy/project`, `/academy/profile` (novas rotas redirect), `/academy/updates`→`/academy/live#academy-updates-feed`.
 - Código morto removido: `StudioClient.tsx`, `model/_legacy/`, `BioinkMultiMaterialFormulator.tsx`. Testes: 1773 verdes (`tests/r24_6_consolidation.test.ts`).
+
+## R24.7 · Linguagem técnica e manual consolidado
+- Títulos e subtítulos das 6 fases reescritos em registro técnico ("1. Qual é o tecido-alvo do seu projeto?", "2. Qual é a aplicação pretendida e a dimensão do construto?", "1. Modelo tridimensional", "5. Substrato de impressão (ponto zero)", "Análise da bioimpressão — ciclo de retroalimentação", etc.); "(Host)" removido do nome da Fase 4 — BIA Host é o modo avançado, acessível no header de `/execute`.
+- Sidebar: Fase 4 aponta para `/execute`; descrições reescritas. Stepper: "Bioimpressão" / "Maturação & caracterizações".
+- Manual: removidos capítulos obsoletos (Formulador Pro, Formulador Bio, Gerador STL, Bioimpressão 3D, Roadmap Futuro, Visão Estratégica — 907 linhas); mantido o protocolo "Análise dos construtos impressos". Capítulo da Fase 2 reescrito para os 4 modos; Fases 3 e 4 atualizadas (testes de imprimibilidade no BioSlicer, destino único da Fase 4).
+- Componentes órfãos removidos: `InfillStudio`, `ToolpathAnalyzer`, `ScientificRefsPanel`.

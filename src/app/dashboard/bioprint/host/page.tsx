@@ -240,7 +240,7 @@ export default function BioHostPage() {
             <div className="mt-2 text-[11px] text-gray-500">Antes de iniciar: posicione o bico sobre a origem (centro do alvo) com o jog e clique em <b>Zerar origem</b>. O G-code BIA não faz home.</div>
           </Panel>
 
-          <Panel title="Jog & origem" icon={<Crosshair className="w-4 h-4" />}>
+          <Panel title="Movimentação manual e origem" icon={<Crosshair className="w-4 h-4" />}>
             <div className="grid grid-cols-[auto_1fr] gap-3 items-center">
               <div className="grid grid-cols-3 gap-1">
                 <span />
@@ -268,7 +268,7 @@ export default function BioHostPage() {
             {pos && <div className="mt-2 font-mono text-xs text-gray-300">X {pos.x.toFixed(2)} · Y {pos.y.toFixed(2)} · Z {pos.z.toFixed(2)} · E {pos.e.toFixed(2)}</div>}
           </Panel>
 
-          <Panel title="Seringa & extrusão" icon={<Syringe className="w-4 h-4" />}>
+          <Panel title="Seringa e extrusão" icon={<Syringe className="w-4 h-4" />}>
             <Field label="Seringa"><select value={syringe.label} onChange={(e) => setSyringe(SYRINGE_CATALOG.find((s) => s.label === e.target.value) ?? syringe)} className={inp}>{SYRINGE_CATALOG.map((s) => <option key={s.label}>{s.label}</option>)}</select></Field>
             <div className="mt-2 grid grid-cols-3 gap-1.5 text-xs">
               <button onClick={() => send(macroPrimeUl(5, ctx))} disabled={!connected} className="py-1.5 rounded-lg border border-white/10 disabled:opacity-40">Prime 5 µL</button>
@@ -301,7 +301,7 @@ export default function BioHostPage() {
             materialLabel={flowMaterialLabel} memory={flowMemory} startPercent={flowStartRef.current}
             onChange={applyFlow} onConfirmGood={confirmGoodFlow}
           />
-          <Panel title="Velocidade" icon={<Gauge className="w-4 h-4" />}>
+          <Panel title="Velocidade de impressão" icon={<Gauge className="w-4 h-4" />}>
             <Slider label="Velocidade (M220)" value={speed} min={20} max={200} onChange={setSpeed} onCommit={(v) => send(`M220 S${v}`)} disabled={!connected} />
           </Panel>
         </div>
@@ -339,7 +339,7 @@ export default function BioHostPage() {
             </div>
           </Panel>
 
-          <Panel title="Checklist antes de imprimir" icon={<Settings2 className="w-4 h-4" />}>
+          <Panel title="Lista de verificação pré-impressão" icon={<Settings2 className="w-4 h-4" />}>
             <ul className="text-xs text-gray-300 space-y-1 list-disc pl-4">
               <li><b>Extrusão a frio</b> habilitada (M302 S0) — bioimpressoras não têm hotend a 170 °C.</li>
               <li><b>E-steps</b> calibrados para a seringa (tipicamente 2000–9000 steps/mm em redução 4:1).</li>

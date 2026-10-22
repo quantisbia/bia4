@@ -129,7 +129,7 @@ function DrawPrintInner() {
 
       <div className="grid lg:grid-cols-[minmax(0,1fr)_380px] gap-6">
         <div className="space-y-5 min-w-0">
-          <Panel title="1 · Desenhe sobre a mesa" icon={<Pencil className="w-4 h-4" />} subtitle={`Ø útil ${bed.toFixed(0)} mm · ${strokes.length} traço(s)`}>
+          <Panel title="1. Desenho sobre a mesa de impressão" icon={<Pencil className="w-4 h-4" />} subtitle={`Ø útil ${bed.toFixed(0)} mm · ${strokes.length} traço(s)`}>
             <DrawCanvas strokes={strokes} onChange={(s) => { setStrokes(s); setResult(null) }} activeTool={activeTool} toolCount={tools.heads.length} onActiveTool={setActiveTool} bedDiameter_mm={bed} fillClosed={fillClosed} onFillClosed={setFillClosed} defaultLayers={vol.layers} layerHeight_mm={P.layerHeight_mm} />
             {strokes.length > 0 && (
               <div className={cn("mt-2 text-xs rounded-lg border px-3 py-2", fits ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-100" : "border-rose-500/40 bg-rose-500/10 text-rose-100")}>
@@ -140,7 +140,7 @@ function DrawPrintInner() {
 
           {result && (
             <>
-              <Panel title="Preview por camada" icon={<Layers className="w-4 h-4" />}>
+              <Panel title="Pré-visualização por camada" icon={<Layers className="w-4 h-4" />}>
                 <LayerPreview layers={result.layers} bbox={{ minX: -bed / 2, maxX: bed / 2, minY: -bed / 2, maxY: bed / 2, minZ: 0, maxZ: drawingLayerCount(strokes, vol) * P.layerHeight_mm }} lineWidth_mm={P.lineWidth_mm} />
               </Panel>
               <div className="grid sm:grid-cols-4 gap-2 text-xs">
@@ -159,7 +159,7 @@ function DrawPrintInner() {
         </div>
 
         <div className="space-y-5 min-w-0">
-          <Panel title="2 · Volume a partir do desenho" icon={<Layers className="w-4 h-4" />}>
+          <Panel title="2. Volume gerado a partir do desenho" icon={<Layers className="w-4 h-4" />}>
             <div className="space-y-3 text-sm">
               <Row label={`Camadas padrão para linhas e novas formas (${vol.layers} × ${P.layerHeight_mm} mm = ${(vol.layers * P.layerHeight_mm).toFixed(2)} mm)`}><input type="range" min={1} max={60} value={vol.layers} onChange={(e) => setVol({ ...vol, layers: +e.target.value })} className="w-full accent-emerald-400" /></Row>
               {strokes.some((s) => s.closed) && (
@@ -193,7 +193,7 @@ function DrawPrintInner() {
             </div>
           </Panel>
 
-          <Panel title="3 · Agulha, camada e velocidade" icon={<Gauge className="w-4 h-4" />}>
+          <Panel title="3. Agulha, altura de camada e velocidade" icon={<Gauge className="w-4 h-4" />}>
             <div className="space-y-3 text-sm">
               <Row label="Agulha / bico"><select value={P.nozzleDiameter_mm} onChange={(e) => { const d = +e.target.value; setP({ ...P, nozzleDiameter_mm: d, lineWidth_mm: defaultLineWidth(d), layerHeight_mm: defaultLayerHeight(d), firstLayerHeight_mm: Math.round(defaultLayerHeight(d) * 0.9 * 100) / 100 }) }} className={inp}>{NEEDLE_GAUGES.map((g) => <option key={g.gauge} value={g.id_mm}>{g.gauge} · {g.id_mm} mm</option>)}{!gauge && <option value={P.nozzleDiameter_mm}>{P.nozzleDiameter_mm} mm</option>}</select></Row>
               <Row label="Seringa"><select value={X.syringe ? `${X.syringe.volume_mL}|${X.syringe.innerDiameter_mm}` : "pneumatic"} onChange={(e) => { if (e.target.value === "pneumatic") setX({ ...X, kind: "pneumatic", syringe: undefined }); else { const [v, d] = e.target.value.split("|").map(Number); setX({ ...X, kind: "syringe_stepper", syringe: { volume_mL: v, innerDiameter_mm: d } }) } }} className={inp}>{SYRINGE_CATALOG.map((s) => <option key={s.label} value={`${s.volume_mL}|${s.innerDiameter_mm}`}>{s.label}</option>)}<option value="pneumatic">Pneumático (pressão)</option></select></Row>
@@ -203,8 +203,8 @@ function DrawPrintInner() {
             </div>
           </Panel>
 
-          <Panel title="4 · Onde imprimir (ponto zero)" icon={<Target className="w-4 h-4" />}><TargetPanel target={target} onChange={setTarget} footprint_mm={footprint || null} /></Panel>
-          <Panel title="5 · Cabeçotes e biotintas" icon={<Palette className="w-4 h-4" />}><ToolsPanel tools={tools} onChange={(t) => { setTools(t); if (activeTool >= t.heads.length) setActiveTool(0) }} bioinks={bioinkOptions} baseExtrusion={X} /></Panel>
+          <Panel title="4. Substrato de impressão (ponto zero)" icon={<Target className="w-4 h-4" />}><TargetPanel target={target} onChange={setTarget} footprint_mm={footprint || null} /></Panel>
+          <Panel title="5. Cabeçotes e biotintas" icon={<Palette className="w-4 h-4" />}><ToolsPanel tools={tools} onChange={(t) => { setTools(t); if (activeTool >= t.heads.length) setActiveTool(0) }} bioinks={bioinkOptions} baseExtrusion={X} /></Panel>
 
           <button onClick={() => setConfirmOpen(true)} disabled={!strokes.length || busy} className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-emerald-500 to-cyan-500 text-black disabled:opacity-40 flex items-center justify-center gap-2">
             {busy ? <><RefreshCw className="w-4 h-4 animate-spin" /> Gerando…</> : <><Layers className="w-4 h-4" /> Gerar G-code do desenho (6 créditos)</>}

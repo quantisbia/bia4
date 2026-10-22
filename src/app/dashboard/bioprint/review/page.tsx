@@ -128,13 +128,13 @@ export default function ReviewPage() {
             <div className="text-[10px] uppercase tracking-wider text-sky-300/80 font-semibold">
               Fase 5 / 6 · Bioimpressão
             </div>
-            <h1 className="text-lg font-bold text-white">Análise da bioimpressão — o laço fechado</h1>
+            <h1 className="text-lg font-bold text-white">Análise da bioimpressão — ciclo de retroalimentação</h1>
             <p className="text-xs text-gray-300 mt-1 leading-relaxed max-w-3xl">
-              Olhe para o que saiu da bioimpressora e conte para a BIA: nota de 1 a 5 e um relato livre
-              (“fios entre as paredes”, “a primeira camada descolou”, “ficou borrado”…). A BIA interpreta
-              os sintomas, decide ajustes explicáveis (fluxo, velocidade, camada, retração, paredes, infill,
-              ponto zero) e aplica no <strong className="text-violet-200">próximo G-code da Fase 3</strong>.
-              Se ficou bom, siga para a <strong className="text-rose-200">Fase 6 · Maturação</strong>.
+              Avalie o construto impresso e registre uma nota de 1 a 5 acompanhada de um relato técnico
+              (“filamentos entre as paredes”, “descolamento da primeira camada”, “perda de definição”…). A BIA interpreta
+              os sintomas, determina ajustes rastreáveis (fluxo, velocidade, altura de camada, retração, paredes, preenchimento,
+              ponto zero) e os aplica ao <strong className="text-violet-200">próximo G-code da Fase 3</strong>.
+              Caso o resultado seja satisfatório, prossiga para a <strong className="text-rose-200">Fase 6 · Maturação & caracterizações</strong>.
             </p>
           </div>
           <button
@@ -219,7 +219,7 @@ export default function ReviewPage() {
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-            <Star className="w-4 h-4 text-sky-300" /> Análises (nota + relato → ajustes)
+            <Star className="w-4 h-4 text-sky-300" /> Avaliações registradas (nota, relato e ajustes derivados)
           </h2>
           {feedback.length > 0 && (
             <button
@@ -281,7 +281,7 @@ export default function ReviewPage() {
       {results.length > 0 && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-            <Layers className="w-4 h-4 text-emerald-300" /> Resultados registrados (qualidade + issues)
+            <Layers className="w-4 h-4 text-emerald-300" /> Resultados registrados (qualidade e não conformidades)
           </h2>
           <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {results.slice(0, 20).map((r) => {
@@ -315,7 +315,7 @@ export default function ReviewPage() {
       {/* Navegação */}
       <nav className="flex items-center justify-between flex-wrap gap-2 pt-2">
         <Link href={STEP_ROUTES.control} className="text-xs text-gray-400 hover:text-white flex items-center gap-1.5">
-          <ArrowLeft className="w-3.5 h-3.5" /> <Gamepad2 className="w-3.5 h-3.5" /> Fase 4 · Bioimpressão (Host)
+          <ArrowLeft className="w-3.5 h-3.5" /> <Gamepad2 className="w-3.5 h-3.5" /> Fase 4 · Bioimpressão
         </Link>
         <Link href={STEP_ROUTES.postBio} className="text-xs text-rose-200 hover:text-white flex items-center gap-1.5">
           Fase 6 · Maturação & caracterizações <ArrowRight className="w-3.5 h-3.5" />

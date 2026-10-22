@@ -40,9 +40,9 @@ const STEPS: StepDef[] = [
   { key: "model",   number: 1, label: "Modelo de tecido",   shortLabel: "Tecido",    icon: Box,            route: STEP_ROUTES.model   },
   { key: "bioink",  number: 2, label: "Biotinta",           shortLabel: "Biotinta",  icon: Droplets,       route: STEP_ROUTES.bioink  },
   { key: "slice",   number: 3, label: "Fatiamento",         shortLabel: "Fatiar",    icon: Layers,         route: STEP_ROUTES.slice   },
-  { key: "control", number: 4, label: "Bioimpressão (Host)", shortLabel: "Host",     icon: Gamepad2,       route: STEP_ROUTES.control },
+  { key: "control", number: 4, label: "Bioimpressão",        shortLabel: "Imprimir",     icon: Gamepad2,       route: STEP_ROUTES.control },
   { key: "review",  number: 5, label: "Análise",            shortLabel: "Análise",   icon: ClipboardCheck, route: STEP_ROUTES.review  },
-  { key: "postBio", number: 6, label: "Maturação",          shortLabel: "Maturação", icon: Beaker,         route: STEP_ROUTES.postBio },
+  { key: "postBio", number: 6, label: "Maturação & caracterizações", shortLabel: "Maturação", icon: Beaker,         route: STEP_ROUTES.postBio },
 ]
 
 /** Rotas que também contam como "estou na Fase 3" (todas vivem no BioSlicer). */

@@ -49,7 +49,7 @@ const STEP_CARDS: StepCardDef[] = [
     title: "Modelo de tecido",
     short: STEP_LABELS.model,
     description:
-      "O que você vai bioimprimir: tecido-alvo (cartilagem, pele, osso, vaso, miocárdio, renal, hepático, neural ou teste), aplicação, tamanho e se leva células. Aqui não há STL — a BIA traduz a intenção em sugestão de modelo, perfil, biotinta e alvo para as próximas fases.",
+      "Definição do construto: tecido-alvo (cartilagem, pele, osso, vaso, miocárdio, renal, hepático, neural ou teste de imprimibilidade), aplicação pretendida, dimensão e população celular. Esta fase não envolve geometria — a BIA traduz a intenção biológica em recomendações de modelo, perfil, biotinta e substrato para as fases seguintes.",
     icon: Box,
     route: STEP_ROUTES.model,
     color: "emerald",
@@ -60,7 +60,7 @@ const STEP_CARDS: StepCardDef[] = [
     title: "Biotinta",
     short: STEP_LABELS.bioink,
     description:
-      "Escolha uma biotinta validada (alginato-gelatina, GelMA, Pluronic, FRESH, CELLINK SKIN...) e as células. Os parâmetros que funcionam vêm junto. Laboratório avançado e formulação livre ficam em Opções avançadas.",
+      "Único local de formulação de biotintas, em quatro modos: formulações validadas (alginato-gelatina, GelMA, Pluronic, FRESH, CELLINK SKIN…) com parâmetros correspondentes; laboratório guiado; formulação livre (807 biomateriais, reologia, multimaterial); e Formulador Pro assistido por IA.",
     icon: Droplets,
     route: STEP_ROUTES.bioink,
     color: "cyan",
@@ -71,7 +71,7 @@ const STEP_CARDS: StepCardDef[] = [
     title: "Fatiamento — BioSlicer",
     short: STEP_LABELS.slice,
     description:
-      "O ÚNICO lugar de STL e geometria 3D da BIA: modelo anatômico real, primitiva, upload, desenho ou teste de imprimibilidade → G-code com extrusão volumétrica por seringa, infills honestos (básico + Schwarz P, Diamond, Voronoi, Perlin, gradiente), Mesa (deitar/girar), alvo Petri/placa e 1–4 cabeçotes. Ponto zero = bico. Prévia grátis; 6 créditos por G-code.",
+      "Único local de geometria 3D da BIA: modelo anatômico, primitiva, upload de STL, desenho ou teste de imprimibilidade → G-code com extrusão volumétrica por seringa, padrões de preenchimento (básicos e avançados: Schwarz P, Diamond, Voronoi, Perlin, gradiente), orientação na mesa, substrato Petri/placa e 1–4 cabeçotes. Ponto zero na agulha. Pré-visualização gratuita; 6 créditos por G-code.",
     icon: Layers,
     route: STEP_ROUTES.slice,
     color: "violet",
@@ -79,10 +79,10 @@ const STEP_CARDS: StepCardDef[] = [
   {
     key: "control",
     number: 4,
-    title: "Bioimpressão (Host)",
+    title: "Bioimpressão",
     short: STEP_LABELS.control,
     description:
-      "BIA Host: conexão USB (Web Serial / Marlin), joystick, stream do G-code com ok-handshake, pausa/retomar/cancelar/M112, viabilidade celular live. Ao terminar, você dá a nota e conta o que viu — isso alimenta a Fase 5.",
+      "Execução na bioimpressora: conexão USB (Web Serial / Marlin), validação e pré-visualização 3D do G-code, movimentação manual, transmissão com handshake, pausa/retomada/cancelamento/M112 e viabilidade celular em tempo real. Ao término, a avaliação do construto alimenta a Fase 5.",
     icon: Gamepad2,
     route: STEP_ROUTES.control,
     color: "amber",
@@ -93,7 +93,7 @@ const STEP_CARDS: StepCardDef[] = [
     title: "Análise da bioimpressão",
     short: STEP_LABELS.review,
     description:
-      "Laço fechado: nota 1–5, relato livre, sintomas interpretados (fios, colapso, sub/sobre-extrusão, descolamento…) e os ajustes que a BIA aplica no próximo G-code. Histórico de impressões e decisão: repetir na Fase 3 ou seguir para maturação.",
+      "Ciclo de retroalimentação: nota de 1 a 5, relato técnico, interpretação dos sintomas (filamentos, colapso, sub/sobre-extrusão, descolamento…) e ajustes aplicados pela BIA ao próximo G-code. Histórico de impressões e decisão: repetir a Fase 3 ou prosseguir para a maturação.",
     icon: ClipboardCheck,
     route: STEP_ROUTES.review,
     color: "sky",
@@ -104,7 +104,7 @@ const STEP_CARDS: StepCardDef[] = [
     title: "Maturação & caracterizações",
     short: STEP_LABELS.postBio,
     description:
-      "Do construto ao tecido: cultura, crosslink, biorreator (perfusão/agitação) e caracterizações (Live/Dead, AlamarBlue, histologia, immunostaining, mecânica). Protocolos por tecido: cardíaco · ósseo · cartilagem · vaso · pele · nervo · hepático.",
+      "Do construto ao tecido: cultivo, reticulação, biorreator (perfusão/agitação) e caracterizações (Live/Dead, AlamarBlue, histologia, imunomarcação, ensaios mecânicos). Protocolos por tecido: cardíaco · ósseo · cartilaginoso · vascular · cutâneo · neural · hepático.",
     icon: Beaker,
     route: STEP_ROUTES.postBio,
     color: "rose",
@@ -219,7 +219,7 @@ export default function BioprintHubPage() {
             onClick={() => router.push("/dashboard/bioprint/execute")}
             className="px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-400 hover:bg-emerald-500/30 text-emerald-100 text-xs font-semibold transition-colors flex items-center gap-1.5"
           >
-            Ir para a Bioimpressão (Host) <ArrowRight className="w-3.5 h-3.5" />
+            Ir para a Fase 4 · Bioimpressão <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </section>
       )}

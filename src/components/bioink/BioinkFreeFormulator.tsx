@@ -495,7 +495,7 @@ export function BioinkFreeFormulator() {
             </div>
             <h1 className="text-lg sm:text-2xl font-bold text-white flex items-center gap-2">
               <Droplets className="w-5 h-5 text-cyan-400" />
-              Formular do zero
+              Formulação livre
             </h1>
             <p className="text-xs sm:text-sm text-gray-400 mt-1 max-w-2xl">
               Defina o material, concentração, agente de crosslinking e células — as propriedades reológicas

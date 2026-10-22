@@ -149,7 +149,7 @@ export default function BioprintPostPage() {
           <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-6 text-center">
             <Lock className="w-10 h-10 text-amber-300 mx-auto mb-3" />
             <h2 className="text-lg font-semibold text-amber-100 mb-2">
-              Fase 4 (Bioimpressão · Host) ainda não concluída
+              Fase 4 · Bioimpressão ainda não concluída
             </h2>
             <p className="text-sm text-amber-200/80 mb-5">
               Você precisa executar a bioimpressão antes de configurar a
@@ -187,7 +187,7 @@ export default function BioprintPostPage() {
                 Cultura → Biorreator → Caracterizações · construto → tecido funcional
               </p>
             </div>
-            <InfoButton title="O que é a Pós-Bioimpressão?" size="sm">
+            <InfoButton title="O que compreende a Fase 6?" size="sm">
               <p className="mb-2">
                 Quando o construct sai da bioimpressora ele <strong>não é
                 tecido ainda</strong> — é um andaime com células dispersas.
@@ -274,9 +274,9 @@ export default function BioprintPostPage() {
           <div className="flex items-center gap-2">
             <Microscope className="w-5 h-5 text-rose-300" />
             <h2 className="text-base font-semibold text-white">
-              Tipo de tecido alvo
+              Tecido-alvo
             </h2>
-            <InfoButton title="Por que selecionar o tecido?" size="sm">
+            <InfoButton title="Por que informar o tecido-alvo?" size="sm">
               <p className="mb-2">
                 Cada tecido tem requisitos biológicos próprios:
               </p>
@@ -326,9 +326,9 @@ export default function BioprintPostPage() {
           <div className="flex items-center gap-2">
             <FlaskConical className="w-5 h-5 text-emerald-300" />
             <h2 className="text-base font-semibold text-white">
-              Checklist de execução biológica
+              Protocolo de maturação e caracterização
             </h2>
-            <InfoButton title="Para que serve esse checklist?" size="sm">
+            <InfoButton title="Qual é a finalidade deste protocolo?" size="sm">
               <p>
                 Marque cada estágio à medida que ele for executado em
                 laboratório. Isso registra o progresso real do construct
@@ -401,7 +401,7 @@ export default function BioprintPostPage() {
             <div className="mt-3 rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-2 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
               <p className="text-xs text-amber-200">
-                A Fase 4 (Bioimpressão · Host) ainda não está marcada como concluída.
+                A Fase 4 · Bioimpressão ainda não foi registrada como concluída.
                 Você pode planejar a pós-bioimpressão aqui, mas o construct
                 precisa estar realmente impresso para que o checklist faça sentido.
               </p>

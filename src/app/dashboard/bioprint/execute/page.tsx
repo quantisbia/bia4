@@ -1919,13 +1919,22 @@ export default function BioprintExecutePage() {
           <div className="w-px h-5 bg-white/10" />
           <h1 className="text-base font-bold text-white flex items-center gap-2">
             <Zap className="w-4 h-4 text-amber-300" />
-            Fase 4 / 6 · Bioimpressão (Host)
+            Fase 4 / 6 · Bioimpressão
             <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-200 font-semibold">
               USB · Web Serial
             </span>
           </h1>
 
           <div className="flex-1" />
+
+          {/* R24.6 · BIA Host = modo avançado da Fase 4 (host serial: checksum/reenvio, jog, macros de seringa) */}
+          <Link
+            href="/dashboard/bioprint/host"
+            title="Modo avançado: host serial profissional (linhas numeradas + checksum, reenvio, janela de envio, macros de seringa)"
+            className="text-[11px] px-2.5 py-1 rounded-md border border-white/10 text-gray-300 hover:text-white hover:border-emerald-400/40 transition-colors"
+          >
+            Modo avançado · BIA Host
+          </Link>
 
           {/* Mode toggle.
               R12.53: a ordem visual agora é "Real USB" PRIMEIRO (default) e
@@ -2020,7 +2029,7 @@ export default function BioprintExecutePage() {
           )}
           {/* ── 1. G-code input ───────────────────────────────────── */}
           <Panel
-            title="1. G-code"
+            title="1. Arquivo G-code"
             icon={<FileCode2 className="w-4 h-4" />}
             badge={`${lineCount.toLocaleString()} linhas`}
             badgeColor="cyan"
@@ -2088,7 +2097,7 @@ export default function BioprintExecutePage() {
 
           {/* ── 2. Validador ──────────────────────────────────────── */}
           <Panel
-            title="2. Validação"
+            title="2. Validação do G-code"
             icon={<CheckCircle2 className="w-4 h-4" />}
             badge={validation ? verdictLabel(validation.verdict).text : "Não validado"}
             badgeColor={validation ? (verdictLabel(validation.verdict).color as any) : "gray"}
@@ -2385,7 +2394,7 @@ export default function BioprintExecutePage() {
           {/* ── 2.5 Análise de Complexidade (R12.11) ──────────────── */}
           {complexityAnalysis && (
             <Panel
-              title="2.5 Complexidade do G-code"
+              title="2.1 Complexidade do G-code"
               icon={<Cpu className="w-4 h-4" />}
               badge={complexityAnalysis.complexityLabel}
               badgeColor={complexityAnalysis.complexityColor as any}
@@ -2524,7 +2533,7 @@ export default function BioprintExecutePage() {
 
           {/* ── 3. Preview 3D ─────────────────────────────────────── */}
           <Panel
-            title="3. Preview profissional (3D)"
+            title="3. Pré-visualização tridimensional"
             icon={<Eye className="w-4 h-4" />}
             badge={parsed ? `${parsed.moves.length.toLocaleString()} moves` : "sem dados"}
             badgeColor="violet"
@@ -2570,7 +2579,7 @@ export default function BioprintExecutePage() {
 
           {/* ── 4. Stream / Execução ──────────────────────────────── */}
           <Panel
-            title="4. Enviar para a bioimpressora"
+            title="4. Envio à bioimpressora"
             icon={<Send className="w-4 h-4" />}
             badge={controllerState}
             badgeColor={
@@ -2960,7 +2969,7 @@ export default function BioprintExecutePage() {
 
           {/* ── Joystick lateral ─────────────────────────────────── */}
           <Panel
-            title="Joystick (jog manual)"
+            title="Movimentação manual (jog)"
             icon={<Gamepad2 className="w-4 h-4" />}
             badge={isHandshaking ? "🔒 preparando…" : `${step} mm`}
             badgeColor={isHandshaking ? "amber" : "cyan"}
