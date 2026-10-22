@@ -2034,3 +2034,10 @@ Janaina Dernowsek (CEO/Founder)
 - Ao **fechar uma forma** (laço livre que volta ao início, círculo ou retângulo) a tela pergunta **"Quantas camadas?"** (atalhos 1/3/5/10/20/40, campo numérico, slider, altura resultante em mm, preencher o interior sim/não). A resposta vira `Stroke.layers` — **altura própria da forma**.
 - `strokesToLayers` agora respeita a altura de cada traço: a forma fechada sobe N camadas enquanto linhas ao lado param na altura padrão. Altura total do desenho = traço mais alto (`drawingLayerCount`). Painel "Volume" lista as formas fechadas com campo de camadas editável; duplo toque na forma reabre a pergunta (editar/apagar). Rótulo no canvas mostra `n·T0 · 10cam`.
 - Testes: `tests/r24_draw_layers_per_stroke.test.ts` (4).
+
+### R24.5 · Desenhar & Imprimir: lupa, sanduíche por camada, +8 biotintas, pergunta pós-impressão no Host
+- **Lupa de zoom** no canvas de desenho (botões −/+/ajustar, 0,5×–4×, scroll do mouse); canvas limitado à altura da janela — não "estoura" mais ao mostrar o resultado.
+- **Sanduíche por camada** (`DrawVolume.bands: LayerBand[]`): faixas de N camadas com padrão + densidade próprios (gyroid → grid → triangular 30 %…), empilhadas de baixo para cima e repetidas ciclicamente. Presets: Pele 3 camadas, Osteocondral, Sanduíche clássico, Alternado. Editor com rótulo/ordem/remover, pilha visual colorida, resumo no modal e `bands` no `;BIA_META`. Todos os infills (básicos + avançados) disponíveis no desenho.
+- **Fase 2 · Biotinta**: catálogo de **18 receitas validadas** (+ CELLINK SKIN 3 camadas, GelMA+Alginato dupla reticulação, CNF+GelMA+HAp osso, Agarose+Alginato, dECM+GelMA, PCL+HAp fusão, Gelatina sacrificial, Alg/Gel/Fibrina cardíaco) com **filtro por objetivo** (pré-selecionado pelo tecido da Fase 1).
+- **BIA Host**: ao terminar a impressão, marca a Fase 4 como pronta e abre o modal **"Ficou como você esperava? nota 1–5 + o que mudar"** (banner com botão "Avaliar impressão" e link para a Fase 5).
+- Testes: `r24_draw_bands.test.ts` (5); `r16_bioink_lab` ajustado para ≥10 receitas.

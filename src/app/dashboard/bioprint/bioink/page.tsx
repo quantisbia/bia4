@@ -14,7 +14,7 @@ import { useRouter } from "next/navigation"
 import { Droplets, ArrowRight, Check, Sun, Thermometer, CircleDot, ChevronDown, FlaskConical, SlidersHorizontal, Microscope, Info } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { useBioprintProcess } from "@/lib/bioprint/process-context"
-import { RECIPES, CELL_LABELS, toBioinkPatch, getRecipe, type CellTypeId, type Recipe } from "@/lib/bioink-lab"
+import { RECIPES, CELL_LABELS, GOAL_LABELS, toBioinkPatch, getRecipe, type CellTypeId, type Recipe } from "@/lib/bioink-lab"
 
 const ORDER: Record<Recipe["level"], number> = { starter: 0, intermediate: 1, advanced: 2 }
 const CELL_ORDER: CellTypeId[] = ["none", "fibroblast", "keratinocyte", "chondrocyte", "osteoblast", "msc", "huvec", "hepatocyte", "cardiomyocyte", "neuron", "ipsc", "tumor"]
@@ -37,7 +37,15 @@ export default function BioinkStepPage() {
   useEffect(() => { try { sessionStorage.setItem(PICK_KEY, JSON.stringify({ recipeId, cell, density })) } catch { /* noop */ } }, [recipeId, cell, density])
 
   const recipes = useMemo(() => [...RECIPES].sort((a, b) => ORDER[a.level] - ORDER[b.level]), [])
-  const visible = showAll ? recipes : recipes.filter((r) => r.level !== "advanced")
+  // R24.5 · catálogo ampliado (18 receitas): filtro por objetivo/tecido; o brief da Fase 1 pré-seleciona
+  const [goal, setGoal] = useState<string>("all")
+  useEffect(() => {
+    const t = state.model.brief?.tissue?.toLowerCase() ?? ""
+    const map: Array<[RegExp, string]> = [[/pele/, "skin"], [/cartil/, "cartilage"], [/osso|óss/, "bone"], [/vasc/, "vascular"], [/mioc|card/, "cardiac"], [/hep|fíg/, "liver"], [/neur/, "neural"], [/renal|rim/, "generic_cells"], [/teste/, "learn"]]
+    const hit = map.find(([re]) => re.test(t)); if (hit) setGoal(hit[1])
+  }, [state.model.brief?.tissue])
+  const byGoal = goal === "all" ? recipes : recipes.filter((r) => r.goals.includes(goal as Recipe["goals"][number]))
+  const visible = showAll || goal !== "all" ? byGoal : byGoal.filter((r) => r.level !== "advanced")
   const recipe = getRecipe(recipeId) ?? recipes[0]
   const canCells = recipe.cellDensity_Mml[1] > 0
   const cellOk = canCells && cell !== "none" && recipe.cellsOk.includes(cell)
@@ -82,7 +90,13 @@ export default function BioinkStepPage() {
 
         {/* Receitas */}
         <section id="bioink-recipes">
-          <h2 className="text-sm font-semibold text-white mb-3">1 · Qual biotinta?</h2>
+          <h2 className="text-sm font-semibold text-white mb-2">1 · Qual biotinta? <span className="text-xs font-normal text-gray-500">({recipes.length} receitas validadas)</span></h2>
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            <button onClick={() => setGoal("all")} className={cn("px-2.5 py-1 rounded-lg border text-xs", goal === "all" ? "border-cyan-400/50 bg-cyan-500/15 text-cyan-100" : "border-white/10 text-gray-300 hover:border-white/25")}>Todas</button>
+            {Object.entries(GOAL_LABELS).map(([id, g]) => (
+              <button key={id} onClick={() => setGoal(id)} title={g.hint} className={cn("px-2.5 py-1 rounded-lg border text-xs", goal === id ? "border-cyan-400/50 bg-cyan-500/15 text-cyan-100" : "border-white/10 text-gray-300 hover:border-white/25")}>{g.emoji} {g.label} <span className="text-gray-500">({recipes.filter((r) => r.goals.includes(id as Recipe["goals"][number])).length})</span></button>
+            ))}
+          </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {visible.map((r) => {
               const active = r.id === recipe.id
@@ -104,9 +118,12 @@ export default function BioinkStepPage() {
               )
             })}
           </div>
-          <button onClick={() => setShowAll(!showAll)} className="mt-2 text-xs text-gray-500 hover:text-gray-300 inline-flex items-center gap-1">
-            <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showAll && "rotate-180")} /> {showAll ? "Ocultar receitas avançadas" : `Mostrar receitas avançadas (${recipes.length - visible.length})`}
-          </button>
+          {goal === "all" && byGoal.length > visible.length + (showAll ? 0 : -1) && (
+            <button onClick={() => setShowAll(!showAll)} className="mt-2 text-xs text-gray-500 hover:text-gray-300 inline-flex items-center gap-1">
+              <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showAll && "rotate-180")} /> {showAll ? "Ocultar receitas avançadas" : `Mostrar receitas avançadas (${byGoal.length - visible.length})`}
+            </button>
+          )}
+          {visible.length === 0 && <div className="text-xs text-gray-500 mt-2">Nenhuma receita para este objetivo — escolha “Todas” ou monte a sua no Laboratório (Opções avançadas).</div>}
         </section>
 
         {/* Células */}

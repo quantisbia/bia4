@@ -43,6 +43,22 @@ export interface Stroke {
   layers?: number
 }
 
+/**
+ * R24.5 · Faixa do "sanduíche": um bloco de N camadas com um preenchimento
+ * e densidade próprios. As faixas são empilhadas em ordem (de baixo para cima)
+ * e repetidas ciclicamente se o desenho for mais alto que a soma delas.
+ *   ex.: [gyroid 30% ×2] [grid 40% ×1] [triangles 30% ×2] → 5 camadas, repete
+ */
+export interface LayerBand {
+  /** nº de camadas desta faixa (≥1) */
+  layers: number
+  pattern: SliceParams["infillPattern"]
+  /** densidade (%) do preenchimento nesta faixa */
+  density: number
+  /** rótulo opcional (ex.: "derme") */
+  label?: string
+}
+
 export interface DrawVolume {
   /** nº de camadas a repetir o desenho (1 = só uma camada) */
   layers: number
@@ -51,9 +67,47 @@ export interface DrawVolume {
   /** densidade do preenchimento das formas fechadas com fill=true (%) */
   fillDensity: number
   fillPattern: SliceParams["infillPattern"]
+  /**
+   * R24.5 · plano de preenchimento por camada ("sanduíche"). Se presente e
+   * não vazio, substitui fillPattern/fillDensity: a camada i usa a faixa que
+   * a contém (ciclando). Se ausente, todas as camadas usam fillPattern/fillDensity.
+   */
+  bands?: LayerBand[]
 }
 
 export const DEFAULT_DRAW_VOLUME: DrawVolume = { layers: 1, alternate90: false, fillDensity: 30, fillPattern: "rectilinear" }
+
+/** Preenchimento efetivo (padrão + densidade) da camada i segundo o plano de faixas. */
+export function fillForLayer(vol: DrawVolume, i: number): { pattern: SliceParams["infillPattern"]; density: number; band: number | null } {
+  const bands = (vol.bands ?? []).filter((b) => b.layers >= 1)
+  if (!bands.length) return { pattern: vol.fillPattern, density: vol.fillDensity, band: null }
+  const total = bands.reduce((a, b) => a + Math.round(b.layers), 0)
+  let k = ((i % total) + total) % total
+  for (let b = 0; b < bands.length; b++) {
+    const n = Math.round(bands[b].layers)
+    if (k < n) return { pattern: bands[b].pattern, density: bands[b].density, band: b }
+    k -= n
+  }
+  const last = bands[bands.length - 1]
+  return { pattern: last.pattern, density: last.density, band: bands.length - 1 }
+}
+
+/** Soma de camadas das faixas (0 se não há plano). */
+export function bandsTotalLayers(vol: DrawVolume): number {
+  return (vol.bands ?? []).reduce((a, b) => a + Math.max(0, Math.round(b.layers)), 0)
+}
+
+/** Presets de sanduíche prontos (pt-BR). */
+export const BAND_PRESETS: Array<{ id: string; label: string; hint: string; bands: LayerBand[] }> = [
+  { id: "skin3", label: "Pele 3 camadas", hint: "derme reticular gyroid 30 % · derme papilar grid 40 % · epiderme concêntrico 60 %", bands: [
+    { layers: 2, pattern: "gyroid", density: 30, label: "derme reticular" }, { layers: 1, pattern: "grid", density: 40, label: "derme papilar" }, { layers: 1, pattern: "concentric", density: 60, label: "epiderme" } ] },
+  { id: "osteochondral", label: "Osteocondral", hint: "osso triangular 50 % embaixo · zona de transição grid 40 % · cartilagem honeycomb 30 % em cima", bands: [
+    { layers: 3, pattern: "triangles", density: 50, label: "osso" }, { layers: 1, pattern: "grid", density: 40, label: "transição" }, { layers: 3, pattern: "honeycomb", density: 30, label: "cartilagem" } ] },
+  { id: "sandwich", label: "Sanduíche clássico", hint: "casca densa 60 % · miolo gyroid 20 % · casca densa 60 %", bands: [
+    { layers: 1, pattern: "rectilinear", density: 60, label: "base" }, { layers: 3, pattern: "gyroid", density: 20, label: "miolo" }, { layers: 1, pattern: "rectilinear", density: 60, label: "topo" } ] },
+  { id: "alt3", label: "Alternado (gyroid · grid · triangular)", hint: "uma camada de cada, repete", bands: [
+    { layers: 1, pattern: "gyroid", density: 30 }, { layers: 1, pattern: "grid", density: 30 }, { layers: 1, pattern: "triangles", density: 30 } ] },
+]
 
 export function newStrokeId(): string { return `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}` }
 
@@ -148,8 +202,9 @@ export function strokesToLayers(strokes: Stroke[], P: SliceParams, vol: DrawVolu
         const poly = ensureCCW(pts)
         contours.push(poly)
         if (s.fill) {
+          const F = fillForLayer(vol, i)
           const inf = generateInfill({
-            region: [poly], pattern: vol.fillPattern, lineWidth_mm: P.lineWidth_mm, density_pct: vol.fillDensity,
+            region: [poly], pattern: F.pattern, lineWidth_mm: P.lineWidth_mm, density_pct: F.density,
             angle_deg: P.infillAngle_deg + i * P.infillAngleStep_deg, layerIndex: i, z_mm: z, strandSpacing_mm: P.strandSpacing_mm,
           })
           for (const ip of inf.paths) paths.push({ role: "infill", points: ip, closed: false, speed_mms: i === 0 ? P.speedFirstLayer_mms : P.speedInfill_mms, lineWidth_mm: P.lineWidth_mm, tool: s.tool })
@@ -179,7 +234,8 @@ export function drawToGCode(job: DrawPrintJob): { layers: SlicedLayer[]; result:
   const layers = strokesToLayers(strokes, job.params, job.volume)
   const result = writeGCode(layers, { ...job.params, skirtLoops: 0, purgeLine_mm: 0 }, job.extrusion, {
     ...job.write,
-    meta: { ...(job.write.meta ?? {}), source: "draw-print", strokes: strokes.length, drawLayers: drawingLayerCount(strokes, job.volume), alternate90: job.volume.alternate90 },
+    meta: { ...(job.write.meta ?? {}), source: "draw-print", strokes: strokes.length, drawLayers: drawingLayerCount(strokes, job.volume), alternate90: job.volume.alternate90,
+      bands: job.volume.bands?.length ? job.volume.bands.map((b) => `${b.layers}x${b.pattern}@${b.density}%`).join("|") : undefined },
   })
   return { layers, result, warnings }
 }
@@ -192,5 +248,7 @@ export function describeDrawing(strokes: Stroke[], vol: DrawVolume, layerHeight_
   const L = strokes.reduce((acc, s) => acc + strokeLength(s), 0)
   const n = drawingLayerCount(strokes, vol)
   const mixed = strokes.some((s) => strokeLayers(s, vol) !== n)
-  return `${strokes.length} traço(s) (${tools}) · ${L.toFixed(0)} mm por camada · ${n} camada(s)${mixed ? " (máx.; alturas por traço)" : ""} = ${(n * layerHeight_mm).toFixed(2)} mm de altura${vol.alternate90 ? " · alterna 90°" : ""}`
+  const bands = (vol.bands ?? []).filter((b) => b.layers >= 1)
+  const sand = bands.length ? ` · sanduíche ${bands.map((b) => `${Math.round(b.layers)}×${b.pattern} ${b.density}%`).join(" / ")}` : ""
+  return `${strokes.length} traço(s) (${tools}) · ${L.toFixed(0)} mm por camada · ${n} camada(s)${mixed ? " (máx.; alturas por traço)" : ""} = ${(n * layerHeight_mm).toFixed(2)} mm de altura${vol.alternate90 ? " · alterna 90°" : ""}${sand}`
 }

@@ -12,14 +12,14 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Pencil, Layers, Download, Send, AlertTriangle, ShieldCheck, X as XIcon, Target, Palette, RefreshCw, Gauge } from "lucide-react"
+import { Pencil, Layers, Download, Send, AlertTriangle, ShieldCheck, X as XIcon, Target, Palette, RefreshCw, Gauge, Plus, Trash2, ArrowUp, ArrowDown, Sandwich } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { useBioprintProcess } from "@/lib/bioprint/process-context"
 import { BASIC_PROFILES, SYRINGE_CATALOG, NEEDLE_GAUGES, defaultLineWidth, defaultLayerHeight, type SliceParams, type ExtrusionModel, type InfillPattern } from "@/lib/slicer"
 import { type PrintTarget, DEFAULT_TARGET, describeTarget, targetUsableDiameter } from "@/lib/slicer/target"
 import { type ToolsConfig, singleTool, describeTools } from "@/lib/slicer/tools"
-import { type Stroke, type DrawVolume, DEFAULT_DRAW_VOLUME, drawToGCode, describeDrawing, strokesBBox, drawingLayerCount } from "@/lib/slicer/draw-print"
-import { INFILL_PATTERN_LABELS, BASIC_INFILL_PATTERNS } from "@/lib/slicer/infill-advanced"
+import { type Stroke, type DrawVolume, type LayerBand, DEFAULT_DRAW_VOLUME, BAND_PRESETS, drawToGCode, describeDrawing, strokesBBox, drawingLayerCount, bandsTotalLayers, fillForLayer } from "@/lib/slicer/draw-print"
+import { INFILL_PATTERN_LABELS, BASIC_INFILL_PATTERNS, ADVANCED_INFILL_PATTERNS } from "@/lib/slicer/infill-advanced"
 import { DrawCanvas } from "@/components/slicer/DrawCanvas"
 import { TargetPanel } from "@/components/slicer/TargetPanel"
 import { ToolsPanel, type BioinkOption } from "@/components/slicer/ToolsPanel"
@@ -89,7 +89,7 @@ function DrawPrintInner() {
       setResult({ gcode, layers, stats: r.stats, warnings })
       try {
         const res = await fetch("/api/gcode/charge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ summary: {
-          jobName: "draw-print", profileId: "draw", infill: vol.fillPattern, infillDensity: vol.fillDensity, layerCount: layers.length, volume_uL: Math.round(r.stats.volume_uL), time_s: r.stats.estimatedTime_s,
+          jobName: "draw-print", profileId: "draw", infill: vol.bands?.length ? "bands" : vol.fillPattern, infillDensity: vol.fillDensity, layerCount: layers.length, volume_uL: Math.round(r.stats.volume_uL), time_s: r.stats.estimatedTime_s,
           target: target.kind, wells: r.stats.wells, tools: tools.heads.length, geometryId: "draw", gcodeLines: gcode.split("\n").length,
         } }) })
         if (res.ok) { const j = await res.json(); setCharged({ ok: true, msg: j.charged ? `${j.charged} créditos debitados` : "sem cobrança (admin)" }) }
@@ -177,8 +177,19 @@ function DrawPrintInner() {
                 </div>
               )}
               <label className="flex items-center gap-2 text-xs text-gray-300"><input type="checkbox" checked={vol.alternate90} onChange={(e) => setVol({ ...vol, alternate90: e.target.checked })} /> alternar 90° a cada camada (woodpile — para linhas)</label>
-              <Row label="Preenchimento das formas fechadas"><select value={vol.fillPattern} onChange={(e) => setVol({ ...vol, fillPattern: e.target.value as InfillPattern })} className={inp}>{BASIC_INFILL_PATTERNS.filter((p) => p !== "none").map((p) => <option key={p} value={p}>{INFILL_PATTERN_LABELS[p].label}</option>)}</select></Row>
-              <Row label={`Densidade do preenchimento · ${vol.fillDensity} %`}><input type="range" min={5} max={100} step={5} value={vol.fillDensity} onChange={(e) => setVol({ ...vol, fillDensity: +e.target.value })} className="w-full accent-emerald-400" /></Row>
+              {/* R24.5 · Modo de preenchimento: igual em todas as camadas OU sanduíche por faixas */}
+              <div className="flex items-center gap-1 rounded-lg border border-white/10 p-0.5 text-xs">
+                <button type="button" onClick={() => { setVol({ ...vol, bands: undefined }); setResult(null) }} className={cn("flex-1 px-2 py-1 rounded-md", !vol.bands?.length ? "bg-emerald-500/20 text-emerald-100" : "text-gray-400 hover:text-gray-200")}>Mesmo preenchimento em todas</button>
+                <button type="button" onClick={() => { if (!vol.bands?.length) setVol({ ...vol, bands: BAND_PRESETS[2].bands.map((b) => ({ ...b })) }); setResult(null) }} className={cn("flex-1 px-2 py-1 rounded-md flex items-center justify-center gap-1", vol.bands?.length ? "bg-emerald-500/20 text-emerald-100" : "text-gray-400 hover:text-gray-200")}><Sandwich className="w-3.5 h-3.5" /> Sanduíche por camada</button>
+              </div>
+              {!vol.bands?.length ? (
+                <>
+                  <Row label="Preenchimento das formas fechadas"><select value={vol.fillPattern} onChange={(e) => setVol({ ...vol, fillPattern: e.target.value as InfillPattern })} className={inp}>{PATTERNS.map((p) => <option key={p} value={p}>{INFILL_PATTERN_LABELS[p].label}{(ADVANCED_INFILL_PATTERNS as readonly string[]).includes(p) ? " (avançado)" : ""}</option>)}</select></Row>
+                  <Row label={`Densidade do preenchimento · ${vol.fillDensity} %`}><input type="range" min={5} max={100} step={5} value={vol.fillDensity} onChange={(e) => setVol({ ...vol, fillDensity: +e.target.value })} className="w-full accent-emerald-400" /></Row>
+                </>
+              ) : (
+                <BandsEditor vol={vol} onChange={(v) => { setVol(v); setResult(null) }} totalLayers={drawingLayerCount(strokes, vol)} layerHeight_mm={P.layerHeight_mm} />
+              )}
             </div>
           </Panel>
 
@@ -208,6 +219,7 @@ function DrawPrintInner() {
             <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between"><div className="flex items-center gap-2 text-white font-semibold"><ShieldCheck className="w-5 h-5 text-emerald-300" /> Confirme antes de gerar</div><button onClick={() => setConfirmOpen(false)} className="p-1 rounded hover:bg-white/10 text-gray-400"><XIcon className="w-4 h-4" /></button></div>
             <div className="p-5 space-y-2 text-sm">
               <KV k="Desenho" v={describeDrawing(strokes, vol, P.layerHeight_mm)} />
+              {vol.bands?.length ? <KV k="Sanduíche" v={vol.bands.map((b, i) => `${i + 1}) ${b.layers}× ${INFILL_PATTERN_LABELS[b.pattern]?.label ?? b.pattern} ${b.density}%${b.label ? ` (${b.label})` : ""}`).join(" · ")} /> : null}
               <KV k="Agulha / camada" v={`${P.nozzleDiameter_mm} mm · ${P.layerHeight_mm} mm · ${P.speedPerimeter_mms} mm/s · fluxo ×${X.flowMultiplier.toFixed(2)}`} />
               <KV k="Onde" v={describeTarget(target)} />
               <KV k="Cabeçotes" v={describeTools(tools)} />
@@ -219,6 +231,60 @@ function DrawPrintInner() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+const PATTERNS: InfillPattern[] = [...BASIC_INFILL_PATTERNS.filter((p) => p !== "none"), ...ADVANCED_INFILL_PATTERNS] as InfillPattern[]
+
+/** R24.5 · Editor do "sanduíche": faixas de camadas com preenchimento e densidade próprios. */
+function BandsEditor({ vol, onChange, totalLayers, layerHeight_mm }: { vol: DrawVolume; onChange: (v: DrawVolume) => void; totalLayers: number; layerHeight_mm: number }) {
+  const bands = vol.bands ?? []
+  const set = (b: LayerBand[]) => onChange({ ...vol, bands: b })
+  const upd = (i: number, patch: Partial<LayerBand>) => set(bands.map((b, k) => k === i ? { ...b, ...patch } : b))
+  const move = (i: number, d: -1 | 1) => { const j = i + d; if (j < 0 || j >= bands.length) return; const c = [...bands]; [c[i], c[j]] = [c[j], c[i]]; set(c) }
+  const sum = bandsTotalLayers(vol)
+  // mapa visual: para cada camada do desenho (de cima para baixo), que faixa é
+  const stack = Array.from({ length: totalLayers }, (_, i) => fillForLayer(vol, i))
+  const COLORS = ["#34d399", "#60a5fa", "#f472b6", "#fbbf24", "#a78bfa", "#f87171", "#22d3ee", "#c084fc"]
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1.5">
+        {BAND_PRESETS.map((pr) => (
+          <button key={pr.id} type="button" title={pr.hint} onClick={() => set(pr.bands.map((b) => ({ ...b })))} className="px-2 py-1 rounded-md border border-white/10 text-[11px] text-gray-300 hover:border-emerald-400/40">{pr.label}</button>
+        ))}
+      </div>
+      <div className="text-[10px] text-gray-500">Faixas de baixo para cima. Se o desenho tiver mais camadas que a soma ({sum}), o padrão repete.</div>
+      <div className="space-y-1.5">
+        {bands.map((b, i) => (
+          <div key={i} className="rounded-lg border border-white/10 bg-black/20 p-2 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="inline-block w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
+              <span className="text-gray-400 font-mono">#{i + 1}</span>
+              <input type="text" value={b.label ?? ""} placeholder="rótulo (ex.: derme)" onChange={(e) => upd(i, { label: e.target.value })} className="flex-1 min-w-0 rounded bg-black/30 border border-white/10 px-1.5 py-0.5 text-xs" />
+              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="p-1 rounded border border-white/10 text-gray-400 disabled:opacity-30" aria-label="Subir"><ArrowUp className="w-3 h-3" /></button>
+              <button type="button" onClick={() => move(i, 1)} disabled={i === bands.length - 1} className="p-1 rounded border border-white/10 text-gray-400 disabled:opacity-30" aria-label="Descer"><ArrowDown className="w-3 h-3" /></button>
+              <button type="button" onClick={() => set(bands.filter((_, k) => k !== i))} disabled={bands.length <= 1} className="p-1 rounded border border-white/10 text-rose-300 disabled:opacity-30" aria-label="Remover faixa"><Trash2 className="w-3 h-3" /></button>
+            </div>
+            <div className="grid grid-cols-[64px_1fr_72px] gap-1.5 items-center text-xs">
+              <label className="flex items-center gap-1"><input type="number" min={1} max={200} value={b.layers} onChange={(e) => upd(i, { layers: Math.max(1, Math.min(200, Math.round(+e.target.value || 1))) })} className="w-12 rounded bg-black/30 border border-white/10 px-1 py-0.5 font-mono" /><span className="text-gray-500">cam.</span></label>
+              <select value={b.pattern} onChange={(e) => upd(i, { pattern: e.target.value as InfillPattern })} className={inp}>{PATTERNS.map((p) => <option key={p} value={p}>{INFILL_PATTERN_LABELS[p].label}</option>)}</select>
+              <label className="flex items-center gap-1"><input type="number" min={5} max={100} step={5} value={b.density} onChange={(e) => upd(i, { density: Math.max(5, Math.min(100, Math.round(+e.target.value || 5))) })} className="w-12 rounded bg-black/30 border border-white/10 px-1 py-0.5 font-mono" /><span className="text-gray-500">%</span></label>
+            </div>
+          </div>
+        ))}
+      </div>
+      <button type="button" onClick={() => set([...bands, { layers: 1, pattern: "grid", density: 30 }])} className="w-full px-2 py-1.5 rounded-lg border border-dashed border-white/15 text-xs text-gray-300 hover:border-emerald-400/40 flex items-center justify-center gap-1"><Plus className="w-3.5 h-3.5" /> Adicionar faixa</button>
+      {/* pilha visual (topo em cima) */}
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Pilha resultante · {totalLayers} camadas · {(totalLayers * layerHeight_mm).toFixed(2)} mm</div>
+        <div className="flex flex-col-reverse gap-px rounded-md overflow-hidden border border-white/10">
+          {stack.slice(0, 60).map((f, i) => (
+            <div key={i} className="h-2 flex items-center" style={{ background: f.band == null ? "#6b7280" : COLORS[f.band % COLORS.length], opacity: 0.35 + 0.65 * (f.density / 100) }} title={`camada ${i + 1}: ${INFILL_PATTERN_LABELS[f.pattern]?.label ?? f.pattern} ${f.density}%${f.band != null && bands[f.band]?.label ? ` · ${bands[f.band].label}` : ""}`} />
+          ))}
+        </div>
+        {totalLayers > 60 && <div className="text-[10px] text-gray-500 mt-0.5">mostrando as 60 primeiras camadas</div>}
+      </div>
     </div>
   )
 }

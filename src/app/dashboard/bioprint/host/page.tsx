@@ -29,12 +29,24 @@ import { SYRINGE_CATALOG, syringeArea_mm2 } from "@/lib/slicer/extrusion"
 import { useBioprintProcess } from "@/lib/bioprint/process-context"
 import { FlowBoostPanel } from "@/components/bioprint/FlowBoostPanel"
 import { suggestStartFlow, rememberGoodFlow, clampFlow, type FlowMemoryEntry } from "@/lib/bioprint/flow-memory"
+import { PrintFeedbackModal } from "@/components/bioprint/PrintFeedbackModal"
+import { inferTissueFromGeometry, type PresetParams } from "@/lib/bioprint/tissue-presets"
 
 const HANDOFF_KEY = "bia.host.gcode.handoff"
 type LogLine = { k: "tx" | "rx" | "info" | "warn" | "error"; t: string; ts: number }
 
 export default function BioHostPage() {
-  const { state } = useBioprintProcess()
+  const { state, updateControl } = useBioprintProcess()
+  // R24.5 · Fase 5 começa aqui: ao terminar, perguntar "ficou bom? nota? o que mudar?"
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [lastFinished, setLastFinished] = useState<{ ok: boolean; at: number } | null>(null)
+  const fbTissueId = inferTissueFromGeometry(state.model.geometryId) ?? "membrana"
+  const fbBioinkId = (() => { const f = state.bioink.formulations?.[0]; if (f?.materialId) return f.materialId; const m = (state.bioink.material ?? "").toLowerCase(); return m.includes("gelma") ? "gelma" : "alginate" })()
+  const fbParams: PresetParams = {
+    layerHeightMm: state.slice.layerHeightMm ?? 0.25, printSpeedMmS: state.slice.printSpeedMmS ?? 8, pressureKPa: state.slice.pressureKPa ?? 80,
+    flowPercent: Math.round((state.slice.extrusionMultiplier ?? 1) * 100), infillPercent: state.slice.infillPercent ?? 30, infillPatternId: state.slice.infillPatternId ?? "classic-lines",
+    walls: 2, skirtLoops: state.slice.skirtLoops ?? 0, retractionMm: state.slice.retractionMm ?? 0, cartridgeTempC: state.slice.cartridgeTempC ?? 25, bedTempC: state.slice.bedTempC ?? 20, chamberTempC: state.slice.chamberTempC ?? null, perimeterOnly: state.slice.perimeterOnly ?? false,
+  }
   const hostRef = useRef<MarlinHost | null>(null)
 
   const [transport, setTransport] = useState<"serial" | "mock">("serial")
@@ -114,13 +126,20 @@ export default function BioHostPage() {
         onPosition: setPos,
         onProgress: setProg,
         onLog: (k, t) => { if (k === "tx" && !showTxRef.current) return; if (k === "rx" && /^ok\s*$/.test(t)) return; pushLog(k, t) },
-        onFinished: (ok, r) => pushLog(ok ? "info" : "warn", ok ? "✅ Impressão concluída" : `⏹ ${r}`),
+        onFinished: (ok, r) => {
+          pushLog(ok ? "info" : "warn", ok ? "✅ Impressão concluída" : `⏹ ${r}`)
+          setLastFinished({ ok, at: Date.now() })
+          // Fase 4 pronta → desbloqueia Fases 5 e 6; e pergunta como ficou (laço fechado)
+          try { updateControl({ status: "ready", connected: true, tissueType: state.control.tissueType ?? fbTissueId }) } catch { /* noop */ }
+          if (ok) setTimeout(() => setFeedbackOpen(true), 900)
+          else pushLog("info", "Quer registrar o que aconteceu? Use o botão “Avaliar impressão” para a BIA ajustar o próximo G-code.")
+        },
       }, { window: windowN, firmware, tempPoll_ms: 3000, tryAutoreport: true, okTimeout_ms: 45000 })
       hostRef.current = host
       await host.connect()
       pushLog("info", `conectado (${transport === "mock" ? "simulador" : `USB ${baud} baud`}) · janela ${windowN} · ${firmware}`)
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
-  }, [transport, baud, firmware, windowN, serialSupported, pushLog])
+  }, [transport, baud, firmware, windowN, serialSupported, pushLog, updateControl, state.control.tissueType, fbTissueId])
 
   const disconnect = useCallback(async () => {
     try { await hostRef.current?.disconnect() } catch { /* noop */ }
@@ -330,6 +349,29 @@ export default function BioHostPage() {
           </Panel>
         </div>
       </div>
+
+      {/* R24.5 · Pós-impressão: ficou bom? nota + o que mudar (Fase 5) */}
+      {(lastFinished || hs === "finished") && (
+        <div className="rounded-xl border border-sky-400/40 bg-sky-500/[0.08] p-4 flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-[240px]">
+            <div className="text-[10px] uppercase tracking-wider text-sky-300/90 font-semibold">Fase 5 · Análise da bioimpressão</div>
+            <div className="text-sm font-semibold text-white">A impressão terminou. Ficou como você esperava?</div>
+            <div className="text-xs text-gray-300 mt-0.5">Dê uma nota de 1 a 5 e conte o que viu — a BIA interpreta e ajusta fluxo, velocidade, camada, retração ou paredes no próximo G-code.</div>
+          </div>
+          <button type="button" onClick={() => setFeedbackOpen(true)} className="px-4 py-2 rounded-xl bg-sky-500/20 border border-sky-400 hover:bg-sky-500/30 text-sky-100 text-xs font-semibold">⭐ Avaliar impressão</button>
+          <Link href="/dashboard/bioprint/review" className="px-3 py-2 rounded-xl border border-white/15 hover:border-white/30 text-xs text-gray-200">Ver histórico (Fase 5) →</Link>
+        </div>
+      )}
+      <PrintFeedbackModal
+        open={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+        tissueId={fbTissueId}
+        bioinkId={fbBioinkId}
+        geometryId={state.model.geometryId ?? (gcodeName ? "draw" : null)}
+        params={fbParams}
+        materialId={state.bioink.material ?? null}
+        onSaved={() => pushLog("info", "📝 Análise registrada — a Fase 3 vai aplicar os ajustes no próximo G-code.")}
+      />
     </div>
   )
 }

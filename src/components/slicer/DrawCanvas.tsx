@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { Pencil, Minus, Circle as CircleIcon, Square, Eraser, Undo2, Trash2, Grid3X3, Layers, Check, X as XIcon } from "lucide-react"
+import { Pencil, Minus, Circle as CircleIcon, Square, Eraser, Undo2, Trash2, Grid3X3, Layers, Check, X as XIcon, ZoomIn, ZoomOut, Maximize2 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import type { Vec2 } from "@/lib/slicer/types"
 import { type Stroke, type StrokeKind, newStrokeId, circlePoints, rectPoints, simplifyStroke } from "@/lib/slicer/draw-print"
@@ -55,15 +55,30 @@ export function DrawCanvas({ strokes, onChange, activeTool, toolCount, onActiveT
   const drawing = useRef<{ start: Vec2; pts: Vec2[] } | null>(null)
   const [preview, setPreview] = useState<Vec2[] | null>(null)
 
-  // responsivo
+  // responsivo — tamanho em px limitado pelo container E pela altura da janela
+  // (R24.4: nunca maior que a tela → não "estoura" ao mostrar o resultado)
   useEffect(() => {
     const el = wrapRef.current; if (!el) return
-    const ro = new ResizeObserver(() => setSize(Math.max(260, Math.min(el.clientWidth, 640))))
-    ro.observe(el); setSize(Math.max(260, Math.min(el.clientWidth, 640)))
-    return () => ro.disconnect()
+    const measure = () => {
+      const maxH = typeof window !== "undefined" ? Math.max(260, window.innerHeight - 260) : 640
+      setSize(Math.max(260, Math.min(el.clientWidth, 640, maxH)))
+    }
+    const ro = new ResizeObserver(measure)
+    ro.observe(el); measure()
+    window.addEventListener("resize", measure)
+    return () => { ro.disconnect(); window.removeEventListener("resize", measure) }
   }, [])
 
-  const extent = Math.max(bedDiameter_mm * 1.15, 40)
+  // R24.5 · lupa: zoom 0.5×–4× sobre a mesa (scroll do mouse / botões)
+  const [zoom, setZoom] = useState(1)
+  useEffect(() => {
+    const cv = cvRef.current; if (!cv) return
+    // listener nativo não-passivo: React registra onWheel como passive e não deixa preventDefault
+    const onWheel = (e: WheelEvent) => { e.preventDefault(); setZoom((z) => Math.max(0.5, Math.min(4, +(z * (e.deltaY < 0 ? 1.1 : 1 / 1.1)).toFixed(2)))) }
+    cv.addEventListener("wheel", onWheel, { passive: false })
+    return () => cv.removeEventListener("wheel", onWheel)
+  }, [])
+  const extent = Math.max(bedDiameter_mm * 1.15, 40) / zoom
   const sc = size / extent
   const toMm = useCallback((e: { clientX: number; clientY: number }): Vec2 => {
     const cv = cvRef.current!; const r = cv.getBoundingClientRect()
@@ -82,8 +97,9 @@ export function DrawCanvas({ strokes, onChange, activeTool, toolCount, onActiveT
     ctx.clearRect(0, 0, size, size)
     ctx.fillStyle = "#0a0f0e"; ctx.fillRect(0, 0, size, size)
     // grade 5 mm / 10 mm
-    for (let g = -Math.ceil(extent / 2); g <= extent / 2; g += 5) {
-      ctx.strokeStyle = g % 10 === 0 ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.035)"; ctx.lineWidth = 1
+    const gStep = extent > 120 ? 10 : extent < 25 ? 1 : 5
+    for (let g = -Math.ceil(extent / 2 / gStep) * gStep; g <= extent / 2; g += gStep) {
+      ctx.strokeStyle = (g / gStep) % 2 === 0 ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.035)"; ctx.lineWidth = 1
       ctx.beginPath(); ctx.moveTo(X(g), 0); ctx.lineTo(X(g), size); ctx.stroke()
       ctx.beginPath(); ctx.moveTo(0, Y(g)); ctx.lineTo(size, Y(g)); ctx.stroke()
     }
@@ -113,9 +129,9 @@ export function DrawCanvas({ strokes, onChange, activeTool, toolCount, onActiveT
     ctx.strokeStyle = "#fbbf24"; ctx.lineWidth = 1.5
     ctx.beginPath(); ctx.moveTo(size / 2 - 8, size / 2); ctx.lineTo(size / 2 + 8, size / 2); ctx.moveTo(size / 2, size / 2 - 8); ctx.lineTo(size / 2, size / 2 + 8); ctx.stroke()
     ctx.fillStyle = "#fbbf24"; ctx.font = "10px ui-sans-serif"; ctx.fillText("ponto zero", size / 2 + 10, size / 2 - 6)
-    ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.fillText("+X →", size - 36, size - 8); ctx.fillText("+Y ↑", 6, 14); ctx.fillText(`grade 5 mm · Ø${bedDiameter_mm.toFixed(0)} mm`, 6, size - 8)
+    ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.fillText("+X →", size - 36, size - 8); ctx.fillText("+Y ↑", 6, 14); ctx.fillText(`grade ${gStep} mm · Ø${bedDiameter_mm.toFixed(0)} mm · zoom ${zoom.toFixed(1)}×`, 6, size - 8)
     if (pending && pending.points.length >= 2) drawPath(pending.points, true, "#ffffff", 2, true)
-  }, [strokes, preview, pending, size, sc, extent, bedDiameter_mm, X, Y, tool, activeTool, defaultLayers])
+  }, [strokes, preview, pending, size, sc, extent, bedDiameter_mm, X, Y, tool, activeTool, defaultLayers, zoom])
 
   const onDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     e.preventDefault(); (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId)
@@ -203,6 +219,13 @@ export function DrawCanvas({ strokes, onChange, activeTool, toolCount, onActiveT
         <button type="button" onClick={() => onChange([])} disabled={!strokes.length} className="px-2 py-1.5 rounded-lg border border-white/10 text-xs text-gray-300 flex items-center gap-1 disabled:opacity-40"><Trash2 className="w-3.5 h-3.5" /> Limpar</button>
         <label className="ml-auto text-[11px] text-gray-400 flex items-center gap-1"><Grid3X3 className="w-3 h-3" /><input type="checkbox" checked={snap} onChange={(e) => setSnap(e.target.checked)} /> imã 0,5 mm</label>
         <label className="text-[11px] text-gray-400 flex items-center gap-1"><input type="checkbox" checked={fillClosed} onChange={(e) => onFillClosed(e.target.checked)} /> preencher formas fechadas</label>
+        <span className="mx-1 h-5 w-px bg-white/10" />
+        <div className="flex items-center gap-1" title="Lupa — zoom sobre a mesa (ou use o scroll do mouse no desenho)">
+          <button type="button" onClick={() => setZoom((z) => Math.max(0.5, +(z / 1.25).toFixed(2)))} className="p-1.5 rounded-lg border border-white/10 text-gray-300 hover:border-white/25" aria-label="Diminuir zoom"><ZoomOut className="w-3.5 h-3.5" /></button>
+          <span className="text-[11px] font-mono text-gray-400 w-10 text-center">{zoom.toFixed(1)}×</span>
+          <button type="button" onClick={() => setZoom((z) => Math.min(4, +(z * 1.25).toFixed(2)))} className="p-1.5 rounded-lg border border-white/10 text-gray-300 hover:border-white/25" aria-label="Aumentar zoom"><ZoomIn className="w-3.5 h-3.5" /></button>
+          <button type="button" onClick={() => setZoom(1)} className="p-1.5 rounded-lg border border-white/10 text-gray-300 hover:border-white/25" aria-label="Ajustar à mesa" title="Ajustar à mesa (1×)"><Maximize2 className="w-3.5 h-3.5" /></button>
+        </div>
       </div>
       <div className="flex flex-wrap items-center gap-1.5 text-xs">
         <span className="text-gray-400">Desenhando com:</span>

@@ -10,10 +10,10 @@ import {
 import type { Goal, CellTypeId } from "@/lib/bioink-lab"
 
 describe("R16 · receitas", () => {
-  it("tem 10 receitas com ids únicos e campos essenciais", () => {
-    expect(RECIPES.length).toBe(10)
+  it("tem ≥ 10 receitas com ids únicos e campos essenciais", () => {
+    expect(RECIPES.length).toBeGreaterThanOrEqual(10) // R16: 10 · R24.5: 18
     const ids = new Set(RECIPES.map((r) => r.id))
-    expect(ids.size).toBe(10)
+    expect(ids.size).toBe(RECIPES.length)
     for (const r of RECIPES) {
       expect(r.components.length).toBeGreaterThan(0)
       expect(r.prep.length).toBeGreaterThan(0)
