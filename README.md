@@ -207,6 +207,14 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R22 — Etapa 4 única, Etapa 1 só com malhas reais, manual da Etapa 3 (2026-10-21)
+
+- **Build Vercel R21 confirmado verde** (biaquantis.bio serve `/stl/*-real.stl` com os tamanhos decimados; `/slice` 307→login como esperado).
+- **Etapa 4 unificada**: `/dashboard/bioprint/control` → redirect para `/execute`. `/execute` herdou o **Modo avançado** (Extrusão Fluida + Sensores; Tecido Vivo · Viabilidade ao vivo + Encolhimento), persiste `state.control` (status/conexão/tecido) e ganhou o link para a Etapa 5. Stepper, hub, roadmap, Pós-bioimpressão e editor da Academy apontam para `/execute`.
+- **Etapa 1 sem facetado**: menisco agora é a **malha anatômica real** embutida (`meshes/meniscus-mesh-data.ts`, 4.904 tri) com um único parâmetro (comprimento); fêmur e orelha passaram a **escala uniforme** (só "comprimento/altura"). O antigo `genMeniscus` (semicírculo) virou `genArcRing` e só a córnea paramétrica o usa. Malhas geradas na Etapa 1 agora são persistidas no IndexedDB → a Mesa da Etapa 3 abre já com elas.
+- **Manual · capítulo Etapa 3 reescrito**: base única, ponto zero, Mesa, infills honestos (tabela "o que é / quando usar", incl. Avançado: Schwarz P, Diamond, Voronoi, Perlin, gradiente), alvo Petri/lâmina/placa, 1–4 cabeçotes, prévia grátis + cobrança, erros que bloqueiam, FAQ.
+- Testes: +2 (`r21_anatomical_bed`), suite **1743 verdes**.
+
 ### R21 — Modelos anatômicos REAIS + Mesa: escolha a dimensão, veja na mesa, gire e arrume antes de fatiar (2026-10-21)
 
 **Mandato:** *"o menisco possui arestas retas e não curvilíneas… com fêmur e orelha também… deixar apenas a dimensão para ser escolhida e poder ver o arquivo na mesa preview e poder rodar o arquivo, arrumando ele corretamente na mesa de impressão."*
