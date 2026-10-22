@@ -2029,3 +2029,8 @@ Janaina Dernowsek (CEO/Founder)
 - **Build Vercel confirmado em produção** (`2738127` → `5ccecf3`): hub com 6 fases, `/dashboard/bioprint/review` (Fase 5) servindo, `/dashboard/studio` redirecionando para a Fase 3, `/api/auth/change-password` ativo.
 - **Organoid Builder** saiu de "Projetar" e ganhou grupo próprio no sidebar, **"Esferoides & Organoides"**, logo após "Bioimprimir" — organoides são scaffold-free e não passam pelas 6 fases de bioimpressão.
 - **Manual**: capítulo da Fase 1 reescrito ("Modelo de tecido", racional das 6 fases, sem STL); novo capítulo **"Fases 5 e 6 — Análise da bioimpressão · Maturação & caracterizações"** (`bioprint-review-post.tsx`); capítulos das Fases 2, 3 e 4 com textos "Etapa → Fase".
+
+### R24.3 · Desenhar & Imprimir — formas fechadas viram volume
+- Ao **fechar uma forma** (laço livre que volta ao início, círculo ou retângulo) a tela pergunta **"Quantas camadas?"** (atalhos 1/3/5/10/20/40, campo numérico, slider, altura resultante em mm, preencher o interior sim/não). A resposta vira `Stroke.layers` — **altura própria da forma**.
+- `strokesToLayers` agora respeita a altura de cada traço: a forma fechada sobe N camadas enquanto linhas ao lado param na altura padrão. Altura total do desenho = traço mais alto (`drawingLayerCount`). Painel "Volume" lista as formas fechadas com campo de camadas editável; duplo toque na forma reabre a pergunta (editar/apagar). Rótulo no canvas mostra `n·T0 · 10cam`.
+- Testes: `tests/r24_draw_layers_per_stroke.test.ts` (4).

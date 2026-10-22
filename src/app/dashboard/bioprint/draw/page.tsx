@@ -18,7 +18,7 @@ import { useBioprintProcess } from "@/lib/bioprint/process-context"
 import { BASIC_PROFILES, SYRINGE_CATALOG, NEEDLE_GAUGES, defaultLineWidth, defaultLayerHeight, type SliceParams, type ExtrusionModel, type InfillPattern } from "@/lib/slicer"
 import { type PrintTarget, DEFAULT_TARGET, describeTarget, targetUsableDiameter } from "@/lib/slicer/target"
 import { type ToolsConfig, singleTool, describeTools } from "@/lib/slicer/tools"
-import { type Stroke, type DrawVolume, DEFAULT_DRAW_VOLUME, drawToGCode, describeDrawing, strokesBBox } from "@/lib/slicer/draw-print"
+import { type Stroke, type DrawVolume, DEFAULT_DRAW_VOLUME, drawToGCode, describeDrawing, strokesBBox, drawingLayerCount } from "@/lib/slicer/draw-print"
 import { INFILL_PATTERN_LABELS, BASIC_INFILL_PATTERNS } from "@/lib/slicer/infill-advanced"
 import { DrawCanvas } from "@/components/slicer/DrawCanvas"
 import { TargetPanel } from "@/components/slicer/TargetPanel"
@@ -130,7 +130,7 @@ function DrawPrintInner() {
       <div className="grid lg:grid-cols-[1fr_380px] gap-6">
         <div className="space-y-5">
           <Panel title="1 · Desenhe sobre a mesa" icon={<Pencil className="w-4 h-4" />} subtitle={`Ø útil ${bed.toFixed(0)} mm · ${strokes.length} traço(s)`}>
-            <DrawCanvas strokes={strokes} onChange={(s) => { setStrokes(s); setResult(null) }} activeTool={activeTool} toolCount={tools.heads.length} onActiveTool={setActiveTool} bedDiameter_mm={bed} fillClosed={fillClosed} onFillClosed={setFillClosed} />
+            <DrawCanvas strokes={strokes} onChange={(s) => { setStrokes(s); setResult(null) }} activeTool={activeTool} toolCount={tools.heads.length} onActiveTool={setActiveTool} bedDiameter_mm={bed} fillClosed={fillClosed} onFillClosed={setFillClosed} defaultLayers={vol.layers} layerHeight_mm={P.layerHeight_mm} />
             {strokes.length > 0 && (
               <div className={cn("mt-2 text-xs rounded-lg border px-3 py-2", fits ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-100" : "border-rose-500/40 bg-rose-500/10 text-rose-100")}>
                 {describeDrawing(strokes, vol, P.layerHeight_mm)} · {fits ? "✓ cabe no alvo" : `✗ passa do alvo (${footprint.toFixed(0)} mm > ${bed.toFixed(0)} mm)`}
@@ -141,7 +141,7 @@ function DrawPrintInner() {
           {result && (
             <>
               <Panel title="Preview por camada" icon={<Layers className="w-4 h-4" />}>
-                <LayerPreview layers={result.layers} bbox={{ minX: -bed / 2, maxX: bed / 2, minY: -bed / 2, maxY: bed / 2, minZ: 0, maxZ: vol.layers * P.layerHeight_mm }} lineWidth_mm={P.lineWidth_mm} />
+                <LayerPreview layers={result.layers} bbox={{ minX: -bed / 2, maxX: bed / 2, minY: -bed / 2, maxY: bed / 2, minZ: 0, maxZ: drawingLayerCount(strokes, vol) * P.layerHeight_mm }} lineWidth_mm={P.lineWidth_mm} />
               </Panel>
               <div className="grid sm:grid-cols-4 gap-2 text-xs">
                 <Stat label="Camadas" value={String(result.layers.length)} /><Stat label="Tempo est." value={`${(result.stats.estimatedTime_s / 60).toFixed(1)} min`} /><Stat label="Volume" value={`${result.stats.volume_uL.toFixed(0)} µL`} /><Stat label="Êmbolo" value={`${result.stats.plungerTravel_mm.toFixed(1)} mm`} />
@@ -161,7 +161,21 @@ function DrawPrintInner() {
         <div className="space-y-5">
           <Panel title="2 · Volume a partir do desenho" icon={<Layers className="w-4 h-4" />}>
             <div className="space-y-3 text-sm">
-              <Row label={`Camadas (${vol.layers} × ${P.layerHeight_mm} mm = ${(vol.layers * P.layerHeight_mm).toFixed(2)} mm)`}><input type="range" min={1} max={60} value={vol.layers} onChange={(e) => setVol({ ...vol, layers: +e.target.value })} className="w-full accent-emerald-400" /></Row>
+              <Row label={`Camadas padrão para linhas e novas formas (${vol.layers} × ${P.layerHeight_mm} mm = ${(vol.layers * P.layerHeight_mm).toFixed(2)} mm)`}><input type="range" min={1} max={60} value={vol.layers} onChange={(e) => setVol({ ...vol, layers: +e.target.value })} className="w-full accent-emerald-400" /></Row>
+              {strokes.some((s) => s.closed) && (
+                <div className="rounded-lg border border-white/10 bg-black/20 p-2 space-y-1">
+                  <div className="text-[10px] uppercase tracking-wider text-gray-500">Camadas por forma fechada</div>
+                  {strokes.map((s, i) => s.closed ? (
+                    <div key={s.id} className="flex items-center gap-2 text-xs">
+                      <span className="font-mono text-gray-400 w-14">{i + 1}·T{s.tool}</span>
+                      <span className="text-gray-300 flex-1">{s.kind === "circle" ? "círculo" : s.kind === "rect" ? "retângulo" : "laço"}{s.fill ? " · preenchido" : ""}</span>
+                      <input type="number" min={1} max={200} value={s.layers ?? vol.layers} onChange={(e) => { const n = Math.max(1, Math.min(200, Math.round(+e.target.value || 1))); setStrokes(strokes.map((x) => x.id === s.id ? { ...x, layers: n } : x)); setResult(null) }} className="w-16 rounded bg-black/30 border border-white/10 px-1.5 py-0.5 font-mono text-xs" />
+                      <span className="text-gray-500 w-16 text-right">{(((s.layers ?? vol.layers)) * P.layerHeight_mm).toFixed(2)} mm</span>
+                    </div>
+                  ) : null)}
+                  <div className="text-[10px] text-gray-500">Altura total do desenho: {(drawingLayerCount(strokes, vol) * P.layerHeight_mm).toFixed(2)} mm ({drawingLayerCount(strokes, vol)} camadas)</div>
+                </div>
+              )}
               <label className="flex items-center gap-2 text-xs text-gray-300"><input type="checkbox" checked={vol.alternate90} onChange={(e) => setVol({ ...vol, alternate90: e.target.checked })} /> alternar 90° a cada camada (woodpile — para linhas)</label>
               <Row label="Preenchimento das formas fechadas"><select value={vol.fillPattern} onChange={(e) => setVol({ ...vol, fillPattern: e.target.value as InfillPattern })} className={inp}>{BASIC_INFILL_PATTERNS.filter((p) => p !== "none").map((p) => <option key={p} value={p}>{INFILL_PATTERN_LABELS[p].label}</option>)}</select></Row>
               <Row label={`Densidade do preenchimento · ${vol.fillDensity} %`}><input type="range" min={5} max={100} step={5} value={vol.fillDensity} onChange={(e) => setVol({ ...vol, fillDensity: +e.target.value })} className="w-full accent-emerald-400" /></Row>

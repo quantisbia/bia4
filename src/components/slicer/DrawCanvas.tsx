@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { Pencil, Minus, Circle as CircleIcon, Square, Eraser, Undo2, Trash2, Grid3X3 } from "lucide-react"
+import { Pencil, Minus, Circle as CircleIcon, Square, Eraser, Undo2, Trash2, Grid3X3, Layers, Check, X as XIcon } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import type { Vec2 } from "@/lib/slicer/types"
 import { type Stroke, type StrokeKind, newStrokeId, circlePoints, rectPoints, simplifyStroke } from "@/lib/slicer/draw-print"
@@ -31,13 +31,23 @@ export interface DrawCanvasProps {
   /** preencher formas fechadas por padrão */
   fillClosed: boolean
   onFillClosed: (v: boolean) => void
+  /** R24.3 · camadas padrão do desenho e altura de camada — para a pergunta ao fechar uma forma */
+  defaultLayers?: number
+  layerHeight_mm?: number
+  /** se false, não pergunta: usa defaultLayers direto */
+  askLayersOnClose?: boolean
   className?: string
 }
 
 const SNAP_MM = 0.5
 
-export function DrawCanvas({ strokes, onChange, activeTool, toolCount, onActiveTool, bedDiameter_mm, fillClosed, onFillClosed, className }: DrawCanvasProps) {
+export function DrawCanvas({ strokes, onChange, activeTool, toolCount, onActiveTool, bedDiameter_mm, fillClosed, onFillClosed, defaultLayers = 3, layerHeight_mm = 0.3, askLayersOnClose = true, className }: DrawCanvasProps) {
   const cvRef = useRef<HTMLCanvasElement>(null)
+  // R24.3 · forma fechada aguardando resposta "quantas camadas?"
+  const [pending, setPending] = useState<Stroke | null>(null)
+  const [pendingLayers, setPendingLayers] = useState(defaultLayers)
+  const [pendingFill, setPendingFill] = useState(fillClosed)
+  const [editing, setEditing] = useState<Stroke | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const [tool, setTool] = useState<DrawTool>("freehand")
   const [snap, setSnap] = useState(true)
@@ -94,7 +104,9 @@ export function DrawCanvas({ strokes, onChange, activeTool, toolCount, onActiveT
       if (s.closed && s.fill) { ctx.beginPath(); ctx.moveTo(X(s.points[0].x), Y(s.points[0].y)); for (const p of s.points.slice(1)) ctx.lineTo(X(p.x), Y(p.y)); ctx.closePath(); ctx.fillStyle = color + "33"; ctx.fill() }
       drawPath(s.points, s.closed, color, 3)
       // numeração
-      const p0 = s.points[0]; ctx.fillStyle = color; ctx.font = "10px ui-sans-serif"; ctx.fillText(`${strokes.indexOf(s) + 1}·T${s.tool}`, X(p0.x) + 4, Y(p0.y) - 4)
+      const p0 = s.points[0]; ctx.fillStyle = color; ctx.font = "10px ui-sans-serif"
+      const lab = `${strokes.indexOf(s) + 1}·T${s.tool}${s.closed ? ` · ${s.layers ?? defaultLayers}cam` : ""}`
+      ctx.fillText(lab, X(p0.x) + 4, Y(p0.y) - 4)
     }
     if (preview && preview.length >= 2) drawPath(preview, tool === "circle" || tool === "rect", TOOL_COLORS[activeTool % TOOL_COLORS.length], 2, true)
     // ponto zero
@@ -102,7 +114,8 @@ export function DrawCanvas({ strokes, onChange, activeTool, toolCount, onActiveT
     ctx.beginPath(); ctx.moveTo(size / 2 - 8, size / 2); ctx.lineTo(size / 2 + 8, size / 2); ctx.moveTo(size / 2, size / 2 - 8); ctx.lineTo(size / 2, size / 2 + 8); ctx.stroke()
     ctx.fillStyle = "#fbbf24"; ctx.font = "10px ui-sans-serif"; ctx.fillText("ponto zero", size / 2 + 10, size / 2 - 6)
     ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.fillText("+X →", size - 36, size - 8); ctx.fillText("+Y ↑", 6, 14); ctx.fillText(`grade 5 mm · Ø${bedDiameter_mm.toFixed(0)} mm`, 6, size - 8)
-  }, [strokes, preview, size, sc, extent, bedDiameter_mm, X, Y, tool, activeTool])
+    if (pending && pending.points.length >= 2) drawPath(pending.points, true, "#ffffff", 2, true)
+  }, [strokes, preview, pending, size, sc, extent, bedDiameter_mm, X, Y, tool, activeTool, defaultLayers])
 
   const onDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     e.preventDefault(); (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId)
@@ -145,7 +158,30 @@ export function DrawCanvas({ strokes, onChange, activeTool, toolCount, onActiveT
     } else if (tool === "rect") {
       if (Math.abs(p.x - d.start.x) >= 0.5 && Math.abs(p.y - d.start.y) >= 0.5) s = { id: newStrokeId(), kind: "rect", points: rectPoints(d.start, p), closed: true, tool: activeTool, fill: fillClosed, color }
     }
-    if (s) onChange([...strokes, s])
+    if (!s) return
+    if (s.closed && askLayersOnClose) {
+      // Fechou uma forma → pergunta quantas camadas (vira volume) antes de salvar
+      setPendingLayers(Math.max(1, Math.round(defaultLayers))); setPendingFill(s.fill); setPending(s)
+      return
+    }
+    onChange([...strokes, s])
+  }
+  const commitPending = () => {
+    if (!pending) return
+    onChange([...strokes, { ...pending, layers: Math.max(1, Math.round(pendingLayers)), fill: pendingFill }])
+    setPending(null)
+  }
+  const commitEditing = () => {
+    if (!editing) return
+    onChange(strokes.map((x) => x.id === editing.id ? { ...x, layers: Math.max(1, Math.round(pendingLayers)), fill: pendingFill } : x))
+    setEditing(null)
+  }
+  // duplo clique/toque em uma forma fechada → reabre a pergunta para editar camadas
+  const onDouble = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const p = toMm(e)
+    let best: Stroke | null = null, bestD = 1.5
+    for (const st of strokes) { if (!st.closed) continue; const pts = [...st.points, st.points[0]]; for (let k = 1; k < pts.length; k++) { const d = segDist(p, pts[k - 1], pts[k]); if (d < bestD) { bestD = d; best = st } } }
+    if (best) { setPendingLayers(best.layers ?? defaultLayers); setPendingFill(best.fill); setEditing(best) }
   }
 
   const ToolBtn = ({ id, icon: Icon, label }: { id: DrawTool; icon: React.ElementType; label: string }) => (
@@ -176,13 +212,29 @@ export function DrawCanvas({ strokes, onChange, activeTool, toolCount, onActiveT
           </button>
         ))}
       </div>
-      <canvas
-        ref={cvRef} width={size} height={size}
-        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
-        className="w-full h-auto rounded-xl border border-white/10 touch-none select-none cursor-crosshair"
-        style={{ touchAction: "none" }}
-      />
-      <div className="text-[11px] text-gray-500">Toque/arraste para desenhar. Cada traço vira um caminho de extrusão do cabeçote escolhido. Traço livre que termina perto de onde começou fecha a forma.</div>
+      <div className="relative">
+        <canvas
+          ref={cvRef} width={size} height={size}
+          onPointerDown={pending || editing ? undefined : onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
+          onDoubleClick={onDouble}
+          className={cn("w-full h-auto rounded-xl border border-white/10 touch-none select-none", pending || editing ? "cursor-default opacity-90" : "cursor-crosshair")}
+          style={{ touchAction: "none" }}
+        />
+        {(pending || editing) && (
+          <LayersPrompt
+            title={editing ? "Editar forma fechada" : "Forma fechada! Quantas camadas?"}
+            kind={(editing ?? pending)!.kind}
+            layers={pendingLayers} onLayers={setPendingLayers}
+            fill={pendingFill} onFill={setPendingFill}
+            layerHeight_mm={layerHeight_mm}
+            onOk={editing ? commitEditing : commitPending}
+            onCancel={() => { setPending(null); setEditing(null) }}
+            canDelete={!!editing}
+            onDelete={() => { if (editing) onChange(strokes.filter((x) => x.id !== editing.id)); setEditing(null) }}
+          />
+        )}
+      </div>
+      <div className="text-[11px] text-gray-500">Toque/arraste para desenhar. Cada traço vira um caminho de extrusão do cabeçote escolhido. Traço livre que termina perto de onde começou fecha a forma — e a BIA pergunta quantas camadas ela deve ter (vira volume). Duplo toque numa forma fechada para mudar as camadas.</div>
     </div>
   )
 }
@@ -191,4 +243,45 @@ function segDist(p: Vec2, a: Vec2, b: Vec2): number {
   const dx = b.x - a.x, dy = b.y - a.y; const L2 = dx * dx + dy * dy || 1e-9
   const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / L2))
   return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
+}
+
+// ─── R24.3 · Pergunta "quantas camadas?" ao fechar uma forma ─────────────
+const QUICK_LAYERS = [1, 3, 5, 10, 20, 40]
+function LayersPrompt({ title, kind, layers, onLayers, fill, onFill, layerHeight_mm, onOk, onCancel, canDelete, onDelete }: {
+  title: string; kind: StrokeKind
+  layers: number; onLayers: (n: number) => void
+  fill: boolean; onFill: (v: boolean) => void
+  layerHeight_mm: number
+  onOk: () => void; onCancel: () => void
+  canDelete?: boolean; onDelete?: () => void
+}) {
+  const h = (Math.max(1, layers) * layerHeight_mm)
+  const kindLabel = kind === "circle" ? "círculo" : kind === "rect" ? "retângulo" : "laço livre"
+  return (
+    <div className="absolute inset-0 flex items-center justify-center p-3 rounded-xl bg-black/55 backdrop-blur-[2px]" role="dialog" aria-label={title}>
+      <div className="w-full max-w-sm rounded-2xl border border-emerald-400/40 bg-[#0b1412] shadow-2xl p-4 space-y-3" onPointerDown={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2 text-white font-semibold text-sm"><Layers className="w-4 h-4 text-emerald-300" /> {title}</div>
+        <p className="text-[11.5px] text-gray-300">
+          Você fechou um <b className="text-white">{kindLabel}</b>. Quantas camadas essa forma deve ter? Cada camada repete o contorno
+          {fill ? " e o preenchimento" : ""} em Z, criando volume.
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {QUICK_LAYERS.map((n) => (
+            <button key={n} type="button" onClick={() => onLayers(n)} className={cn("px-2.5 py-1 rounded-lg border text-xs font-mono", layers === n ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-100" : "border-white/10 text-gray-300 hover:border-white/25")}>{n}</button>
+          ))}
+          <input type="number" min={1} max={200} value={layers} onChange={(e) => onLayers(Math.max(1, Math.min(200, Math.round(+e.target.value || 1))))} className="w-20 rounded-lg bg-black/30 border border-white/10 focus:border-emerald-400/50 px-2 py-1 text-xs font-mono text-white" aria-label="Número de camadas" />
+        </div>
+        <input type="range" min={1} max={60} value={Math.min(60, layers)} onChange={(e) => onLayers(+e.target.value)} className="w-full accent-emerald-400" />
+        <div className="flex items-center justify-between text-[11px] text-gray-400">
+          <span>Altura resultante: <b className="text-emerald-200">{h.toFixed(2)} mm</b> ({layers} × {layerHeight_mm} mm)</span>
+          <label className="flex items-center gap-1.5 text-gray-300"><input type="checkbox" checked={fill} onChange={(e) => onFill(e.target.checked)} /> preencher o interior</label>
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          {canDelete && <button type="button" onClick={onDelete} className="mr-auto px-3 py-1.5 rounded-lg text-xs text-rose-300 hover:bg-rose-500/10 flex items-center gap-1"><Trash2 className="w-3.5 h-3.5" /> Apagar forma</button>}
+          <button type="button" onClick={onCancel} className="px-3 py-1.5 rounded-lg text-xs text-gray-300 hover:bg-white/10 flex items-center gap-1"><XIcon className="w-3.5 h-3.5" /> {canDelete ? "Cancelar" : "Descartar"}</button>
+          <button type="button" onClick={onOk} className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-emerald-400 text-black hover:bg-emerald-300 flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Usar {layers} camada{layers === 1 ? "" : "s"}</button>
+        </div>
+      </div>
+    </div>
+  )
 }

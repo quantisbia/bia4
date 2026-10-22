@@ -35,6 +35,12 @@ export interface Stroke {
   fill: boolean
   /** cor de exibição */
   color?: string
+  /**
+   * R24.3 · nº de camadas DESTE traço (altura própria). Se ausente, usa
+   * DrawVolume.layers. Permite uma forma fechada virar volume de 10 camadas
+   * enquanto uma linha ao lado fica em 1 camada.
+   */
+  layers?: number
 }
 
 export interface DrawVolume {
@@ -109,9 +115,21 @@ function ensureCCW(poly: Polygon): Polygon { return signedArea(poly) >= 0 ? poly
  * (ou N quando repetido por camada). Formas fechadas com `fill` ganham
  * infill honesto do BioSlicer dentro do contorno.
  */
+/** Camadas efetivas de um traço: valor próprio (≥1) ou o global do desenho. */
+export function strokeLayers(s: Stroke, vol: DrawVolume): number {
+  const own = s.layers != null && Number.isFinite(s.layers) ? Math.round(s.layers) : 0
+  return Math.max(1, own > 0 ? own : Math.round(vol.layers))
+}
+
+/** Altura total do desenho = o traço mais alto. */
+export function drawingLayerCount(strokes: Stroke[], vol: DrawVolume): number {
+  if (!strokes.length) return Math.max(1, Math.round(vol.layers))
+  return Math.max(...strokes.map((s) => strokeLayers(s, vol)))
+}
+
 export function strokesToLayers(strokes: Stroke[], P: SliceParams, vol: DrawVolume): SlicedLayer[] {
   const layers: SlicedLayer[] = []
-  const n = Math.max(1, Math.round(vol.layers))
+  const n = drawingLayerCount(strokes, vol)
   for (let i = 0; i < n; i++) {
     const h = i === 0 ? P.firstLayerHeight_mm : P.layerHeight_mm
     const z = P.firstLayerHeight_mm + i * P.layerHeight_mm
@@ -120,6 +138,8 @@ export function strokesToLayers(strokes: Stroke[], P: SliceParams, vol: DrawVolu
     const contours: Polygon[] = []
     for (const s of strokes) {
       if (s.points.length < 2) continue
+      // R24.3: cada traço só existe até a SUA altura
+      if (i >= strokeLayers(s, vol)) continue
       const pts: Path = ang ? s.points.map((p) => rotate(p, ang, 0, 0)) : s.points
       const isClosed = s.closed && pts.length >= 3
       const speed = i === 0 ? P.speedFirstLayer_mms : P.speedPerimeter_mms
@@ -159,7 +179,7 @@ export function drawToGCode(job: DrawPrintJob): { layers: SlicedLayer[]; result:
   const layers = strokesToLayers(strokes, job.params, job.volume)
   const result = writeGCode(layers, { ...job.params, skirtLoops: 0, purgeLine_mm: 0 }, job.extrusion, {
     ...job.write,
-    meta: { ...(job.write.meta ?? {}), source: "draw-print", strokes: strokes.length, drawLayers: job.volume.layers, alternate90: job.volume.alternate90 },
+    meta: { ...(job.write.meta ?? {}), source: "draw-print", strokes: strokes.length, drawLayers: drawingLayerCount(strokes, job.volume), alternate90: job.volume.alternate90 },
   })
   return { layers, result, warnings }
 }
@@ -170,5 +190,7 @@ export function describeDrawing(strokes: Stroke[], vol: DrawVolume, layerHeight_
   for (const s of strokes) byTool.set(s.tool, (byTool.get(s.tool) ?? 0) + 1)
   const tools = Array.from(byTool.entries()).sort((a, b) => a[0] - b[0]).map(([t, n]) => `T${t}: ${n}`).join(" · ")
   const L = strokes.reduce((acc, s) => acc + strokeLength(s), 0)
-  return `${strokes.length} traço(s) (${tools}) · ${L.toFixed(0)} mm por camada · ${vol.layers} camada(s) = ${(vol.layers * layerHeight_mm).toFixed(2)} mm de altura${vol.alternate90 ? " · alterna 90°" : ""}`
+  const n = drawingLayerCount(strokes, vol)
+  const mixed = strokes.some((s) => strokeLayers(s, vol) !== n)
+  return `${strokes.length} traço(s) (${tools}) · ${L.toFixed(0)} mm por camada · ${n} camada(s)${mixed ? " (máx.; alturas por traço)" : ""} = ${(n * layerHeight_mm).toFixed(2)} mm de altura${vol.alternate90 ? " · alterna 90°" : ""}`
 }
