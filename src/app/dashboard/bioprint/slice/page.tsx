@@ -438,8 +438,8 @@ function BioSlicerInner() {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-[380px_1fr] gap-6">
-        <div className="space-y-5">
+      <div className="grid lg:grid-cols-[380px_minmax(0,1fr)] gap-6">
+        <div className="space-y-5 min-w-0">
           <Panel title="1 · Modelo 3D" icon={<Box className="w-4 h-4" />}>
             <div
               onClick={() => fileRef.current?.click()}
@@ -579,7 +579,7 @@ function BioSlicerInner() {
           {error && <div className="text-sm text-red-300 flex gap-2"><AlertTriangle className="w-4 h-4 shrink-0" />{error}</div>}
         </div>
 
-        <div className="space-y-5">
+        <div className="space-y-5 min-w-0">
           {!result && (
             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-8 text-center text-gray-400 text-sm">
               <Layers className="w-10 h-10 mx-auto mb-3 text-gray-600" />
@@ -633,7 +633,7 @@ function BioSlicerInner() {
               <TipsBox tips={profile.tips} title={`Dicas do perfil "${profile.name}"`} />
 
               <Panel title="G-code" icon={<FlaskConical className="w-4 h-4" />} subtitle={`${result.gcode.split("\n").length.toLocaleString("pt-BR")} linhas`}>
-                <pre className="text-[11px] leading-relaxed font-mono max-h-72 overflow-auto bg-black/40 rounded-lg p-3 text-gray-300 whitespace-pre">{result.gcode.slice(0, 20000)}{result.gcode.length > 20000 ? "\n… (truncado no preview — o download contém tudo)" : ""}</pre>
+                <pre className="text-[11px] leading-relaxed font-mono max-h-72 w-full max-w-full overflow-auto bg-black/40 rounded-lg p-3 text-gray-300 whitespace-pre">{result.gcode.slice(0, 20000)}{result.gcode.length > 20000 ? "\n… (truncado no preview — o download contém tudo)" : ""}</pre>
               </Panel>
             </>
           )}

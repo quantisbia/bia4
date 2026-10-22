@@ -127,8 +127,8 @@ function DrawPrintInner() {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-[1fr_380px] gap-6">
-        <div className="space-y-5">
+      <div className="grid lg:grid-cols-[minmax(0,1fr)_380px] gap-6">
+        <div className="space-y-5 min-w-0">
           <Panel title="1 · Desenhe sobre a mesa" icon={<Pencil className="w-4 h-4" />} subtitle={`Ø útil ${bed.toFixed(0)} mm · ${strokes.length} traço(s)`}>
             <DrawCanvas strokes={strokes} onChange={(s) => { setStrokes(s); setResult(null) }} activeTool={activeTool} toolCount={tools.heads.length} onActiveTool={setActiveTool} bedDiameter_mm={bed} fillClosed={fillClosed} onFillClosed={setFillClosed} defaultLayers={vol.layers} layerHeight_mm={P.layerHeight_mm} />
             {strokes.length > 0 && (
@@ -153,12 +153,12 @@ function DrawPrintInner() {
                 <button onClick={toStep4} className="px-4 py-2 rounded-lg border border-white/15 hover:border-white/30 text-sm">Fase 4 (Bioimpressão · Host) →</button>
                 {charged && <span className={cn("text-xs self-center px-2 py-1 rounded border", charged.ok ? "text-emerald-200 border-emerald-400/30 bg-emerald-500/10" : "text-rose-200 border-rose-400/30 bg-rose-500/10")}>{charged.msg}</span>}
               </div>
-              <pre className="text-[11px] font-mono max-h-60 overflow-auto bg-black/40 rounded-lg p-3 text-gray-300 whitespace-pre">{result.gcode.slice(0, 12000)}{result.gcode.length > 12000 ? "\n… (truncado)" : ""}</pre>
+              <pre className="text-[11px] font-mono max-h-60 w-full max-w-full overflow-auto bg-black/40 rounded-lg p-3 text-gray-300 whitespace-pre">{result.gcode.slice(0, 12000)}{result.gcode.length > 12000 ? "\n… (truncado)" : ""}</pre>
             </>
           )}
         </div>
 
-        <div className="space-y-5">
+        <div className="space-y-5 min-w-0">
           <Panel title="2 · Volume a partir do desenho" icon={<Layers className="w-4 h-4" />}>
             <div className="space-y-3 text-sm">
               <Row label={`Camadas padrão para linhas e novas formas (${vol.layers} × ${P.layerHeight_mm} mm = ${(vol.layers * P.layerHeight_mm).toFixed(2)} mm)`}><input type="range" min={1} max={60} value={vol.layers} onChange={(e) => setVol({ ...vol, layers: +e.target.value })} className="w-full accent-emerald-400" /></Row>

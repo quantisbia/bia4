@@ -27,9 +27,10 @@ export function LayerPreview({ layers, bbox, lineWidth_mm, height = 420 }: { lay
   useEffect(() => {
     const el = wrapRef.current
     if (!el) return
-    const ro = new ResizeObserver(() => setWidth(el.clientWidth))
+    const measure = () => setWidth(Math.max(240, Math.min(el.clientWidth, 900)))
+    const ro = new ResizeObserver(measure)
     ro.observe(el)
-    setWidth(el.clientWidth)
+    measure()
     return () => ro.disconnect()
   }, [])
 
@@ -121,8 +122,8 @@ export function LayerPreview({ layers, bbox, lineWidth_mm, height = 420 }: { lay
   }, [L])
 
   return (
-    <div ref={wrapRef} className="w-full">
-      <canvas ref={canvasRef} style={{ width, height }} className="rounded-lg border border-white/10 block" />
+    <div ref={wrapRef} className="w-full min-w-0 max-w-full">
+      <canvas ref={canvasRef} style={{ width, height, maxWidth: "100%" }} className="rounded-lg border border-white/10 block" />
       <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-300">
         <input type="range" min={0} max={Math.max(0, layers.length - 1)} value={idx} onChange={(e) => setIdx(+e.target.value)} className="flex-1 min-w-[160px] accent-emerald-400" />
         <span className="font-mono">camada {idx + 1}/{layers.length} · z={L ? (L.z_mm + L.height_mm / 2).toFixed(2) : "–"} mm</span>

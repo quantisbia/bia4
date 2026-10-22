@@ -191,7 +191,7 @@ export function DrawCanvas({ strokes, onChange, activeTool, toolCount, onActiveT
   )
 
   return (
-    <div className={cn("space-y-2", className)} ref={wrapRef}>
+    <div className={cn("space-y-2 min-w-0 max-w-full", className)} ref={wrapRef}>
       <div className="flex flex-wrap items-center gap-1.5">
         <ToolBtn id="freehand" icon={Pencil} label="Livre" />
         <ToolBtn id="line" icon={Minus} label="Linha" />
@@ -212,13 +212,13 @@ export function DrawCanvas({ strokes, onChange, activeTool, toolCount, onActiveT
           </button>
         ))}
       </div>
-      <div className="relative">
+      <div className="relative mx-auto" style={{ width: size, maxWidth: "100%" }}>
         <canvas
           ref={cvRef} width={size} height={size}
           onPointerDown={pending || editing ? undefined : onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
           onDoubleClick={onDouble}
-          className={cn("w-full h-auto rounded-xl border border-white/10 touch-none select-none", pending || editing ? "cursor-default opacity-90" : "cursor-crosshair")}
-          style={{ touchAction: "none" }}
+          className={cn("block rounded-xl border border-white/10 touch-none select-none", pending || editing ? "cursor-default opacity-90" : "cursor-crosshair")}
+          style={{ touchAction: "none", width: size, height: size, maxWidth: "100%" }}
         />
         {(pending || editing) && (
           <LayersPrompt
