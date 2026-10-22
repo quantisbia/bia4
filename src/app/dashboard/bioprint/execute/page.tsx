@@ -3858,6 +3858,7 @@ export default function BioprintExecutePage() {
         bioinkId={feedbackBioinkId}
         geometryId={bioprintState.model.geometryId}
         params={sliceParamsSnapshot}
+        materialId={bioprintState.bioink.material ?? null}
         onSaved={(id) => {
           loggerRef.current?.ok(
             `Feedback do print registrado (id ${id.slice(0, 12)}…). A BIA vai usar isso pra melhorar as próximas recomendações.`,

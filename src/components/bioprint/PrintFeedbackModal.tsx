@@ -34,6 +34,9 @@ import {
   type PrintQuality, type PrintIssue,
 } from "@/lib/bioprint/learning-store"
 import type { PresetParams } from "@/lib/bioprint/tissue-presets"
+// R23: laço fechado — nota 1–5 + relato livre → ajustes no próximo G-code
+import { interpretFeedback, saveFeedback, RATING_LABELS, type Rating } from "@/lib/bioprint/print-feedback"
+import { Star } from "lucide-react"
 
 // ─── Props ─────────────────────────────────────────────────────────────
 
@@ -52,12 +55,20 @@ export interface PrintFeedbackModalProps {
   params: PresetParams
   /** Callback opcional após salvar com sucesso — pai pode mostrar toast */
   onSaved?: (resultId: string) => void
+  /** R23: id/rótulo do material (para o laço fechado priorizar a mesma biotinta) */
+  materialId?: string | null
+  /** R23: perfil do BioSlicer usado */
+  profileId?: string | null
 }
 
 // ─── Componente principal ──────────────────────────────────────────────
 
 export function PrintFeedbackModal(props: PrintFeedbackModalProps) {
-  const { open, onClose, tissueId, bioinkId, geometryId, params, onSaved } = props
+  const { open, onClose, tissueId, bioinkId, geometryId, params, onSaved, materialId, profileId } = props
+  // R23: nota 1–5 + relato → ajustes
+  const [rating, setRating] = useState<Rating | null>(null)
+  const [story, setStory] = useState("")
+  const learned = rating ? interpretFeedback(rating, story) : { symptoms: [], adjustments: [] }
 
   // Estado local do formulário
   const [quality, setQuality] = useState<PrintQuality | null>(null)
@@ -89,21 +100,29 @@ export function PrintFeedbackModal(props: PrintFeedbackModalProps) {
 
   // Salvar resultado no learning-store
   const handleSave = useCallback(async () => {
-    if (!quality) {
-      setError("Escolha um nível de qualidade antes de salvar.")
+    if (!rating && !quality) {
+      setError("Dê uma nota de 1 a 5 (ou escolha um nível de qualidade) antes de salvar.")
       return
     }
     setSaving(true)
     setError(null)
     try {
+      // R23: grava nota + relato → ajustes aprendidos para o próximo fatiamento
+      if (rating) {
+        saveFeedback({
+          rating, text: story.trim(), materialId: materialId ?? bioinkId, geometryId, profileId: profileId ?? null,
+          params: { flow: params.flowPercent, speed: params.printSpeedMmS, layer: params.layerHeightMm, density: params.infillPercent },
+        })
+      }
+      const q = quality ?? (rating && rating >= 4 ? "excelente" : rating === 3 ? "aceitavel" : "ruim")
       const result = await savePrintResult({
         tissueId,
         bioinkId,
         geometryId: geometryId ?? "unknown",
         params,
-        quality,
+        quality: q,
         issues: Array.from(selectedIssues),
-        notes: notes.trim() || null,
+        notes: [story.trim(), notes.trim()].filter(Boolean).join(" · "),
       })
       setSavedId(result.id)
       onSaved?.(result.id)
@@ -114,7 +133,7 @@ export function PrintFeedbackModal(props: PrintFeedbackModalProps) {
     } finally {
       setSaving(false)
     }
-  }, [quality, tissueId, bioinkId, geometryId, params, selectedIssues, notes, onSaved, handleClose])
+  }, [quality, rating, story, materialId, profileId, tissueId, bioinkId, geometryId, params, selectedIssues, notes, onSaved, handleClose])
 
   if (!open) return null
 
@@ -169,6 +188,44 @@ export function PrintFeedbackModal(props: PrintFeedbackModalProps) {
 
         {/* Body */}
         <div className="px-5 py-5 space-y-5">
+          {/* R23 · 0. Nota 1–5 + como foi (laço fechado) */}
+          <section className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.05] p-3 space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-wider text-emerald-300 block">
+              Como foi a bioimpressão? Dê uma nota de 1 a 5
+            </label>
+            <div className="flex items-center gap-1">
+              {([1, 2, 3, 4, 5] as Rating[]).map((n) => (
+                <button key={n} type="button" onClick={() => setRating(n)} aria-label={`${n} estrela(s)`}
+                  className={cn("w-10 h-10 rounded-lg border flex items-center justify-center transition", rating !== null && n <= rating ? "border-amber-400/60 bg-amber-500/20 text-amber-300" : "border-white/10 text-gray-500 hover:text-amber-200")}>
+                  <Star className={cn("w-5 h-5", rating !== null && n <= rating ? "fill-amber-400" : "")} />
+                </button>
+              ))}
+              {rating && <span className="ml-2 text-xs text-gray-300">{RATING_LABELS[rating]}</span>}
+            </div>
+            <textarea
+              value={story}
+              onChange={(e) => setStory(e.target.value)}
+              placeholder="Escreva como foi, com suas palavras. Ex.: “saiu muito volume de biotinta” · “começou a imprimir longe do ponto zero” · “não saiu biotinta no começo” · “a peça desmoronou”"
+              rows={3}
+              className="w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2 text-sm text-gray-200 placeholder:text-gray-600 focus:border-emerald-500/40 focus:outline-none resize-none"
+            />
+            {rating !== null && rating <= 3 && (
+              <div className="text-[11px] rounded-lg border border-white/10 bg-black/20 p-2.5">
+                {learned.adjustments.length > 0 ? (
+                  <>
+                    <div className="text-emerald-200 font-semibold mb-1">Entendi. No próximo G-code eu vou:</div>
+                    <ul className="list-disc pl-4 space-y-0.5 text-gray-300">
+                      {learned.adjustments.map((a, i) => <li key={i}>{a.reason}</li>)}
+                    </ul>
+                  </>
+                ) : (
+                  <div className="text-gray-400">Descreva o que aconteceu (volume, ponto zero, aderência, colapso, fios, entupimento…) para eu saber o que corrigir no próximo G-code.</div>
+                )}
+              </div>
+            )}
+            {rating !== null && rating >= 4 && <div className="text-[11px] text-emerald-200">Ótimo — vou manter estes parâmetros como referência para esta biotinta.</div>}
+          </section>
+
           {/* 1. Qualidade — radio cards */}
           <section>
             <label className="text-xs font-semibold uppercase tracking-wider text-violet-300/80 mb-2 block">
@@ -342,10 +399,10 @@ export function PrintFeedbackModal(props: PrintFeedbackModalProps) {
           <button
             type="button"
             onClick={handleSave}
-            disabled={!quality || saving}
+            disabled={(!quality && !rating) || saving}
             className={cn(
               "inline-flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-lg transition-all",
-              !quality || saving
+              (!quality && !rating) || saving
                 ? "bg-white/5 text-gray-500 cursor-not-allowed"
                 : "bg-violet-500 hover:bg-violet-400 text-violet-950",
             )}

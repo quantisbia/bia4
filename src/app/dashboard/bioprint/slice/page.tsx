@@ -37,6 +37,8 @@ import { LayerPreview } from "@/components/slicer/LayerPreview"
 import { BedStage } from "@/components/slicer/BedStage"
 import { type Orientation, IDENTITY_ORIENTATION, orientMesh } from "@/lib/slicer/mesh-slice"
 import { ANATOMICAL_MODELS, type AnatomicalModel, uniformScaleFor } from "@/lib/slicer/anatomical-library"
+// R23: laço fechado — ajustes aprendidos do último feedback (nota ≤ 3)
+import { pendingAdjustments, applyLearned, markConsumed, type LearnedAdjustment, type PrintFeedback } from "@/lib/bioprint/print-feedback"
 import { previewLayers } from "@/lib/slicer/slice"
 import { INFILL_PATTERN_LABELS, BASIC_INFILL_PATTERNS, ADVANCED_INFILL_PATTERNS } from "@/lib/slicer/infill-advanced"
 import { useSearchParams } from "next/navigation"
@@ -65,6 +67,13 @@ function BioSlicerInner() {
   const [anatDim, setAnatDim] = useState<number>(0)
   const [anatLoading, setAnatLoading] = useState<string | null>(null)
   const oriented = useMemo(() => (mesh ? orientMesh(mesh, orientation) : null), [mesh, orientation])
+  // R23: aprendizado pendente (último feedback com nota ≤ 3)
+  const [learned, setLearned] = useState<{ feedback: PrintFeedback | null; adjustments: LearnedAdjustment[] }>({ feedback: null, adjustments: [] })
+  const [useLearned, setUseLearned] = useState(true)
+  useEffect(() => {
+    setLearned(pendingAdjustments({ materialId: state.bioink.material ?? null, geometryId: state.model.geometryId ?? null }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.bioink.material, state.model.geometryId])
   const [stored, setStored] = useState<Array<{ id: string; name: string; sizeKb: number; source: string }>>([])
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -259,13 +268,27 @@ function BioSlicerInner() {
         if (intent.targetSize_mm.z && sz > 0) c.push(intent.targetSize_mm.z / sz)
         if (c.length) { params = { ...P, scale: Math.min(...c) }; setP(params) }
       }
+      // R23: aplica o que foi aprendido com a última impressão (nota ≤ 3) e registra no G-code
+      let Xeff = X
+      let learnedNotes: string[] = []
+      if (useLearned && learned.adjustments.length > 0) {
+        const ap = applyLearned({ params, extrusion: X }, learned.adjustments)
+        params = ap.out.params as typeof params; Xeff = ap.out.extrusion as typeof X; learnedNotes = ap.notes
+        if (ap.originCheck) params = { ...params, skirtLoops: 0, purgeLine_mm: 0 }
+      }
       const r = sliceMesh({
-        mesh: oriented, params, extrusion: X, profileId: profile.id, profileName: profile.name, rheology,
+        mesh: oriented, params, extrusion: Xeff, profileId: profile.id, profileName: profile.name, rheology,
         jobName: mesh.name ?? "bia-print",
         target, tools,
         meta: { geometryId: anat?.id ?? state.model.geometryId ?? mesh.name ?? "stl", tissue: anat?.tissue ?? intent?.tissue ?? state.control.tissueType ?? null, material: intent?.material ?? state.bioink.material ?? null, intent: intentText || null, orientation: `X${orientation.rotX_deg} Y${orientation.rotY_deg} Z${orientation.rotZ_deg} ×${orientation.scale.toFixed(3)}` },
         onProgress: (f, s) => setBusy(`${s} (${Math.round(f * 100)}%)`),
       })
+      if (learnedNotes.length > 0) {
+        r.gcode = r.gcode.replace(/\n(;\s*BIA_META)/, `\n; ── Aprendido com a última impressão (nota ${learned.feedback?.rating}/5: "${(learned.feedback?.text ?? "").slice(0, 80)}") ──\n${learnedNotes.join("\n")}\n$1`)
+        if (!/APRENDIDO/.test(r.gcode)) r.gcode = `${learnedNotes.join("\n")}\n${r.gcode}`
+        if (learned.feedback) markConsumed(learned.feedback.id)
+        setLearned({ feedback: null, adjustments: [] })
+      }
       setResult(r)
       setCharged(null)
       // R20: cobrança por G-code gerado (6 créditos; admin isento). Sem crédito → não libera download/handoff.
@@ -291,7 +314,7 @@ function BioSlicerInner() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao fatiar")
     } finally { setBusy(null) }
-  }, [mesh, oriented, orientation, anat, P, X, profile, rheology, intent, intentText, state, updateSlice, target, tools])
+  }, [mesh, oriented, orientation, anat, P, X, profile, rheology, intent, intentText, state, updateSlice, target, tools, learned, useLearned])
 
   const download = useCallback(() => {
     if (!result) return
@@ -348,6 +371,19 @@ function BioSlicerInner() {
             {!modelReady && <Link href="/dashboard/bioprint/model" className="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-100 whitespace-nowrap">→ Modelo</Link>}
             {!bioinkReady && <Link href="/dashboard/bioprint/bioink" className="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-100 whitespace-nowrap">→ Biotinta</Link>}
           </div>
+        </div>
+      )}
+
+      {learned.feedback && learned.adjustments.length > 0 && (
+        <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/[0.07] p-3 text-xs space-y-1.5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-emerald-200 font-semibold">🧠 Aprendi com a sua última impressão (nota {learned.feedback.rating}/5{learned.feedback.text ? `: “${learned.feedback.text.slice(0, 90)}”` : ""})</div>
+            <label className="flex items-center gap-1.5 text-gray-300 whitespace-nowrap"><input type="checkbox" checked={useLearned} onChange={(e) => setUseLearned(e.target.checked)} /> aplicar no próximo G-code</label>
+          </div>
+          <ul className="list-disc pl-5 text-gray-300 space-y-0.5">
+            {learned.adjustments.map((a, i) => <li key={i}>{a.reason}</li>)}
+          </ul>
+          <div className="text-[10px] text-gray-500">Os ajustes são aplicados sobre os parâmetros abaixo no momento de fatiar e ficam registrados no cabeçalho do G-code (; APRENDIDO …). Desmarque se quiser repetir exatamente a configuração anterior.</div>
         </div>
       )}
 
@@ -575,6 +611,7 @@ function BioSlicerInner() {
               <Row k="Cabeçotes" v={describeTools(tools)} />
               <Row k="Ponto zero" v={target.kind === "plate" ? `Bico no centro do 1º poço — o 1º cordão nasce ali, sem deslocamento.` : `Bico no centro da peça — o 1º cordão nasce ali, sem deslocamento.`} />
               <Row k="Skirt" v={P.skirtLoops > 0 ? `${P.skirtLoops} volta(s) (você ligou)` : "desligado"} />
+              {useLearned && learned.adjustments.length > 0 && <Row k="Aprendido" v={`${learned.adjustments.length} ajuste(s) da última impressão serão aplicados`} />}
               <div className="text-[11px] text-gray-500 pt-1">Serão debitados <b className="text-gray-300">6 créditos</b> ao gerar. Se algo acima não for o que você quer, cancele e ajuste — nada é inventado: só o que está listado vai para o G-code.</div>
             </div>
             <div className="px-5 py-3.5 border-t border-white/10 flex justify-end gap-2">
