@@ -56,10 +56,11 @@ describe("R17 · flow-memory", () => {
   it("clamp e bump", () => {
     expect(clampFlow(5)).toBe(FLOW_MIN)
     expect(clampFlow(999)).toBe(FLOW_MAX)
+    // R25: saltos proporcionais (seringa 10 mL exige salto real) e teto Marlin 999
     expect(nextFlowBump(80)).toBe(105)
-    expect(nextFlowBump(120)).toBe(135)
-    expect(nextFlowBump(200)).toBe(210)
-    expect(nextFlowBump(295)).toBe(FLOW_MAX)
+    expect(nextFlowBump(120)).toBe(170)
+    expect(nextFlowBump(200)).toBe(300)
+    expect(nextFlowBump(900)).toBe(FLOW_MAX)
   })
 
   it("flowAdvice orienta por faixa", () => {

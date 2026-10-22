@@ -3,6 +3,7 @@
  *   placeMesh → layerZs/sliceAtZ → planLayer → writeGCode → stats/avisos bio.
  */
 
+import { diagnoseFlow, type BioinkClass } from "./flow-science"
 import type { TriMesh, SliceParams, ExtrusionModel, SliceResult, SlicedLayer, SliceWarning, Vec2, BBox3 } from "./types"
 import { placeMesh, layerZs, sliceAtZ } from "./mesh-slice"
 import { planLayer } from "./toolpath"
@@ -136,6 +137,22 @@ export function sliceMesh(job: SliceJob): SliceResult {
     if (missing.length) warnings.push({ level: "warn", code: "tool_unlabeled", message: `${missing.length} cabeçote(s) sem biotinta definida.`, hint: "Informe a biotinta de cada cabeçote para o G-code ficar rastreável." })
   }
 
+  // R25 · Diagnóstico de fluxo (vai sair biotinta?) — por cabeçote
+  {
+    const heads: Array<{ index: number; label: string; materialId?: string; extrusion: typeof job.extrusion }> =
+      job.tools?.heads ?? [{ index: 0, label: "Biotinta", extrusion: job.extrusion }]
+    for (const h of heads) {
+      const X = h.extrusion
+      if (X.kind !== "syringe_stepper") continue
+      const mat = h.materialId ?? (job.meta?.material != null ? String(job.meta.material) : h.label)
+      const d = diagnoseFlow(P, X, mat, X.bioinkClass as BioinkClass | undefined)
+      const who = heads.length > 1 ? `T${h.index} (${h.label}) · ` : ""
+      if (d.status === "very_low") warnings.push({ level: "warn", code: "flow_very_low", message: `${who}Êmbolo a ${d.plungerSpeed_mmmin.toFixed(2)} mm/min — a biotinta provavelmente NÃO vai sair.`, hint: d.recommendations.join(" ") })
+      else if (d.status === "low") warnings.push({ level: "info", code: "flow_low", message: `${who}Fluxo ${d.flowEffective_uLs.toFixed(2)} µL/s abaixo da faixa da literatura para ${d.bioinkClass}.`, hint: d.recommendations.join(" ") })
+      else if (d.status === "high") warnings.push({ level: "info", code: "flow_high", message: `${who}Fator de extrusão ${X.flowMultiplier.toFixed(2)}× acima da faixa — risco de cordão largo/escorrido.`, hint: d.recommendations.join(" ") })
+    }
+  }
+
   progress(0.95, "Calculando estatísticas")
   const avgSpeed = (P.speedPerimeter_mms + P.speedInfill_mms) / 2
   const flow = flowRate_uLs(P.lineWidth_mm, P.layerHeight_mm, avgSpeed, X.flowMultiplier)
@@ -158,7 +175,8 @@ export function sliceMesh(job: SliceJob): SliceResult {
       warnings.push({ level: "info", code: "syringe_60", message: `Volume usa ${Math.round((w.stats.volume_uL / cap_uL) * 100)} % da seringa.`, hint: "Carregue a seringa cheia e purgue bolhas." })
     }
     const ePerMin = (flow / syringeArea_mm2(X.syringe)) * 60
-    if (ePerMin < 0.5) warnings.push({ level: "info", code: "plunger_slow", message: `Êmbolo avança só ${ePerMin.toFixed(2)} mm/min.`, hint: "Exige microstepping e E-steps calibrados (≥ 2000 steps/mm). Seringa menor melhora a resolução." })
+    // R25: diagnóstico de fluxo (flow_very_low/flow_low) já cobre este caso com recomendações — mantém só para < 0,2 mm/min
+    if (ePerMin < 0.2) warnings.push({ level: "info", code: "plunger_slow", message: `Êmbolo avança só ${ePerMin.toFixed(2)} mm/min.`, hint: "Exige microstepping e E-steps calibrados (≥ 2000 steps/mm). Seringa menor melhora a resolução." })
   }
   if (poreInfo?.pore !== null && poreInfo?.pore !== undefined) {
     if (poreInfo.pore < P.lineWidth_mm * 0.4) {

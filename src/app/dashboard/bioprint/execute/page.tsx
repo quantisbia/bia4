@@ -1658,6 +1658,38 @@ export default function BioprintExecutePage() {
    * Durante o streaming, debounce é menor (120ms) para resposta rápida;
    * fora dele, 250ms.
    */
+  // R25 · área da seringa a partir do ;BIA_META do G-code (fallback BD 10 mL = 165 mm²)
+  const syringeArea = useMemo(() => {
+    const m = gcodeText.match(/^;BIA_META (\{.*\})$/m)
+    try {
+      const meta = m ? (JSON.parse(m[1]) as { syringe_mL?: number | null }) : null
+      const map: Record<number, number> = { 1: 4.78, 3: 8.66, 5: 12.06, 10: 14.5, 20: 19.13 }
+      const d = meta?.syringe_mL && map[meta.syringe_mL] ? map[meta.syringe_mL] : 14.5
+      return Math.PI * (d / 2) ** 2
+    } catch { return Math.PI * 7.25 ** 2 }
+  }, [gcodeText])
+
+  /**
+   * R25 · Empurra volume REAL agora (G1 E volumétrico, M83). Independe do M221.
+   * Durante stream usa inject (entra na fila prioritária entre linhas);
+   * parado usa sendAndWait. É o que faz a biotinta aparecer na ponta.
+   */
+  const handlePushNow = useCallback(async (uL: number) => {
+    const ctrl = controllerRef.current
+    if (!ctrl || !connected) return
+    const e = uL / syringeArea
+    const f = Math.max(6, Math.round((e / Math.max(1.5, uL / 20)) * 60)) // ~20 µL/s; mínimo 0,1 mm/s de êmbolo
+    const cmds = ["M83", `G1 E${e.toFixed(4)} F${f} ; R25 empurrar ${uL} µL`]
+    try {
+      const st = ctrl.getState()
+      if (st === "streaming" || st === "paused") { for (const c of cmds) ctrl.inject(c, "push") }
+      else { for (const c of cmds) await ctrl.sendAndWait(c) }
+      loggerRef.current.ok(`Empurrados ${uL} µL (${e.toFixed(3)} mm de êmbolo, seringa ${syringeArea.toFixed(0)} mm²).`, "flow")
+    } catch (err) {
+      loggerRef.current.warn(`Empurrar ${uL} µL falhou: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }, [connected, syringeArea])
+
   const handleFlowChange = useCallback((next: number) => {
     setFlowPercent(next)
     if (flowSendTimerRef.current) clearTimeout(flowSendTimerRef.current)
@@ -2025,6 +2057,8 @@ export default function BioprintExecutePage() {
               startPercent={flowStartRef.current}
               onChange={handleFlowChange}
               onConfirmGood={handleConfirmGoodFlow}
+              onPushNow={handlePushNow}
+              syringeArea_mm2={syringeArea}
             />
           )}
           {/* ── 1. G-code input ───────────────────────────────────── */}
@@ -3280,6 +3314,8 @@ export default function BioprintExecutePage() {
               startPercent={flowStartRef.current}
               onChange={handleFlowChange}
               onConfirmGood={handleConfirmGoodFlow}
+              onPushNow={handlePushNow}
+              syringeArea_mm2={syringeArea}
             />
           )}
 

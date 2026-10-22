@@ -113,7 +113,7 @@ export function defaultLayerHeight(nozzleDiameter_mm: number): number {
 export const DEFAULT_EXTRUSION_SYRINGE_10ML: ExtrusionModel = {
   kind: "syringe_stepper",
   syringe: { volume_mL: 10, innerDiameter_mm: 14.5 },
-  flowMultiplier: 1.0,
+  flowMultiplier: 1.5, // R25: hidrogéis moles 1,2–2,2× (Ribeiro 2017, Lee 2020, Cordova 2024) — 1,0 só vale para pastas
   primeVolume_uL: 0.8,
   retractVolume_uL: 0.6,
   retractSpeed_mms: 2,

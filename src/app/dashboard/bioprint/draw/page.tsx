@@ -24,6 +24,7 @@ import { DrawCanvas } from "@/components/slicer/DrawCanvas"
 import { TargetPanel } from "@/components/slicer/TargetPanel"
 import { ToolsPanel, type BioinkOption } from "@/components/slicer/ToolsPanel"
 import { LayerPreview } from "@/components/slicer/LayerPreview"
+import { FlowCheck } from "@/components/slicer/FlowCheck"
 import { sendToExecute } from "@/lib/bioprint/execute-handoff"
 import { pendingAdjustments, applyLearned, markConsumed } from "@/lib/bioprint/print-feedback"
 import type { SlicedLayer } from "@/lib/slicer/types"
@@ -199,8 +200,10 @@ function DrawPrintInner() {
               <Row label="Seringa"><select value={X.syringe ? `${X.syringe.volume_mL}|${X.syringe.innerDiameter_mm}` : "pneumatic"} onChange={(e) => { if (e.target.value === "pneumatic") setX({ ...X, kind: "pneumatic", syringe: undefined }); else { const [v, d] = e.target.value.split("|").map(Number); setX({ ...X, kind: "syringe_stepper", syringe: { volume_mL: v, innerDiameter_mm: d } }) } }} className={inp}>{SYRINGE_CATALOG.map((s) => <option key={s.label} value={`${s.volume_mL}|${s.innerDiameter_mm}`}>{s.label}</option>)}<option value="pneumatic">Pneumático (pressão)</option></select></Row>
               <Row label={`Altura de camada · ${P.layerHeight_mm} mm (${Math.round(P.layerHeight_mm / P.nozzleDiameter_mm * 100)} % do bico)`}><input type="range" min={0.1} max={1.2} step={0.01} value={P.layerHeight_mm} onChange={(e) => setP({ ...P, layerHeight_mm: +e.target.value, firstLayerHeight_mm: Math.round(+e.target.value * 0.9 * 100) / 100 })} className="w-full accent-emerald-400" /></Row>
               <Row label={`Velocidade · ${P.speedPerimeter_mms} mm/s`}><input type="range" min={1} max={20} step={0.5} value={P.speedPerimeter_mms} onChange={(e) => { const v = +e.target.value; setP({ ...P, speedPerimeter_mms: v, speedInfill_mms: Math.round(v * 1.2 * 10) / 10, speedFirstLayer_mms: Math.max(1, Math.round(v * 0.7 * 10) / 10) }) }} className="w-full accent-emerald-400" /></Row>
-              <Row label={`Fluxo · ×${X.flowMultiplier.toFixed(2)}`}><input type="range" min={0.5} max={2} step={0.05} value={X.flowMultiplier} onChange={(e) => setX({ ...X, flowMultiplier: +e.target.value })} className="w-full accent-emerald-400" /></Row>
+              <Row label={`Fator de extrusão · ×${X.flowMultiplier.toFixed(2)}`}><input type="range" min={0.5} max={3} step={0.05} value={X.flowMultiplier} onChange={(e) => setX({ ...X, flowMultiplier: +e.target.value })} className="w-full accent-emerald-400" /></Row>
             </div>
+            {/* R25 · vai sair biotinta? */}
+            <div className="mt-3"><FlowCheck P={P} X={X} setX={setX} material={state.bioink.material ?? null} /></div>
           </Panel>
 
           <Panel title="4. Substrato de impressão (ponto zero)" icon={<Target className="w-4 h-4" />}><TargetPanel target={target} onChange={setTarget} footprint_mm={footprint || null} /></Panel>

@@ -27,7 +27,7 @@ export interface FlowMemoryEntry {
 
 const KEY = "bia.flow-memory.v1"
 export const FLOW_MIN = 10
-export const FLOW_MAX = 300
+export const FLOW_MAX = 999 // R25: limite do Marlin (M221 S1–999). Antes 300 — insuficiente p/ seringa 10 mL
 export const FLOW_STEPS = [10, 25] as const
 
 /**
@@ -104,9 +104,12 @@ export function clampFlow(v: number): number {
 
 /** Próximo passo sugerido quando "não está saindo": sobe agressivo no começo, fino depois. */
 export function nextFlowBump(current: number): number {
+  // R25: passos proporcionais — "não está saindo" precisa de salto real,
+  // não +10 % sobre um E que já é quase zero (seringa 10 mL).
   if (current < 100) return clampFlow(current + 25)
-  if (current < 160) return clampFlow(current + 15)
-  return clampFlow(current + 10)
+  if (current < 200) return clampFlow(current + 50)
+  if (current < 400) return clampFlow(current + 100)
+  return clampFlow(current + 150)
 }
 
 /**

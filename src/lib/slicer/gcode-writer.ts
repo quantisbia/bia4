@@ -16,6 +16,7 @@
  *     ferramenta; a troca emite retração → T<n> → prime → dwell. Um único G-code.
  */
 
+import { needleDeadVolume_uL, BIOINK_CLASSES, type BioinkClass } from "./flow-science"
 import type { SliceParams, ExtrusionModel, SlicedLayer, ToolPath, Vec2, SliceStats, PathRole } from "./types"
 import { ePerMm, volumeToE, beadArea_mm2 } from "./extrusion"
 import { dist } from "./polygon-ops"
@@ -95,6 +96,7 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
     toolLabels: tools.heads.map((h) => h.label).join("|"), ...opt.meta,
   }
   push(`;BIA_META ${JSON.stringify(meta)}`)
+  push(`; Extrusão: fator ${X.flowMultiplier.toFixed(2)}× (Q_real/Q_teórico)${X.bioinkClass ? ` · classe ${X.bioinkClass}` : ""} · seringa ${X.syringe?.volume_mL ?? 10} mL`)
   push(`; Geometry: ${opt.meta?.geometryId ?? opt.meshName ?? "stl"}`)
   push(`; ═══════════════════════════════════════════════════════════`)
   push(``)
@@ -123,6 +125,24 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
   if (P.customStart.trim()) {
     push(`; custom start:`)
     for (const l of P.customStart.split(/\r?\n/)) if (l.trim()) push(l.trim())
+  }
+  // R25 · PRÉ-CARGA: encher agulha + luer e fazer o filamento aparecer na ponta
+  // ANTES do primeiro cordão. Sem isto a cabeça anda e nada sai (dead volume
+  // de 22G×25 mm + luer ≈ 43 µL ≫ 0,13 mm² × poucos mm de cordão).
+  {
+    const X0 = tools.heads[0].extrusion
+    const cls = (X0.bioinkClass as BioinkClass | undefined) && BIOINK_CLASSES[X0.bioinkClass as BioinkClass] ? (X0.bioinkClass as BioinkClass) : undefined
+    const auto = needleDeadVolume_uL(P.nozzleDiameter_mm) + (cls ? BIOINK_CLASSES[cls].extraPrime_uL : 6)
+    const vol = X0.startPrime_uL === undefined ? auto : Math.max(0, X0.startPrime_uL)
+    if (vol > 0) {
+      const eP = volumeToE(vol, X0)
+      // velocidade de êmbolo moderada (0,15 mm/s) — enche sem jato
+      push(`; ─── PRÉ-CARGA R25: ${vol.toFixed(1)} µL (agulha ${P.nozzleDiameter_mm} mm + luer${cls ? ` · ${BIOINK_CLASSES[cls].label}` : ""}) ───`)
+      push(`G1 E${f(eP, 4)} F9            ; encher agulha até o filamento aparecer (${eP.toFixed(3)} mm de êmbolo)`)
+      push(`G4 P800                ; relaxar pressão`)
+      eTotal += eP; time += eP / 0.15 + 0.8
+      push(`; dica: se já pré-carregou pelo Host, defina startPrime_uL = 0 no perfil`)
+    }
   }
   push(``)
 

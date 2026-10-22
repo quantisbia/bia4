@@ -61,6 +61,15 @@ export interface ExtrusionModel {
   retractSpeed_mms: number
   /** Dwell após prime (ms). */
   primeDwell_ms: number
+  /**
+   * R25 · Pré-carga no START (µL): enche agulha + luer (dead volume) e empurra
+   * um extra para o filamento aparecer na ponta ANTES do primeiro cordão.
+   * undefined → calculado por flow-science (dead volume + extra da classe).
+   * 0 → desliga (já pré-carregado manualmente no Host).
+   */
+  startPrime_uL?: number
+  /** R25 · Classe da biotinta usada para o fator de extrusão (informativo no cabeçalho). */
+  bioinkClass?: string
 }
 
 export type InfillPattern =

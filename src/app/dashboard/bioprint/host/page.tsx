@@ -172,6 +172,12 @@ export default function BioHostPage() {
     const c = clampFlow(v); setFlow(c)
     void send(`M221 S${c}`).then(() => setFlowApplied(c))
   }, [send])
+  // R25 · empurra volume real (G1 E em M83) — funciona parado ou durante o stream (inject)
+  const pushNow = useCallback((uL: number) => {
+    const e = uL / syringeArea_mm2(syringe)
+    const f = Math.max(6, Math.round((e / Math.max(1.5, uL / 20)) * 60)) // ~20 µL/s, mínimo 0,1 mm/s de êmbolo
+    void send(["M83", `G1 E${e.toFixed(4)} F${f}  ; R25 empurrar ${uL} µL`])
+  }, [send, syringe])
   const confirmGoodFlow = useCallback(() => {
     setFlowMemory(rememberGoodFlow(flowMaterialKey, flowMaterialLabel, flow, flowStartRef.current))
   }, [flowMaterialKey, flowMaterialLabel, flow])
@@ -300,6 +306,7 @@ export default function BioHostPage() {
             flowPercent={flow} appliedPercent={flowApplied} connected={connected} streaming={printing}
             materialLabel={flowMaterialLabel} memory={flowMemory} startPercent={flowStartRef.current}
             onChange={applyFlow} onConfirmGood={confirmGoodFlow}
+            onPushNow={pushNow} syringeArea_mm2={syringeArea_mm2(syringe)}
           />
           <Panel title="Velocidade de impressão" icon={<Gauge className="w-4 h-4" />}>
             <Slider label="Velocidade (M220)" value={speed} min={20} max={200} onChange={setSpeed} onCommit={(v) => send(`M220 S${v}`)} disabled={!connected} />

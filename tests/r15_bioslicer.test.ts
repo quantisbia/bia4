@@ -152,7 +152,9 @@ describe("R15 · extrusão volumétrica (seringa)", () => {
     expect(volumeToE(1, DEFAULT_EXTRUSION_SYRINGE_10ML)).toBeCloseTo(0.00606, 4)
   })
   it("ePerMm coerente com área do cordão", () => {
-    expect(ePerMm(0.47, 0.33, DEFAULT_EXTRUSION_SYRINGE_10ML)).toBeCloseTo(beadArea_mm2(0.47, 0.33) / 165.13, 5)
+    // R25: o default agora carrega fator 1,5 (hidrogéis moles) — ePerMm = área × fator / A_seringa
+    expect(ePerMm(0.47, 0.33, { ...DEFAULT_EXTRUSION_SYRINGE_10ML, flowMultiplier: 1 })).toBeCloseTo(beadArea_mm2(0.47, 0.33) / 165.13, 5)
+    expect(ePerMm(0.47, 0.33, DEFAULT_EXTRUSION_SYRINGE_10ML)).toBeCloseTo(beadArea_mm2(0.47, 0.33) * 1.5 / 165.13, 5)
   })
   it("shear e viabilidade (Blaeser)", () => {
     expect(wallShearStress_Pa(2.5, 0.8, 0.41)).toBeGreaterThan(0)

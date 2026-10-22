@@ -2055,3 +2055,13 @@ Janaina Dernowsek (CEO/Founder)
 - Sidebar: Fase 4 aponta para `/execute`; descrições reescritas. Stepper: "Bioimpressão" / "Maturação & caracterizações".
 - Manual: removidos capítulos obsoletos (Formulador Pro, Formulador Bio, Gerador STL, Bioimpressão 3D, Roadmap Futuro, Visão Estratégica — 907 linhas); mantido o protocolo "Análise dos construtos impressos". Capítulo da Fase 2 reescrito para os 4 modos; Fases 3 e 4 atualizadas (testes de imprimibilidade no BioSlicer, destino único da Fase 4).
 - Componentes órfãos removidos: `InfillStudio`, `ToolpathAnalyzer`, `ScientificRefsPanel`.
+
+## R25 · Fluxo de biotinta com racional científico (por que não saía — e o que mudou)
+**Diagnóstico.** O modelo volumétrico (E = V/A_seringa) estava certo, mas (a) todos os perfis usavam fator 1,0 — a literatura de extrusão mecânica de hidrogéis usa **1,2–2,5× (Q_real/Q_teórico)** por compressibilidade, escorregamento na parede e die-swell (Ribeiro 2017, Lee 2020, Cordova 2024); (b) numa seringa BD 10 mL (165 mm²) o êmbolo andava **0,004 mm/s (0,24 mm/min)** — abaixo do stick-slip/backlash do fuso; (c) o G-code começava a imprimir **sem encher a agulha** (dead volume 22G×25 mm + luer ≈ 43 µL); (d) o M221 estava limitado a 300 % e, multiplicando um E quase nulo, não resolvia.
+**Correções.**
+- `src/lib/slicer/flow-science.ts`: 5 classes de biotinta (hidrogel mole 1,6× · pseudoplástica 1,35× · pasta 1,15× · FRESH 1,8× · sacrificial 1,3×) com faixas, vazão-alvo (0,8–5 µL/s; pastas 4–30), velocidade mínima de êmbolo (0,02 mm/s) e `diagnoseFlow()` (vai sair? very_low/low/ok/high + recomendações). Dead volume por agulha.
+- G-code: **PRÉ-CARGA no START** (`G1 E… F9` = dead volume + extra da classe, ~50 µL) antes do primeiro cordão; cabeçalho declara fator e classe; `startPrime_uL = 0` desliga.
+- Perfis: fator por classe; hidrogéis moles em **seringa 3 mL** (êmbolo anda 2,8× mais por µL) e 8–12 mm/s. Todos os 12 perfis agora saem com veredito **ok** (organoide 27G/1 mL fica "low" por natureza — informativo).
+- BioSlicer e Desenhar & Imprimir: painel **"Vai sair biotinta?"** (`FlowCheck`) em tempo real — vazão, êmbolo, E/mm, pré-carga, seletor de classe, botões "Aplicar fator" e "Usar seringa 3 mL". `sliceMesh` emite `flow_very_low` / `flow_low` / `flow_high`.
+- Fase 4 (`/execute` e BIA Host): M221 até **999 %** (limite Marlin), saltos proporcionais (+50/+100/+150) e botões **"Empurre biotinta agora +20/+50/+100 µL"** (G1 E volumétrico via M83, funciona parado ou durante o stream) — independe do M221 e é o que faz o filamento aparecer na ponta.
+- Testes: `tests/r25_flow_science.test.ts` (12). 1783 verdes.

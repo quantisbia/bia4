@@ -38,6 +38,7 @@ import { ToolsPanel, type BioinkOption } from "@/components/slicer/ToolsPanel"
 import { sendToExecute } from "@/lib/bioprint/execute-handoff"
 import { Target, Palette, ShieldCheck, X as XIcon } from "lucide-react"
 import { LayerPreview } from "@/components/slicer/LayerPreview"
+import { FlowCheck } from "@/components/slicer/FlowCheck"
 import { BedStage } from "@/components/slicer/BedStage"
 import { type Orientation, IDENTITY_ORIENTATION, orientMesh } from "@/lib/slicer/mesh-slice"
 import { ANATOMICAL_MODELS, type AnatomicalModel, uniformScaleFor } from "@/lib/slicer/anatomical-library"
@@ -626,6 +627,8 @@ function BioSlicerInner() {
           </Panel>
 
           <Panel title="4. Parâmetros de fatiamento" icon={<Gauge className="w-4 h-4" />}>
+            {/* R25 · diagnóstico de fluxo em tempo real (literatura de extrusão mecânica) */}
+            <div className="mb-3"><FlowCheck P={P} X={X} setX={setX} material={intent?.material ?? state.bioink.material ?? null} /></div>
             {mode === "basic"
               ? <BasicParams P={P} setP={setP} X={X} setX={setX} />
               : <AdvancedParams P={P} setP={setP} X={X} setX={setX} rheology={rheology} setRheology={setRheology} />}
@@ -866,7 +869,7 @@ function AdvancedParams({ P, setP, X, setX, rheology, setRheology }: {
         {X.kind === "syringe_stepper" && <F k="syringe" label="Seringa"><select value={X.syringe ? `${X.syringe.volume_mL}|${X.syringe.innerDiameter_mm}` : ""} onChange={(e) => { const [v, d] = e.target.value.split("|").map(Number); setX({ ...X, syringe: { volume_mL: v, innerDiameter_mm: d } }) }} className={inp}>{SYRINGE_CATALOG.map((s) => <option key={s.label} value={`${s.volume_mL}|${s.innerDiameter_mm}`}>{s.label}</option>)}</select></F>}
         {X.kind === "syringe_stepper" && <F k="syringeId" label="Ø interno (mm)"><input type="number" step={0.01} value={X.syringe?.innerDiameter_mm ?? 14.5} onChange={(e) => setX({ ...X, syringe: { volume_mL: X.syringe?.volume_mL ?? 10, innerDiameter_mm: +e.target.value } })} className={inp} /></F>}
         {X.kind === "pneumatic" && <F k="pressure_kPa" label="Pressão (kPa)"><input type="number" step={1} value={X.pressure_kPa ?? 75} onChange={(e) => setX({ ...X, pressure_kPa: +e.target.value })} className={inp} /></F>}
-        <F k="flowMultiplier" label="Multiplicador de fluxo"><input type="number" step={0.05} value={X.flowMultiplier} onChange={(e) => setX({ ...X, flowMultiplier: +e.target.value })} className={inp} /></F>
+        <F k="flowMultiplier" label="Fator de extrusão (Q_real/Q_teórico)"><input type="number" step={0.05} value={X.flowMultiplier} onChange={(e) => setX({ ...X, flowMultiplier: +e.target.value })} className={inp} /></F>
         <F k="primeVolume_uL" label="Prime (µL)"><input type="number" step={0.1} value={X.primeVolume_uL} onChange={(e) => setX({ ...X, primeVolume_uL: +e.target.value })} className={inp} /></F>
         <F k="retractVolume_uL" label="Retração (µL)"><input type="number" step={0.1} value={X.retractVolume_uL} onChange={(e) => setX({ ...X, retractVolume_uL: +e.target.value })} className={inp} /></F>
         <F k="retractSpeed_mms" label="Vel. êmbolo retr. (mm/s)"><input type="number" step={0.5} value={X.retractSpeed_mms} onChange={(e) => setX({ ...X, retractSpeed_mms: +e.target.value })} className={inp} /></F>

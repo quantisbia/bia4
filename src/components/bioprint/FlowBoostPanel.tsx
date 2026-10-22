@@ -23,10 +23,19 @@ export interface FlowBoostPanelProps {
   onChange: (next: number) => void
   onConfirmGood: () => void
   compact?: boolean
+  /**
+   * R25 · Empurra um volume (µL) AGORA via G1 E volumétrico — independe do
+   * M221 e funciona durante o stream (inject). É o que faz a biotinta aparecer
+   * na ponta quando o M221 sozinho não resolve (seringa 10 mL = 165 mm²).
+   */
+  onPushNow?: (uL: number) => void
+  /** Área da seringa (mm²) para mostrar quanto o êmbolo vai andar. */
+  syringeArea_mm2?: number
 }
 
 export function FlowBoostPanel(p: FlowBoostPanelProps) {
-  const { flowPercent, appliedPercent, connected, streaming, materialLabel, memory, onChange, onConfirmGood } = p
+  const { flowPercent, appliedPercent, connected, streaming, materialLabel, memory, onChange, onConfirmGood, onPushNow, syringeArea_mm2 } = p
+  const mmFor = (uL: number) => (syringeArea_mm2 ? ` (${(uL / syringeArea_mm2).toFixed(2)} mm de êmbolo)` : "")
   const applied = appliedPercent === flowPercent
   const tone = flowPercent < 80 ? "amber" : flowPercent <= 160 ? "emerald" : "violet"
   const bump = nextFlowBump(flowPercent)
@@ -64,6 +73,26 @@ export function FlowBoostPanel(p: FlowBoostPanelProps) {
           </div>
         </div>
 
+        {/* R25 · empurrar volume AGORA (G1 E) — o que de fato faz sair */}
+        {onPushNow && (
+          <div className="rounded-xl border border-rose-400/40 bg-rose-500/10 p-3 space-y-2">
+            <div className="text-xs font-semibold text-rose-100">Nada saindo? Empurre biotinta agora (volume real, G1 E)</div>
+            <div className="grid grid-cols-3 gap-2">
+              {[20, 50, 100].map((uL) => (
+                <button key={uL} onClick={() => onPushNow(uL)} disabled={!connected}
+                  title={`Extruda ${uL} µL imediatamente${mmFor(uL)} — independe do M221`}
+                  className="py-2.5 rounded-lg text-sm font-bold bg-rose-500/20 border border-rose-400/50 text-rose-50 hover:bg-rose-500/30 disabled:opacity-40">
+                  +{uL} µL
+                </button>
+              ))}
+            </div>
+            <p className="text-[10.5px] text-rose-200/80 leading-snug">
+              Agulha 22G + luer têm ~45 µL de volume morto: até encher, nada aparece. O M221 só multiplica o E das próximas linhas —
+              em seringa de 10 mL isso é quase nada por mm. Empurre 50 µL e observe a ponta; repita até o filamento aparecer, depois imprima.
+            </p>
+          </div>
+        )}
+
         {/* botões grandes */}
         <div className="grid grid-cols-2 gap-2">
           <button
@@ -89,7 +118,7 @@ export function FlowBoostPanel(p: FlowBoostPanelProps) {
 
         {/* slider fino */}
         <input type="range" min={FLOW_MIN} max={FLOW_MAX} step={1} value={flowPercent} onChange={(e) => onChange(parseInt(e.target.value, 10))} disabled={!connected} className="w-full accent-emerald-400 disabled:opacity-40" />
-        <div className="flex justify-between text-[9px] text-gray-500 font-mono"><span>{FLOW_MIN}%</span><span>100</span><span>150</span><span>200</span><span>{FLOW_MAX}%</span></div>
+        <div className="flex justify-between text-[9px] text-gray-500 font-mono"><span>{FLOW_MIN}%</span><span>100</span><span>250</span><span>500</span><span>{FLOW_MAX}%</span></div>
 
         <p className="text-[11px] text-gray-300 bg-black/30 rounded-lg px-3 py-2 flex gap-2"><Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0 mt-0.5" /> {flowAdvice(flowPercent, materialLabel)}</p>
       </div>
