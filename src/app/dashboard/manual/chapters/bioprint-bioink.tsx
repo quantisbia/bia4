@@ -1,5 +1,5 @@
 /**
- * BIA · Manual · Capítulo — Bioimpressão · Etapa 2 · Biotinta
+ * BIA · Manual · Capítulo — Bioimpressão · Fase 2 de 6 · Biotinta
  */
 
 "use client"
@@ -15,7 +15,7 @@ export function ChapterBioprintBioink() {
     <article className="space-y-6">
       <ChapterCover
         number={4}
-        badge="ETAPA 2 DE 4"
+        badge="FASE 2 DE 6"
         title="Bioimpressão · Biotinta"
         icon={Droplet}
         gradient="from-cyan-500/15 to-teal-500/15 border-cyan-500/20"

@@ -19,7 +19,7 @@ import {
   ChevronDown, Lightbulb, Rocket, Save, ShieldCheck, ArrowRight,
   Microscope, GitBranch, Map, Wrench, FileText, Coffee, Download,
   Compass, Layers, Notebook as NotebookIcon, BarChart3, CreditCard,
-  PlayCircle,
+  PlayCircle, ClipboardCheck,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
@@ -35,6 +35,7 @@ import { ChapterBioprintModel as BioprintModel } from "./chapters/bioprint-model
 import { ChapterBioprintBioink as BioprintBioink } from "./chapters/bioprint-bioink"
 import { ChapterBioprintSlice as BioprintSlice } from "./chapters/bioprint-slice"
 import { ChapterBioprintExecute as BioprintExecute } from "./chapters/bioprint-execute"
+import { ChapterBioprintReviewPost as BioprintReviewPost } from "./chapters/bioprint-review-post"
 import { OrganoidBuilder } from "./chapters/organoid-builder"
 import { Protocols as ChapterProtocols } from "./chapters/protocols"
 import { Knowledge as ChapterKnowledge } from "./chapters/knowledge"
@@ -99,7 +100,7 @@ const CHAPTERS: Chapter[] = [
   {
     id: "bioprint-model",
     title: "Bioimpressão — Fase 1: Modelo de tecido (sem STL)",
-    subtitle: "Modelo paramétrico, upload STL ou biblioteca anatômica",
+    subtitle: "O racional das 6 fases; tecido-alvo, aplicação, tamanho, células → sugestões para as Fases 2 e 3",
     icon: Box,
     color: "from-blue-500 to-purple-600",
     badge: "NOVO",
@@ -125,12 +126,21 @@ const CHAPTERS: Chapter[] = [
   },
   {
     id: "bioprint-execute",
-    title: "Bioimpressão — Fase 4: Bioimpressão (Host) · Fase 5: Análise · Fase 6: Maturação",
-    subtitle: "USB, joystick, extrusão, Speed/Flow, pausa, retomada (R12.40)",
+    title: "Bioimpressão — Fase 4: Bioimpressão (Host)",
+    subtitle: "USB, joystick, extrusão, Speed/Flow, pausa, retomada",
     icon: PlayCircle,
     color: "from-rose-500 to-red-600",
     badge: "ATUALIZADO",
     estReadMin: 12,
+  },
+  {
+    id: "bioprint-review-post",
+    title: "Bioimpressão — Fases 5 e 6: Análise da bioimpressão · Maturação & caracterizações",
+    subtitle: "Laço fechado (nota + relato → próximo G-code), crosslink, cultura, biorreator, ensaios",
+    icon: ClipboardCheck,
+    color: "from-sky-500 to-rose-600",
+    badge: "NOVO",
+    estReadMin: 8,
   },
   {
     id: "organoid-builder",
@@ -400,6 +410,7 @@ export default function ManualPage() {
             {activeId === "bioprint-bioink"  && <BioprintBioink />}
             {activeId === "bioprint-slice"   && <BioprintSlice />}
             {activeId === "bioprint-execute" && <BioprintExecute />}
+            {activeId === "bioprint-review-post" && <BioprintReviewPost />}
             {activeId === "organoid-builder" && <OrganoidBuilder />}
             {activeId === "protocols"        && <ChapterProtocols />}
             {activeId === "knowledge"        && <ChapterKnowledge />}

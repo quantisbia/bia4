@@ -127,8 +127,6 @@ export const NAV_GROUPS: NavGroup[] = [
         info: "Fluxo guiado em 12 etapas: do problema clínico ao protocolo validado." },
       { href: "/dashboard/formulator-pro", label: "Formulador Pro",   labelKey: "nav_formulator", icon: Atom,
         info: "Monte formulações de biotintas com até 8 componentes. 807 biomateriais + reologia em tempo real." },
-      { href: "/dashboard/organoids",      label: "Organoid Builder", labelKey: "nav_organoids",  icon: CircleDot,
-        info: "Esferoides e organoides (intestinal, hepático, neural, cardíaco, renal) com QMicroNiche™ + QMatrix™." },
     ],
   },
   {
@@ -149,6 +147,18 @@ export const NAV_GROUPS: NavGroup[] = [
         info: "Host serial profissional: USB Web Serial, checksum/reenvio, temperaturas, jog, macros de seringa, pausa segura." },
       { href: "/dashboard/bioprint/review", label: "Fase 5 · Análise", icon: ClipboardCheck,
         info: "Laço fechado: nota 1–5 + relato → a BIA ajusta o próximo G-code. Histórico de impressões.", badge: "novo" },
+    ],
+  },
+  {
+    // R24.2 · Esferoides e organoides são biofabricação SCAFFOLD-FREE — não passam
+    // pelas 6 fases de bioimpressão. Vivem em grupo próprio, depois de "Bioimprimir".
+    id: "organoids",
+    label: "Esferoides & Organoides",
+    icon: CircleDot,
+    accent: "text-amber-400",
+    items: [
+      { href: "/dashboard/organoids",      label: "Organoid Builder", labelKey: "nav_organoids",  icon: CircleDot,
+        info: "Biofabricação scaffold-free (sem bioimpressão): esferoides e organoides (intestinal, hepático, neural, cardíaco, renal, pancreático, pulmonar) com protocolo QMicroNiche™ e moldes não-adesivos QMatrix™." },
     ],
   },
   {

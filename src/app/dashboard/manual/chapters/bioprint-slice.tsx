@@ -1,5 +1,5 @@
 /**
- * BIA · Manual · Capítulo — Bioimpressão · Etapa 3 · Fatiamento (BioSlicer)
+ * BIA · Manual · Capítulo — Bioimpressão · Fase 3 de 6 · Fatiamento (BioSlicer) — o ÚNICO lugar de STL
  * R22: reescrito para a base única (R20), infills honestos (R20-B), Mesa (R21).
  */
 
@@ -16,7 +16,7 @@ export function ChapterBioprintSlice() {
     <article className="space-y-6">
       <ChapterCover
         number={5}
-        badge="ETAPA 3 DE 4"
+        badge="FASE 3 DE 6 · ÚNICO LUGAR DE STL"
         title="Bioimpressão · Fatiamento — BioSlicer"
         icon={FileCode2}
         gradient="from-emerald-500/15 to-cyan-500/15 border-emerald-500/20"
@@ -25,8 +25,8 @@ export function ChapterBioprintSlice() {
         cost="6 créditos por G-code gerado (prévia é grátis)"
         lead={
           <>
-            A BIA tem <strong className="text-white">um único fatiador</strong>: o BioSlicer. Ele transforma o modelo 3D
-            (STL da Etapa 1, modelo anatômico real, upload ou primitiva) em <strong className="text-white">G-code</strong> com
+            A BIA tem <strong className="text-white">um único fatiador e um único lugar de geometria 3D</strong>: o BioSlicer.
+            Ele transforma o modelo 3D (anatômico real, primitiva, upload de STL ou desenho à mão) em <strong className="text-white">G-code</strong> com
             extrusão volumétrica por seringa. Tudo o que antes era “G-code rápido”, “médico” ou “avançado” agora é só um
             caminho para esta mesma base — você sempre vê a peça na <em>Mesa</em>, confirma e só então paga.
           </>
@@ -39,21 +39,22 @@ export function ChapterBioprintSlice() {
           <li><strong className="text-white">Ponto zero é ponto zero</strong>: o G-code começa com <code>G92 X0 Y0 Z0 E0</code> onde o bico está. Sem <code>G28</code>, sem “park”, sem deslocamento seco — o 1º cordão nasce no ponto zero.</li>
           <li><strong className="text-white">Infills honestos</strong>: gyroid é gyroid, grid é grid, hexagonal é hexagonal, ondas são ondas. Nada é “aproximado” por outro padrão.</li>
           <li><strong className="text-white">Alvo</strong>: Petri, lâmina ou placa de 6–96 poços (1º poço = ponto zero; os demais por offset do pitch).</li>
-          <li><strong className="text-white">1 a 4 cabeçotes</strong> em um único G-code (<code>T0..T3</code>), cada um com sua biotinta da Etapa 2.</li>
+          <li><strong className="text-white">1 a 4 cabeçotes</strong> em um único G-code (<code>T0..T3</code>), cada um com sua biotinta da Fase 2.</li>
           <li><strong className="text-white">Mesa</strong>: veja a peça de cima e em 3D sobre o alvo, gire (X/Y/Z), “deite” e só então fatie.</li>
           <li><strong className="text-white">Prévia grátis</strong> de 3 camadas no modal de confirmação — os 6 créditos só são debitados ao confirmar.</li>
         </ul>
       </Box2>
 
-      <WhereIs path="Dashboard → Bioimpressão → Etapa 3 · Fatiar (sidebar: 'Fatiar (Etapa 3)')" />
+      <WhereIs path="Dashboard → Bioimprimir → Fase 3 · Fatiar (STL → G-code)" />
 
       {/* ── Passo a passo ─────────────────────────────────────────────── */}
       <h2 className="text-lg font-bold text-white pt-2">Passo a passo</h2>
 
       <StepCard n={1} title="Modelo 3D — de onde vem a peça" icon={Box} accent="emerald">
-        <p className="mb-2">Quatro origens, todas levam à mesma Mesa:</p>
+        <p className="mb-2">Cinco origens, todas levam à mesma Mesa:</p>
         <ul className="list-disc pl-5 space-y-1">
-          <li><strong className="text-white">Etapa 1</strong> — o que você gerou/escolheu lá já aparece em “Malhas salvas”.</li>
+          <li><strong className="text-white">Vindo da Fase 1</strong> — se você confirmou o modelo de tecido, o BioSlicer já abre com o modelo, o tamanho, o perfil, o infill e o alvo sugeridos (via link <code>?anat=</code>/<code>?prim=</code>).</li>
+          <li><strong className="text-white">Desenhar &amp; Imprimir</strong> — trace linhas, círculos e retângulos com o dedo ou mouse; cada traço vira um caminho de extrusão.</li>
           <li><strong className="text-white">Modelos anatômicos reais</strong> — menisco em C, orelha, nariz, rim, coração, fêmur, segmento vascular ramificado e a grade de fidelidade 15,4 mm. São <em>malhas curvas de verdade</em> (não semicírculos facetados). Você escolhe <strong className="text-white">uma única dimensão</strong> (ex.: comprimento do menisco) e a escala é uniforme — a anatomia é preservada.</li>
           <li><strong className="text-white">Upload .stl</strong> (binário ou ASCII) — arraste na caixa.</li>
           <li><strong className="text-white">Primitiva</strong> — bloco, disco, tubo, domo para testes rápidos.</li>
@@ -134,7 +135,7 @@ export function ChapterBioprintSlice() {
 
       <StepCard n={6} title="Cabeçotes e biotintas (1 a 4)" icon={Palette} accent="rose">
         <p className="mb-2">
-          Informe <strong className="text-white">quantos cabeçotes</strong> sua bioimpressora tem. Para cada <code>T0..T3</code>: biotinta (vinda da Etapa 2), seringa, temperatura,
+          Informe <strong className="text-white">quantos cabeçotes</strong> sua bioimpressora tem. Para cada <code>T0..T3</code>: biotinta (vinda da Fase 2), seringa, temperatura,
           multiplicador de fluxo e offset XY (a partir do 2º). Atribua <em>papéis</em> → ferramenta: paredes externas, internas, infill, suporte.
         </p>
         <ul className="list-disc pl-5 space-y-1">
@@ -151,14 +152,14 @@ export function ChapterBioprintSlice() {
         </p>
         <ul className="list-disc pl-5 space-y-1">
           <li>Ao confirmar, a BIA fatia no seu navegador e debita <strong className="text-white">6 créditos</strong> (administradores são isentos).</li>
-          <li>Sem créditos suficientes o G-code não é liberado para download nem enviado à Etapa 4.</li>
+          <li>Sem créditos suficientes o G-code não é liberado para download nem enviado à Fase 4.</li>
           <li>Depois: <strong className="text-white">Preview por camada</strong>, estatísticas (tempo, volume, êmbolo, vazão, shear no bico, viabilidade estimada), avisos e o G-code completo.</li>
         </ul>
       </StepCard>
 
-      <StepCard n={8} title="Enviar para a Etapa 4" icon={Download} accent="cyan">
+      <StepCard n={8} title="Enviar para a Fase 4" icon={Download} accent="cyan">
         <p>
-          <strong className="text-white">Baixar .gcode</strong>, <strong className="text-white">Enviar ao Host</strong> (impressão direta) ou <strong className="text-white">Etapa 4 (Execução)</strong> — que agora é uma única página:
+          <strong className="text-white">Baixar .gcode</strong>, <strong className="text-white">Enviar ao Host</strong> (impressão direta) ou <strong className="text-white">Fase 4 (Bioimpressão · Host)</strong> — que é uma única página:
           conexão USB, pré-flight (“bico posicionado no ponto zero”), joystick, fluxo da biotinta (M221), validador visual, regenerador e modo avançado.
         </p>
       </StepCard>
@@ -181,9 +182,9 @@ export function ChapterBioprintSlice() {
         </ul>
       </Box2>
 
-      <Box2 icon={Wand2} title="Regenerar sem voltar à Etapa 3" tone="purple">
+      <Box2 icon={Wand2} title="Regenerar sem voltar à Fase 3" tone="purple">
         <p>
-          Na Etapa 4, o painel <strong className="text-white">Regenerar G-code</strong> refatia localmente a mesma malha da Etapa 3 com novas escalas X/Y/Z,
+          Na Fase 4, o painel <strong className="text-white">Regenerar G-code</strong> refatia localmente a mesma malha da Fase 3 com novas escalas X/Y/Z,
           camada, infill, velocidade, fluxo, paredes e temperatura — e cobra 6 créditos por G-code gerado, como qualquer outro.
         </p>
       </Box2>
@@ -198,23 +199,23 @@ export function ChapterBioprintSlice() {
       {/* ── FAQ ───────────────────────────────────────────────────────── */}
       <h2 className="text-lg font-bold text-white pt-2">Perguntas frequentes</h2>
       <FaqItem q="Onde foram parar o 'G-code Rápido', o 'médico' e o 'avançado'?">
-        Viraram caminhos para o BioSlicer. As rotas antigas redirecionam para a Etapa 3 (o “avançado” abre direto na aba Avançado). Os padrões Voronoi/Perlin/TPMS continuam existindo — agora honestos e na mesma base.
+        Viraram caminhos para o BioSlicer. As rotas antigas (inclusive o BIA Studio e “Modelos 3D (STL)”) redirecionam para a Fase 3 (o “avançado” abre direto na aba Avançado). Os padrões Voronoi/Perlin/TPMS continuam existindo — agora honestos e na mesma base.
       </FaqItem>
       <FaqItem q="A prévia cobra créditos?">
         Não. A prévia de 3 camadas no modal é grátis. Só a geração do G-code completo (ao confirmar) debita 6 créditos.
       </FaqItem>
       <FaqItem q="Por que o G-code não tem G28?">
-        Porque em bioimpressão o “home” da impressora não é o ponto zero da peça. Você posiciona o bico onde quer imprimir (centro da Petri, 1º poço), zera com <code>G92</code> na Etapa 4 e o G-code começa ali. Isso evita colisões com a placa e tinta desperdiçada em park.
+        Porque em bioimpressão o “home” da impressora não é o ponto zero da peça. Você posiciona o bico onde quer imprimir (centro da Petri, 1º poço), zera com <code>G92</code> na Fase 4 e o G-code começa ali. Isso evita colisões com a placa e tinta desperdiçada em park.
       </FaqItem>
       <FaqItem q="Posso usar 2 biotintas em uma placa de 24 poços?">
         Sim: 2 cabeçotes (T0/T1) + alvo “Placa 24” + “Todos” os poços. O G-code replica a peça poço a poço, com as trocas de ferramenta dentro de cada poço.
       </FaqItem>
       <FaqItem q="O menisco/fêmur/orelha ainda são facetados?">
-        Não. Desde o R21/R22 são malhas anatômicas reais, tanto na Etapa 1 quanto na biblioteca da Etapa 3. Você escolhe só a dimensão principal e gira na Mesa.
+        Não. Desde o R21/R22 são malhas anatômicas reais, na biblioteca da Fase 3 (o único lugar de geometria). Você escolhe só a dimensão principal e gira na Mesa.
       </FaqItem>
 
       <div className="flex items-center gap-2 text-xs text-emerald-200 pt-2">
-        <CheckCircle2 className="w-4 h-4" /> Próximo capítulo: Etapa 4 · Execução.
+        <CheckCircle2 className="w-4 h-4" /> Próximo capítulo: Fase 4 · Bioimpressão (Host).
       </div>
     </article>
   )

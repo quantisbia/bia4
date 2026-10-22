@@ -1,5 +1,5 @@
 /**
- * BIA · Manual · Capítulo — Bioimpressão · Etapa 4 · Executar (R12.39/R12.40)
+ * BIA · Manual · Capítulo — Bioimpressão · Fase 4 de 6 · Bioimpressão (Host) (R12.39/R12.40 → R24)
  */
 
 "use client"
@@ -16,12 +16,12 @@ export function ChapterBioprintExecute() {
     <article className="space-y-6">
       <ChapterCover
         number={6}
-        badge="ETAPA 4 DE 4 · ATUALIZADO em R12.40"
-        title="Bioimpressão · Executar"
+        badge="FASE 4 DE 6 · HOST USB"
+        title="Bioimpressão · Bioimpressão (Host)"
         icon={Usb}
         gradient="from-emerald-500/15 to-teal-500/15 border-emerald-500/20"
         href="/dashboard/bioprint/execute"
-        hrefLabel="Abrir Executar"
+        hrefLabel="Abrir Fase 4"
         lead={
           <>
             Aqui você <strong className="text-white">conecta a bioimpressora pela USB</strong> e roda

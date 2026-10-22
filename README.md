@@ -2024,3 +2024,8 @@ Janaina Dernowsek (CEO/Founder)
 **Escondido/redirecionado:** antiga página de STL da Etapa 1 → `model/_legacy/LegacyModelPage.tsx` (não roteável); `/dashboard/studio` → redirect para a Fase 3 (`?tab=advanced`); BIA Studio removido do sidebar e das quick-actions; Pipeline, Roadmap, Manual e `/api/stl` apontam para a Fase 3. Sidebar "Bioimprimir": Fase 1 · Fase 3 (Fatiar / Desenhar) · Fase 4 Host · Fase 5 Análise.
 
 **Código:** `STEP_LABELS/STEP_ROUTES/PhaseKey/PHASE_ORDER` + `isStepUnlocked("review")` em `process-context.tsx`; hub e `BioprintStepper` com 6 fases (Fase 5 "pronta" quando há análise salva); `ui-mode.ts` com termos por fase. Testes: 1767 ✓ (r14_3 atualizado para o novo racional).
+
+### R24.2 · Pendências fechadas
+- **Build Vercel confirmado em produção** (`2738127` → `5ccecf3`): hub com 6 fases, `/dashboard/bioprint/review` (Fase 5) servindo, `/dashboard/studio` redirecionando para a Fase 3, `/api/auth/change-password` ativo.
+- **Organoid Builder** saiu de "Projetar" e ganhou grupo próprio no sidebar, **"Esferoides & Organoides"**, logo após "Bioimprimir" — organoides são scaffold-free e não passam pelas 6 fases de bioimpressão.
+- **Manual**: capítulo da Fase 1 reescrito ("Modelo de tecido", racional das 6 fases, sem STL); novo capítulo **"Fases 5 e 6 — Análise da bioimpressão · Maturação & caracterizações"** (`bioprint-review-post.tsx`); capítulos das Fases 2, 3 e 4 com textos "Etapa → Fase".
