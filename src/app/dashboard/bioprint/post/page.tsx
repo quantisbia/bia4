@@ -140,7 +140,7 @@ export default function BioprintPostPage() {
               pós-bioimpressão (cultura, biorreator e ensaios).
             </p>
             <Link
-              href="/dashboard/bioprint/control"
+              href="/dashboard/bioprint/execute"
               className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-100 text-sm font-semibold rounded-lg transition-colors"
             >
               <ArrowRight className="w-4 h-4" /> Ir para Etapa 4 (Execução)
@@ -194,7 +194,7 @@ export default function BioprintPostPage() {
 
           <div className="flex items-center gap-2 shrink-0">
             <Link
-              href="/dashboard/bioprint/control"
+              href="/dashboard/bioprint/execute"
               className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 text-xs font-medium rounded-lg transition-colors"
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Etapa 4

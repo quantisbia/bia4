@@ -37,7 +37,7 @@ const STEPS: StepDef[] = [
   { key: "model",   number: 1, label: "Modelo 3D",  shortLabel: "Modelo",    icon: Box,      route: "/dashboard/bioprint/model"   },
   { key: "bioink",  number: 2, label: "Biotinta",   shortLabel: "Biotinta",  icon: Droplets, route: "/dashboard/bioprint/bioink"  },
   { key: "slice",   number: 3, label: "Fatiamento", shortLabel: "Fatiar",    icon: Layers,   route: "/dashboard/bioprint/slice"   },
-  { key: "control", number: 4, label: "Execução",   shortLabel: "Executar",  icon: Gamepad2, route: "/dashboard/bioprint/control" },
+  { key: "control", number: 4, label: "Execução",   shortLabel: "Executar",  icon: Gamepad2, route: "/dashboard/bioprint/execute" },
 ]
 
 export function BioprintStepper() {

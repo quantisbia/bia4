@@ -144,7 +144,7 @@ const PHASES: Phase[] = [
     title: "Imprimir o Construto (Bioimpressão 3D)",
     goal: "Executar a impressão real com células e biomaterial — em ambiente estéril, monitorando parâmetros críticos.",
     duration: "1–4 horas",
-    module: { name: "Bioimpressão · Etapa 4 (Execução)", href: "/dashboard/bioprint/control", icon: Printer },
+    module: { name: "Bioimpressão · Etapa 4 (Execução)", href: "/dashboard/bioprint/execute", icon: Printer },
     color: "from-purple-500 to-fuchsia-500",
     steps: [
       "Conecte a impressora via USB Web Serial (Marlin/Klipper) — ou opere offline.",

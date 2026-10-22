@@ -81,7 +81,7 @@ const STEP_CARDS: StepCardDef[] = [
     description:
       "Painel de controle da bioimpressora: joystick 3D em primeiro plano, conexão USB (Web Serial / Marlin), extrusão fluida (avançado), viabilidade celular live (Blaeser 2016).",
     icon: Gamepad2,
-    route: "/dashboard/bioprint/control",
+    route: "/dashboard/bioprint/execute",
     color: "amber",
   },
   {
@@ -192,7 +192,7 @@ export default function BioprintHubPage() {
             </div>
           </div>
           <button
-            onClick={() => router.push("/dashboard/bioprint/control")}
+            onClick={() => router.push("/dashboard/bioprint/execute")}
             className="px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-400 hover:bg-emerald-500/30 text-emerald-100 text-xs font-semibold transition-colors flex items-center gap-1.5"
           >
             Ir para Execução <ArrowRight className="w-3.5 h-3.5" />

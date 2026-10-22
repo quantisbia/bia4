@@ -41,7 +41,7 @@ import {
   ChevronDown, ChevronRight, Download, Trash2, Gamepad2, Sparkles,
   ShieldAlert, Info, RotateCcw, Wand2, X, Clipboard, ArrowLeft,
   Wrench, Undo2, Settings2, Droplet, Crosshair, Loader2,
-  Printer, ListChecks,
+  Printer, ListChecks, FlaskConical, Microscope, ArrowRight,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 
@@ -83,6 +83,10 @@ import { GcodeValidatorPanel } from "@/components/bioprinter/GcodeValidatorPanel
 // dimensões do STL e parâmetros de G-code sem sair da tela).
 import { RegeneratePanel } from "@/components/bioprinter/RegeneratePanel"
 import { FlowBoostPanel } from "@/components/bioprint/FlowBoostPanel"
+// R22: /control foi unificado aqui — Etapa 4 é UMA página. Painéis avançados herdados:
+import { ExtrusionPanel, type ExtrusionState } from "@/components/bioprinter/ExtrusionPanel"
+import { TissueViabilityPanel, type TissueState } from "@/components/bioprinter/TissueViabilityPanel"
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection"
 import { suggestStartFlow, rememberGoodFlow, clampFlow, type FlowMemoryEntry } from "@/lib/bioprint/flow-memory"
 import { parseGcode, type ParsedGcode } from "@/lib/bioprint/toolpath-engine"
 import { DEMO_GYROID_GCODE } from "@/lib/bioprint/demo-gyroid-gcode"
@@ -189,12 +193,66 @@ const HANDOFF_KEY = "bia.execute.gcode.handoff"
 
 // ─── Componente principal ────────────────────────────────────────────────
 
+
+// ─── R22 · helpers herdados de /control (mapeamentos de rótulos) ──────────
+function mapToProfileKey(materialLabel: string | null): string {
+  if (!materialLabel) return "Gelatina/GelMA"
+  const lower = materialLabel.toLowerCase()
+  if (lower.includes("gelma") || lower.includes("gelatina")) return "Gelatina/GelMA"
+  if (lower.includes("alginato") || lower.includes("alginate")) return "Alginato"
+  if (lower.includes("colágeno") || lower.includes("colageno") || lower.includes("collagen")) return "Colágeno"
+  if (lower.includes("fibrin")) return "Fibrina"
+  if (lower.includes("pegda") || lower.includes("pegma")) return "PEGDA / PEGMA"
+  if (lower.includes("decm")) return "dECM (decellularizada)"
+  if (lower.includes("pluronic")) return "Pluronic F127 (sacrificial)"
+  return "Gelatina/GelMA"
+}
+function mapCellTypeLabel(cellTypeId: string | null): string {
+  if (!cellTypeId) return "Fibroblastos (NIH-3T3)"
+  const map: Record<string, string> = {
+    hMSC: "hMSC (mesenchymal stem)", iPSC: "iPSC (pluripotent)", Hepatocyte: "Hepatócitos", Cardiomyocyte: "Cardiomiócitos",
+    Chondrocyte: "Condrócitos", Osteoblast: "Osteoblastos", Fibroblast: "Fibroblastos (NIH-3T3)", Keratinocyte: "Queratinócitos",
+    Endothelial: "Endoteliais (HUVEC)", Neuron: "Neurônios",
+  }
+  return map[cellTypeId] ?? cellTypeId
+}
+function mapCategoryToTissue(category: string | null): string {
+  if (!category) return "Cardíaco (patch)"
+  switch (category) {
+    case "rigid-tissue": case "biomimetic-tpms": return "Ósseo"
+    case "organoid-vascular": return "Vaso sanguíneo"
+    default: return "Cardíaco (patch)"
+  }
+}
+
 export default function BioprintExecutePage() {
   // R12.47: estado global do processo de bioimpressão (fonte da verdade).
   // O /execute agora consome o BioprintProcessState para verificar coerência
   // entre o que a usuária escolheu (modelo, biotinta, fatiamento) e o G-code
   // realmente carregado — antes de liberar o IMPRIMIR.
-  const { state: bioprintState } = useBioprintProcess()
+  const { state: bioprintState, updateControl } = useBioprintProcess()
+  // R22: painéis avançados (ex-/control) pré-populados com Etapa 2 + 3
+  const [advExtrusion, setAdvExtrusion] = useState<ExtrusionState>(() => ({
+    mechanism: "pneumatic",
+    setpoint: bioprintState.slice.pressureKPa ?? 30,
+    actual: (bioprintState.slice.pressureKPa ?? 30) * 0.95,
+    cartridgeTempC: bioprintState.slice.cartridgeTempC ?? 25,
+    bedTempC: bioprintState.slice.bedTempC ?? 6,
+    chamberTempC: bioprintState.slice.chamberTempC ?? 20,
+    humidityPercent: 85,
+    bioink: mapToProfileKey(bioprintState.bioink.material),
+  }))
+  const [advTissue, setAdvTissue] = useState<TissueState>(() => ({
+    cellType: mapCellTypeLabel(bioprintState.bioink.cellType),
+    cellDensityMillionMl: bioprintState.bioink.cellDensityMillionMl ?? 5,
+    pressureKPa: bioprintState.slice.pressureKPa ?? 30,
+    nozzleDiameterUm: bioprintState.slice.nozzleDiameterUm ?? 410,
+    viscosityPaS: bioprintState.bioink.rheology?.viscosityPaS ?? 3.0,
+    printSpeedMmS: bioprintState.slice.printSpeedMmS ?? 8,
+    bioink: bioprintState.bioink.material ?? "GelMA",
+    targetDimensionMm: 10,
+    infillPatternId: bioprintState.slice.infillPatternId ?? "rectilinear",
+  }))
 
   // ─── Logger global (singleton por mount) ──
   const loggerRef = useRef<PrintLogger>(new PrintLogger())
@@ -547,6 +605,15 @@ export default function BioprintExecutePage() {
   const [mode, setMode] = useState<"mock" | "real">("real")
   const [baud, setBaud] = useState(DEFAULT_BAUD)
   const [connected, setConnected] = useState(false)
+  // R22: Etapa 4 unificada — persiste status/conexão no processo (antes vivia em /control)
+  useEffect(() => {
+    updateControl({
+      status: "ready",
+      connected,
+      tissueType: bioprintState.control.tissueType ?? mapCategoryToTissue(bioprintState.model.category),
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connected])
   const [firmware, setFirmware] = useState<FirmwareInfo | null>(null)
   // R12.45 — Estado de "preparando impressora": true entre o `setConnected(true)` e o
   // fim do post-home (incluindo G28, G90/M83/M302, ir-pro-centro, descida Z, G92).
@@ -3390,6 +3457,38 @@ export default function BioprintExecutePage() {
               </div>
             </div>
           </Panel>
+
+          {/* ── R22 · Modo avançado (herdado de /control): Extrusão + Sensores · Viabilidade ── */}
+          <div className="flex items-center gap-2 pt-1">
+            <div className="h-px flex-1 bg-white/10" />
+            <span className="text-[10px] uppercase tracking-[0.25em] text-gray-500 font-semibold px-2">Modo avançado · opcional</span>
+            <div className="h-px flex-1 bg-white/10" />
+          </div>
+          <CollapsibleSection
+            title="Extrusão Fluida + Sensores"
+            subtitle="Mecanismo · pressão/vazão/rotação · cartucho · cama · câmara · umidade"
+            icon={FlaskConical} badge="Avançado" badgeColor="cyan" defaultOpen={false}
+          >
+            <ExtrusionPanel state={advExtrusion} onChange={setAdvExtrusion} onGcode={(g) => { loggerRef.current.info(g, "advanced"); if (connected && controllerRef.current) void controllerRef.current.sendAndWait(g) }} />
+          </CollapsibleSection>
+          <CollapsibleSection
+            title="Tecido Vivo · Viabilidade ao Vivo + Encolhimento"
+            subtitle="Shear stress → viabilidade prevista · Encolhimento pós-cura · Crosslinking"
+            icon={Microscope} badge="Avançado" badgeColor="emerald" defaultOpen={false}
+          >
+            <TissueViabilityPanel state={advTissue} onChange={setAdvTissue} onGcode={(g) => { loggerRef.current.info(g, "advanced"); if (connected && controllerRef.current) void controllerRef.current.sendAndWait(g) }} />
+          </CollapsibleSection>
+
+          {/* ── R22 · Etapa 5 ───────────────────────────────────────────── */}
+          <Link href="/dashboard/bioprint/post" className="block rounded-2xl border border-rose-500/30 bg-gradient-to-br from-rose-500/[0.08] to-amber-500/[0.04] p-4 hover:border-rose-500/60 transition-all group">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.2em] text-rose-300/80 font-semibold">Próxima · Etapa 5</div>
+                <div className="text-sm font-bold text-white">Pós-bioimpressão: crosslink · cultura · biorreator · validação</div>
+              </div>
+              <ArrowRight className="w-5 h-5 text-rose-300 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
 
           {/* ── Comandos rápidos ─────────────────────────────────── */}
           <Panel title="Comandos rápidos" icon={<Wand2 className="w-4 h-4" />} badge={`${quickActions.length}`} badgeColor="violet">

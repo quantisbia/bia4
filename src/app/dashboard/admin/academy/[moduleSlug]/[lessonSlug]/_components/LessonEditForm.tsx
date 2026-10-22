@@ -29,7 +29,7 @@ const BIA_TOOLS = [
   { value: "bioprint/model", label: "Bioimpressão · Modelo 3D" },
   { value: "bioprint/bioink", label: "Bioimpressão · Biotinta" },
   { value: "bioprint/slice", label: "Bioimpressão · Fatiamento" },
-  { value: "bioprint/control", label: "Bioimpressão · Execução" },
+  { value: "bioprint/execute", label: "Bioimpressão · Execução" },
   { value: "organoids", label: "Organoid Builder" },
   { value: "pipeline", label: "Pipeline (12 etapas)" },
   { value: "protocols", label: "Protocolos GLP/GMP" },
