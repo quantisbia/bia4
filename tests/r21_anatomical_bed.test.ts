@@ -109,3 +109,30 @@ describe("R21 · orientMesh / suggestLayFlat", () => {
     expect(res.gcode).not.toMatch(/\nG28/)
   })
 })
+
+describe("R22 · Etapa 1 usa as malhas REAIS (menisco/orelha/fêmur), sem facetado", () => {
+  it("catálogo: menisco/fêmur/orelha são anatômicos com UMA dimensão (escala uniforme)", async () => {
+    const { GEOMETRIES } = await import("@/lib/stl/generator")
+    const men = GEOMETRIES.find((x) => x.id === "meniscus")!
+    expect(Object.keys(men.paramLabels)).toEqual(["length"])
+    expect(men.label).toMatch(/Anatômico/)
+    expect(men.description).not.toMatch(/Semicírculo/)
+    for (const id of ["femur", "ear"]) {
+      const g = GEOMETRIES.find((x) => x.id === id)!
+      expect(Object.keys(g.paramLabels)).toEqual(["height"])
+      expect(g.paramLabels.height).toMatch(/uniforme/)
+    }
+  })
+  it("malha embutida do menisco = STL real (4904 tri, 50 × 70.28 × 9.95, curva)", async () => {
+    const { MENISCUS_MESH_VERTICES, MENISCUS_MESH_NATIVE } = await import("@/lib/stl/meshes/meniscus-mesh-data")
+    expect(MENISCUS_MESH_VERTICES.length / 9).toBe(4904)
+    expect(MENISCUS_MESH_NATIVE.depth).toBeCloseTo(70.28, 1)
+    expect(MENISCUS_MESH_NATIVE.width).toBeCloseTo(50, 1)
+    const real = load("/stl/meniscus-real.stl")
+    expect(real.triangleCount).toBe(MENISCUS_MESH_VERTICES.length / 9)
+    // o gerador facetado antigo não existe mais com esse nome
+    const src = (await import("node:fs")).readFileSync(resolve(ROOT, "src/lib/stl/generator.ts"), "utf8")
+    expect(src).not.toMatch(/function genMeniscus\(/)
+    expect(src).toMatch(/genMeniscusAnatomical\(p\.length/)
+  })
+})

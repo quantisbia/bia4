@@ -162,14 +162,10 @@ export const GEOMETRIES: STLGeometry[] = [
     tissue: "Osso (Fêmur)",
     application: "Modelo cirúrgico anatomicamente fiel, planejamento de osteotomia, próteses de quadril/joelho personalizadas, biomecânica e ensino",
     icon: "🦴",
-    // Dimensões nativas (escala CAD normalizada): 2.10 × 1.26 × 9.06.
-    // Fêmur adulto médio humano: comprimento ~45cm, largura epicôndilos ~85mm, profundidade ~30mm
-    defaultParams: { width: 85, height: 450, depth: 30 },
-    paramLabels: {
-      width: "Largura medial→lateral (mm)",
-      height: "Comprimento total (mm)",
-      depth: "Profundidade anterior→posterior (mm)",
-    },
+    // R22: escala UNIFORME pelo comprimento (anatomia preservada). Fêmur adulto ≈ 450 mm;
+    // para bioimpressão de bancada o default é 60 mm.
+    defaultParams: { height: 60 },
+    paramLabels: { height: "Comprimento total (mm) — escala uniforme" },
     creditCost: 10,
   },
   {
@@ -190,13 +186,14 @@ export const GEOMETRIES: STLGeometry[] = [
   },
   {
     id: "meniscus",
-    label: "Meia-Lua / Menisco",
-    description: "Semicírculo aplanado para cartilagem articular do joelho (menisco)",
+    label: "Menisco (Meia-Lua · Anatômico)",
+    description: "Mesh anatômica real de menisco em C (4.904 triângulos) — curvo e afilado para dentro, como o menisco de verdade. R22: substituiu o semicírculo facetado. Você escolhe só o comprimento; a escala é uniforme.",
     tissue: "Cartilagem (Menisco)",
-    application: "Implante de menisco, cartilagem articular, joelho",
+    application: "Implante de menisco, fibrocartilagem articular, joelho",
     icon: "🌙",
-    defaultParams: { outerR: 20, innerR: 10, thickness: 5, arcAngle: 180, segments: 48 },
-    paramLabels: { outerR: "Raio externo (mm)", innerR: "Raio interno (mm)", thickness: "Espessura (mm)", arcAngle: "Ângulo do arco (°)" },
+    // Nativo: 50.00 × 70.28 × 9.95 mm (comprimento ponta a ponta em Y)
+    defaultParams: { length: 35 },
+    paramLabels: { length: "Comprimento ponta a ponta (mm)" },
     creditCost: 6,
   },
   {
@@ -239,13 +236,9 @@ export const GEOMETRIES: STLGeometry[] = [
     tissue: "Cartilagem auricular",
     application: "Microtia, reconstrução auricular pós-traumática, próteses externas personalizadas, educação em otorrinolaringologia",
     icon: "👂",
-    // Dimensões nativas da mesh: 28.07 × 47.15 × 15.16 mm — escaladas para orelha adulta média
-    defaultParams: { width: 35, height: 60, depth: 18 },
-    paramLabels: {
-      width: "Largura lateral (mm)",
-      height: "Altura superior→lobo (mm)",
-      depth: "Profundidade hélice→tragus (mm)",
-    },
+    // R22: escala UNIFORME pela altura (anatomia preservada). Nativo 28.07 × 47.15 × 15.16 mm.
+    defaultParams: { height: 60 },
+    paramLabels: { height: "Altura superior→lobo (mm) — escala uniforme" },
     creditCost: 8,
   },
   {
@@ -438,7 +431,8 @@ function genTube(outerR: number, innerR: number, length: number, segs: number): 
 }
 
 /** Meia-lua (menisco / córnea) */
-function genMeniscus(outerR: number, innerR: number, thickness: number, arcDeg: number, segs: number): Triangle[] {
+// R22: antigo genMeniscus (semicírculo facetado) renomeado — só a córnea paramétrica ainda usa.
+function genArcRing(outerR: number, innerR: number, thickness: number, arcDeg: number, segs: number): Triangle[] {
   const tris: Triangle[] = []
   const arcRad = (arcDeg * Math.PI) / 180
   const startAng = -arcRad/2
@@ -505,6 +499,7 @@ function genSphere(radius: number, segs: number): Triangle[] {
 }
 
 /** Cilindro oval (cristalino) */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- mantido para a córnea/lente paramétrica legada
 function genOvalCylinder(rA: number, rB: number, height: number, segs: number): Triangle[] {
   const tris: Triangle[] = []
   const pts = (z: number): Vec3[] => Array.from({length: segs}, (_, i) => {
@@ -542,15 +537,15 @@ function genOvalCylinder(rA: number, rB: number, height: number, segs: number): 
  * Detalhes anatômicos preservados: cabeça do fêmur · colo · trocânter
  * maior · diáfise · côndilos medial e lateral.
  */
-function genFemurAnatomical(width: number, height: number, depth: number): Triangle[] {
+function genFemurAnatomical(width: number | undefined, height: number, depth: number | undefined): Triangle[] {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const meshMod = require("./meshes/femur-mesh-data") as typeof import("./meshes/femur-mesh-data")
   const { FEMUR_MESH_VERTICES, FEMUR_MESH_NATIVE } = meshMod
 
-  // Fatores de escala anisotrópica (dimensões alvo / dimensões nativas)
-  const sx = width  / FEMUR_MESH_NATIVE.width   // X
-  const sy = depth  / FEMUR_MESH_NATIVE.depth   // Y
+  // R22: escala UNIFORME pelo comprimento (width/depth opcionais mantêm retrocompat anisotrópica)
   const sz = height / FEMUR_MESH_NATIVE.height  // Z (eixo longo)
+  const sx = width  !== undefined ? width / FEMUR_MESH_NATIVE.width : sz
+  const sy = depth  !== undefined ? depth / FEMUR_MESH_NATIVE.depth : sz
 
   const verts = FEMUR_MESH_VERTICES
   const n = verts.length / 9
@@ -772,15 +767,16 @@ function genBoneBlock(width: number, height: number, depth: number, wallT: numbe
  * substituído por 'depth' (Y) — que representa a profundidade real da concha,
  * preservando a anatomia 3D em vez da extrusão plana.
  */
-function genEarAnatomical(width: number, height: number, depth: number): Triangle[] {
+function genEarAnatomical(width: number | undefined, height: number, depth: number | undefined): Triangle[] {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const meshMod = require("./meshes/ear-mesh-data") as typeof import("./meshes/ear-mesh-data")
   const { EAR_MESH_VERTICES, EAR_MESH_NATIVE } = meshMod
 
-  // Fatores de escala anisotrópica (dimensões alvo / dimensões nativas)
-  const sx = width  / EAR_MESH_NATIVE.width   // X
-  const sy = depth  / EAR_MESH_NATIVE.depth   // Y
+  // R22: escala UNIFORME pela altura (a malha nativa tem a altura da orelha em Y=depth;
+  // mantemos a convenção histórica height↔Z para o fatiador deitar a orelha na mesa).
   const sz = height / EAR_MESH_NATIVE.height  // Z
+  const sx = width  !== undefined ? width / EAR_MESH_NATIVE.width : sz
+  const sy = depth  !== undefined ? depth / EAR_MESH_NATIVE.depth : sz
 
   const verts = EAR_MESH_VERTICES
   const n = verts.length / 9  // 9 floats por triângulo (3 vértices × 3)
@@ -792,6 +788,29 @@ function genEarAnatomical(width: number, height: number, depth: number): Triangl
     const v2: Vec3 = [verts[k+3] * sx, verts[k+4] * sy, verts[k+5] * sz]
     const v3: Vec3 = [verts[k+6] * sx, verts[k+7] * sy, verts[k+8] * sz]
     tris[i] = tri(v1, v2, v3)  // re-computa normal a partir dos vértices escalados
+  }
+  return tris
+}
+
+/**
+ * Menisco ANATÔMICO real (R22): meia-lua curva de verdade (4.904 triângulos),
+ * substitui o semicírculo facetado. Escala UNIFORME pelo comprimento ponta a ponta (Y).
+ */
+function genMeniscusAnatomical(length_mm: number): Triangle[] {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const meshMod = require("./meshes/meniscus-mesh-data") as typeof import("./meshes/meniscus-mesh-data")
+  const { MENISCUS_MESH_VERTICES, MENISCUS_MESH_NATIVE } = meshMod
+  const s = length_mm / MENISCUS_MESH_NATIVE.depth
+  const verts = MENISCUS_MESH_VERTICES
+  const n = verts.length / 9
+  const tris: Triangle[] = new Array(n)
+  for (let i = 0; i < n; i++) {
+    const k = i * 9
+    tris[i] = tri(
+      [verts[k] * s, verts[k + 1] * s, verts[k + 2] * s],
+      [verts[k + 3] * s, verts[k + 4] * s, verts[k + 5] * s],
+      [verts[k + 6] * s, verts[k + 7] * s, verts[k + 8] * s],
+    )
   }
   return tris
 }
@@ -1025,14 +1044,15 @@ export function generateGeometry(id: string, params: GeometryParams): Triangle[]
       return genHexagonalLiverFromMesh(p.radius ?? 8, p.thickness ?? 4)
     case "femur":
       // R12.15: mesh anatômica real (substituiu cilindro oco + 2 esferas)
-      return genFemurAnatomical(p.width ?? 85, p.height ?? 450, p.depth ?? 30)
+      return genFemurAnatomical(p.width, p.height ?? 60, p.depth)
     case "nose":
       // R12.13: mesh anatômico real (substituiu pirâmide oval algorítmica)
       return genNoseAnatomical(p.width ?? 32, p.height ?? 20, p.depth ?? 51)
     case "meniscus":
-      return genMeniscus(p.outerR ?? 20, p.innerR ?? 10, p.thickness ?? 5, p.arcAngle ?? 180, p.segments ?? 48)
+      // R22: malha anatômica real (meia-lua curva) — o semicírculo facetado foi removido
+      return genMeniscusAnatomical(p.length ?? 35)
     case "cornea":
-      return genMeniscus(p.outerR ?? 6, p.innerR ?? 3, p.thickness ?? 1.2, p.arcAngle ?? 200, p.segments ?? 64)
+      return genArcRing(p.outerR ?? 6, p.innerR ?? 3, p.thickness ?? 1.2, p.arcAngle ?? 200, p.segments ?? 64)
     case "lens":
       // R12.42: cristalino oval real (mesh STL ~3.7k triângulos), substitui geração procedural
       return genLensFromMesh(p.radiusA ?? 5, p.radiusB ?? 3, p.thickness ?? 4)
@@ -1040,7 +1060,7 @@ export function generateGeometry(id: string, params: GeometryParams): Triangle[]
       return genSphere(p.radius ?? 5, p.segments ?? 32)
     case "ear":
       // R12.14: mesh anatômico real (substituiu elipse deformada + C-scroll algorítmico)
-      return genEarAnatomical(p.width ?? 35, p.height ?? 60, p.depth ?? 18)
+      return genEarAnatomical(p.width, p.height ?? 60, p.depth)
     case "heart":
       return genHeartAnatomical(p.width ?? 80, p.height ?? 100, p.depth ?? 95)
     case "kidney":

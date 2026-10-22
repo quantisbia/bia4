@@ -585,6 +585,15 @@ function GeneratePanel({
       setGenerated(true)
       setGenerating(false)
 
+      // R22: persiste a malha gerada no IndexedDB para a Mesa da Etapa 3 abrir já com ela
+      void (async () => {
+        try {
+          const { putMesh, newMeshId } = await import("@/lib/slicer/mesh-store")
+          const { trianglesToBinarySTL } = await import("@/lib/stl/generator")
+          await putMesh({ id: newMeshId("etapa1"), name: `${selectedGeo.id}.stl`, bytes: trianglesToBinarySTL(tris), format: "stl", createdAt: Date.now(), source: "etapa-1", meta: params as Record<string, number | string | boolean> })
+        } catch { /* IndexedDB indisponível */ }
+      })()
+
       // Persiste no context
       onSelected({
         status: "ready",
