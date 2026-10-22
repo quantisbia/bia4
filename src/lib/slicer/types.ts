@@ -164,6 +164,8 @@ export interface ToolPath {
   closed: boolean
   speed_mms: number
   lineWidth_mm: number
+  /** R23: cabeçote explícito (Draw & Print / grupos de camada). Sobrepõe o mapeamento papel→ferramenta. */
+  tool?: number
 }
 
 export interface SlicedLayer {

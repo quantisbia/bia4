@@ -7,7 +7,7 @@
  */
 import { Syringe, Palette, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
-import { type ToolsConfig, type ToolHead, TOOL_COLORS } from "@/lib/slicer/tools"
+import { layerGroupsOnePerHead, type ToolsConfig, type ToolHead, TOOL_COLORS } from "@/lib/slicer/tools"
 import { SYRINGE_CATALOG } from "@/lib/slicer/extrusion"
 import type { ExtrusionModel, PathRole } from "@/lib/slicer/types"
 
@@ -95,7 +95,29 @@ export function ToolsPanel({ tools, onChange, bioinks, baseExtrusion }: {
       {n > 1 && (
         <div>
           <div className="text-[11px] uppercase tracking-wide text-gray-500 mb-1 flex items-center gap-1"><Palette className="w-3 h-3" /> Qual cabeçote imprime o quê</div>
-          <div className="space-y-1">
+          {/* R23 · modo: por papel (paredes/infill) ou por CAMADA (grupos de camada, estilo DNA Studio) */}
+          <div className="flex gap-1 mb-2 text-[11px]">
+            <button type="button" onClick={() => onChange({ ...tools, layerGroups: undefined })} className={cn("px-2 py-1 rounded border", !tools.layerGroups?.length ? "border-emerald-400/50 bg-emerald-500/10 text-emerald-100" : "border-white/10 text-gray-400")}>por papel (paredes / infill / suporte)</button>
+            <button type="button" onClick={() => onChange({ ...tools, layerGroups: layerGroupsOnePerHead(tools.heads) })} className={cn("px-2 py-1 rounded border", tools.layerGroups?.length ? "border-emerald-400/50 bg-emerald-500/10 text-emerald-100" : "border-white/10 text-gray-400")}>por camada (camada 1→T0, 2→T1…)</button>
+          </div>
+          {tools.layerGroups?.length ? (
+            <div className="space-y-1 mb-2">
+              {tools.layerGroups.map((g, i) => (
+                <div key={i} className="flex items-center gap-2 text-xs">
+                  <span className="text-gray-400">camadas</span>
+                  <input type="number" min={1} value={g.from} onChange={(e) => { const lg = [...tools.layerGroups!]; lg[i] = { ...g, from: Math.max(1, +e.target.value) }; onChange({ ...tools, layerGroups: lg }) }} className="w-14 px-1.5 py-0.5 rounded bg-black/30 border border-white/10 text-gray-100" />
+                  <span className="text-gray-500">a</span>
+                  <input type="number" min={g.from} placeholder="fim" value={g.to ?? ""} onChange={(e) => { const lg = [...tools.layerGroups!]; lg[i] = { ...g, to: e.target.value === "" ? undefined : Math.max(g.from, +e.target.value) }; onChange({ ...tools, layerGroups: lg }) }} className="w-14 px-1.5 py-0.5 rounded bg-black/30 border border-white/10 text-gray-100" />
+                  <ArrowRight className="w-3 h-3 text-gray-600" />
+                  <div className="flex gap-1">{tools.heads.map((h) => <button key={h.index} type="button" onClick={() => { const lg = [...tools.layerGroups!]; lg[i] = { ...g, tool: h.index }; onChange({ ...tools, layerGroups: lg }) }} className={cn("px-2 py-0.5 rounded border text-[11px] font-mono", g.tool === h.index ? "text-black border-transparent" : "border-white/10 text-gray-400")} style={g.tool === h.index ? { background: h.color } : undefined}>T{h.index}</button>)}</div>
+                  <button type="button" onClick={() => onChange({ ...tools, layerGroups: tools.layerGroups!.filter((_, k) => k !== i) })} className="text-gray-500 hover:text-rose-300 text-[11px]">remover</button>
+                </div>
+              ))}
+              <button type="button" onClick={() => { const last = tools.layerGroups![tools.layerGroups!.length - 1]; onChange({ ...tools, layerGroups: [...tools.layerGroups!, { from: (last?.to ?? last?.from ?? 0) + 1, tool: 0 }] }) }} className="text-[11px] text-emerald-300 hover:underline">+ adicionar faixa</button>
+              <div className="text-[10px] text-gray-500">Ex. pele (protocolo CELLINK SKIN): camada 1 → T0 derme reticular (HDF 4×10⁶) · camada 2 → T1 derme papilar (HDF 8×10⁶) · camada 3 → T2 epiderme (HEK 10×10⁶), infill concêntrico 42 %.</div>
+            </div>
+          ) : null}
+          <div className={cn("space-y-1", tools.layerGroups?.length ? "opacity-50" : "")}>
             {ROLE_LABELS.map(({ role, label, hint }) => (
               <div key={role} className="flex items-center gap-2 text-xs">
                 <span className="w-32 text-gray-200 shrink-0" title={hint}>{label}</span>

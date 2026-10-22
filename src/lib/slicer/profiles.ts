@@ -140,6 +140,21 @@ export const ADVANCED_PROFILES: SliceProfile[] = [
     ],
   },
   {
+    id: "adv_cellink_skin_3ph",
+    name: "Pele 3 cabeçotes — protocolo CELLINK SKIN (1 camada por cabeçote)",
+    description: "Cilindro Ø10 × 1,2 mm em 3 camadas de 0,4 mm, infill CONCÊNTRICO 42 %, agulha 22G cônica, 10 mm/s. Camada 1 → T0 derme reticular (HDF 4×10⁶/mL) · 2 → T1 derme papilar (HDF 8×10⁶) · 3 → T2 epiderme (HEK 10×10⁶). Adaptado de pneumático 12 kPa para seringa mecânica.",
+    tier: "advanced",
+    params: { ...baseParams(0.41), layerHeight_mm: 0.4, firstLayerHeight_mm: 0.4, infillPattern: "concentric", infillDensity: 42, wallCount: 1, speedPerimeter_mms: 10, speedInfill_mms: 10, speedFirstLayer_mms: 8, hasCells: true, zHop_mm: 0.8, cartridgeTemp_C: null, bedTemp_C: null },
+    extrusion: withExtrusion({ syringe: { volume_mL: 3, innerDiameter_mm: 8.66 }, primeVolume_uL: 0.4, retractVolume_uL: 0.3 }),
+    tips: [
+      "Na Etapa 3 use 3 cabeçotes e o modo 'por camada' (camada 1→T0, 2→T1, 3→T2) — é o 'Layer group' do DNA Studio 4.",
+      "Petri para otimizar; depois Placa 24 poços para replicatas. Em transwell, calibre o Z no inserto.",
+      "Protocolo original: 12 kPa pneumático; em seringa mecânica comece com fluxo ×1,0 e ajuste ±10 % pelo laço de feedback.",
+      "Pós-impressão: Crosslinking Agent + trombina (100 U), cultura submersa → interface ar-líquido.",
+    ],
+    references: ["CELLINK · Bioprinting Skin Tissue Model Protocol, CELLINK SKIN, v5, 06-FEB-2023"],
+  },
+  {
     id: "adv_vascular_channel",
     name: "Canal vascular (sacrificial em bloco celular)",
     description: "Imprime o CANAL com Pluronic/gelatina sacrificial; bloco ao redor por casting ou 2º cartucho. Paredes contínuas, zero infill.",

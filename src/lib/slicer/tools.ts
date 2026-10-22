@@ -42,6 +42,27 @@ export interface ToolsConfig {
   retractBeforeSwitch_uL: number
   /** segundos de espera após a troca (estabilizar) */
   dwellAfterSwitch_s: number
+  /**
+   * R23 · Grupos de camada (DNA Studio "Layer groups"): cabeçote por FAIXA de camadas.
+   * Ex. protocolo CELLINK SKIN: camada 1 → T0 (derme reticular), 2 → T1 (papilar), 3 → T2 (epiderme).
+   * Quando presente e a camada cai numa faixa, o grupo vence a atribuição papel→ferramenta.
+   * `from`/`to` são índices 1-based inclusivos; `to` ausente = até o fim.
+   */
+  layerGroups?: Array<{ from: number; to?: number; tool: number; label?: string }>
+}
+
+/** Cabeçote definido por grupo de camada (ou null se nenhum grupo cobre a camada). */
+export function toolForLayer(cfg: ToolsConfig, layerIndex0: number): ToolHead | null {
+  if (!cfg.layerGroups?.length) return null
+  const n = layerIndex0 + 1
+  const g = cfg.layerGroups.find((g) => n >= g.from && (g.to === undefined || n <= g.to))
+  if (!g) return null
+  return cfg.heads.find((h) => h.index === g.tool) ?? null
+}
+
+/** Preset: 1 cabeçote por camada, na ordem (camada 1→T0, 2→T1, …, última faixa até o fim). */
+export function layerGroupsOnePerHead(heads: ToolHead[], labels?: string[]): NonNullable<ToolsConfig["layerGroups"]> {
+  return heads.map((h, i) => ({ from: i + 1, to: i === heads.length - 1 ? undefined : i + 1, tool: h.index, label: labels?.[i] }))
 }
 
 export const TOOL_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ec4899"] as const

@@ -20,7 +20,7 @@ import type { SliceParams, ExtrusionModel, SlicedLayer, ToolPath, Vec2, SliceSta
 import { ePerMm, volumeToE, beadArea_mm2 } from "./extrusion"
 import { dist } from "./polygon-ops"
 import { type PrintTarget, DEFAULT_TARGET, PLATES, wellOffsets, referenceWell, describeTarget } from "./target"
-import { type ToolsConfig, type ToolHead, singleTool, toolForRole, describeTools } from "./tools"
+import { type ToolsConfig, type ToolHead, singleTool, toolForRole, toolForLayer, describeTools } from "./tools"
 
 const f = (n: number, d = 3) => {
   const s = n.toFixed(d)
@@ -270,14 +270,16 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
       globalLayer++
 
       // R20: agrupa caminhos por ferramenta dentro da camada para minimizar trocas
-      const ordered = multiTool ? [...L.paths].sort((a, b) => toolForRole(tools, a.role).index - toolForRole(tools, b.role).index) : L.paths
+      const layerHead = toolForLayer(tools, L.index)
+      const headOf = (tp: ToolPath) => (tp.tool !== undefined ? (tools.heads.find((h) => h.index === tp.tool) ?? tools.heads[0]) : layerHead ?? toolForRole(tools, tp.role))
+      const ordered = multiTool ? [...L.paths].sort((a, b) => headOf(a).index - headOf(b).index) : L.paths
 
       let lastRole: string | null = null
       for (const tp0 of ordered) {
         if (tp0.points.length < 2) continue
         // aplica offset do poço
         const tp: ToolPath = copy.dx || copy.dy ? { ...tp0, points: tp0.points.map((p) => ({ x: p.x + copy.dx, y: p.y + copy.dy })) } : tp0
-        const head = toolForRole(tools, tp.role)
+        const head = headOf(tp)
         if (multiTool && head.index !== activeTool.index) {
           if (firstBeadDone) switchTool(head, zTop)
           else { // ainda não imprimiu nada nesta cópia: troca sem hop

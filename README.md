@@ -207,6 +207,16 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R23 — Aprendizados do DNA Studio 4 (CELLINK) + laço fechado pós-impressão (2026-10-22)
+
+**Fontes estudadas:** BIO X Series Brochure (DNA Studio 4: Shape Generator, Decoding G-Code, Draw & Print, Print Report, Layer groups), protocolo *CELLINK SKIN* v5 (3 cabeçotes, 1 camada cada, concêntrico 42 %, 22G, 10 mm/s), Zdravković 2025 (*AI-native bioprinting* — closed loop com sinal do resultado) e Zhang 2025 (*AI-driven bioprinting* — QbD, controle em linha). A BIA é por **extrusão mecânica** (seringa); nada do nosso fluxo foi trocado — só complementado.
+
+- **Laço fechado (mandato):** ao fim da impressão o modal pergunta **"Como foi? Nota 1–5"** + caixa de texto livre. Notas **3, 2, 1** são interpretadas (`src/lib/bioprint/print-feedback.ts`, regras pt-BR explicáveis): *"saiu muito volume de biotinta"* → fluxo ×0,9/0,8/0,7 (+velocidade se grave); *"não saiu biotinta"* → fluxo ↑, prime ↑; *"começou longe do ponto zero"* → reforço de origem (skirt 0, purga 0, validador/pré-flight); colapso → camada ↓, velocidade ↓, +parede; má aderência → 1ª camada ↓; fios → retração ↑, z-hop ↑; entupimento → velocidade ↑, retração ↓; poros/densidade; temperatura. O modal já mostra **"no próximo G-code eu vou…"**. Na Etapa 3 (e no Desenhar & Imprimir) aparece o banner **"🧠 Aprendi com a sua última impressão"** com checkbox *aplicar*; ao fatiar, os ajustes entram nos parâmetros e ficam gravados no G-code (`; APRENDIDO (sintoma): motivo`). Prioriza mesma biotinta/geometria; consumido uma vez. Notas 4–5 = manter.
+- **Desenhar & Imprimir** (`/dashboard/bioprint/draw`, `DrawCanvas`, `draw-print.ts`): desenhe com **dedo, caneta ou mouse** (Pointer Events) linhas, círculos, retângulos e traço livre sobre a mesa (grade 5 mm, imã 0,5 mm, ponto zero). **Cada traço = 1 caminho de extrusão** do cabeçote escolhido (3 linhas → 3 caminhos; `T0..T3` por traço). **Volume**: repete por N camadas (altura = N × camada), opção alternar 90° (woodpile), formas fechadas com preenchimento honesto. Mesmo writer do BioSlicer, mesmo alvo Petri/placa, mesma cobrança (6 créditos), mesmo pré-flight no `/execute`.
+- **Grupos de camada por cabeçote** (DNA Studio *Layer groups*): `ToolsConfig.layerGroups` + modo **"por camada"** no painel de cabeçotes (camada 1→T0, 2→T1, 3→T2…, faixas editáveis). `ToolPath.tool` explícito. Perfil novo **"Pele 3 cabeçotes — protocolo CELLINK SKIN"** (Ø10 × 1,2 mm, 3 × 0,4 mm, concêntrico 42 %, 22G, 10 mm/s; 12 kPa pneumático → fluxo ×1,0 em seringa, ajustado pelo laço).
+- Sidebar: "Desenhar & Imprimir" (novo). Testes: `r23_closed_loop_feedback` (13), `r23_draw_print` (5), grupo de camadas em `r20_target_tools` (+1). Suite **1764 verdes**.
+- *Pendente (próxima rodada):* Print Report (relatório exportável de cada impressão com parâmetros + nota + ajustes aprendidos).
+
 ### R22 — Etapa 4 única, Etapa 1 só com malhas reais, manual da Etapa 3 (2026-10-21)
 
 - **Build Vercel R21 confirmado verde** (biaquantis.bio serve `/stl/*-real.stl` com os tamanhos decimados; `/slice` 307→login como esperado).

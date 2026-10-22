@@ -113,3 +113,26 @@ describe("R20 · cabeçotes · multi-material em 1 G-code", () => {
     expect(r.gcode).toMatch(/M218 T1 X30/)
   })
 })
+
+describe("R23 · grupos de camada por cabeçote (DNA Studio 'Layer groups' / CELLINK SKIN)", () => {
+  it("camada 1→T0, 2→T1, 3→T2: cada camada sai inteira do seu cabeçote", async () => {
+    const { sliceMesh } = await import("@/lib/slicer/slice")
+    const { cylinderMesh } = await import("@/lib/slicer/primitives")
+    const { ALL_PROFILES } = await import("@/lib/slicer/profiles")
+    const { singleTool, layerGroupsOnePerHead } = await import("@/lib/slicer/tools")
+    const prof = ALL_PROFILES.find((p) => p.id === "adv_cellink_skin_3ph")!
+    expect(prof.params.infillPattern).toBe("concentric"); expect(prof.params.infillDensity).toBe(42)
+    const base = singleTool(prof.extrusion, "HDF 4M")
+    const heads = [base.heads[0], { ...base.heads[0], index: 1, label: "HDF 8M" }, { ...base.heads[0], index: 2, label: "HEK 10M" }]
+    const tools = { ...base, heads, layerGroups: layerGroupsOnePerHead(heads, ["reticular", "papilar", "epiderme"]) }
+    const res = sliceMesh({ mesh: cylinderMesh(10, 1.2), params: prof.params, extrusion: prof.extrusion, profileId: prof.id, profileName: prof.name, tools })
+    expect(res.stats.layerCount).toBe(3)
+    const g = res.gcode
+    const iL1 = g.indexOf(";LAYER:0"), iL2 = g.indexOf(";LAYER:1"), iL3 = g.indexOf(";LAYER:2")
+    expect(g.slice(iL2, iL3)).toMatch(/\nT1\b/)
+    expect(g.slice(iL3)).toMatch(/\nT2\b/)
+    expect(g.slice(iL1, iL2)).not.toMatch(/\nT[12]\b/)
+    expect(res.stats.toolChanges).toBe(2)
+    expect(Object.keys(res.stats.volumeByTool_uL ?? {})).toEqual(["0", "1", "2"])
+  })
+})

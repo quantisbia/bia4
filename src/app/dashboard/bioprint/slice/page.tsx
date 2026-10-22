@@ -357,6 +357,7 @@ function BioSlicerInner() {
         </div>
         <div className="flex items-center gap-2 text-xs">
           <ModeToggle mode={mode} onChange={setMode} />
+          <Link href="/dashboard/bioprint/draw" className="px-3 py-1.5 rounded-lg border border-emerald-400/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-100">✏️ Desenhar & Imprimir</Link>
           <Link href="/dashboard/bioprint/host" className="px-3 py-1.5 rounded-lg border border-white/10 hover:border-emerald-400/40 text-gray-300">Host →</Link>
         </div>
       </header>

@@ -12,6 +12,7 @@ import {
   Crown, Wrench, Info, Map, Atom, Library, GraduationCap,
   Lightbulb, ShieldCheck, UserCircle, ChevronDown,
   Microscope, Sparkles,
+  Pencil,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { isSuperAdmin } from "@/lib/auth/admin-shared"
@@ -144,7 +145,9 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard/bioprint/model", label: "Modelos 3D (STL)", labelKey: "step_model",   icon: CircleDot,
         info: "Upload de STL ou geração a partir de 20+ geometrias prontas (biomiméticas + testes)." },
       { href: "/dashboard/bioprint/slice", label: "Fatiar (Etapa 3)", labelKey: "term_gcode", icon: Zap,
-        info: "Atalho: gera G-code otimizado em 60 segundos a partir de um modelo + biotinta." },
+        info: "BioSlicer: STL/modelo anatômico → G-code (ponto zero no bico, alvo Petri/placa, 1–4 cabeçotes, infills honestos)." },
+      { href: "/dashboard/bioprint/draw", label: "Desenhar & Imprimir", icon: Pencil,
+        info: "Desenhe linhas, círculos e retângulos com o dedo ou mouse — cada traço vira um caminho de extrusão; repita camadas para criar volume.", badge: "novo" },
       { href: "/dashboard/bioprint/host", label: "BIA Host (impressora)", icon: Cpu,
         info: "Host serial profissional: USB Web Serial, checksum/reenvio, temperaturas, jog, macros de seringa, pausa segura.", badge: "novo" },
     ],
