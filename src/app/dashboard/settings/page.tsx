@@ -42,6 +42,10 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState(initialTab)
   const [saving, setSaving]       = useState(false)
   const [saved, setSaved]         = useState(false)
+  // R24 · troca de senha funcional (Segurança)
+  const [pw, setPw] = useState({ current: "", next: "", confirm: "" })
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [form, setForm] = useState({
     name:            session?.user?.name ?? "",
     email:           session?.user?.email ?? "",
@@ -234,18 +238,39 @@ export default function SettingsPage() {
                 <p className="text-xs text-gray-500 mt-0.5">Gerencie sua senha e sessões</p>
               </div>
 
-              <div className="p-4 sm:p-5 rounded-2xl bg-white/[0.03] border border-white/8 space-y-3">
+              <form
+                className="p-4 sm:p-5 rounded-2xl bg-white/[0.03] border border-white/8 space-y-3"
+                onSubmit={async (e) => {
+                  e.preventDefault()
+                  setPwMsg(null)
+                  if (pw.next !== pw.confirm) { setPwMsg({ ok: false, text: "A confirmação não confere com a nova senha." }); return }
+                  setPwSaving(true)
+                  try {
+                    const res = await fetch("/api/auth/change-password", {
+                      method: "POST", headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ currentPassword: pw.current, newPassword: pw.next }),
+                    })
+                    const data = await res.json().catch(() => ({}))
+                    if (res.ok && data.ok) { setPwMsg({ ok: true, text: "Senha atualizada com sucesso." }); setPw({ current: "", next: "", confirm: "" }) }
+                    else setPwMsg({ ok: false, text: data.error ?? "Não foi possível atualizar a senha." })
+                  } catch { setPwMsg({ ok: false, text: "Falha de rede. Tente novamente." }) }
+                  finally { setPwSaving(false) }
+                }}
+              >
                 <div>
                   <h4 className="text-sm font-semibold text-white mb-0.5">Alterar Senha</h4>
-                  <p className="text-xs text-gray-500">Use uma senha forte com 12+ caracteres</p>
+                  <p className="text-xs text-gray-500">Mínimo 8 caracteres, com letra e número. Recomendado: 12+.</p>
                 </div>
-                {["Senha atual", "Nova senha", "Confirmar nova senha"].map((label) => (
-                  <input key={label} type="password" placeholder={label} className={inputClass} />
-                ))}
-                <button className="px-4 py-2.5 rounded-xl bg-white/8 text-sm text-gray-300 hover:bg-white/12 transition-colors active:scale-[0.98] w-full sm:w-auto">
-                  Atualizar senha
+                <input type="password" autoComplete="current-password" placeholder="Senha atual" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} className={inputClass} required />
+                <input type="password" autoComplete="new-password" placeholder="Nova senha" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} className={inputClass} required minLength={8} />
+                <input type="password" autoComplete="new-password" placeholder="Confirmar nova senha" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} className={inputClass} required minLength={8} />
+                {pwMsg && (
+                  <p className={cn("text-xs", pwMsg.ok ? "text-emerald-300" : "text-rose-300")}>{pwMsg.text}</p>
+                )}
+                <button type="submit" disabled={pwSaving} className="px-4 py-2.5 rounded-xl bg-violet-500/20 border border-violet-400/50 text-sm text-violet-100 hover:bg-violet-500/30 transition-colors active:scale-[0.98] w-full sm:w-auto disabled:opacity-50 flex items-center justify-center gap-2">
+                  {pwSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Atualizar senha
                 </button>
-              </div>
+              </form>
 
               <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/5 border border-amber-500/15">
                 <h4 className="text-sm font-semibold text-amber-300 mb-1">Sessões Ativas</h4>

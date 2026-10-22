@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>BIA Academy · Guia do Aluno</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", Inter, Arial, sans-serif; color: #1f1b2e; font-size: 11.5pt; line-height: 1.5; margin: 0; }
+  h1 { font-size: 26pt; margin: 0 0 4px; color: #3b1d8f; letter-spacing: -0.5px; }
+  h2 { font-size: 16pt; margin: 26px 0 8px; color: #5b21b6; border-bottom: 2px solid #ddd6fe; padding-bottom: 4px; page-break-after: avoid; }
+  h3 { font-size: 12.5pt; margin: 16px 0 6px; color: #3b1d8f; page-break-after: avoid; }
+  p { margin: 6px 0; }
+  ul, ol { margin: 6px 0 6px 20px; padding: 0; }
+  li { margin: 3px 0; }
+  .cover { text-align: center; padding: 60px 0 30px; page-break-after: always; }
+  .cover .badge { display: inline-block; padding: 10px 22px; background: linear-gradient(135deg,#7c3aed,#c026d3); color: #fff; border-radius: 12px; font-weight: 800; font-size: 20pt; }
+  .cover .sub { color: #6b6485; margin-top: 14px; font-size: 13pt; }
+  .cover .meta { margin-top: 50px; color: #6b6485; font-size: 10.5pt; }
+  .box { border: 1px solid #ddd6fe; background: #faf8ff; border-radius: 10px; padding: 12px 14px; margin: 10px 0; page-break-inside: avoid; }
+  .box.warn { border-color: #fde68a; background: #fffbeb; }
+  .box.ok { border-color: #a7f3d0; background: #ecfdf5; }
+  code, .mono { font-family: "JetBrains Mono", Menlo, Consolas, monospace; background: #f1efff; padding: 1px 5px; border-radius: 4px; font-size: 10.5pt; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10.5pt; page-break-inside: avoid; }
+  th, td { border: 1px solid #e5e1f5; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f1efff; color: #3b1d8f; }
+  .muted { color: #6b6485; font-size: 10pt; }
+  .step { display: flex; gap: 10px; margin: 8px 0; page-break-inside: avoid; }
+  .step .n { flex: 0 0 26px; height: 26px; border-radius: 50%; background: #7c3aed; color: #fff; font-weight: 700; text-align: center; line-height: 26px; font-size: 11pt; }
+  .footer { margin-top: 30px; color: #6b6485; font-size: 9.5pt; border-top: 1px solid #e5e1f5; padding-top: 8px; }
+  .toc li { margin: 2px 0; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="badge">BIA Academy</div>
+  <h1 style="margin-top:28px">Guia do Aluno</h1>
+  <div class="sub">Como entrar, estudar e usar a plataforma BIA<br>(Biomaterial Intelligent Assistant · Quantis Biotechnology)</div>
+  <div class="meta">
+    Turma 2026 · Aulas práticas 23 e 24 de outubro · Bayer (Quantis) — São Paulo<br>
+    Versão R24 · outubro de 2026 · biaquantis.bio
+  </div>
+</div>
+
+<h2>Sumário</h2>
+<ol class="toc">
+  <li>Seu acesso: login, senha inicial e troca de senha</li>
+  <li>As duas plataformas: BIA Academy e BIA (ferramentas)</li>
+  <li>BIA Academy — módulos, aulas, biblioteca, certificados</li>
+  <li>BIA — ferramentas: Bioimpressão em 6 fases, Formulador, Organoid Builder, Chat IA, Notebook</li>
+  <li>Aulas práticas 23 e 24/10 — onde, horário, o que levar</li>
+  <li>Créditos, dúvidas frequentes e suporte</li>
+</ol>
+
+<h2>1. Seu acesso</h2>
+<div class="box">
+  <p><strong>Endereço:</strong> <span class="mono">https://biaquantis.bio/auth/login</span></p>
+  <p><strong>E-mail:</strong> o mesmo em que você recebeu este guia.</p>
+  <p><strong>Senha inicial:</strong> <span class="mono">BiaAcademy2026!</span> &nbsp;<span class="muted">(com B e A maiúsculos e ponto de exclamação no final)</span></p>
+</div>
+<h3>Trocar a senha (recomendado no primeiro acesso)</h3>
+<div class="step"><div class="n">1</div><div>Entre com a senha inicial. No canto superior direito, clique no seu nome → <strong>Configurações</strong> (<span class="mono">/dashboard/settings</span>).</div></div>
+<div class="step"><div class="n">2</div><div>Em <strong>Segurança</strong>, informe a senha atual e a nova senha (mínimo 8 caracteres, com letra maiúscula, minúscula e número).</div></div>
+<div class="step"><div class="n">3</div><div>Esqueceu a senha? Em <span class="mono">https://biaquantis.bio/auth/forgot-password</span> informe seu e-mail — você recebe um link válido por 30 minutos para criar uma nova.</div></div>
+<div class="box warn"><strong>Importante:</strong> a senha é pessoal. Não a compartilhe. Seu acesso ao Academy e às ferramentas BIA vale por <strong>12 meses</strong> a partir da matrícula.</div>
+
+<h2>2. As duas plataformas</h2>
+<table>
+  <tr><th style="width:30%">Onde</th><th>O que é</th><th style="width:28%">Endereço</th></tr>
+  <tr><td><strong>BIA Academy</strong></td><td>Curso: 12 módulos, aulas em vídeo + texto, quizzes, biblioteca (artigos, white papers, e-books), encontros ao vivo, projeto de biofabricação e certificados.</td><td class="mono">biaquantis.bio/academy/dashboard</td></tr>
+  <tr><td><strong>BIA — plataforma de ferramentas</strong></td><td>Assistente inteligente para biofabricação: Bioimpressão em 6 fases (do tecido ao G-code e à maturação), Formulador de biotintas, Organoid Builder, Pipeline de 12 etapas, Protocolos GLP/GMP, Chat com IA, Notebook do pesquisador, Motor de Conhecimento.</td><td class="mono">biaquantis.bio/dashboard</td></tr>
+</table>
+<p class="muted">O mesmo login abre as duas. No menu lateral da BIA há um atalho "BIA Academy"; no Academy há o atalho "Abrir a plataforma BIA".</p>
+
+<h2>3. BIA Academy</h2>
+<h3>3.1 Painel do aluno (<span class="mono">/academy/dashboard</span>)</h3>
+<p>Mostra seu progresso, a próxima aula sugerida, os encontros ao vivo e os avisos da turma. Na primeira visita há um onboarding rápido (área de interesse, nível, objetivo) — pode pular.</p>
+<h3>3.2 Módulos e aulas (<span class="mono">/academy/modules</span>)</h3>
+<p>Todos os módulos estão liberados desde o primeiro dia. Cada aula tem: vídeo/texto, referências, quiz de fixação e botão <strong>Concluir aula</strong> (gera o certificado da aula).</p>
+<table>
+  <tr><th>#</th><th>Módulo</th><th>Aula</th></tr>
+  <tr><td>1</td><td>Introdução à Biofabricação</td><td>Aula completa (75 min)</td></tr>
+  <tr><td>2</td><td>Biomateriais</td><td>Aula completa (85 min)</td></tr>
+  <tr><td>3</td><td>Biotintas</td><td>Formulação, reologia e printabilidade (90 min)</td></tr>
+  <tr><td>4</td><td>Bioimpressão 3D</td><td>Modelagem, fatiamento e parâmetros de impressão (100 min)</td></tr>
+  <tr><td>5</td><td>Arquitetura 3D</td><td>Scaffolds, porosidade e TPMS (80 min)</td></tr>
+  <tr><td>6</td><td>Células</td><td>Cultivo 2D/3D (75 min) · Esferoides — building blocks (70 min)</td></tr>
+  <tr><td>7</td><td>Tecidos</td><td>Pele, osso, cartilagem, tecidos moles e vasos (85 min)</td></tr>
+  <tr><td>8</td><td>Esferoides e Organoides</td><td>Organoides e bioassembly (80 min)</td></tr>
+  <tr><td>9</td><td>Avaliação pós-impressão</td><td>Viabilidade, morfologia, mecânica e histologia (90 min)</td></tr>
+  <tr><td>10</td><td>Translação</td><td>Em preparação</td></tr>
+  <tr><td>11</td><td>Desenvolvimento de Projeto</td><td>Do problema clínico ao protocolo bioimprimível (95 min)</td></tr>
+  <tr><td>12</td><td>Projeto Final</td><td>Entrega e apresentação (encontro ao vivo #3)</td></tr>
+</table>
+<h3>3.3 Biblioteca (<span class="mono">/academy/library</span>)</h3>
+<ul>
+  <li><strong>E-book "Biofabricação em Ortopedia"</strong> — do defeito ósseo crítico ao implante bioimpresso paciente-específico (53 páginas, exclusivo para alunos).</li>
+  <li><strong>White paper QMatrix</strong> — agregação de esferoides em células com baixa produção de matriz extracelular (Leichtweis &amp; Guarnier, 2026).</li>
+  <li>65+ artigos científicos curados por módulo (open access quando disponível).</li>
+</ul>
+<h3>3.4 Encontros ao vivo (<span class="mono">/academy/live</span>)</h3>
+<ul>
+  <li>#1 Abertura — 25/nov/2026, 19:00 (Brasília)</li>
+  <li>#2 Meio do caminho: discussão de projetos — 15/dez/2026, 19:00</li>
+  <li>#3 Fechamento: apresentações finais &amp; certificação — 26/jan/2027, 19:00</li>
+</ul>
+<h3>3.5 Projeto e certificados (<span class="mono">/academy/journey</span>, <span class="mono">/academy/certificate</span>)</h3>
+<p>Você desenvolve um projeto de biofabricação próprio (versionado automaticamente e exportável em PDF). Cada aula concluída emite um certificado individual; o certificado final (código verificável <span class="mono">BIA-ACAD-…</span>) é emitido ao completar o programa.</p>
+
+<h2>4. BIA — ferramentas</h2>
+<h3>4.1 Bioimpressão em 6 fases (<span class="mono">/dashboard/bioprint</span>)</h3>
+<p>Um racional único, do tecido ao tecido:</p>
+<div class="step"><div class="n">1</div><div><strong>Modelo de tecido</strong> — diga o que você vai bioimprimir (cartilagem, pele, osso, vaso, miocárdio, renal, hepático, neural ou teste), aplicação, tamanho e se leva células. Sem STL: a BIA sugere modelo, perfil, biotinta e alvo.</div></div>
+<div class="step"><div class="n">2</div><div><strong>Biotinta</strong> — escolha uma receita validada (alginato-gelatina, GelMA, Pluronic, FRESH, CELLINK SKIN…) e as células.</div></div>
+<div class="step"><div class="n">3</div><div><strong>Fatiamento — BioSlicer</strong> — o único lugar de geometria 3D: modelo anatômico real, primitiva, upload de STL ou desenho à mão → G-code para extrusão por seringa. Prévia gratuita; cada G-code gerado custa 6 créditos.</div></div>
+<div class="step"><div class="n">4</div><div><strong>Bioimpressão (Host)</strong> — conecta à bioimpressora por USB (Chrome/Edge), envia o G-code, pausa/retoma, parada de emergência.</div></div>
+<div class="step"><div class="n">5</div><div><strong>Análise da bioimpressão</strong> — dê uma nota de 1 a 5 e conte o que viu; a BIA interpreta e ajusta o próximo G-code.</div></div>
+<div class="step"><div class="n">6</div><div><strong>Maturação &amp; caracterizações</strong> — crosslink, cultura, biorreator e ensaios (Live/Dead, AlamarBlue, histologia, mecânica).</div></div>
+<h3>4.2 Outras ferramentas</h3>
+<table>
+  <tr><th style="width:32%">Ferramenta</th><th>Para quê</th></tr>
+  <tr><td>Formulador Pro <span class="muted">(/dashboard/formulator-pro)</span></td><td>Formulações multi-componente (até 8 biomateriais), reologia, score, protocolo, ISO/ANVISA. 10 créditos.</td></tr>
+  <tr><td>Organoid Builder <span class="muted">(/dashboard/organoids)</span></td><td>Esferoides e organoides com QMicroNiche™ e moldes QMatrix™.</td></tr>
+  <tr><td>Pipeline <span class="muted">(/dashboard/pipeline)</span></td><td>Engenharia de tecidos em 12 etapas, do problema clínico ao pré-clínico. 5 créditos/etapa.</td></tr>
+  <tr><td>Protocolos GLP/GMP <span class="muted">(/dashboard/protocols)</span></td><td>POPs em formato ABNT/ISO 17025/ANVISA, exportáveis em PDF. 8 créditos.</td></tr>
+  <tr><td>Chat com a BIA <span class="muted">(/dashboard/chat)</span></td><td>Perguntas científicas com referências; use para tirar dúvidas das aulas.</td></tr>
+  <tr><td>Notebook do pesquisador <span class="muted">(/dashboard/notebook)</span></td><td>Caderno de laboratório digital, versionado, com imagens.</td></tr>
+  <tr><td>Manual do usuário <span class="muted">(/dashboard/manual)</span></td><td>Tutoriais passo a passo de cada módulo.</td></tr>
+</table>
+
+<h2>5. Aulas práticas — 23 e 24 de outubro</h2>
+<div class="box ok">
+  <p><strong>Onde:</strong> Bayer (Quantis Biotechnology) — Rua Domingos Jorge, 1100 — Vila Socorro, São Paulo/SP</p>
+  <p><strong>Quando:</strong> sexta 23/10 e sábado 24/10, a partir das <strong>8:30</strong>. Encerramento do curso presencial no sábado 24/10 por volta das <strong>14:30</strong>.</p>
+  <p><strong>Contato Quantis:</strong> (11) 96863-2231 (WhatsApp)</p>
+</div>
+<h3>O que levar</h3>
+<ul>
+  <li>Documento com foto e este guia (impresso ou no celular).</li>
+  <li>Notebook com Chrome ou Edge atualizado (para o BIA Host via USB) e seu login da BIA já testado.</li>
+  <li>Jaleco e calçado fechado para o laboratório.</li>
+  <li>Dúvidas das aulas online anotadas — a prática é o momento de resolvê-las.</li>
+</ul>
+<h3>Antes de chegar (10 minutos)</h3>
+<ol>
+  <li>Entre em <span class="mono">biaquantis.bio</span> e troque a senha inicial.</li>
+  <li>No Academy, assista (ou revise) os módulos 3 (Biotintas) e 4 (Bioimpressão 3D).</li>
+  <li>Na BIA, abra <strong>Bioimpressão → Fase 1</strong>, escolha um tecido e siga até a Fase 3 para ver a prévia do fatiamento (a prévia é gratuita).</li>
+</ol>
+
+<h2>6. Créditos, dúvidas e suporte</h2>
+<p>Sua matrícula inclui o plano <strong>GUIDE</strong> com <strong>1.500 créditos mensais</strong> para as ferramentas da BIA (o Academy não consome créditos). Saldo e extrato em <span class="mono">/dashboard/billing</span>.</p>
+<table>
+  <tr><th style="width:45%">Dúvida</th><th>Resposta</th></tr>
+  <tr><td>Não consigo entrar.</td><td>Confira o e-mail e a senha <span class="mono">BiaAcademy2026!</span>. Se já trocou e esqueceu, use "Esqueci a senha".</td></tr>
+  <tr><td>A aula não marca como concluída.</td><td>Role até o fim do conteúdo e clique em <strong>Concluir aula</strong>; o quiz é opcional.</td></tr>
+  <tr><td>Onde baixo o e-book?</td><td>Academy → Biblioteca → "Biofabricação em Ortopedia" → Baixar PDF (precisa estar logado).</td></tr>
+  <tr><td>O Host não encontra a impressora.</td><td>Use Chrome/Edge 89+, cabo USB de dados, e permita o acesso à porta serial quando o navegador perguntar.</td></tr>
+  <tr><td>Fiquei sem créditos.</td><td>Renovam todo mês. Para a prática, a equipe Quantis libera créditos extras se necessário.</td></tr>
+</table>
+<p><strong>Suporte:</strong> responda o e-mail de boas-vindas, escreva para <span class="mono">suporte@quantis.bio</span> ou WhatsApp (11) 96863-2231.</p>
+
+<div class="footer">BIA Academy · Quantis Biotechnology · biaquantis.bio · Este material é de uso exclusivo dos alunos matriculados.</div>
+</body>
+</html>
