@@ -182,6 +182,8 @@ export interface SliceStepState {
    * a usuária ajustar em tempo real.
    */
   extrusionMultiplier: number | null
+  /** R26 · nº de paredes usado (para a tabela de aprendizado) */
+  walls?: number | null
   /**
    * R12.53: ID da bioimpressora selecionada no /slice (default
    * "bioender_bioedtech"). Persistido aqui para que o /execute saiba

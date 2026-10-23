@@ -884,3 +884,25 @@ enum OrganoidType {
   RETINA
   CUSTOM
 }
+
+// R26 · Tabela de aprendizado de bioimpressão (laço fechado material × aplicação × geometria)
+model PrintLearning {
+  id              String   @id            // id gerado no cliente (lr-…), idempotente
+  userId          String?
+  material        String
+  materialKey     String
+  application     String
+  geometryId      String?
+  params          Json
+  flowed          Boolean
+  rating          Int
+  text            String   @default("")
+  symptoms        Json?
+  adjustments     Json?
+  effectiveFactor Float
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([materialKey])
+  @@index([createdAt])
+}

@@ -28,6 +28,9 @@ import { cn } from "@/lib/utils/helpers"
 // R12.68 · ExportBar universal + adapter do Formulator Pro
 // (substitui o antigo "Salvar protocolo" — Notebook R12.66 é a fonte única de verdade)
 import { ExportBar } from "@/components/notebook/ExportBar"
+import { PrintParamsCard } from "@/components/bioink/PrintParamsCard"
+import { applicationFromText } from "@/lib/bioprint/print-recommend"
+import { useBioprintProcess } from "@/lib/bioprint/process-context"
 import { buildContentFromProFormulation } from "@/lib/export/adapters/formulator-pro-adapter"
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -789,11 +792,19 @@ export function FormulatorPro() {
                   ← Voltar
                 </button>
                 <button
+                  onClick={() => { void submit() }}
+                  disabled={components.length === 0 || components.some(c => !c.name.trim()) || loading}
+                  title="Gera a formulação agora. As especificações (passo 3) são opcionais — a IA decide pelo objetivo."
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-semibold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Zap className="w-4 h-4" /> Gerar formulação (10 créditos)
+                </button>
+                <button
                   onClick={() => setStep(3)}
                   disabled={components.length === 0 || components.some(c => !c.name.trim())}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-500 text-white text-sm font-semibold hover:bg-blue-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="px-4 py-2 rounded-lg text-xs text-gray-400 hover:text-white border border-white/10 hover:bg-white/5 disabled:opacity-40 transition-colors"
                 >
-                  Próximo: Especificações <ChevronRight className="w-4 h-4" />
+                  Especificações avançadas (opcional) <ChevronRight className="w-3.5 h-3.5 inline" />
                 </button>
               </div>
             </div>
@@ -1350,6 +1361,9 @@ function ResultView({
         )}
       </div>
 
+      {/* R26 · parâmetros de fatiamento recomendados (literatura + aprendizado) → Fase 3 */}
+      <ProPrintParams result={result} inputContext={inputContext} />
+
       {/* Bioimpressão */}
       {result.printingParameters && Object.keys(result.printingParameters).length > 0 && (
         <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-4">
@@ -1609,4 +1623,37 @@ function formatAsMarkdown(r: ProFormulation): string {
   r.preparationProtocol?.forEach(p => lines.push(`${p.step}. **${p.title}** — ${p.description}`))
   lines.push(`\n## Regulatório\n${r.regulatory?.estimatedClass} | ${r.regulatory?.relevantStandards?.join(", ")}`)
   return lines.join("\n")
+}
+
+
+/** R26 · Converte a formulação da IA em fatos da biotinta e mostra o pacote de fatiamento. */
+function ProPrintParams({ result, inputContext }: { result: ProFormulation; inputContext: { goal: string; goalCategory: ClinicalGoal; targetTissue: string } }) {
+  const { updateBioink } = useBioprintProcess()
+  const pp = (result.printingParameters ?? {}) as { nozzleDiameterUm?: number; nozzleTempC?: number }
+  const visc = parseFloat(String(result.predictedProperties?.viscosityPaS ?? "").replace(/[^\d.,]/g, " ").trim().split(/\s+/)[0]?.replace(",", ".") ?? "")
+  const material = result.components.map((c) => `${c.name}${c.concentration ? ` ${c.concentration}` : ""}`).join(" + ")
+  const hasCells = /cell|célul|laden/i.test(JSON.stringify(result.components)) || /cell/i.test(inputContext.goal)
+  return (
+    <PrintParamsCard
+      source="pro"
+      facts={{
+        material: material || result.name,
+        viscosity_PaS: Number.isFinite(visc) ? visc : null,
+        crosslink: result.crosslinking?.method ?? null,
+        printTemp_C: typeof pp.nozzleTempC === "number" ? pp.nozzleTempC : null,
+        nozzle_mm: typeof pp.nozzleDiameterUm === "number" ? Math.round(pp.nozzleDiameterUm) / 1000 : null,
+        hasCells,
+        application: applicationFromText(`${inputContext.goalCategory} ${inputContext.targetTissue} ${inputContext.goal}`),
+      }}
+      onBeforeGo={() => {
+        const first = result.components[0]
+        const conc = parseFloat(String(first?.concentration ?? "").replace(",", ".")) || 0
+        updateBioink({
+          status: "ready", material: material || result.name, concentration: conc, crosslinker: result.crosslinking?.method ?? null,
+          formulations: [{ tool: 0, color: "#a78bfa", role: "structural", material: material || result.name, materialId: (first?.name ?? result.name).toLowerCase().replace(/\s+/g, "_"), concentration: conc, crosslinker: result.crosslinking?.method ?? null, crosslinkerConc: null, cellType: null, cellDensityMillionMl: null, additives: [], rheology: { viscosityPaS: Number.isFinite(visc) ? visc : undefined }, label: result.name }],
+          strategy: "single",
+        } as never)
+      }}
+    />
+  )
 }

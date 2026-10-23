@@ -3913,6 +3913,7 @@ export default function BioprintExecutePage() {
         geometryId={bioprintState.model.geometryId}
         params={sliceParamsSnapshot}
         materialId={bioprintState.bioink.material ?? null}
+        learn={{ material: bioprintState.bioink.material, application: bioprintState.model.brief?.tissue ?? bioprintState.control.tissueType, nozzle_mm: (bioprintState.slice.nozzleDiameterUm ?? 410) / 1000, flowFactor: bioprintState.slice.extrusionMultiplier ?? 1, infillPattern: bioprintState.slice.infillPatternId ?? undefined, wallCount: bioprintState.slice.walls ?? undefined, syringe_mL: Math.round(Math.sqrt(syringeArea / Math.PI) * 2) >= 14 ? 10 : Math.round(Math.sqrt(syringeArea / Math.PI) * 2) >= 12 ? 5 : Math.round(Math.sqrt(syringeArea / Math.PI) * 2) >= 8 ? 3 : 1 }}
         onSaved={(id) => {
           loggerRef.current?.ok(
             `Feedback do print registrado (id ${id.slice(0, 12)}…). A BIA vai usar isso pra melhorar as próximas recomendações.`,

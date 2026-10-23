@@ -23,6 +23,8 @@ import { RECIPES, CELL_LABELS, GOAL_LABELS, toBioinkPatch, getRecipe, type CellT
 import { BioinkGuidedLab } from "@/components/bioink/BioinkGuidedLab"
 import { BioinkFreeFormulator } from "@/components/bioink/BioinkFreeFormulator"
 import { FormulatorPro } from "@/components/bioink/FormulatorPro"
+import { PrintParamsCard } from "@/components/bioink/PrintParamsCard"
+import { applicationFromText } from "@/lib/bioprint/print-recommend"
 
 export type BioinkMode = "recipes" | "lab" | "free" | "pro"
 const MODES: Array<{ id: BioinkMode; label: string; hint: string; icon: typeof Droplets }> = [
@@ -223,6 +225,18 @@ function RecipesMode({ onOpenMode }: { onOpenMode: (m: BioinkMode) => void }) {
           </div>
           <button onClick={confirm} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-400 text-black font-semibold text-sm hover:bg-cyan-300">Confirmar biotinta e avançar <ArrowRight className="w-4 h-4" /></button>
         </section>
+
+        {/* R26 · Com esta biotinta, imprima assim → Fase 3 com tudo preenchido */}
+        <PrintParamsCard
+          source="recipes"
+          compact
+          facts={{
+            material: recipe.name, viscosity_PaS: recipe.rheology.viscosity_PaS, powerLawN: recipe.rheology.powerLawN, yieldStress_Pa: recipe.rheology.yieldStress_Pa,
+            crosslink: recipe.crosslink, printTemp_C: recipe.printTemp_C, hasCells: cellOk, nozzle_mm: recipe.startParams.nozzle_mm,
+            application: applicationFromText(state.model.brief?.tissue ?? recipe.goals[0]),
+          }}
+          onBeforeGo={() => { const patch = toBioinkPatch(recipe, cellOk ? cell : "none", cellOk ? dens : null); const { labRecipeId, labPrintTemp_C, labStartParams, ...ctx } = patch; void labRecipeId; void labPrintTemp_C; void labStartParams; updateBioink(ctx) }}
+        />
 
         {/* Outros modos — mesma página, sem duplicar ferramentas */}
         <div className="pt-2 text-xs text-gray-500 flex flex-wrap gap-x-3 gap-y-1 items-center">

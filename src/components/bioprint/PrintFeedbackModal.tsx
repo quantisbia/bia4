@@ -36,6 +36,8 @@ import {
 import type { PresetParams } from "@/lib/bioprint/tissue-presets"
 // R23: laço fechado — nota 1–5 + relato livre → ajustes no próximo G-code
 import { interpretFeedback, saveFeedback, RATING_LABELS, type Rating } from "@/lib/bioprint/print-feedback"
+import { recordLearning } from "@/lib/bioprint/learning-table"
+import { applicationFromText } from "@/lib/bioprint/print-recommend"
 import { Star } from "lucide-react"
 
 // ─── Props ─────────────────────────────────────────────────────────────
@@ -59,14 +61,19 @@ export interface PrintFeedbackModalProps {
   materialId?: string | null
   /** R23: perfil do BioSlicer usado */
   profileId?: string | null
+  /** R26 · contexto para a tabela de aprendizado */
+  learn?: { material?: string | null; application?: string | null; nozzle_mm?: number; flowFactor?: number; infillPattern?: string; wallCount?: number; syringe_mL?: number; startPrime_uL?: number }
 }
 
 // ─── Componente principal ──────────────────────────────────────────────
 
 export function PrintFeedbackModal(props: PrintFeedbackModalProps) {
-  const { open, onClose, tissueId, bioinkId, geometryId, params, onSaved, materialId, profileId } = props
+  const { open, onClose, tissueId, bioinkId, geometryId, params, onSaved, materialId, profileId, learn } = props
   // R23: nota 1–5 + relato → ajustes
   const [rating, setRating] = useState<Rating | null>(null)
+  // R26 · a biotinta fluiu? (pergunta nº 1 — sem ela nada mais importa)
+  const [flowState, setFlowState] = useState<"ok" | "none" | "excess" | null>(null)
+  const flowed = flowState === null ? null : flowState !== "none"
   const [story, setStory] = useState("")
   const learned = rating ? interpretFeedback(rating, story) : { symptoms: [], adjustments: [] }
 
@@ -113,6 +120,18 @@ export function PrintFeedbackModal(props: PrintFeedbackModalProps) {
           rating, text: story.trim(), materialId: materialId ?? bioinkId, geometryId, profileId: profileId ?? null,
           params: { flow: params.flowPercent, speed: params.printSpeedMmS, layer: params.layerHeightMm, density: params.infillPercent },
         })
+        // R26 · linha na tabela de aprendizado (material × aplicação × geometria)
+        recordLearning({
+          material: learn?.material ?? materialId ?? bioinkId,
+          application: applicationFromText(learn?.application ?? tissueId),
+          geometryId,
+          params: {
+            nozzle_mm: learn?.nozzle_mm ?? 0.41, layerHeight_mm: params.layerHeightMm, speed_mms: params.printSpeedMmS,
+            flowFactor: learn?.flowFactor ?? 1, flowPercentM221: params.flowPercent, infillPattern: learn?.infillPattern ?? "rectilinear",
+            infillDensity: params.infillPercent, wallCount: learn?.wallCount ?? 1, syringe_mL: learn?.syringe_mL ?? 10, startPrime_uL: learn?.startPrime_uL,
+          },
+          flowed: flowed ?? (rating >= 3), rating, text: story.trim(),
+        })
       }
       const q = quality ?? (rating && rating >= 4 ? "excelente" : rating === 3 ? "aceitavel" : "ruim")
       const result = await savePrintResult({
@@ -133,7 +152,7 @@ export function PrintFeedbackModal(props: PrintFeedbackModalProps) {
     } finally {
       setSaving(false)
     }
-  }, [quality, rating, story, materialId, profileId, tissueId, bioinkId, geometryId, params, selectedIssues, notes, onSaved, handleClose])
+  }, [quality, rating, story, materialId, profileId, tissueId, bioinkId, geometryId, params, selectedIssues, notes, onSaved, handleClose, flowed, learn])
 
   if (!open) return null
 
@@ -188,10 +207,23 @@ export function PrintFeedbackModal(props: PrintFeedbackModalProps) {
 
         {/* Body */}
         <div className="px-5 py-5 space-y-5">
+          {/* R26 · A biotinta fluiu? */}
+          <section className="rounded-xl border border-rose-400/30 bg-rose-500/[0.06] p-3 space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-wider text-rose-200 block">1. A biotinta saiu da agulha e formou cordão?</label>
+            <div className="grid grid-cols-3 gap-2">
+              {([["ok", "Sim, fluiu bem"], ["none", "Não saiu / saiu pouco"], ["excess", "Saiu demais"]] as Array<["ok" | "none" | "excess", string]>).map(([v, label]) => (
+                <button key={v} type="button"
+                  onClick={() => { setFlowState(v); if (v === "excess") setStory((t) => /excesso/i.test(t) ? t : `${t} excesso de biotinta`.trim()); if (v === "none") setStory((t) => /não saiu/i.test(t) ? t : `${t} não saiu biotinta`.trim()) }}
+                  className={cn("py-2 rounded-lg border text-xs font-semibold transition", flowState === v ? "border-rose-400/60 bg-rose-500/20 text-rose-50" : "border-white/10 text-gray-300 hover:border-white/25")}>{label}</button>
+              ))}
+            </div>
+            <p className="text-[10.5px] text-gray-400">Esta resposta alimenta a tabela de aprendizado: se não fluiu, o próximo G-code desta biotinta sobe o fator de extrusão e a pré-carga automaticamente.</p>
+          </section>
+
           {/* R23 · 0. Nota 1–5 + como foi (laço fechado) */}
           <section className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.05] p-3 space-y-2">
             <label className="text-xs font-semibold uppercase tracking-wider text-emerald-300 block">
-              Como foi a bioimpressão? Dê uma nota de 1 a 5
+              2. Como foi a bioimpressão? Dê uma nota de 1 a 5
             </label>
             <div className="flex items-center gap-1">
               {([1, 2, 3, 4, 5] as Rating[]).map((n) => (

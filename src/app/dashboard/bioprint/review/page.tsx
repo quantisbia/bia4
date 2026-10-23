@@ -34,6 +34,7 @@ import {
 } from "@/lib/bioprint/learning-store"
 import { inferTissueFromGeometry, type PresetParams } from "@/lib/bioprint/tissue-presets"
 import { PrintFeedbackModal } from "@/components/bioprint/PrintFeedbackModal"
+import { LearningTable } from "@/components/bioprint/LearningTable"
 
 const TARGET_LABEL: Record<LearnedAdjustment["target"], string> = {
   flowMultiplier: "fluxo",
@@ -216,6 +217,9 @@ export default function ReviewPage() {
       </section>
 
       {/* Lista de análises (laço fechado) */}
+        {/* R26 · memória de bioimpressão */}
+        <LearningTable />
+
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-white flex items-center gap-2">

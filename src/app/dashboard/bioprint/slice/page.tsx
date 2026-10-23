@@ -39,6 +39,7 @@ import { sendToExecute } from "@/lib/bioprint/execute-handoff"
 import { Target, Palette, ShieldCheck, X as XIcon } from "lucide-react"
 import { LayerPreview } from "@/components/slicer/LayerPreview"
 import { FlowCheck } from "@/components/slicer/FlowCheck"
+import { SLICER_RECIPE_KEY, type SlicerRecipeHandoff } from "@/lib/bioprint/print-recommend"
 import { BedStage } from "@/components/slicer/BedStage"
 import { type Orientation, IDENTITY_ORIENTATION, orientMesh } from "@/lib/slicer/mesh-slice"
 import { ANATOMICAL_MODELS, type AnatomicalModel, uniformScaleFor } from "@/lib/slicer/anatomical-library"
@@ -289,6 +290,22 @@ function BioSlicerInner() {
     setResult(null)
   }, [])
 
+  // R26 · receita completa vinda da Fase 2 (PrintParamsCard): parâmetros + extrusão + reologia
+  const [recipeFrom, setRecipeFrom] = useState<SlicerRecipeHandoff | null>(null)
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(SLICER_RECIPE_KEY)
+      if (!raw) return
+      sessionStorage.removeItem(SLICER_RECIPE_KEY)
+      const h = JSON.parse(raw) as SlicerRecipeHandoff
+      setP((p) => ({ ...p, ...h.params }))
+      setX((x) => ({ ...x, kind: "syringe_stepper", ...h.extrusion }))
+      if (h.rheology?.viscosity_PaS || h.rheology?.powerLawN) setRheology({ viscosity_PaS: h.rheology.viscosity_PaS, powerLawN: h.rheology.powerLawN })
+      if (h.application === "calibration") setMode("basic")
+      setRecipeFrom(h)
+    } catch { /* noop */ }
+  }, [])
+
   // R16: hint vindo do Laboratório de Biotintas (receita → objetivo + parâmetros iniciais)
   useEffect(() => {
     try {
@@ -392,6 +409,7 @@ function BioSlicerInner() {
         gcode: r.gcode,
         layerHeightMm: params.layerHeight_mm, printSpeedMmS: params.speedPerimeter_mms, nozzleDiameterUm: Math.round(params.nozzleDiameter_mm * 1000),
         infillPatternId: params.infillPattern, infillPercent: params.infillDensity, skirtLoops: params.skirtLoops,
+        extrusionMultiplier: Xeff.flowMultiplier, walls: params.wallCount,
         cartridgeTempC: params.cartridgeTemp_C, bedTempC: params.bedTemp_C,
         estimate: { totalLayers: r.stats.layerCount, estimatedTimeMin: Math.round(r.stats.estimatedTime_s / 60), estimatedVolumeMl: Math.round(r.stats.volume_uL) / 1000 },
       })
@@ -469,6 +487,17 @@ function BioSlicerInner() {
             {learned.adjustments.map((a, i) => <li key={i}>{a.reason}</li>)}
           </ul>
           <div className="text-[10px] text-gray-500">Os ajustes são aplicados sobre os parâmetros abaixo no momento de fatiar e ficam registrados no cabeçalho do G-code (; APRENDIDO …). Desmarque se quiser repetir exatamente a configuração anterior.</div>
+        </div>
+      )}
+
+      {recipeFrom && (
+        <div className="rounded-xl border border-violet-400/40 bg-violet-500/10 p-3 text-xs flex items-start gap-2">
+          <Sparkles className="w-4 h-4 text-violet-300 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <div className="text-violet-100 font-semibold">Parâmetros carregados da Fase 2 · {recipeFrom.material}</div>
+            <div className="text-gray-300 mt-0.5">Agulha {recipeFrom.params.nozzleDiameter_mm} mm · camada {recipeFrom.params.layerHeight_mm} mm · {recipeFrom.params.speedPerimeter_mms} mm/s · fator {recipeFrom.extrusion.flowMultiplier.toFixed(2)}× · {recipeFrom.params.infillPattern} {recipeFrom.params.infillDensity} % · {recipeFrom.params.wallCount} parede(s) · seringa {recipeFrom.extrusion.syringe?.volume_mL} mL · pré-carga {recipeFrom.extrusion.startPrime_uL} µL. Escolha o modelo 3D (painel 1) e clique em <b>Fatiar</b>.</div>
+          </div>
+          <button onClick={() => setRecipeFrom(null)} className="text-gray-500 hover:text-gray-300"><XIcon className="w-4 h-4" /></button>
         </div>
       )}
 

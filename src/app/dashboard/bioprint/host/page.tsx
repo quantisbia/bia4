@@ -379,6 +379,7 @@ export default function BioHostPage() {
         geometryId={state.model.geometryId ?? (gcodeName ? "draw" : null)}
         params={fbParams}
         materialId={state.bioink.material ?? null}
+        learn={{ material: state.bioink.material, application: state.model.brief?.tissue ?? state.control.tissueType, nozzle_mm: (state.slice.nozzleDiameterUm ?? 410) / 1000, flowFactor: state.slice.extrusionMultiplier ?? 1, infillPattern: state.slice.infillPatternId ?? undefined, wallCount: state.slice.walls ?? undefined, syringe_mL: syringe.volume_mL }}
         onSaved={() => pushLog("info", "📝 Análise registrada — a Fase 3 vai aplicar os ajustes no próximo G-code.")}
       />
     </div>
