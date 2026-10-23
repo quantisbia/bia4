@@ -89,7 +89,7 @@ import { ExtrusionPanel, type ExtrusionState } from "@/components/bioprinter/Ext
 import { TissueViabilityPanel, type TissueState } from "@/components/bioprinter/TissueViabilityPanel"
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection"
 import { suggestStartFlow, rememberGoodFlow, clampFlow, type FlowMemoryEntry } from "@/lib/bioprint/flow-memory"
-import { plungerLimits, plungerLimitsGcode, parseEsteps, pushVolumePlan, type PlungerLimits } from "@/lib/slicer/flow-science"
+import { plungerLimits, parseEsteps, pushVolumePlan, type PlungerLimits } from "@/lib/slicer/flow-science"
 import { parseGcode, type ParsedGcode } from "@/lib/bioprint/toolpath-engine"
 import { DEMO_GYROID_GCODE } from "@/lib/bioprint/demo-gyroid-gcode"
 
@@ -1229,25 +1229,16 @@ export default function BioprintExecutePage() {
         loggerRef.current.warn(`Não foi possível ajustar modo de coordenadas: ${e instanceof Error ? e.message : String(e)}`)
       }
 
-      // R27 · LÊ E-STEPS (M503) E APLICA LIMITES DO ÊMBOLO.
-      //
-      // Por que o êmbolo "não andava" / o fluxo era baixo: o firmware vem com
-      // jerk/aceleração/feed máximo de FILAMENTO (jerk E 5 mm/s, accel 3000+).
-      // Com 2000–9000 steps/mm de seringa, um `G1 E1 F200` pede 7k–30k steps/s
-      // instantâneos → o driver perde passos, o Marlin responde "ok" e nada sai.
-      // Agora: M203 E (teto), M201 E / M204 R (aceleração), M205 E (jerk) são
-      // calculados para ~4000 steps/s a partir dos E-steps reais. Sem M500.
+      // R27.3 · SÓ LÊ os E-steps (M503). A BIA NÃO altera M203/M201/M204/M205
+      // do firmware: velocidade/aceleração/jerk do E ficam como o usuário
+      // configurou na impressora. Os E-steps lidos servem para (a) avisar se
+      // ainda são de filamento e (b) limitar o feed dos comandos que a própria
+      // BIA envia (purga/prime), nunca para reconfigurar a máquina.
       try {
         await controllerRef.current?.sendAndWait("M503 ; ler configuração (E-steps) — R27", 8000)
+        if (!eStepsRef.current) loggerRef.current.warn("M503 não trouxe M92 E — E-steps desconhecidos. Use o painel \"Calibrar E-steps do êmbolo\".", "flow")
       } catch (e) {
-        loggerRef.current.warn(`M503 sem resposta (${e instanceof Error ? e.message : String(e)}) — assumindo 3000 steps/mm no êmbolo.`, "flow")
-      }
-      try {
-        const L = plungerLimits(eStepsRef.current)
-        for (const l of plungerLimitsGcode(L, false)) await controllerRef.current?.sendAndWait(l)
-        loggerRef.current.ok(`Limites do êmbolo aplicados (R27): máx ${L.maxFeed_mms} mm/s · accel ${L.accel_mms2} mm/s² · jerk ${L.jerk_mms} mm/s${L.assumed ? " (E-steps assumidos = 3000 — calibre em Comandos rápidos → E-steps)" : ` (${L.eSteps} steps/mm)`}.`, "flow")
-      } catch (e) {
-        loggerRef.current.warn(`Não foi possível aplicar limites do êmbolo: ${e instanceof Error ? e.message : String(e)}`)
+        loggerRef.current.warn(`M503 sem resposta (${e instanceof Error ? e.message : String(e)}) — E-steps desconhecidos.`, "flow")
       }
 
       // R12.64: PÓS-CONEXÃO REMOVIDO (moveToSafeCenter).
@@ -1855,7 +1846,7 @@ export default function BioprintExecutePage() {
   const onEstepsApplied = useCallback((v: number) => {
     eStepsRef.current = v; setEsteps(v)
     const L = plungerLimits(v)
-    loggerRef.current.ok(`E-steps gravados: ${v} steps/mm → êmbolo máx ${L.maxFeed_mms} mm/s. Teste E+10 de novo: deve andar 10 mm.`, "flow")
+    loggerRef.current.ok(`E-steps gravados: ${v} steps/mm (M92 + M500). Teste E+10 de novo: deve andar 10 mm. (Purgas da BIA limitadas a ${L.maxFeed_mms} mm/s; M203/M201/M205 do firmware não foram alterados.)`, "flow")
   }, [])
 
   const runQuickAction = useCallback(async (cmds: string) => {
@@ -1865,12 +1856,6 @@ export default function BioprintExecutePage() {
     // os 'ok's de cada uma podem ser capturados por outro sendAndWait pendente.
     for (const c of cmds.split("\n")) {
       try { await controllerRef.current.sendAndWait(c) } catch {}
-    }
-    // R27: após M503 (E-steps atualizados pelo onLine), reaplica limites do êmbolo
-    if (/^M503\b/.test(cmds)) {
-      const L = plungerLimits(eStepsRef.current)
-      for (const l of plungerLimitsGcode(L, false)) { try { await controllerRef.current.sendAndWait(l) } catch {} }
-      loggerRef.current.ok(`Limites do êmbolo reaplicados: máx ${L.maxFeed_mms} mm/s (${L.eSteps}${L.assumed ? " assumidos" : ""} steps/mm).`, "flow")
     }
   }, [connected])
 

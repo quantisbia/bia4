@@ -21,7 +21,7 @@ import {
 import { cn } from "@/lib/utils/helpers"
 import {
   MarlinHost, type HostState, type HostProgress, type HostTemps, type HostPosition,
-  macroPrimeUl, macroRetractUl, macroPurge, MACRO_SET_ORIGIN, MACRO_GO_ORIGIN, MACRO_COLD_EXTRUSION, macroPlungerLimits, plungerMaxFeed,
+  macroPrimeUl, macroRetractUl, macroPurge, MACRO_SET_ORIGIN, MACRO_GO_ORIGIN, MACRO_COLD_EXTRUSION, plungerMaxFeed,
 } from "@/lib/host/marlin-host"
 import { PrinterMock } from "@/lib/bioprint/printer-mock"
 import { PrinterConnection, type PrinterTransport } from "@/lib/bioprint/printer-connection"
@@ -147,13 +147,13 @@ export default function BioHostPage() {
       hostRef.current = host
       await host.connect()
       pushLog("info", `conectado (${transport === "mock" ? "simulador" : `USB ${baud} baud`}) · janela ${windowN} · ${firmware}`)
-      // R27 · prepara o eixo E para seringa: E relativo, extrusão a frio, lê E-steps e aplica limites do êmbolo
+      // R27.3 · prepara o eixo E: E relativo, extrusão a frio e LÊ E-steps (M503).
+      // Não altera M203/M201/M204/M205 do firmware.
       if (firmware !== "klipper") {
         try {
           await host.inject("M83"); await host.inject("M302 S0 P1")
           try { await host.inject("M503") } catch { /* alguns firmwares não respondem */ }
-          for (const l of macroPlungerLimits(estepsReadRef.current)) await host.inject(l)
-          pushLog("info", `limites do êmbolo aplicados (R27): máx ${plungerMaxFeed(estepsReadRef.current)} mm/s${estepsReadRef.current ? ` (${estepsReadRef.current} steps/mm)` : " (3000 steps/mm assumidos — calibre abaixo)"}`)
+          if (!estepsReadRef.current) pushLog("warn", "E-steps não lidos — use \"Calibrar E-steps do êmbolo\" abaixo")
         } catch (e) { pushLog("warn", `preparação do eixo E falhou: ${(e as Error).message}`) }
       }
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }

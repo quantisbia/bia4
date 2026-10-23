@@ -2082,6 +2082,9 @@ Janaina Dernowsek (CEO/Founder)
 **Causa.** Firmware com E-steps de filamento (Ender 93 · BMG 415 steps/mm) em extrusor de seringa (fuso + redução → 400–8 000 steps/mm). `G1 E10` manda 930 passos = ~0,3–1 mm de fuso. Nenhum fluxo/M221 compensa isso — e o teto de velocidade R27, derivado dos E-steps lidos, ficava 10× alto.
 **Correção.** `calibrateEsteps(atual, pedido, medido)` em `flow-science.ts` (novo = atual × pedido / medido; valida faixa 400–20 000; gera `M92 E` + `M500` + limites do êmbolo recalculados) e `theoreticalEsteps()` com presets (Enderstruder/Replistruder 0,8 mm → 4 000; T8 2 mm → 1 600; T8 8 mm → 400; T8 8 mm + 5,18:1 → 2 072; M8 1,25 → 2 560). Componente `EstepsCalibrator` (3 passos: Ler M503 → Mover E+5/10/20 a ≤ 0,5 mm/s com M400 → digitar medido → Gravar) no `/execute` (abaixo dos Comandos rápidos) e no BIA Host (painel Seringa). O handshake do `/execute` avisa quando lê E-steps < 400. Após gravar, os limites M203/M201/M204/M205 são reaplicados e o teto do painel de fluxo muda na hora. +3 testes (20 no arquivo R27).
 
+## R27.3 · A BIA não reconfigura o firmware (M203/M201/M204/M205 removidos do automático)
+A pedido: o Host e o G-code **não alteram mais** velocidade máxima, aceleração e jerk do eixo E da impressora. Os E-steps lidos (M503) servem só para avisar se são de filamento e para limitar o feed dos comandos que a própria BIA envia (purga/prime). O calibrador grava **apenas `M92 E` + `M500`**. Quem quiser os limites no G-code usa `writePlungerLimits: true` no perfil (opt-in; `calibrateEsteps().limitsGcode` traz a sugestão).
+
 ## R26 · Formulador simplificado → parâmetros de impressão → aprendizado contínuo
 
 **Problema relatado:** "o formulador de biotinta não está funcionando". A API `/api/biomaterials/formulate-pro` respondia (≈26 s, Gemini), mas o passo 3 *Especificações* era um formulário longo obrigatório antes de gerar — a sensação era de travamento.

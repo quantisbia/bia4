@@ -80,6 +80,11 @@ export interface ExtrusionModel {
   /** R27 · Teto manual da velocidade do êmbolo (mm/s). undefined → derivado dos E-steps. */
   plungerMaxFeed_mms?: number
   /**
+   * R27.3 · Escrever M203/M201/M204/M205 do eixo E no START (opt-in, padrão false).
+   * Por padrão a BIA NÃO altera velocidade/aceleração/jerk do firmware.
+   */
+  writePlungerLimits?: boolean
+  /**
    * R27 · Multiplicador de fluxo da 1ª camada (padrão 1,15): a pressão ainda
    * está subindo e a adesão ao substrato pede cordão um pouco mais cheio.
    */

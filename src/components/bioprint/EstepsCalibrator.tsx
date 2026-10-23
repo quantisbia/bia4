@@ -50,17 +50,16 @@ export function EstepsCalibrator({ connected, busy, currentEsteps, onSend, onApp
   }
   const apply = async () => {
     if (!calib) return
-    setStatus(`Gravando M92 E${calib.newEsteps} + M500 e reaplicando limites do êmbolo…`)
+    setStatus(`Gravando M92 E${calib.newEsteps} + M500 (só os passos — velocidade/aceleração do firmware não mudam)…`)
     await onSend(calib.gcode)
     onApplied?.(calib.newEsteps)
-    setStatus(`✓ Gravado: ${calib.newEsteps} steps/mm · êmbolo máx ${calib.limits.maxFeed_mms} mm/s. Repita o teste de ${requested} mm para confirmar (deve andar ${requested} mm).`)
+    setStatus(`✓ Gravado: ${calib.newEsteps} steps/mm. Repita o teste de ${requested} mm para confirmar (deve andar ${requested} mm).`)
     setMeasured(""); setMoved(false)
   }
   const applyPreset = async () => {
     const p = SYRINGE_EXTRUDER_PRESETS.find((x) => x.id === preset); if (!p) return
-    const L = plungerLimits(p.esteps)
     setStatus(`Gravando preset ${p.label}: M92 E${p.esteps} + M500…`)
-    await onSend([`M92 E${p.esteps}`, "M500", `M203 E${L.maxFeed_mms}`, `M201 E${L.accel_mms2}`, `M204 R${L.accel_mms2}`, `M205 E${L.jerk_mms}`])
+    await onSend([`M92 E${p.esteps}`, "M500"])
     onApplied?.(p.esteps)
     setStatus(`✓ Preset gravado (${p.esteps} steps/mm). Confirme com o teste de ${requested} mm.`)
   }
@@ -117,7 +116,7 @@ export function EstepsCalibrator({ connected, busy, currentEsteps, onSend, onApp
             {calib && (
               <div className={cn("rounded-md px-2.5 py-2 text-[11px] leading-snug border", calib.plausible ? "bg-black/30 border-white/10 text-gray-200" : "bg-amber-500/10 border-amber-400/40 text-amber-100")}>
                 {calib.note}
-                <div className="mt-1 font-mono text-[10.5px] text-gray-400">{calib.gcode.slice(0, 2).join(" · ")} · êmbolo máx {calib.limits.maxFeed_mms} mm/s</div>
+                <div className="mt-1 font-mono text-[10.5px] text-gray-400">{calib.gcode.join(" · ")}</div>
               </div>
             )}
             <button onClick={apply} disabled={dis || !calib || Math.abs(calib.ratio - 1) < 0.05} className="w-full py-2 rounded-md bg-amber-400 hover:bg-amber-300 text-black text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">

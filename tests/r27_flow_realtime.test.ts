@@ -102,12 +102,15 @@ describe("R27 · G-code: sem reset de M221, limites do êmbolo no START, fluxo c
     expect(c.some((l) => /^M22[01]\b/.test(l))).toBe(false)
     expect(isFlowOverrideLine("M221 S150")).toBe(true); expect(isFlowOverrideLine("M220 S80")).toBe(true); expect(isFlowOverrideLine("M2210")).toBe(false)
   })
-  it("START tem M203 E / M201 E / M204 R / M205 E antes da pré-carga", () => {
-    const i203 = c.findIndex((l) => /^M203 E/.test(l))
-    const iPrime = c.findIndex((l, i) => i > 0 && /^G1 E[\d.]+ F\d+$/.test(l))
-    expect(i203).toBeGreaterThan(0)
-    expect(c.some((l) => /^M205 E0\.\d+$/.test(l))).toBe(true)
-    expect(iPrime).toBeGreaterThan(i203)
+  it("R27.3: por padrão NÃO escreve M203/M201/M204/M205 (não reconfigura o firmware); opt-in com writePlungerLimits", () => {
+    expect(c.some((l) => /^M20[1345]\b/.test(l))).toBe(false)
+    const r2 = sliceMesh({ mesh, params: { ...baseParams(0.41), ...pf.params }, extrusion: { ...pf.extrusion, writePlungerLimits: true, eSteps: 2000 }, profileId: pf.id, profileName: pf.name, jobName: "t" })
+    const c2 = cmds(r2.gcode)
+    const i203 = c2.findIndex((l) => /^M203 E2$/.test(l))
+    const iPrime = c2.findIndex((l, i) => i > 0 && /^G1 E[\d.]+ F\d+$/.test(l))
+    expect(i203).toBeGreaterThan(0); expect(iPrime).toBeGreaterThan(i203)
+    expect(c2.some((l) => /^M205 E0\.2$/.test(l))).toBe(true)
+    expect(r2.gcode).not.toMatch(/M500/)
   })
   it("pré-carga em 2 etapas com feed limitado (não mais F9 fixo), total = dead volume + extra", () => {
     const lines = r.gcode.split("\n")
@@ -195,8 +198,8 @@ describe("R27.2 · calibração de E-steps (pedi 10 mm, andou 1 mm)", () => {
     const { calibrateEsteps } = await import("../src/lib/slicer/flow-science")
     const c = calibrateEsteps(93, 10, 1)
     expect(c.newEsteps).toBe(930); expect(c.ratio).toBe(10)
-    expect(c.gcode[0]).toBe("M92 E930"); expect(c.gcode[1]).toBe("M500")
-    expect(c.gcode.some((l) => /^M203 E/.test(l))).toBe(true)
+    expect(c.gcode).toEqual(["M92 E930", "M500"]) // só os passos — não mexe em M203/M201/M205
+    expect(c.limitsGcode.some((l) => /^M203 E/.test(l))).toBe(true) // sugestão separada, opcional
     expect(c.limits.maxFeed_mms).toBeCloseTo(4000 / 930, 2)
     expect(c.note).toMatch(/10× baixos/)
   })

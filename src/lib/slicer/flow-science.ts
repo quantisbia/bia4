@@ -305,8 +305,10 @@ export interface EstepsCalibration {
   ratio: number
   /** limites recalculados para o novo valor */
   limits: PlungerLimits
-  /** linhas a enviar: M92 + M500 + limites */
+  /** linhas a enviar: M92 + M500 (R27.3: NÃO altera M203/M201/M205 do firmware) */
   gcode: string[]
+  /** opcional, para quem quiser: limites M203/M201/M204/M205 sugeridos para o novo valor */
+  limitsGcode: string[]
   /** faixa plausível para seringa (400–20 000)? */
   plausible: boolean
   note: string
@@ -326,7 +328,8 @@ export function calibrateEsteps(current: number | null | undefined, requested_mm
   if (!plausible) note += ` Atenção: ${newE} steps/mm está fora da faixa típica de seringa (400–20 000) — confira a medição e a redução do extrusor.`
   return {
     current: cur, requested_mm: req, measured_mm: meas, newEsteps: newE, ratio, limits,
-    gcode: [`M92 E${newE}`, "M500", ...plungerLimitsGcode(limits, false)],
+    gcode: [`M92 E${newE}`, "M500"],
+    limitsGcode: plungerLimitsGcode(limits, false),
     plausible, note,
   }
 }

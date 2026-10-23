@@ -124,13 +124,15 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
   // biotinta ANTES do stream; um M221 S100 no arquivo zerava esse ajuste no
   // meio do START ("aumentei o fluxo e voltou para 100 %").
   push(`; fluxo (M221) e velocidade (M220) são do HOST — não são redefinidos aqui`)
-  // R27 · LIMITES DO EIXO E PARA SERINGA — o firmware vem com jerk/aceleração
-  // de filamento; com 2 000–9 000 steps/mm o motor perde passos e o êmbolo
-  // não anda ("ok" sem movimento). Sem M500: vale só para este job.
+  // R27.3 · A BIA NÃO reconfigura o firmware (M203/M201/M204/M205) por padrão:
+  // velocidade/aceleração/jerk do E ficam como estão na impressora. LIM é usado
+  // só para limitar o feed dos movimentos só-E que o próprio G-code gera
+  // (pré-carga, prime, retração, purga). `writePlungerLimits: true` escreve
+  // as linhas no START para quem quiser (sem M500).
   const X0 = tools.heads[0].extrusion
   const LIM = plungerLimits(X0.eSteps, X0.plungerMaxFeed_mms)
-  if (X0.kind === "syringe_stepper" && (P.firmware === "marlin" || P.firmware === "reprap")) {
-    push(`; ─── LIMITES DO ÊMBOLO R27 (${LIM.eSteps}${LIM.assumed ? " steps/mm assumidos — calibre no Host" : " steps/mm"}) ───`)
+  if (X0.writePlungerLimits && X0.kind === "syringe_stepper" && (P.firmware === "marlin" || P.firmware === "reprap")) {
+    push(`; ─── LIMITES DO ÊMBOLO (opcional, ${LIM.eSteps} steps/mm) ───`)
     for (const l of plungerLimitsGcode(LIM)) push(l)
   }
   if (P.customStart.trim()) {
