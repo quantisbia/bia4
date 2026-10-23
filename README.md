@@ -145,8 +145,11 @@ Problema nº 1 de bancada: ao clicar em **Bioimprimir**, o fluxo é pouco e **n�
 # Instalar dependências
 npm install
 
-# Build (com limite de memória para sandbox de 1GB)
-NODE_OPTIONS="--max-old-space-size=768" npm run build
+# Build na sandbox de 1 GB (R27.1): precisa de swap + webpack no mesmo processo.
+# Sem isso o worker do webpack é morto pelo kernel (SIGKILL/OOM). Leva ~15 min.
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo /sbin/swapon /swapfile
+NEXT_NO_BUILD_WORKER=1 NODE_OPTIONS="--max-old-space-size=1400" npx next build
+# (na Vercel/CI com ≥ 4 GB basta `npm run build`)
 
 # Desenvolvimento (Vite dev server)
 npm run dev
