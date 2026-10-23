@@ -6,6 +6,11 @@ const nextConfig = {
     // Sandbox com RAM limitada (~1GB): desliga workers paralelos do webpack/build
     workerThreads: false,
     cpus: 1,
+    // R27 · sandbox 1 GB: o worker de build do webpack (processo separado) soma
+    // ao processo pai e estoura a RAM (SIGKILL). NEXT_NO_BUILD_WORKER=1 roda o
+    // webpack no mesmo processo, dentro do --max-old-space-size. Na Vercel fica
+    // o padrão (worker ligado).
+    ...(process.env.NEXT_NO_BUILD_WORKER ? { webpackBuildWorker: false } : {}),
     // R13.15.7 · Inclui /src/content/ebooks/ no bundle serverless da Vercel.
     // Esses PDFs são lidos via fs.readFile() pela rota /api/library/download/[id].
     //
