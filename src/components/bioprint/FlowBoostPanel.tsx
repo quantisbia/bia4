@@ -100,10 +100,10 @@ export function FlowBoostPanel(p: FlowBoostPanelProps) {
               Durante a impressão o comando entra entre duas linhas do G-code (0,1–1 s) e o volume é <b>real</b> — já compensa o M221 ativo.
             </p>
             {eSteps === null && (
-              <p className="text-[10.5px] text-amber-200/90 leading-snug flex gap-1"><AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" /> E-steps não lidos do firmware — êmbolo limitado a {plungerMax_mms ?? 1.33} mm/s (3000 steps/mm assumidos). Use <b>E-steps (M503)</b> nos Comandos rápidos para ler o valor real.</p>
+              <p className="text-[10.5px] text-amber-200/90 leading-snug flex gap-1"><AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" /> E-steps não lidos do firmware — purgas da BIA limitadas a {plungerMax_mms ?? 1.33} mm/s (3000 steps/mm assumidos). Use <b>Calibrar E-steps do êmbolo</b> para ler/gravar o valor real.</p>
             )}
             {typeof eSteps === "number" && plungerMax_mms && (
-              <p className="text-[10px] text-gray-400">E-steps {eSteps} steps/mm · êmbolo máx {plungerMax_mms} mm/s (limites M203/M201/M205 aplicados)</p>
+              <p className="text-[10px] text-gray-400">E-steps {eSteps} steps/mm · purgas da BIA até {plungerMax_mms} mm/s de êmbolo (firmware não alterado)</p>
             )}
           </div>
         )}

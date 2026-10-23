@@ -8,7 +8,7 @@
  * (M92 + M500) e reaplicar os limites do êmbolo. Usado no /execute e no Host.
  */
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Ruler, Save, Play, RefreshCw, AlertTriangle, CheckCircle2 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { calibrateEsteps, SYRINGE_EXTRUDER_PRESETS, plungerLimits } from "@/lib/slicer/flow-science"
@@ -27,12 +27,36 @@ export interface EstepsCalibratorProps {
 
 const inp = "w-full px-2 py-1.5 rounded-md bg-black/40 border border-white/15 text-xs text-gray-100 focus:border-emerald-400/50 outline-none disabled:opacity-40"
 
+/** R27.4 · último valor gravado pela usuária (localStorage) — sobrevive a reconexão/recarga. */
+const MEM_KEY = "bia.esteps.v1"
+export function readEstepsMemory(): { value: number; at: number } | null {
+  try { const r = typeof window !== "undefined" ? window.localStorage.getItem(MEM_KEY) : null; return r ? (JSON.parse(r) as { value: number; at: number }) : null } catch { return null }
+}
+export function writeEstepsMemory(value: number) {
+  try { if (typeof window !== "undefined") window.localStorage.setItem(MEM_KEY, JSON.stringify({ value, at: Date.now() })) } catch { /* noop */ }
+}
+
 export function EstepsCalibrator({ connected, busy, currentEsteps, onSend, onApplied, compact }: EstepsCalibratorProps) {
   const [requested, setRequested] = useState(10)
   const [measured, setMeasured] = useState<string>("")
   const [preset, setPreset] = useState<string>("")
   const [moved, setMoved] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
+  // R27.4 · "já sei o valor" (ex.: 930) + memória do último gravado
+  const [known, setKnown] = useState<string>("")
+  const [memory, setMemory] = useState<{ value: number; at: number } | null>(null)
+  useEffect(() => { setMemory(readEstepsMemory()) }, [])
+  const knownVal = parseFloat(known.replace(",", "."))
+  const knownOk = Number.isFinite(knownVal) && knownVal >= 50 && knownVal <= 50000
+  const applyKnown = async (v: number) => {
+    setStatus(`Gravando M92 E${v} + M500…`)
+    await onSend([`M92 E${v}`, "M500"])
+    writeEstepsMemory(v); setMemory({ value: v, at: Date.now() })
+    onApplied?.(v)
+    setStatus(`✓ Gravado: ${v} steps/mm. Confirme com Mover E+${requested} (deve andar ${requested} mm).`)
+    setKnown("")
+  }
+  const mismatch = memory && currentEsteps !== null && Math.abs(memory.value - currentEsteps) / memory.value > 0.02
 
   const meas = parseFloat(measured.replace(",", "."))
   const calib = useMemo(() => (Number.isFinite(meas) && meas > 0 ? calibrateEsteps(currentEsteps, requested, meas) : null), [currentEsteps, requested, meas])
@@ -52,6 +76,7 @@ export function EstepsCalibrator({ connected, busy, currentEsteps, onSend, onApp
     if (!calib) return
     setStatus(`Gravando M92 E${calib.newEsteps} + M500 (só os passos — velocidade/aceleração do firmware não mudam)…`)
     await onSend(calib.gcode)
+    writeEstepsMemory(calib.newEsteps); setMemory({ value: calib.newEsteps, at: Date.now() })
     onApplied?.(calib.newEsteps)
     setStatus(`✓ Gravado: ${calib.newEsteps} steps/mm. Repita o teste de ${requested} mm para confirmar (deve andar ${requested} mm).`)
     setMeasured(""); setMoved(false)
@@ -60,6 +85,7 @@ export function EstepsCalibrator({ connected, busy, currentEsteps, onSend, onApp
     const p = SYRINGE_EXTRUDER_PRESETS.find((x) => x.id === preset); if (!p) return
     setStatus(`Gravando preset ${p.label}: M92 E${p.esteps} + M500…`)
     await onSend([`M92 E${p.esteps}`, "M500"])
+    writeEstepsMemory(p.esteps); setMemory({ value: p.esteps, at: Date.now() })
     onApplied?.(p.esteps)
     setStatus(`✓ Preset gravado (${p.esteps} steps/mm). Confirme com o teste de ${requested} mm.`)
   }
@@ -83,8 +109,25 @@ export function EstepsCalibrator({ connected, busy, currentEsteps, onSend, onApp
           </p>
         )}
         {!suspicious && currentEsteps === null && (
-          <p className="text-[11px] text-gray-400 leading-snug">Se o êmbolo anda menos do que o pedido (ex.: pede 10 mm, anda 1 mm), os E-steps estão errados. Siga os 3 passos.</p>
+          <p className="text-[11px] text-gray-400 leading-snug">Se o êmbolo anda menos do que o pedido (ex.: pede 10 mm, anda 1 mm), os E-steps estão errados. Siga os 3 passos — ou grave o valor direto se já souber.</p>
         )}
+        {mismatch && (
+          <div className="rounded-md border border-amber-400/40 bg-amber-500/10 px-2.5 py-2 text-[11px] text-amber-100 flex items-center gap-2">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+            <span className="flex-1">Firmware em <b>{currentEsteps}</b>, mas você gravou <b>{memory!.value}</b> da última vez (M500 não salvou ou a EEPROM foi resetada).</span>
+            <button onClick={() => applyKnown(memory!.value)} disabled={dis} className="px-2 py-1 rounded bg-amber-400 text-black font-bold disabled:opacity-40 whitespace-nowrap">Regravar {memory!.value}</button>
+          </div>
+        )}
+
+        {/* R27.4 · já sei o valor */}
+        <div className="rounded-md border border-emerald-400/30 bg-emerald-500/[0.06] px-2.5 py-2 space-y-1.5">
+          <div className="text-[11px] text-emerald-100 font-semibold">Já sei o valor — gravar direto</div>
+          <div className="flex gap-1.5">
+            <input type="number" step={1} min={50} value={known} onChange={(e) => setKnown(e.target.value)} placeholder={memory ? `${memory.value}` : "ex. 930"} className={cn(inp, "font-mono")} disabled={dis} />
+            <button onClick={() => knownOk && applyKnown(knownVal)} disabled={dis || !knownOk} className="px-3 rounded-md bg-emerald-400 hover:bg-emerald-300 text-black text-xs font-bold disabled:opacity-40 whitespace-nowrap flex items-center gap-1"><Save className="w-3.5 h-3.5" /> M92 + M500</button>
+          </div>
+          {memory && <p className="text-[10px] text-gray-400">Último gravado: {memory.value} steps/mm ({new Date(memory.at).toLocaleDateString("pt-BR")}).</p>}
+        </div>
 
         {/* passo 1 */}
         <div className="grid grid-cols-[auto_1fr] gap-2 items-center">

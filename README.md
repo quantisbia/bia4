@@ -2085,6 +2085,9 @@ Janaina Dernowsek (CEO/Founder)
 ## R27.3 · A BIA não reconfigura o firmware (M203/M201/M204/M205 removidos do automático)
 A pedido: o Host e o G-code **não alteram mais** velocidade máxima, aceleração e jerk do eixo E da impressora. Os E-steps lidos (M503) servem só para avisar se são de filamento e para limitar o feed dos comandos que a própria BIA envia (purga/prime). O calibrador grava **apenas `M92 E` + `M500`**. Quem quiser os limites no G-code usa `writePlungerLimits: true` no perfil (opt-in; `calibrateEsteps().limitsGcode` traz a sugestão).
 
+## R27.4 · E-steps: gravar valor conhecido + memória
+Calibrador ganhou **"Já sei o valor — gravar direto"** (ex.: 930 → `M92 E930` + `M500`) e memória em `localStorage` (`bia.esteps.v1`). Ao conectar, o `/execute` compara o M503 com o último valor gravado: se divergir > 2 % avisa "M500 pode não ter salvo" e oferece **Regravar**; se o M503 não responder, usa o valor da memória para limitar as purgas da BIA. Textos do painel de fluxo atualizados (firmware não é alterado).
+
 ## R26 · Formulador simplificado → parâmetros de impressão → aprendizado contínuo
 
 **Problema relatado:** "o formulador de biotinta não está funcionando". A API `/api/biomaterials/formulate-pro` respondia (≈26 s, Gemini), mas o passo 3 *Especificações* era um formulário longo obrigatório antes de gerar — a sensação era de travamento.

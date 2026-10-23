@@ -83,7 +83,7 @@ import { GcodeValidatorPanel } from "@/components/bioprinter/GcodeValidatorPanel
 // dimensões do STL e parâmetros de G-code sem sair da tela).
 import { RegeneratePanel } from "@/components/bioprinter/RegeneratePanel"
 import { FlowBoostPanel } from "@/components/bioprint/FlowBoostPanel"
-import { EstepsCalibrator } from "@/components/bioprint/EstepsCalibrator"
+import { EstepsCalibrator, readEstepsMemory } from "@/components/bioprint/EstepsCalibrator"
 // R22: /control foi unificado aqui — Etapa 4 é UMA página. Painéis avançados herdados:
 import { ExtrusionPanel, type ExtrusionState } from "@/components/bioprinter/ExtrusionPanel"
 import { TissueViabilityPanel, type TissueState } from "@/components/bioprinter/TissueViabilityPanel"
@@ -1239,6 +1239,18 @@ export default function BioprintExecutePage() {
         if (!eStepsRef.current) loggerRef.current.warn("M503 não trouxe M92 E — E-steps desconhecidos. Use o painel \"Calibrar E-steps do êmbolo\".", "flow")
       } catch (e) {
         loggerRef.current.warn(`M503 sem resposta (${e instanceof Error ? e.message : String(e)}) — E-steps desconhecidos.`, "flow")
+      }
+      // R27.4 · compara com o último valor gravado pela usuária (localStorage)
+      {
+        const mem = readEstepsMemory()
+        if (mem) {
+          if (!eStepsRef.current) {
+            eStepsRef.current = mem.value; setEsteps(mem.value)
+            loggerRef.current.info(`Usando E-steps da última calibração (${mem.value} steps/mm) para limitar as purgas da BIA.`, "flow")
+          } else if (Math.abs(eStepsRef.current - mem.value) / mem.value > 0.02) {
+            loggerRef.current.warn(`⚠ Firmware está com ${eStepsRef.current} steps/mm, mas você gravou ${mem.value} da última vez — o M500 pode não ter salvo. Regrave no painel "Calibrar E-steps do êmbolo".`, "flow")
+          }
+        }
       }
 
       // R12.64: PÓS-CONEXÃO REMOVIDO (moveToSafeCenter).
