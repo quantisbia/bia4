@@ -46,7 +46,7 @@ export interface LearningRow {
   effectiveFactor: number
 }
 
-export const normalizeMaterial = (m: string) => m.toLowerCase().replace(/\s+/g, " ").replace(/[%,]/g, "").trim()
+export const normalizeMaterial = (m: string) => m.toLowerCase().replace(/[%,]/g, "").replace(/\s+/g, " ").trim()
 
 function load(): LearningRow[] {
   if (typeof window === "undefined") return []

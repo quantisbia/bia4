@@ -22,6 +22,8 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { useBioprintProcess } from "@/lib/bioprint/process-context"
+import { PrintParamsCard } from "@/components/bioink/PrintParamsCard"
+import { applicationFromText } from "@/lib/bioprint/print-recommend"
 import {
   RECIPES, GOAL_LABELS, CELL_LABELS, ZONE_LABELS, DEFAULT_EQUIPMENT,
   recommend, pickAlternatives, evaluateRecipeWindow, planBench, relevantTroubles,
@@ -181,7 +183,27 @@ export function BioinkGuidedLab() {
           <StepRecipe lab={lab} chosen={chosen} chosenRec={chosenRec} recs={recs} alternatives={alternatives} win={win} onPick={pickRecipe} onBack={() => setStep(1)} onNext={goStep3} />
         )}
         {step === 3 && chosen && bench && win && (
-          <StepBench lab={lab} set={set} chosen={chosen} bench={bench} win={win} hasCells={hasCells} cellDensity={cellDensityClamped} troubles={troubles} onBack={() => setStep(2)} onDownload={downloadMd} onCopy={copyMd} onSend={sendToPipeline} />
+          <>
+            <StepBench lab={lab} set={set} chosen={chosen} bench={bench} win={win} hasCells={hasCells} cellDensity={cellDensityClamped} troubles={troubles} onBack={() => setStep(2)} onDownload={downloadMd} onCopy={copyMd} onSend={sendToPipeline} />
+            {/* R26 · parâmetros de impressão recomendados + ir ao fatiamento já configurado */}
+            <div className="mt-4">
+              <PrintParamsCard
+                source="lab"
+                compact
+                facts={{
+                  material: chosen.name, viscosity_PaS: chosen.rheology.viscosity_PaS, powerLawN: chosen.rheology.powerLawN, yieldStress_Pa: chosen.rheology.yieldStress_Pa,
+                  crosslink: chosen.crosslink, printTemp_C: chosen.printTemp_C, hasCells, nozzle_mm: lab.equipment.nozzle_mm ?? chosen.startParams.nozzle_mm,
+                  application: applicationFromText(state.model.brief?.tissue ?? GOAL_LABELS[lab.goal]?.label ?? chosen.goals[0]),
+                }}
+                onBeforeGo={() => {
+                  const patch = toBioinkPatch(chosen, lab.cell, hasCells ? cellDensityClamped : null)
+                  const { labRecipeId, labPrintTemp_C, labStartParams, ...ctxPatch } = patch
+                  void labRecipeId; void labPrintTemp_C; void labStartParams
+                  updateBioink(ctxPatch)
+                }}
+              />
+            </div>
+          </>
         )}
       </main>
 

@@ -216,10 +216,10 @@ export default function ReviewPage() {
         </div>
       </section>
 
-      {/* Lista de análises (laço fechado) */}
-        {/* R26 · memória de bioimpressão */}
-        <LearningTable />
+      {/* R26 · memória de bioimpressão (tabela de aprendizado) */}
+      <LearningTable />
 
+      {/* Lista de análises (laço fechado) */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-white flex items-center gap-2">

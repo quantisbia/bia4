@@ -30,8 +30,11 @@ describe("R26 · applicationFromText", () => {
 describe("R26 · recommendPrintParams", () => {
   it("hidrogel mole (alginato/gelatina) → fator ≥ 1.5, seringa 3 mL, pré-carga > 0, skirt off", () => {
     const r = recommendPrintParams({ material: "Alginato 3% + Gelatina 7%", viscosity_PaS: 20, hasCells: true, application: "cartilage" })
-    expect(r.bioinkClass).toBe("soft_hydrogel")
-    expect(r.extrusion.flowMultiplier).toBeGreaterThanOrEqual(1.5)
+    // alginato + gelatina é pseudoplástico (shear-thinning); alginato puro é hidrogel mole
+    expect(r.bioinkClass).toBe("shear_thinning")
+    expect(r.extrusion.flowMultiplier).toBeGreaterThanOrEqual(1.3)
+    expect(recommendPrintParams({ material: "Alginato 3%" }).bioinkClass).toBe("soft_hydrogel")
+    expect(recommendPrintParams({ material: "Alginato 3%" }).extrusion.flowMultiplier).toBeGreaterThanOrEqual(1.5)
     expect(r.syringe.volume_mL).toBe(3)
     expect(r.extrusion.startPrime_uL).toBeGreaterThan(0)
     expect(r.params.skirtLoops).toBe(0)

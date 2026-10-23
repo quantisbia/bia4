@@ -2065,3 +2065,15 @@ Janaina Dernowsek (CEO/Founder)
 - BioSlicer e Desenhar & Imprimir: painel **"Vai sair biotinta?"** (`FlowCheck`) em tempo real — vazão, êmbolo, E/mm, pré-carga, seletor de classe, botões "Aplicar fator" e "Usar seringa 3 mL". `sliceMesh` emite `flow_very_low` / `flow_low` / `flow_high`.
 - Fase 4 (`/execute` e BIA Host): M221 até **999 %** (limite Marlin), saltos proporcionais (+50/+100/+150) e botões **"Empurre biotinta agora +20/+50/+100 µL"** (G1 E volumétrico via M83, funciona parado ou durante o stream) — independe do M221 e é o que faz o filamento aparecer na ponta.
 - Testes: `tests/r25_flow_science.test.ts` (12). 1783 verdes.
+
+## R26 · Formulador simplificado → parâmetros de impressão → aprendizado contínuo
+
+**Problema relatado:** "o formulador de biotinta não está funcionando". A API `/api/biomaterials/formulate-pro` respondia (≈26 s, Gemini), mas o passo 3 *Especificações* era um formulário longo obrigatório antes de gerar — a sensação era de travamento.
+
+**O que mudou**
+1. **Formulador Pro simplificado** — no passo 2 (Componentes) já existe **"Gerar formulação (10 créditos)"**; *Especificações avançadas* ficou opcional.
+2. **Parâmetros de impressão recomendados** (`src/lib/bioprint/print-recommend.ts` + `PrintParamsCard`) — ao final de **qualquer** biotinta (receitas, laboratório guiado, formulação livre, Pro) o card **"Com esta biotinta, imprima assim"** mostra, com o porquê e referência: agulha, seringa, altura de camada, largura de linha, velocidades (perímetro / infill / 1ª camada), **fator de extrusão**, pré-carga, **retração / prime**, **preenchimento (padrão + %) por aplicação**, **paredes**, **skirt**, temperaturas.
+3. **"Ir ao Fatiamento com estes parâmetros"** — handoff via `sessionStorage["bia:slicer-recipe"]`; o BioSlicer (`/dashboard/bioprint/slice?recipe=1`) abre configurado e mostra o banner *Parâmetros carregados da Fase 2*.
+4. **Tabela de aprendizado** (`src/lib/bioprint/learning-table.ts`, Prisma `PrintLearning`, `/api/learning`) — após cada bioimpressão (Fase 4: `/execute` e BIA Host) o modal pergunta **"1. A biotinta saiu da agulha e formou cordão?"** (sim / não / em excesso) e **"2. Como foi a bioimpressão?"** (nota 1–5 + relato). Cada resposta vira uma linha *material × aplicação × geometria → parâmetros, fluiu?, nota, sintomas, ajustes, fator efetivo*. Na próxima biotinta igual, o card aplica a mediana das impressões boas (nota ≥ 4) e os ajustes pendentes da última ruim ("não fluiu" → fator ×1,25, prime +1 µL). Fase 5 (`/review`) exibe a tabela com estatísticas por material e exportação CSV.
+
+**Validação:** vitest 1798/1798 (56 arquivos, inclui `tests/r26_print_recommend_learning.test.ts`); tsc focado e eslint limpos nos arquivos alterados; migração `20261023000001_r26_print_learning` aplicada no Neon.

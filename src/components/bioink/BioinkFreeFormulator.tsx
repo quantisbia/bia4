@@ -30,6 +30,8 @@ import { cn } from "@/lib/utils/helpers"
 import { useBioprintProcess, type BioinkRole, type BioinkFormulation } from "@/lib/bioprint/process-context"
 // R12.68 · ExportBar universal + adapter da Biotinta (Bioink)
 import { ExportBar } from "@/components/notebook/ExportBar"
+import { PrintParamsCard } from "@/components/bioink/PrintParamsCard"
+import { applicationFromText } from "@/lib/bioprint/print-recommend"
 import { buildContentFromBioinkDrafts } from "@/lib/export/adapters/bioink-adapter"
 
 // ─── Constantes da biotinta (importadas da página antiga, agora aqui) ─────
@@ -647,13 +649,29 @@ export function BioinkFreeFormulator() {
           />
         )}
         {tab === "rheology" && (
-          <RheologyPanel
-            rheology={rheology}
-            nozzleUm={nozzleUm}            onNozzleChange={setNozzleUm}
-            printSpeedMmS={printSpeedMmS}  onPrintSpeedChange={setPrintSpeedMmS}
-            materialLabel={matPreset.label}
-            concentration={activeDraft.concentration}
-          />
+          <>
+            <RheologyPanel
+              rheology={rheology}
+              nozzleUm={nozzleUm}            onNozzleChange={setNozzleUm}
+              printSpeedMmS={printSpeedMmS}  onPrintSpeedChange={setPrintSpeedMmS}
+              materialLabel={matPreset.label}
+              concentration={activeDraft.concentration}
+            />
+            {/* R26 · da reologia aos parâmetros de impressão + ir ao fatiamento já configurado */}
+            <div className="mt-4">
+              <PrintParamsCard
+                source="free"
+                compact
+                facts={{
+                  material: `${matPreset.label} ${activeDraft.concentration}%`,
+                  viscosity_PaS: rheology.viscosityPaS, yieldStress_Pa: rheology.yieldStressPa,
+                  crosslink: activeDraft.crosslinker || null,
+                  hasCells: activeDraft.hasCells, nozzle_mm: nozzleUm / 1000,
+                  application: applicationFromText(state.model.brief?.tissue ?? state.control.tissueType),
+                }}
+              />
+            </div>
+          </>
         )}
       </main>
 
