@@ -83,6 +83,7 @@ import { GcodeValidatorPanel } from "@/components/bioprinter/GcodeValidatorPanel
 // dimensões do STL e parâmetros de G-code sem sair da tela).
 import { RegeneratePanel } from "@/components/bioprinter/RegeneratePanel"
 import { FlowBoostPanel } from "@/components/bioprint/FlowBoostPanel"
+import { EstepsCalibrator } from "@/components/bioprint/EstepsCalibrator"
 // R22: /control foi unificado aqui — Etapa 4 é UMA página. Painéis avançados herdados:
 import { ExtrusionPanel, type ExtrusionState } from "@/components/bioprinter/ExtrusionPanel"
 import { TissueViabilityPanel, type TissueState } from "@/components/bioprinter/TissueViabilityPanel"
@@ -1095,6 +1096,8 @@ export default function BioprintExecutePage() {
               eStepsRef.current = v; setEsteps(v)
               const L = plungerLimits(v)
               loggerRef.current.ok(`E-steps lidos do firmware: ${v} steps/mm → êmbolo máx ${L.maxFeed_mms} mm/s (${L.stepRate} steps/s).`, "flow")
+              // R27.2 · valor de FILAMENTO (< 400) num extrusor de seringa = "pedi 10 mm, andou 1 mm"
+              if (v < 400) loggerRef.current.warn(`⚠ ${v} steps/mm é E-steps de FILAMENTO. Extrusor de seringa precisa de 400–8000 — por isso o êmbolo anda ~${(v / 1000).toFixed(1)}–${(v / 400).toFixed(1)}× menos que o pedido. Calibre no painel "Calibrar E-steps do êmbolo" (coluna direita).`, "flow")
             }
           },
         },
@@ -1840,6 +1843,20 @@ export default function BioprintExecutePage() {
     { label: "M84 Off",       cmd: "M84",                      title: "Disable steppers" },
     { label: "Cool All",      cmd: "M104 S0\nM140 S0\nM141 S0", title: "Desliga todos os aquecedores" },
   ]
+
+  // R27.2 · envia linhas em sequência (sendAndWait) para o calibrador de E-steps
+  const sendLines = useCallback(async (lines: string[]) => {
+    const ctrl = controllerRef.current
+    if (!ctrl || !connected) return
+    for (const l of lines) {
+      try { await ctrl.sendAndWait(l, /^(G1 E|M400)/.test(l) ? 120000 : 10000) } catch (e) { loggerRef.current.warn(`${l} → ${e instanceof Error ? e.message : String(e)}`) }
+    }
+  }, [connected])
+  const onEstepsApplied = useCallback((v: number) => {
+    eStepsRef.current = v; setEsteps(v)
+    const L = plungerLimits(v)
+    loggerRef.current.ok(`E-steps gravados: ${v} steps/mm → êmbolo máx ${L.maxFeed_mms} mm/s. Teste E+10 de novo: deve andar 10 mm.`, "flow")
+  }, [])
 
   const runQuickAction = useCallback(async (cmds: string) => {
     if (!controllerRef.current || !connected) return
@@ -3642,6 +3659,9 @@ export default function BioprintExecutePage() {
               </button>
             </div>
           </Panel>
+
+          {/* ── R27.2 · Calibrar E-steps ("pedi 10 mm, andou 1 mm") ── */}
+          <EstepsCalibrator connected={connected} busy={isStreaming || isHandshaking} currentEsteps={eSteps} onSend={sendLines} onApplied={onEstepsApplied} compact />
 
           {/* ── Terminal Serial ──────────────────────────────────── */}
           <Panel

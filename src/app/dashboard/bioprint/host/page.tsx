@@ -21,13 +21,14 @@ import {
 import { cn } from "@/lib/utils/helpers"
 import {
   MarlinHost, type HostState, type HostProgress, type HostTemps, type HostPosition,
-  macroPrimeUl, macroRetractUl, macroPurge, MACRO_SET_ORIGIN, MACRO_GO_ORIGIN, MACRO_COLD_EXTRUSION, MACRO_ESTEP_TEST, MACRO_READ_SETTINGS, macroSetEsteps, macroPlungerLimits, plungerMaxFeed,
+  macroPrimeUl, macroRetractUl, macroPurge, MACRO_SET_ORIGIN, MACRO_GO_ORIGIN, MACRO_COLD_EXTRUSION, macroPlungerLimits, plungerMaxFeed,
 } from "@/lib/host/marlin-host"
 import { PrinterMock } from "@/lib/bioprint/printer-mock"
 import { PrinterConnection, type PrinterTransport } from "@/lib/bioprint/printer-connection"
 import { SYRINGE_CATALOG, syringeArea_mm2 } from "@/lib/slicer/extrusion"
 import { useBioprintProcess } from "@/lib/bioprint/process-context"
 import { FlowBoostPanel } from "@/components/bioprint/FlowBoostPanel"
+import { EstepsCalibrator } from "@/components/bioprint/EstepsCalibrator"
 import { suggestStartFlow, rememberGoodFlow, clampFlow, type FlowMemoryEntry } from "@/lib/bioprint/flow-memory"
 import { PrintFeedbackModal } from "@/components/bioprint/PrintFeedbackModal"
 import { inferTissueFromGeometry, type PresetParams } from "@/lib/bioprint/tissue-presets"
@@ -74,7 +75,6 @@ export default function BioHostPage() {
   const [flowMemory, setFlowMemory] = useState<FlowMemoryEntry | null>(null)
   const flowStartRef = useRef(100)
   const [speed, setSpeed] = useState(100)
-  const [esteps, setEsteps] = useState(2000)
   // R27 · E-steps lidos do firmware (M503) — null = assumidos 3000
   const [estepsRead, setEstepsRead] = useState<number | null>(null)
   const estepsReadRef = useRef<number | null>(null)
@@ -132,7 +132,7 @@ export default function BioHostPage() {
         onProgress: setProg,
         onLog: (k, t) => {
           // R27 · captura E-steps do echo do M503/M92
-          if (k === "rx") { const m = t.match(/\bM92\b[^\n]*?\bE(-?[\d.]+)/); const v = m ? parseFloat(m[1]) : NaN; if (Number.isFinite(v) && v > 0 && v !== estepsReadRef.current) { estepsReadRef.current = v; setEstepsRead(v); setEsteps(v); pushLog("info", `E-steps lidos: ${v} steps/mm → êmbolo máx ${plungerMaxFeed(v)} mm/s`) } }
+          if (k === "rx") { const m = t.match(/\bM92\b[^\n]*?\bE(-?[\d.]+)/); const v = m ? parseFloat(m[1]) : NaN; if (Number.isFinite(v) && v > 0 && v !== estepsReadRef.current) { estepsReadRef.current = v; setEstepsRead(v); pushLog("info", `E-steps lidos: ${v} steps/mm → êmbolo máx ${plungerMaxFeed(v)} mm/s`) } }
           if (k === "tx" && !showTxRef.current) return; if (k === "rx" && /^ok\s*$/.test(t)) return; pushLog(k, t)
         },
         onFinished: (ok, r) => {
@@ -307,20 +307,10 @@ export default function BioHostPage() {
               <button onClick={() => jogE(eStep)} disabled={!connected} className="px-2 py-1 rounded border border-white/10 disabled:opacity-40">E+</button>
               <button onClick={() => jogE(-eStep)} disabled={!connected} className="px-2 py-1 rounded border border-white/10 disabled:opacity-40">E−</button>
             </div>
-            <details className="mt-2 text-xs">
-              <summary className="cursor-pointer text-gray-300">Calibrar E-steps (seringa)</summary>
-              <ol className="mt-1 text-gray-400 list-decimal pl-4 space-y-1">
-                <li>Marque o êmbolo e clique <b>Mover 10 mm</b>.</li>
-                <li>Meça quanto andou (d). Novo = atual × 10 / d.</li>
-                <li>Digite e aplique (M92 + M500).</li>
-              </ol>
-              <div className="mt-1.5 flex gap-1.5 flex-wrap">
-                <button onClick={() => send(MACRO_READ_SETTINGS)} disabled={!connected} className="px-2 py-1 rounded border border-white/10 disabled:opacity-40">Ler (M503)</button>
-                <button onClick={() => send(MACRO_ESTEP_TEST)} disabled={!connected} className="px-2 py-1 rounded border border-white/10 disabled:opacity-40">Mover 10 mm (20 s)</button>
-                <input type="number" value={esteps} onChange={(e) => setEsteps(+e.target.value)} className={cn(inp, "w-24")} />
-                <button onClick={() => { void send([...macroSetEsteps(esteps), ...macroPlungerLimits(esteps)]); estepsReadRef.current = esteps; setEstepsRead(esteps) }} disabled={!connected} className="px-2 py-1 rounded bg-amber-500/20 border border-amber-400/40 disabled:opacity-40">Aplicar M92 + limites</button>
-              </div>
-            </details>
+            <div className="mt-2">
+              <EstepsCalibrator connected={connected} busy={printing} currentEsteps={estepsRead} onSend={send}
+                onApplied={(v) => { estepsReadRef.current = v; setEstepsRead(v); pushLog("info", `E-steps gravados: ${v} steps/mm → êmbolo máx ${plungerMaxFeed(v)} mm/s`) }} compact />
+            </div>
           </Panel>
 
           <FlowBoostPanel

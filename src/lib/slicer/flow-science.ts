@@ -283,6 +283,70 @@ export function purgePlan(rate_uLs: number, seconds: number, syringeArea_mm2: nu
   return pushVolumePlan(rate_uLs * seconds, syringeArea_mm2, L, flowPercent, rate_uLs)
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+ *  R27.2 · Calibração de E-steps (pedi 10 mm, andou 1 mm)
+ *  ─────────────────────────────────────────────────────────────────────
+ *  O Marlin vem com E-steps de FILAMENTO (Ender: 93; BMG: 415). Um extrusor
+ *  de seringa com fuso trapezoidal (2–8 mm/volta) e redução 1:1 a 5:1 num
+ *  Nema17 a 16 µsteps precisa de 400–8 000 steps/mm:
+ *      steps/mm = 200 × µsteps × redução / passo_do_fuso
+ *  Com 93 steps/mm configurados, `G1 E10` manda 930 passos — que no fuso
+ *  M8 (1,25 mm/volta, 3 200 steps/mm) são apenas 0,29 mm. Daí "10 → 1 mm".
+ *  Regra: novo = atual × pedido / medido. Grava com M92 E<novo> + M500.
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+export interface EstepsCalibration {
+  current: number
+  requested_mm: number
+  measured_mm: number
+  /** novo valor de M92 E */
+  newEsteps: number
+  /** quanto o eixo estava errado (×) */
+  ratio: number
+  /** limites recalculados para o novo valor */
+  limits: PlungerLimits
+  /** linhas a enviar: M92 + M500 + limites */
+  gcode: string[]
+  /** faixa plausível para seringa (400–20 000)? */
+  plausible: boolean
+  note: string
+}
+
+export function calibrateEsteps(current: number | null | undefined, requested_mm: number, measured_mm: number): EstepsCalibration {
+  const cur = current && current > 0 ? current : ASSUMED_SYRINGE_ESTEPS
+  const req = Math.max(0.1, requested_mm), meas = Math.max(0.01, measured_mm)
+  const newE = Math.round((cur * req / meas) * 100) / 100
+  const ratio = Math.round((req / meas) * 100) / 100
+  const limits = plungerLimits(newE)
+  const plausible = newE >= 400 && newE <= 20000
+  let note = ""
+  if (ratio > 1.05) note = `O êmbolo andou ${meas} mm em vez de ${req} mm (${ratio}× menos): os E-steps estavam ${ratio}× baixos — provavelmente ainda de filamento. Novo valor: ${newE} steps/mm.`
+  else if (ratio < 0.95) note = `O êmbolo andou ${meas} mm em vez de ${req} mm (${(1 / ratio).toFixed(2)}× mais): E-steps ${(1 / ratio).toFixed(2)}× altos. Novo valor: ${newE} steps/mm.`
+  else note = `Dentro de 5 % — E-steps já calibrados (${newE} steps/mm).`
+  if (!plausible) note += ` Atenção: ${newE} steps/mm está fora da faixa típica de seringa (400–20 000) — confira a medição e a redução do extrusor.`
+  return {
+    current: cur, requested_mm: req, measured_mm: meas, newEsteps: newE, ratio, limits,
+    gcode: [`M92 E${newE}`, "M500", ...plungerLimitsGcode(limits, false)],
+    plausible, note,
+  }
+}
+
+/** E-steps teóricos de um extrusor de seringa: motor × microsteps × redução ÷ passo do fuso. */
+export function theoreticalEsteps(opts: { motorSteps?: number; microsteps?: number; gearRatio?: number; leadscrewPitch_mm: number }): number {
+  const { motorSteps = 200, microsteps = 16, gearRatio = 1 } = opts
+  return Math.round((motorSteps * microsteps * gearRatio) / Math.max(0.1, opts.leadscrewPitch_mm) * 100) / 100
+}
+
+/** Presets de extrusores de seringa comuns (fuso em mm/volta, redução). */
+export const SYRINGE_EXTRUDER_PRESETS: Array<{ id: string; label: string; leadscrewPitch_mm: number; gearRatio: number; esteps: number }> = [
+  { id: "enderstruder", label: "Enderstruder (fuso M5 0,8 mm/volta, direto)", leadscrewPitch_mm: 0.8, gearRatio: 1, esteps: theoreticalEsteps({ leadscrewPitch_mm: 0.8 }) },
+  { id: "replistruder4", label: "Replistruder 4 (fuso M5, redução 1:1)", leadscrewPitch_mm: 0.8, gearRatio: 1, esteps: theoreticalEsteps({ leadscrewPitch_mm: 0.8 }) },
+  { id: "t8_2mm", label: "Fuso T8 2 mm/volta (1 entrada), direto", leadscrewPitch_mm: 2, gearRatio: 1, esteps: theoreticalEsteps({ leadscrewPitch_mm: 2 }) },
+  { id: "t8_8mm", label: "Fuso T8 8 mm/volta (4 entradas), direto", leadscrewPitch_mm: 8, gearRatio: 1, esteps: theoreticalEsteps({ leadscrewPitch_mm: 8 }) },
+  { id: "t8_8mm_5_1", label: "Fuso T8 8 mm/volta + redução 5,18:1 (Nema17 planetário)", leadscrewPitch_mm: 8, gearRatio: 5.18, esteps: theoreticalEsteps({ leadscrewPitch_mm: 8, gearRatio: 5.18 }) },
+  { id: "m8_125", label: "Rosca M8 1,25 mm/volta, direto", leadscrewPitch_mm: 1.25, gearRatio: 1, esteps: theoreticalEsteps({ leadscrewPitch_mm: 1.25 }) },
+]
+
 /** Remove overrides de fluxo/velocidade (M220/M221) de um G-code — o host aplica os seus. */
 export function isFlowOverrideLine(cmd: string): boolean {
   return /^\s*M22[01]\b/i.test(cmd)

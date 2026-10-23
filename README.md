@@ -2078,6 +2078,10 @@ Janaina Dernowsek (CEO/Founder)
 **UI.** `/execute`: handshake lê M503 → aplica limites; Comandos rápidos **E-steps (M503)** e **Teste 10 mm E**; `FlowBoostPanel` mostra E-steps/teto e avisa quando assumidos (3000). BIA Host: prepara eixo E ao conectar (M83, M302, M503, limites), **Purgar 30 µL (3 s)**, **Ler (M503)**, **Aplicar M92 + limites**. BioSlicer → Extrusão: campos **E-steps** e **Fluxo da 1ª camada**.
 **Testes.** `tests/r27_flow_realtime.test.ts` (17): limites, parse M503, compensação M221, G-code sem M22x e com M203/M205, feed ≤ teto em todo G1 só-E, sem G4/des-prime por caminho, 1ª camada 1,15×, host ignora M22x do arquivo e mantém o M221 injetado. 1815 verdes.
 
+## R27.2 · "E+10 anda 1 mm" → calibrador de E-steps do êmbolo
+**Causa.** Firmware com E-steps de filamento (Ender 93 · BMG 415 steps/mm) em extrusor de seringa (fuso + redução → 400–8 000 steps/mm). `G1 E10` manda 930 passos = ~0,3–1 mm de fuso. Nenhum fluxo/M221 compensa isso — e o teto de velocidade R27, derivado dos E-steps lidos, ficava 10× alto.
+**Correção.** `calibrateEsteps(atual, pedido, medido)` em `flow-science.ts` (novo = atual × pedido / medido; valida faixa 400–20 000; gera `M92 E` + `M500` + limites do êmbolo recalculados) e `theoreticalEsteps()` com presets (Enderstruder/Replistruder 0,8 mm → 4 000; T8 2 mm → 1 600; T8 8 mm → 400; T8 8 mm + 5,18:1 → 2 072; M8 1,25 → 2 560). Componente `EstepsCalibrator` (3 passos: Ler M503 → Mover E+5/10/20 a ≤ 0,5 mm/s com M400 → digitar medido → Gravar) no `/execute` (abaixo dos Comandos rápidos) e no BIA Host (painel Seringa). O handshake do `/execute` avisa quando lê E-steps < 400. Após gravar, os limites M203/M201/M204/M205 são reaplicados e o teto do painel de fluxo muda na hora. +3 testes (20 no arquivo R27).
+
 ## R26 · Formulador simplificado → parâmetros de impressão → aprendizado contínuo
 
 **Problema relatado:** "o formulador de biotinta não está funcionando". A API `/api/biomaterials/formulate-pro` respondia (≈26 s, Gemini), mas o passo 3 *Especificações* era um formulário longo obrigatório antes de gerar — a sensação era de travamento.

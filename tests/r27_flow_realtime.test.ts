@@ -189,3 +189,29 @@ describe("R27 · host ignora M220/M221 do arquivo; macros seguras", () => {
     expect(+(/F(\d+)/.exec(m[1])![1])).toBeLessThanOrEqual(80)
   })
 })
+
+describe("R27.2 · calibração de E-steps (pedi 10 mm, andou 1 mm)", () => {
+  it("93 steps/mm (filamento) com 10 → 1 mm vira 930 steps/mm e ratio 10×", async () => {
+    const { calibrateEsteps } = await import("../src/lib/slicer/flow-science")
+    const c = calibrateEsteps(93, 10, 1)
+    expect(c.newEsteps).toBe(930); expect(c.ratio).toBe(10)
+    expect(c.gcode[0]).toBe("M92 E930"); expect(c.gcode[1]).toBe("M500")
+    expect(c.gcode.some((l) => /^M203 E/.test(l))).toBe(true)
+    expect(c.limits.maxFeed_mms).toBeCloseTo(4000 / 930, 2)
+    expect(c.note).toMatch(/10× baixos/)
+  })
+  it("sem leitura (null) assume 3000; andou 10,2 de 10 → dentro de 5 %; valores fora de 400–20000 avisam", async () => {
+    const { calibrateEsteps } = await import("../src/lib/slicer/flow-science")
+    const ok = calibrateEsteps(null, 10, 10.2)
+    expect(ok.current).toBe(3000); expect(ok.note).toMatch(/já calibrados/)
+    const bad = calibrateEsteps(93, 10, 50)
+    expect(bad.plausible).toBe(false); expect(bad.note).toMatch(/fora da faixa/)
+  })
+  it("E-steps teóricos: fuso 0,8 mm/volta direto = 4000; T8 8 mm = 400; T8 8 mm + 5,18:1 = 2072", async () => {
+    const { theoreticalEsteps, SYRINGE_EXTRUDER_PRESETS } = await import("../src/lib/slicer/flow-science")
+    expect(theoreticalEsteps({ leadscrewPitch_mm: 0.8 })).toBe(4000)
+    expect(theoreticalEsteps({ leadscrewPitch_mm: 8 })).toBe(400)
+    expect(theoreticalEsteps({ leadscrewPitch_mm: 8, gearRatio: 5.18 })).toBe(2072)
+    for (const p of SYRINGE_EXTRUDER_PRESETS) { expect(p.esteps).toBeGreaterThanOrEqual(400); expect(p.esteps).toBeLessThanOrEqual(20000) }
+  })
+})

@@ -188,7 +188,7 @@ export function ChapterBioprintExecute() {
             <li><strong>Puxa-empurra a cada linha.</strong> Cada caminho fazia prime → pausa 150 ms → cordão → "des-prime". Em gel isso não repõe pressão e cria uma pausa seca por linha. Agora o fluxo é contínuo: prime só quando a pressão caiu de verdade (1º cordão, após retração ou travel longo), e a 1ª camada sai com 1,15× de fluxo.</li>
             <li><strong>"Empurrar biotinta agora" é volume real.</strong> +20/+50/+100 µL compensam o M221 ativo (o Marlin multiplica também movimentos só-E) e saem a ~10 µL/s dentro do teto do êmbolo. Durante a impressão o comando entra entre duas linhas (0,1–1 s).</li>
           </ul>
-          <p className="text-[11px] text-gray-400">Se o painel mostrar "E-steps não lidos", use <em>Comandos rápidos → E-steps (M503)</em>; para calibrar, <em>Teste 10 mm E</em> (marque o êmbolo, meça, novo = atual × 10 / medido, aplique com <code>M92 E…</code> + <code>M500</code>).</p>
+          <p className="text-[11px] text-gray-400"><strong className="text-amber-200">"Cliquei E+10 e o fuso andou 1 mm"</strong> = E-steps de <em>filamento</em> (Ender 93, BMG 415) num extrusor de seringa, que precisa de 400–8 000 steps/mm (200 × 16 µsteps × redução ÷ passo do fuso). Use o painel <em>Calibrar E-steps do êmbolo</em> (coluna direita): 1) Ler (M503) · 2) Mover E+10 · 3) digitar quanto andou → a BIA calcula novo = atual × 10 / medido e grava <code>M92 E…</code> + <code>M500</code> + limites do êmbolo. Repita o teste: deve andar 10 mm. Quem conhece o fuso pode gravar o valor teórico (presets Enderstruder, T8 2/8 mm, planetário 5,18:1).</p>
         </div>
       </Box2>
 
