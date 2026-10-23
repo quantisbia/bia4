@@ -68,6 +68,13 @@ export interface ControllerOptions {
   safetyFooter?: string[]
   /** Filtra linhas vazias e comentários puros (default true) */
   stripComments?: boolean
+  /**
+   * R27 · Remove M220/M221 do arquivo durante o stream (default true).
+   * O HOST é o dono do fluxo/velocidade: um `M221 S100` no START do G-code
+   * (ou de slicers externos) zerava o ajuste que a usuária fez no painel
+   * "Está saindo biotinta?" — ela subia para 150 %, o arquivo voltava a 100 %.
+   */
+  stripFlowOverrides?: boolean
 }
 
 const DEFAULT_OPTS: Required<ControllerOptions> = {
@@ -81,6 +88,7 @@ const DEFAULT_OPTS: Required<ControllerOptions> = {
     // manualmente via botões "M18 Off" / "M84 Off" no painel de comandos rápidos.
   ],
   stripComments: true,
+  stripFlowOverrides: true,
 }
 
 export class PrinterController {
@@ -415,7 +423,8 @@ export class PrinterController {
   }
 
   private prepareQueue(gcode: string): string[] {
-    return gcode
+    let stripped = 0
+    const q = gcode
       .split(/\r?\n/)
       .map((l) => l.trim())
       .filter((l) => {
@@ -429,6 +438,12 @@ export class PrinterController {
         return semi >= 0 ? l.slice(0, semi).trim() : l
       })
       .filter((l) => l.length > 0)
+      .filter((l) => {
+        if (this.opts.stripFlowOverrides && /^M22[01]\b/i.test(l)) { stripped++; return false }
+        return true
+      })
+    if (stripped > 0) this.logger.info(`R27: ${stripped} linha(s) M220/M221 do arquivo ignorada(s) — o fluxo/velocidade do painel prevalece.`, "controller")
+    return q
   }
 
   private async runLoop(): Promise<void> {

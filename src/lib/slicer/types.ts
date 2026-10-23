@@ -70,6 +70,20 @@ export interface ExtrusionModel {
   startPrime_uL?: number
   /** R25 · Classe da biotinta usada para o fator de extrusão (informativo no cabeçalho). */
   bioinkClass?: string
+  /**
+   * R27 · E-steps do extrusor de seringa (steps/mm de êmbolo), se conhecidos.
+   * Usado para calcular os limites seguros do eixo E (M203/M201/M204/M205)
+   * escritos no START — evita perda de passos em prime/retração/purga.
+   * undefined → assume 3000 steps/mm (conservador).
+   */
+  eSteps?: number
+  /** R27 · Teto manual da velocidade do êmbolo (mm/s). undefined → derivado dos E-steps. */
+  plungerMaxFeed_mms?: number
+  /**
+   * R27 · Multiplicador de fluxo da 1ª camada (padrão 1,15): a pressão ainda
+   * está subindo e a adesão ao substrato pede cordão um pouco mais cheio.
+   */
+  firstLayerFlow?: number
 }
 
 export type InfillPattern =

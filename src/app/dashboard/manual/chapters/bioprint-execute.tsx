@@ -177,9 +177,19 @@ export function ChapterBioprintExecute() {
           </div>
         </div>
         <p className="mt-3 text-[12px] text-gray-400">
-          <strong>4 presets:</strong> 30% (leve), 50% (padrão hidrogel), 70% (denso), 100%
-          (filamento FDM). Botões ±1 e ±5 para ajuste fino.
+          <strong>Painel "Está saindo biotinta?"</strong>: botão laranja <em>Não está saindo</em> (salto proporcional +50/+100 %),
+          +10 / +25 %, slider até 999 % e <em>Saiu bem — lembrar</em> (grava na memória da biotinta).
         </p>
+        <div className="mt-3 rounded-lg bg-emerald-500/[0.06] border border-emerald-500/25 p-2.5 text-[12px] space-y-1.5">
+          <strong className="text-emerald-200">R27 — por que o fluxo era baixo e "aumentar" não mudava nada (corrigido)</strong>
+          <ul className="list-disc list-inside text-gray-300 space-y-1 text-[11.5px]">
+            <li><strong>O arquivo zerava o seu ajuste.</strong> O G-code tinha <code>M221 S100</code> no START: você subia para 150 %, o arquivo voltava a 100 %. Agora o BioSlicer não escreve M220/M221 e o Host <em>ignora</em> essas linhas de qualquer arquivo — o fluxo do painel prevalece.</li>
+            <li><strong>O motor perdia passos.</strong> Prime, retração e purga usavam feed fixo de filamento (F120–F200 = 2–3 mm/s). Com 2 000–9 000 steps/mm de seringa isso são 10 000–30 000 steps/s instantâneos: o Marlin responde "ok" e o êmbolo não anda. Agora o Host lê os <strong>E-steps</strong> (M503) e aplica <code>M203 E</code>/<code>M201 E</code>/<code>M204 R</code>/<code>M205 E</code> (~4 000 steps/s); toda purga/prime respeita esse teto.</li>
+            <li><strong>Puxa-empurra a cada linha.</strong> Cada caminho fazia prime → pausa 150 ms → cordão → "des-prime". Em gel isso não repõe pressão e cria uma pausa seca por linha. Agora o fluxo é contínuo: prime só quando a pressão caiu de verdade (1º cordão, após retração ou travel longo), e a 1ª camada sai com 1,15× de fluxo.</li>
+            <li><strong>"Empurrar biotinta agora" é volume real.</strong> +20/+50/+100 µL compensam o M221 ativo (o Marlin multiplica também movimentos só-E) e saem a ~10 µL/s dentro do teto do êmbolo. Durante a impressão o comando entra entre duas linhas (0,1–1 s).</li>
+          </ul>
+          <p className="text-[11px] text-gray-400">Se o painel mostrar "E-steps não lidos", use <em>Comandos rápidos → E-steps (M503)</em>; para calibrar, <em>Teste 10 mm E</em> (marque o êmbolo, meça, novo = atual × 10 / medido, aplique com <code>M92 E…</code> + <code>M500</code>).</p>
+        </div>
       </Box2>
 
       <Box2 icon={Zap} title="Painel de Velocidade (M220) — XYZ+E" tone="amber">

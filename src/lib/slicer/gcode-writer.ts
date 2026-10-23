@@ -16,7 +16,7 @@
  *     ferramenta; a troca emite retração → T<n> → prime → dwell. Um único G-code.
  */
 
-import { needleDeadVolume_uL, BIOINK_CLASSES, type BioinkClass } from "./flow-science"
+import { needleDeadVolume_uL, BIOINK_CLASSES, plungerLimits, plungerLimitsGcode, safePlungerFeed_mmmin, type BioinkClass } from "./flow-science"
 import type { SliceParams, ExtrusionModel, SlicedLayer, ToolPath, Vec2, SliceStats, PathRole } from "./types"
 import { ePerMm, volumeToE, beadArea_mm2 } from "./extrusion"
 import { dist } from "./polygon-ops"
@@ -120,8 +120,19 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
   }
   if (P.bedTemp_C !== null) push(`M140 S${f(P.bedTemp_C, 1)}  ; temperatura da mesa (sem esperar — estabilize antes pelo painel)`)
   if (X.kind === "pneumatic" && X.pressure_kPa) push(`; pressão: ${X.pressure_kPa} kPa (ajuste no regulador / M-code do fabricante)`)
-  push(`M220 S100              ; feedrate 100 %`)
-  push(`M221 S100              ; fluxo 100 % (ajuste em tempo real durante a impressão)`)
+  // R27 · NÃO escrevemos M220/M221 aqui: o Host aplica o fluxo da memória da
+  // biotinta ANTES do stream; um M221 S100 no arquivo zerava esse ajuste no
+  // meio do START ("aumentei o fluxo e voltou para 100 %").
+  push(`; fluxo (M221) e velocidade (M220) são do HOST — não são redefinidos aqui`)
+  // R27 · LIMITES DO EIXO E PARA SERINGA — o firmware vem com jerk/aceleração
+  // de filamento; com 2 000–9 000 steps/mm o motor perde passos e o êmbolo
+  // não anda ("ok" sem movimento). Sem M500: vale só para este job.
+  const X0 = tools.heads[0].extrusion
+  const LIM = plungerLimits(X0.eSteps, X0.plungerMaxFeed_mms)
+  if (X0.kind === "syringe_stepper" && (P.firmware === "marlin" || P.firmware === "reprap")) {
+    push(`; ─── LIMITES DO ÊMBOLO R27 (${LIM.eSteps}${LIM.assumed ? " steps/mm assumidos — calibre no Host" : " steps/mm"}) ───`)
+    for (const l of plungerLimitsGcode(LIM)) push(l)
+  }
   if (P.customStart.trim()) {
     push(`; custom start:`)
     for (const l of P.customStart.split(/\r?\n/)) if (l.trim()) push(l.trim())
@@ -130,17 +141,23 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
   // ANTES do primeiro cordão. Sem isto a cabeça anda e nada sai (dead volume
   // de 22G×25 mm + luer ≈ 43 µL ≫ 0,13 mm² × poucos mm de cordão).
   {
-    const X0 = tools.heads[0].extrusion
     const cls = (X0.bioinkClass as BioinkClass | undefined) && BIOINK_CLASSES[X0.bioinkClass as BioinkClass] ? (X0.bioinkClass as BioinkClass) : undefined
     const auto = needleDeadVolume_uL(P.nozzleDiameter_mm) + (cls ? BIOINK_CLASSES[cls].extraPrime_uL : 6)
     const vol = X0.startPrime_uL === undefined ? auto : Math.max(0, X0.startPrime_uL)
     if (vol > 0) {
       const eP = volumeToE(vol, X0)
-      // velocidade de êmbolo moderada (0,15 mm/s) — enche sem jato
-      push(`; ─── PRÉ-CARGA R25: ${vol.toFixed(1)} µL (agulha ${P.nozzleDiameter_mm} mm + luer${cls ? ` · ${BIOINK_CLASSES[cls].label}` : ""}) ───`)
-      push(`G1 E${f(eP, 4)} F9            ; encher agulha até o filamento aparecer (${eP.toFixed(3)} mm de êmbolo)`)
-      push(`G4 P800                ; relaxar pressão`)
-      eTotal += eP; time += eP / 0.15 + 0.8
+      // R27: enche a agulha a ~10 µL/s (22G → ~75 mm/s de jato, sem espirrar),
+      // em 2 etapas: 70 % rápido + 30 % lento para a pressão estabilizar; o
+      // feed respeita os limites do êmbolo (antes era F9 = 0,15 mm/s FIXO,
+      // levava 6 s para 0,87 mm e, em seringa 10 mL, 0,3 mm não vencia o backlash).
+      const e1 = eP * 0.7, e2 = eP - e1
+      const f1 = safePlungerFeed_mmmin(e1, (vol * 0.7) / 10, LIM)
+      const f2 = safePlungerFeed_mmmin(e2, (vol * 0.3) / 4, LIM)
+      push(`; ─── PRÉ-CARGA R25/R27: ${vol.toFixed(1)} µL (agulha ${P.nozzleDiameter_mm} mm + luer${cls ? ` · ${BIOINK_CLASSES[cls].label}` : ""}) ───`)
+      push(`G1 E${f(e1, 4)} F${f1}          ; encher agulha + luer (${e1.toFixed(3)} mm de êmbolo)`)
+      push(`G1 E${f(e2, 4)} F${f2}          ; fazer o filamento aparecer na ponta (${e2.toFixed(3)} mm)`)
+      push(`G4 P400                ; estabilizar pressão`)
+      eTotal += eP; time += e1 / (f1 / 60) + e2 / (f2 / 60) + 0.4
       push(`; dica: se já pré-carregou pelo Host, defina startPrime_uL = 0 no perfil`)
     }
   }
@@ -153,9 +170,21 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
   let firstBeadDone = false
   let activeTool: ToolHead = tools.heads[0]
   let XA: ExtrusionModel = activeTool.extrusion // modelo de extrusão ATIVO
+  // R27 · feed de retração/prime limitado pelo êmbolo (antes F120 = 2 mm/s fixo
+  // → 6 000–18 000 steps/s em seringa: perdia passos e o prime não acontecia).
+  const limF = (mms: number) => F(Math.min(mms, LIM.maxFeed_mms))
   let eRetract = volumeToE(XA.retractVolume_uL, XA)
   let ePrime = volumeToE(XA.primeVolume_uL, XA)
-  let retractF = F(XA.retractSpeed_mms)
+  let retractF = limF(XA.retractSpeed_mms)
+  // R27 · Fluxo CONTÍNUO por caminho: antes cada trecho fazia prime → G4 150 ms
+  // → cordão → "des-prime" (G1 E-prime). Em hidrogel isso é um puxa-empurra que
+  // NÃO repõe pressão (o gel é compressível) e cria uma pausa seca a cada linha
+  // de infill (72 arranques × 0,15 s = 11 s parados com a agulha na peça).
+  // Agora: o prime só acontece quando há retração ANTES (recupera o que foi
+  // puxado + prime) ou quando o travel foi longo o bastante para a pressão cair;
+  // o volume do prime NÃO é recuado no fim — a retração (se houver) é a única
+  // responsável por aliviar pressão em travels longos.
+  const firstLayerFlow = Math.max(0.8, Math.min(2, XA.firstLayerFlow ?? 1.15))
 
   const applyOffset = (p: Vec2): Vec2 =>
     tools.applyOffsetInPath && (activeTool.offsetX_mm || activeTool.offsetY_mm)
@@ -176,7 +205,7 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
     XA = h.extrusion
     eRetract = volumeToE(XA.retractVolume_uL, XA)
     ePrime = volumeToE(XA.primeVolume_uL, XA)
-    retractF = F(XA.retractSpeed_mms)
+    retractF = limF(XA.retractSpeed_mms)
     retracted = false
     // escorva o cabeçote que entra
     const eIn = volumeToE(tools.primeAfterSwitch_uL, XA)
@@ -187,13 +216,15 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
     push(`;TOOL:${h.index}`)
   }
 
+  let lastTravel_mm = 0
   const goTravel = (to: Vec2, zTop: number) => {
     const d = dist(cur, to)
+    lastTravel_mm = d
     if (d < 1e-6 && Math.abs(zTop - curZ) < 1e-6) return
     if (d >= P.retractMinTravel_mm && eRetract > 0 && !retracted) {
       push(`G1 E-${f(eRetract, 4)} F${retractF}`)
       retracted = true
-      time += eRetract / Math.max(0.1, XA.retractSpeed_mms)
+      time += eRetract / Math.max(0.05, retractF / 60)
     }
     const hop = d >= P.retractMinTravel_mm ? P.zHop_mm : 0
     if (hop > 0) { push(`G0 Z${f(zTop + hop)} F${F(P.speedZ_mms)}`); time += hop / P.speedZ_mms }
@@ -206,31 +237,30 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
     curZ = zTop
   }
 
-  const startExtrusion = () => {
-    if (retracted && eRetract > 0) {
-      push(`G1 E${f(eRetract, 4)} F${retractF}`)
-      retracted = false
-      time += eRetract / Math.max(0.1, XA.retractSpeed_mms)
+  const startExtrusion = (opts: { isFirstOfJob?: boolean } = {}) => {
+    const vF = Math.max(0.05, retractF / 60)
+    // recupera a retração + prime num único movimento (uma linha, sem pausa)
+    let eIn = 0
+    if (retracted && eRetract > 0) { eIn += eRetract; retracted = false }
+    // prime só quando a pressão realmente caiu: 1º cordão do job/poço, após
+    // retração, ou travel longo (≥ 3× o mínimo de retração) sem retração
+    const pressureDropped = opts.isFirstOfJob || eIn > 0 || lastTravel_mm >= Math.max(3 * P.retractMinTravel_mm, 6)
+    if (ePrime > 0 && pressureDropped) { eIn += ePrime; eTotal += ePrime }
+    if (eIn > 0) {
+      push(`G1 E${f(eIn, 4)} F${retractF}`)
+      time += eIn / vF
+      // dwell só no 1º cordão do job (pressão subindo do zero) — nunca a cada linha
+      if (opts.isFirstOfJob && XA.primeDwell_ms > 0) { push(`G4 P${Math.round(XA.primeDwell_ms)}`); time += XA.primeDwell_ms / 1000 }
     }
-    if (ePrime > 0) {
-      push(`G1 E${f(ePrime, 4)} F${retractF}`)
-      eTotal += ePrime
-      time += ePrime / Math.max(0.1, XA.retractSpeed_mms)
-      if (XA.primeDwell_ms > 0) { push(`G4 P${Math.round(XA.primeDwell_ms)}`); time += XA.primeDwell_ms / 1000 }
-    }
+    lastTravel_mm = 0
     starts++
   }
 
-  const endExtrusion = () => {
-    if (ePrime > 0) {
-      push(`G1 E-${f(ePrime, 4)} F${retractF}`)
-      eTotal -= ePrime
-      time += ePrime / Math.max(0.1, XA.retractSpeed_mms)
-    }
-  }
+  // R27: sem "des-prime" no fim do caminho — ver nota acima.
+  const endExtrusion = () => { /* intencionalmente vazio */ }
 
-  const addVolume = (tp: ToolPath, hMm: number, len: number) => {
-    const v = beadArea_mm2(tp.lineWidth_mm, hMm) * len * XA.flowMultiplier
+  const addVolume = (tp: ToolPath, hMm: number, len: number, mult = 1) => {
+    const v = beadArea_mm2(tp.lineWidth_mm, hMm) * len * XA.flowMultiplier * mult
     volume += v
     volumeByTool[activeTool.index] = (volumeByTool[activeTool.index] ?? 0) + v
   }
@@ -242,12 +272,12 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
     push(`;TYPE:SKIRT`)
     push(`; purge line ${P.purgeLine_mm} mm`)
     push(`G1 Z${f(zTop)} F${F(P.speedZ_mms)}`)
-    const e = ePerMm(P.lineWidth_mm * 1.5, h, XA) * P.purgeLine_mm
+    const e = ePerMm(P.lineWidth_mm * 1.5, h, XA) * P.purgeLine_mm * firstLayerFlow
     push(`G1 X${f(P.purgeLine_mm)} Y0 E${f(e, 4)} F${F(P.speedFirstLayer_mms)}`)
     cur = { x: P.purgeLine_mm, y: 0 }
     curZ = zTop
     extrude += P.purgeLine_mm; eTotal += e
-    volume += beadArea_mm2(P.lineWidth_mm * 1.5, h) * P.purgeLine_mm * XA.flowMultiplier
+    volume += beadArea_mm2(P.lineWidth_mm * 1.5, h) * P.purgeLine_mm * XA.flowMultiplier * firstLayerFlow
     time += P.purgeLine_mm / P.speedFirstLayer_mms
     starts++
     firstBeadDone = true
@@ -274,7 +304,7 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
       cur = { x: copy.dx, y: copy.dy }
       curZ = zTopLast + hop
       if (target.pause_s > 0) { push(`G4 S${f(target.pause_s, 1)}             ; pausa entre poços`); time += target.pause_s }
-      if (target.purge_uL > 0) { const e = volumeToE(target.purge_uL, XA); push(`G1 E${f(e, 4)} F${retractF}  ; purga ${target.purge_uL} µL`); eTotal += e; retracted = false }
+      if (target.purge_uL > 0) { const e = volumeToE(target.purge_uL, XA); const pf = safePlungerFeed_mmmin(e, target.purge_uL / 10, LIM); push(`G1 E${f(e, 4)} F${pf}  ; purga ${target.purge_uL} µL`); eTotal += e; retracted = false; time += e / (pf / 60) }
       // o 1º cordão do poço também nasce no centro do poço (sem travel seco)
       firstBeadDone = false
     }
@@ -310,7 +340,9 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
         }
         const role = roleTag(tp.role)
         if (role !== lastRole) { push(`;TYPE:${role}`); lastRole = role }
-        const eMm = ePerMm(tp.lineWidth_mm, L.height_mm, XA)
+        // R27 · 1ª camada com fluxo extra (adesão + pressão ainda subindo)
+        const layerMult = L.index === 0 ? firstLayerFlow : 1
+        const eMm = ePerMm(tp.lineWidth_mm, L.height_mm, XA) * layerMult
         const speedF = F(tp.speed_mms)
         let pts = tp.points
 
@@ -325,14 +357,14 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
           const first = pts[0]
           push(`G1 Z${f(zTop)} F${F(P.speedZ_mms)}        ; altura da 1ª camada, sem sair do ponto zero`)
           curZ = zTop
-          startExtrusion()
+          startExtrusion({ isFirstOfJob: true })
           const d0 = dist(cur, first)
           if (d0 > 1e-3) {
             const e0 = d0 * eMm
             const o = applyOffset(first)
             push(`G1 X${f(o.x)} Y${f(o.y)} E${f(e0, 5)} F${speedF}  ; aproximação extrudada a partir do ponto zero`)
             eTotal += e0; extrude += d0; time += d0 / tp.speed_mms
-            addVolume(tp, L.height_mm, d0)
+            addVolume(tp, L.height_mm, d0, layerMult)
           }
           cur = first
           firstBeadDone = true
@@ -355,7 +387,7 @@ export function writeGCode(layers: SlicedLayer[], P: SliceParams, X: ExtrusionMo
           time += d / tp.speed_mms
         }
         extrude += segLen
-        addVolume(tp, L.height_mm, segLen)
+        addVolume(tp, L.height_mm, segLen, layerMult)
         endExtrusion()
         cur = seq[seq.length - 1]
       }

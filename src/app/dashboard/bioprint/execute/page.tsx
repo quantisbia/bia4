@@ -88,6 +88,7 @@ import { ExtrusionPanel, type ExtrusionState } from "@/components/bioprinter/Ext
 import { TissueViabilityPanel, type TissueState } from "@/components/bioprinter/TissueViabilityPanel"
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection"
 import { suggestStartFlow, rememberGoodFlow, clampFlow, type FlowMemoryEntry } from "@/lib/bioprint/flow-memory"
+import { plungerLimits, plungerLimitsGcode, parseEsteps, pushVolumePlan, type PlungerLimits } from "@/lib/slicer/flow-science"
 import { parseGcode, type ParsedGcode } from "@/lib/bioprint/toolpath-engine"
 import { DEMO_GYROID_GCODE } from "@/lib/bioprint/demo-gyroid-gcode"
 
@@ -693,6 +694,18 @@ export default function BioprintExecutePage() {
   const flowInitializedRef = useRef(false)
 
   /**
+   * R27 · E-steps do extrusor de seringa lidos do firmware (M503 → `echo: M92 … E<n>`).
+   * Deles derivam os LIMITES DO ÊMBOLO (M203/M201/M204/M205) aplicados no
+   * handshake e o teto de velocidade de toda purga/prime enviada pelo Host.
+   * null = não lido → assume 3000 steps/mm (conservador).
+   */
+  const [eSteps, setEsteps] = useState<number | null>(null)
+  const eStepsRef = useRef<number | null>(null)
+  const plungerLim: PlungerLimits = useMemo(() => plungerLimits(eSteps), [eSteps])
+  const plungerLimRef = useRef<PlungerLimits>(plungerLimits(null))
+  useEffect(() => { plungerLimRef.current = plungerLim }, [plungerLim])
+
+  /**
    * R12.39: Controle de VELOCIDADE em tempo real via Marlin M220.
    *
    * M220 S{percent} = Set Feedrate Percentage — multiplica TODA velocidade
@@ -1074,6 +1087,16 @@ export default function BioprintExecutePage() {
         {
           onState: (s) => setControllerState(s),
           onProgress: (p) => setProgress(p),
+          // R27 · captura E-steps de qualquer `M92 … E<n>` que o firmware ecoar (M503)
+          onLine: (line, kind) => {
+            if (kind !== "rx") return
+            const v = parseEsteps(line)
+            if (v && v !== eStepsRef.current) {
+              eStepsRef.current = v; setEsteps(v)
+              const L = plungerLimits(v)
+              loggerRef.current.ok(`E-steps lidos do firmware: ${v} steps/mm → êmbolo máx ${L.maxFeed_mms} mm/s (${L.stepRate} steps/s).`, "flow")
+            }
+          },
         },
         { okTimeoutMs: 30000, maxRetries: 2 },
       )
@@ -1201,6 +1224,27 @@ export default function BioprintExecutePage() {
         loggerRef.current.info("Modo pronto: XYZ absoluto (G90) + E relativo (M83) + cold extrusion liberada (M302).", "controller")
       } catch (e) {
         loggerRef.current.warn(`Não foi possível ajustar modo de coordenadas: ${e instanceof Error ? e.message : String(e)}`)
+      }
+
+      // R27 · LÊ E-STEPS (M503) E APLICA LIMITES DO ÊMBOLO.
+      //
+      // Por que o êmbolo "não andava" / o fluxo era baixo: o firmware vem com
+      // jerk/aceleração/feed máximo de FILAMENTO (jerk E 5 mm/s, accel 3000+).
+      // Com 2000–9000 steps/mm de seringa, um `G1 E1 F200` pede 7k–30k steps/s
+      // instantâneos → o driver perde passos, o Marlin responde "ok" e nada sai.
+      // Agora: M203 E (teto), M201 E / M204 R (aceleração), M205 E (jerk) são
+      // calculados para ~4000 steps/s a partir dos E-steps reais. Sem M500.
+      try {
+        await controllerRef.current?.sendAndWait("M503 ; ler configuração (E-steps) — R27", 8000)
+      } catch (e) {
+        loggerRef.current.warn(`M503 sem resposta (${e instanceof Error ? e.message : String(e)}) — assumindo 3000 steps/mm no êmbolo.`, "flow")
+      }
+      try {
+        const L = plungerLimits(eStepsRef.current)
+        for (const l of plungerLimitsGcode(L, false)) await controllerRef.current?.sendAndWait(l)
+        loggerRef.current.ok(`Limites do êmbolo aplicados (R27): máx ${L.maxFeed_mms} mm/s · accel ${L.accel_mms2} mm/s² · jerk ${L.jerk_mms} mm/s${L.assumed ? " (E-steps assumidos = 3000 — calibre em Comandos rápidos → E-steps)" : ` (${L.eSteps} steps/mm)`}.`, "flow")
+      } catch (e) {
+        loggerRef.current.warn(`Não foi possível aplicar limites do êmbolo: ${e instanceof Error ? e.message : String(e)}`)
       }
 
       // R12.64: PÓS-CONEXÃO REMOVIDO (moveToSafeCenter).
@@ -1575,7 +1619,11 @@ export default function BioprintExecutePage() {
       )
       return
     }
-    const feedrate = axis === "Z" ? 300 : axis === "E" ? 200 : 1500
+    // R27 · eixo E: feed LIMITADO pelo êmbolo (antes F200 = 3,3 mm/s → em seringa
+    // com 3000 steps/mm são 10 000 steps/s instantâneos: perdia passos e a
+    // "purga +5" não andava). Mira ~0,5 mm/s ou o teto dos E-steps, o que for menor.
+    const eFeed = Math.max(3, Math.round(Math.min(plungerLimRef.current.maxFeed_mms, 0.5) * 60))
+    const feedrate = axis === "Z" ? 300 : axis === "E" ? eFeed : 1500
 
     // R12.39: jog AGORA funciona durante streaming (tempo real) via fila
     // de injeção do controller. Comandos entram em `injectionQueue` e são
@@ -1677,14 +1725,16 @@ export default function BioprintExecutePage() {
   const handlePushNow = useCallback(async (uL: number) => {
     const ctrl = controllerRef.current
     if (!ctrl || !connected) return
-    const e = uL / syringeArea
-    const f = Math.max(6, Math.round((e / Math.max(1.5, uL / 20)) * 60)) // ~20 µL/s; mínimo 0,1 mm/s de êmbolo
-    const cmds = ["M83", `G1 E${e.toFixed(4)} F${f} ; R25 empurrar ${uL} µL`]
+    // R27 · volume REAL: compensa o M221 ativo (o Marlin multiplica também os
+    // movimentos só-E) e respeita o teto do êmbolo (E-steps). ~10 µL/s.
+    const plan = pushVolumePlan(uL, syringeArea, plungerLimRef.current, flowAppliedRef.current ?? 100, 10)
+    const cmds = [...plan.lines]
+    cmds[cmds.length - 1] += ` ; R27 empurrar ${uL} µL`
     try {
       const st = ctrl.getState()
       if (st === "streaming" || st === "paused") { for (const c of cmds) ctrl.inject(c, "push") }
       else { for (const c of cmds) await ctrl.sendAndWait(c) }
-      loggerRef.current.ok(`Empurrados ${uL} µL (${e.toFixed(3)} mm de êmbolo, seringa ${syringeArea.toFixed(0)} mm²).`, "flow")
+      loggerRef.current.ok(`Empurrando ${uL} µL: ${plan.e_mm} mm de êmbolo em ~${plan.seconds} s (F${plan.f_mmmin}${plan.flowCompensated ? `, compensado p/ M221 ${flowAppliedRef.current} %` : ""}; seringa ${syringeArea.toFixed(0)} mm²).`, "flow")
     } catch (err) {
       loggerRef.current.warn(`Empurrar ${uL} µL falhou: ${err instanceof Error ? err.message : String(err)}`)
     }
@@ -1780,6 +1830,9 @@ export default function BioprintExecutePage() {
     { label: "M114",          cmd: "M114",                     title: "Posição atual" },
     { label: "M105",          cmd: "M105",                     title: "Temperaturas" },
     { label: "M115",          cmd: "M115",                     title: "Firmware info" },
+    // R27: lê E-steps (M503 → echo M92 E<n>) e reaplica limites do êmbolo
+    { label: "E-steps (M503)", cmd: "M503",                    title: "Lê E-steps do firmware e recalcula os limites do êmbolo (M203/M201/M204/M205)" },
+    { label: "Teste 10 mm E",  cmd: "M83\nG1 E10 F30",          title: "Calibração de E-steps: marque o êmbolo, mova 10 mm (20 s), meça. Novo = atual × 10 / medido → M92 E<novo> + M500" },
     // R12.23: G92 desacoplado do Home All — ação manual do usuário para definir
     // o ponto atual como origem lógica (0,0,0). Útil após jog manual.
     { label: "Ponto inicial", cmd: "G92 X0 Y0 Z0 E0",          title: "Define o ponto atual como origem (0,0,0) — origem lógica" },
@@ -1795,6 +1848,12 @@ export default function BioprintExecutePage() {
     // os 'ok's de cada uma podem ser capturados por outro sendAndWait pendente.
     for (const c of cmds.split("\n")) {
       try { await controllerRef.current.sendAndWait(c) } catch {}
+    }
+    // R27: após M503 (E-steps atualizados pelo onLine), reaplica limites do êmbolo
+    if (/^M503\b/.test(cmds)) {
+      const L = plungerLimits(eStepsRef.current)
+      for (const l of plungerLimitsGcode(L, false)) { try { await controllerRef.current.sendAndWait(l) } catch {} }
+      loggerRef.current.ok(`Limites do êmbolo reaplicados: máx ${L.maxFeed_mms} mm/s (${L.eSteps}${L.assumed ? " assumidos" : ""} steps/mm).`, "flow")
     }
   }, [connected])
 
@@ -2059,6 +2118,8 @@ export default function BioprintExecutePage() {
               onConfirmGood={handleConfirmGoodFlow}
               onPushNow={handlePushNow}
               syringeArea_mm2={syringeArea}
+              eSteps={eSteps}
+              plungerMax_mms={plungerLim.maxFeed_mms}
             />
           )}
           {/* ── 1. G-code input ───────────────────────────────────── */}
@@ -3316,6 +3377,8 @@ export default function BioprintExecutePage() {
               onConfirmGood={handleConfirmGoodFlow}
               onPushNow={handlePushNow}
               syringeArea_mm2={syringeArea}
+              eSteps={eSteps}
+              plungerMax_mms={plungerLim.maxFeed_mms}
             />
           )}
 

@@ -903,6 +903,8 @@ function AdvancedParams({ P, setP, X, setX, rheology, setRheology }: {
         <F k="retractVolume_uL" label="Retração (µL)"><input type="number" step={0.1} value={X.retractVolume_uL} onChange={(e) => setX({ ...X, retractVolume_uL: +e.target.value })} className={inp} /></F>
         <F k="retractSpeed_mms" label="Vel. êmbolo retr. (mm/s)"><input type="number" step={0.5} value={X.retractSpeed_mms} onChange={(e) => setX({ ...X, retractSpeed_mms: +e.target.value })} className={inp} /></F>
         <F k="primeDwell_ms" label="Dwell pós-prime (ms)"><input type="number" step={50} value={X.primeDwell_ms} onChange={(e) => setX({ ...X, primeDwell_ms: +e.target.value })} className={inp} /></F>
+        {X.kind === "syringe_stepper" && <F k="eSteps" label="E-steps da seringa (steps/mm)"><input type="number" step={100} min={50} value={X.eSteps ?? ""} placeholder="3000 (assumido)" onChange={(e) => setX({ ...X, eSteps: e.target.value === "" ? undefined : +e.target.value })} className={inp} /></F>}
+        {X.kind === "syringe_stepper" && <F k="firstLayerFlow" label="Fluxo da 1ª camada (×)"><input type="number" step={0.05} min={0.8} max={2} value={X.firstLayerFlow ?? 1.15} onChange={(e) => setX({ ...X, firstLayerFlow: +e.target.value })} className={inp} /></F>}
       </Group>
       <Group title="Reologia (para shear/viabilidade)">
         <F k="viscosity" label="Viscosidade (Pa·s)"><input type="number" step={0.1} value={rheology?.viscosity_PaS ?? ""} placeholder="ex. 2.5" onChange={(e) => setRheology({ ...rheology, viscosity_PaS: e.target.value === "" ? undefined : +e.target.value })} className={inp} /></F>

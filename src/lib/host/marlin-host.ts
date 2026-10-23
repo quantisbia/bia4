@@ -49,6 +49,8 @@ export interface HostOptions {
   safetyFooter?: string[]
   stripComments?: boolean
   firmware?: "marlin" | "klipper" | "reprap" | "unknown"
+  /** R27 · ignora M220/M221 do arquivo — o host é dono do fluxo (default true) */
+  stripFlowOverrides?: boolean
 }
 
 const DEFAULTS: Required<HostOptions> = {
@@ -56,7 +58,7 @@ const DEFAULTS: Required<HostOptions> = {
   pauseScript: ["G91", "G1 E-0.3 F120", "G1 Z5 F300", "G90"],
   resumeScript: ["G91", "G1 Z-5 F300", "G1 E0.3 F120", "G90"],
   safetyFooter: ["M104 S0", "M140 S0"],
-  stripComments: true, firmware: "marlin",
+  stripComments: true, firmware: "marlin", stripFlowOverrides: true,
 }
 
 export interface PendingLine { n: number; idx: number; raw: string; cmd: string; sentAt: number }
@@ -317,7 +319,7 @@ export class MarlinHost {
   load(gcode: string): { lines: number; layers: number | null } {
     const lines = gcode.split(/\r?\n/)
     this.queue = []; this.layerAt = []; this.layerCount = null
-    let layer = 0, maxLayer = -1
+    let layer = 0, maxLayer = -1, stripped = 0
     for (const l0 of lines) {
       const l = l0.trim()
       const lm = l.match(/^;LAYER:(\d+)/)
@@ -326,9 +328,11 @@ export class MarlinHost {
       if (lc) { this.layerCount = +lc[1]; continue }
       const cmd = this.o.stripComments ? stripComment(l) : l
       if (!cmd) continue
+      if (this.o.stripFlowOverrides && /^M22[01]\b/i.test(cmd)) { stripped++; continue }
       this.queue.push(cmd)
       this.layerAt.push(layer)
     }
+    if (stripped > 0) this.log("info", `R27: ${stripped} linha(s) M220/M221 do arquivo ignorada(s) — o fluxo do painel prevalece.`)
     if (this.layerCount === null && maxLayer >= 0) this.layerCount = maxLayer + 1
     return { lines: this.queue.length, layers: this.layerCount }
   }
@@ -491,23 +495,55 @@ export class MarlinHost {
 }
 
 // ─── Macros de bioimpressão (seringa) ───────────────────────────────────
-export interface SyringeMacroContext { syringeArea_mm2: number; plungerSpeed_mms: number }
+/**
+ * R27 · `plungerSpeed_mms` é o TETO da velocidade do êmbolo (vem dos E-steps:
+ * 4000 steps/s ÷ steps/mm). `flowPercent` é o M221 ativo — o Marlin multiplica
+ * também movimentos só-E, então compensamos para o volume real ser o pedido.
+ */
+export interface SyringeMacroContext { syringeArea_mm2: number; plungerSpeed_mms: number; flowPercent?: number }
 
-export function macroPrimeUl(uL: number, ctx: SyringeMacroContext): string[] {
-  return ["M83", `G1 E${(uL / ctx.syringeArea_mm2).toFixed(4)} F${Math.round(ctx.plungerSpeed_mms * 60)}`]
+function eCmd(uL: number, ctx: SyringeMacroContext): number {
+  const fp = ctx.flowPercent && ctx.flowPercent > 0 ? ctx.flowPercent / 100 : 1
+  return uL / ctx.syringeArea_mm2 / fp
 }
-export function macroRetractUl(uL: number, ctx: SyringeMacroContext): string[] {
-  return ["M83", `G1 E-${(uL / ctx.syringeArea_mm2).toFixed(4)} F${Math.round(ctx.plungerSpeed_mms * 60)}`]
+function feedFor(e_mm: number, seconds: number, ctx: SyringeMacroContext): number {
+  const v = Math.abs(e_mm) / Math.max(0.2, seconds)
+  return Math.max(3, Math.round(Math.max(0.05, Math.min(ctx.plungerSpeed_mms, v)) * 60))
 }
+/** Prime de `uL` a ~10 µL/s (limitado pelo teto do êmbolo). */
+export function macroPrimeUl(uL: number, ctx: SyringeMacroContext, rate_uLs = 10): string[] {
+  const e = eCmd(uL, ctx)
+  return ["M83", `G1 E${e.toFixed(4)} F${feedFor(e, uL / rate_uLs, ctx)}`]
+}
+export function macroRetractUl(uL: number, ctx: SyringeMacroContext, rate_uLs = 10): string[] {
+  const e = eCmd(uL, ctx)
+  return ["M83", `G1 E-${e.toFixed(4)} F${feedFor(e, uL / rate_uLs, ctx)}`]
+}
+/** Purga contínua: `flow_uLs` durante `seconds` (volume = flow × s). */
 export function macroPurge(flow_uLs: number, seconds: number, ctx: SyringeMacroContext): string[] {
-  const e = (flow_uLs * seconds) / ctx.syringeArea_mm2
-  const f = Math.max(1, Math.round((e / seconds) * 60))
-  return ["M83", `G1 E${e.toFixed(4)} F${f}`]
+  const e = eCmd(flow_uLs * seconds, ctx)
+  return ["M83", `G1 E${e.toFixed(4)} F${feedFor(e, seconds, ctx)}`]
+}
+/** R27 · Limites do eixo E para seringa (M203/M201/M204/M205) a partir dos E-steps. */
+export function macroPlungerLimits(eSteps: number | null | undefined): string[] {
+  const steps = eSteps && eSteps > 0 ? eSteps : 3000
+  const maxFeed = Math.max(0.3, Math.min(5, 4000 / steps))
+  const r = (n: number, d = 3) => Math.round(n * 10 ** d) / 10 ** d
+  const acc = r(Math.max(1, maxFeed * 4), 1)
+  return [`M203 E${r(maxFeed)}`, `M201 E${acc}`, `M204 R${acc}`, `M205 E${r(Math.min(0.2, maxFeed / 4))}`]
+}
+/** R27 · Teto de velocidade do êmbolo (mm/s) para os E-steps informados. */
+export function plungerMaxFeed(eSteps: number | null | undefined): number {
+  const steps = eSteps && eSteps > 0 ? eSteps : 3000
+  return Math.round(Math.max(0.3, Math.min(5, 4000 / steps)) * 1000) / 1000
 }
 export const MACRO_SET_ORIGIN = ["G92 X0 Y0 Z0 E0"]
 export const MACRO_GO_ORIGIN = ["G90", "G0 Z5 F300", "G0 X0 Y0 F2400", "G0 Z0 F300"]
-export const MACRO_COLD_EXTRUSION = ["M302 S0"]
-export const MACRO_ESTEP_TEST = ["M83", "G1 E10 F60"]
+export const MACRO_COLD_EXTRUSION = ["M302 S0 P1"]
+/** Teste de E-steps: 10 mm de êmbolo a 0,5 mm/s (20 s) — lento o bastante p/ não perder passos em 8 bits. */
+export const MACRO_ESTEP_TEST = ["M83", "G1 E10 F30"]
+/** Pede ao firmware os E-steps atuais (resposta `echo: M92 … E<steps>`). */
+export const MACRO_READ_SETTINGS = ["M503"]
 export function macroSetEsteps(stepsPerMm: number): string[] {
   return [`M92 E${stepsPerMm.toFixed(2)}`, "M500"]
 }

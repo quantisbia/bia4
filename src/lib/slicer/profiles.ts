@@ -253,5 +253,7 @@ export const PARAM_TIPS: Record<string, string> = {
   flowMultiplier: "Fator de extrusão = Q_real/Q_teórico. Hidrogéis moles 1,2–2,2× (padrão 1,6); pseudoplásticas 1,1–1,8× (1,35); pastas 1,0–1,4× (1,15); FRESH 1,4–2,5× (1,8). Ajuste pela largura real do cordão.",
   primeVolume_uL: "Volume extra ao iniciar extrusão — compensa compressibilidade do gel e ar na seringa.",
   retractVolume_uL: "Volume recuado ao fim do trecho — reduz oozing. 0–1 µL em hidrogel; 0 para alginato fluido.",
-  primeDwell_ms: "Espera após prime para estabilizar pressão (100–300 ms).",
+  primeDwell_ms: "Espera após prime para estabilizar pressão (100–300 ms). R27: aplicada só no 1º cordão do job — não a cada linha.",
+  eSteps: "R27: steps/mm do êmbolo (lido no Host com M503). Define os limites M203/M201/M205 do eixo E no START — evita o motor perder passos em prime/purga. Vazio = 3000 (conservador).",
+  firstLayerFlow: "R27: multiplicador de fluxo da 1ª camada (padrão 1,15×). Pressão ainda subindo + adesão ao substrato pedem cordão um pouco mais cheio.",
 }

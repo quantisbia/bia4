@@ -21,7 +21,7 @@ import {
 import { cn } from "@/lib/utils/helpers"
 import {
   MarlinHost, type HostState, type HostProgress, type HostTemps, type HostPosition,
-  macroPrimeUl, macroRetractUl, macroPurge, MACRO_SET_ORIGIN, MACRO_GO_ORIGIN, MACRO_COLD_EXTRUSION, MACRO_ESTEP_TEST, macroSetEsteps,
+  macroPrimeUl, macroRetractUl, macroPurge, MACRO_SET_ORIGIN, MACRO_GO_ORIGIN, MACRO_COLD_EXTRUSION, MACRO_ESTEP_TEST, MACRO_READ_SETTINGS, macroSetEsteps, macroPlungerLimits, plungerMaxFeed,
 } from "@/lib/host/marlin-host"
 import { PrinterMock } from "@/lib/bioprint/printer-mock"
 import { PrinterConnection, type PrinterTransport } from "@/lib/bioprint/printer-connection"
@@ -75,6 +75,11 @@ export default function BioHostPage() {
   const flowStartRef = useRef(100)
   const [speed, setSpeed] = useState(100)
   const [esteps, setEsteps] = useState(2000)
+  // R27 · E-steps lidos do firmware (M503) — null = assumidos 3000
+  const [estepsRead, setEstepsRead] = useState<number | null>(null)
+  const estepsReadRef = useRef<number | null>(null)
+  const flowRef = useRef(100)
+  useEffect(() => { flowRef.current = flow }, [flow])
   const logEnd = useRef<HTMLDivElement>(null)
   const serialSupported = typeof navigator !== "undefined" && !!navigator.serial
 
@@ -125,7 +130,11 @@ export default function BioHostPage() {
         onTemps: setTemps,
         onPosition: setPos,
         onProgress: setProg,
-        onLog: (k, t) => { if (k === "tx" && !showTxRef.current) return; if (k === "rx" && /^ok\s*$/.test(t)) return; pushLog(k, t) },
+        onLog: (k, t) => {
+          // R27 · captura E-steps do echo do M503/M92
+          if (k === "rx") { const m = t.match(/\bM92\b[^\n]*?\bE(-?[\d.]+)/); const v = m ? parseFloat(m[1]) : NaN; if (Number.isFinite(v) && v > 0 && v !== estepsReadRef.current) { estepsReadRef.current = v; setEstepsRead(v); setEsteps(v); pushLog("info", `E-steps lidos: ${v} steps/mm → êmbolo máx ${plungerMaxFeed(v)} mm/s`) } }
+          if (k === "tx" && !showTxRef.current) return; if (k === "rx" && /^ok\s*$/.test(t)) return; pushLog(k, t)
+        },
         onFinished: (ok, r) => {
           pushLog(ok ? "info" : "warn", ok ? "✅ Impressão concluída" : `⏹ ${r}`)
           setLastFinished({ ok, at: Date.now() })
@@ -138,6 +147,15 @@ export default function BioHostPage() {
       hostRef.current = host
       await host.connect()
       pushLog("info", `conectado (${transport === "mock" ? "simulador" : `USB ${baud} baud`}) · janela ${windowN} · ${firmware}`)
+      // R27 · prepara o eixo E para seringa: E relativo, extrusão a frio, lê E-steps e aplica limites do êmbolo
+      if (firmware !== "klipper") {
+        try {
+          await host.inject("M83"); await host.inject("M302 S0 P1")
+          try { await host.inject("M503") } catch { /* alguns firmwares não respondem */ }
+          for (const l of macroPlungerLimits(estepsReadRef.current)) await host.inject(l)
+          pushLog("info", `limites do êmbolo aplicados (R27): máx ${plungerMaxFeed(estepsReadRef.current)} mm/s${estepsReadRef.current ? ` (${estepsReadRef.current} steps/mm)` : " (3000 steps/mm assumidos — calibre abaixo)"}`)
+        } catch (e) { pushLog("warn", `preparação do eixo E falhou: ${(e as Error).message}`) }
+      }
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
   }, [transport, baud, firmware, windowN, serialSupported, pushLog, updateControl, state.control.tissueType, fbTissueId])
 
@@ -172,25 +190,26 @@ export default function BioHostPage() {
     const c = clampFlow(v); setFlow(c)
     void send(`M221 S${c}`).then(() => setFlowApplied(c))
   }, [send])
-  // R25 · empurra volume real (G1 E em M83) — funciona parado ou durante o stream (inject)
+  // R25/R27 · empurra volume REAL (G1 E em M83) — compensa o M221 ativo e respeita o teto do êmbolo
+  const ctx = useMemo(() => ({ syringeArea_mm2: syringeArea_mm2(syringe), plungerSpeed_mms: plungerMaxFeed(estepsRead), flowPercent: flow }), [syringe, estepsRead, flow])
   const pushNow = useCallback((uL: number) => {
-    const e = uL / syringeArea_mm2(syringe)
-    const f = Math.max(6, Math.round((e / Math.max(1.5, uL / 20)) * 60)) // ~20 µL/s, mínimo 0,1 mm/s de êmbolo
-    void send(["M83", `G1 E${e.toFixed(4)} F${f}  ; R25 empurrar ${uL} µL`])
-  }, [send, syringe])
+    const m = macroPrimeUl(uL, ctx, 10)
+    m[1] += `  ; R27 empurrar ${uL} µL (M221 ${flowRef.current} % compensado)`
+    void send(m)
+  }, [send, ctx])
   const confirmGoodFlow = useCallback(() => {
     setFlowMemory(rememberGoodFlow(flowMaterialKey, flowMaterialLabel, flow, flowStartRef.current))
   }, [flowMaterialKey, flowMaterialLabel, flow])
 
   const onFile = useCallback(async (f: File) => { setGcode(await f.text()); setGcodeName(f.name) }, [])
 
-  const ctx = useMemo(() => ({ syringeArea_mm2: syringeArea_mm2(syringe), plungerSpeed_mms: 2 }), [syringe])
   const connected = hs !== "disconnected"
   const printing = hs === "printing" || hs === "pausing" || hs === "resuming"
   const gLines = useMemo(() => gcode ? gcode.split(/\r?\n/).filter((l) => l.trim() && !l.trim().startsWith(";")).length : 0, [gcode])
 
   const jog = (axis: "X" | "Y" | "Z", d: number) => send(["G91", `G0 ${axis}${d} F${jogF}`, "G90"])
-  const jogE = (d: number) => send(["M83", `G1 E${d} F120`])
+  // R27 · jog do êmbolo com feed limitado (antes F120 = 2 mm/s fixo → perdia passos)
+  const jogE = (d: number) => send(["M83", `G1 E${d} F${Math.max(3, Math.round(Math.min(ctx.plungerSpeed_mms, 0.5) * 60))}`])
 
   return (
     <div className="space-y-5">
@@ -279,8 +298,9 @@ export default function BioHostPage() {
             <div className="mt-2 grid grid-cols-3 gap-1.5 text-xs">
               <button onClick={() => send(macroPrimeUl(5, ctx))} disabled={!connected} className="py-1.5 rounded-lg border border-white/10 disabled:opacity-40">Prime 5 µL</button>
               <button onClick={() => send(macroRetractUl(2, ctx))} disabled={!connected} className="py-1.5 rounded-lg border border-white/10 disabled:opacity-40">Retrair 2 µL</button>
-              <button onClick={() => send(macroPurge(2, 5, ctx))} disabled={!connected} className="py-1.5 rounded-lg border border-white/10 disabled:opacity-40">Purgar 10 µL</button>
+              <button onClick={() => send(macroPurge(10, 3, ctx))} disabled={!connected} className="py-1.5 rounded-lg border border-white/10 disabled:opacity-40">Purgar 30 µL (3 s)</button>
             </div>
+            <div className="mt-1.5 text-[10.5px] text-gray-500">Êmbolo máx {ctx.plungerSpeed_mms} mm/s {estepsRead ? `(${estepsRead} steps/mm lidos)` : "(3000 steps/mm assumidos)"} · volumes compensam o M221 atual ({flow} %).</div>
             <div className="mt-2 flex items-center gap-1 text-xs flex-wrap">
               <span className="text-gray-400">Êmbolo</span>
               {[0.1, 0.5, 1, 5].map((s) => <button key={s} onClick={() => setEStep(s)} className={cn("px-2 py-1 rounded border", eStep === s ? "border-emerald-400/50 bg-emerald-500/10" : "border-white/10")}>{s} mm</button>)}
@@ -294,10 +314,11 @@ export default function BioHostPage() {
                 <li>Meça quanto andou (d). Novo = atual × 10 / d.</li>
                 <li>Digite e aplique (M92 + M500).</li>
               </ol>
-              <div className="mt-1.5 flex gap-1.5">
-                <button onClick={() => send(MACRO_ESTEP_TEST)} disabled={!connected} className="px-2 py-1 rounded border border-white/10 disabled:opacity-40">Mover 10 mm</button>
+              <div className="mt-1.5 flex gap-1.5 flex-wrap">
+                <button onClick={() => send(MACRO_READ_SETTINGS)} disabled={!connected} className="px-2 py-1 rounded border border-white/10 disabled:opacity-40">Ler (M503)</button>
+                <button onClick={() => send(MACRO_ESTEP_TEST)} disabled={!connected} className="px-2 py-1 rounded border border-white/10 disabled:opacity-40">Mover 10 mm (20 s)</button>
                 <input type="number" value={esteps} onChange={(e) => setEsteps(+e.target.value)} className={cn(inp, "w-24")} />
-                <button onClick={() => send(macroSetEsteps(esteps))} disabled={!connected} className="px-2 py-1 rounded bg-amber-500/20 border border-amber-400/40 disabled:opacity-40">Aplicar M92</button>
+                <button onClick={() => { void send([...macroSetEsteps(esteps), ...macroPlungerLimits(esteps)]); estepsReadRef.current = esteps; setEstepsRead(esteps) }} disabled={!connected} className="px-2 py-1 rounded bg-amber-500/20 border border-amber-400/40 disabled:opacity-40">Aplicar M92 + limites</button>
               </div>
             </details>
           </Panel>
@@ -307,6 +328,7 @@ export default function BioHostPage() {
             materialLabel={flowMaterialLabel} memory={flowMemory} startPercent={flowStartRef.current}
             onChange={applyFlow} onConfirmGood={confirmGoodFlow}
             onPushNow={pushNow} syringeArea_mm2={syringeArea_mm2(syringe)}
+            eSteps={estepsRead} plungerMax_mms={ctx.plungerSpeed_mms}
           />
           <Panel title="Velocidade de impressão" icon={<Gauge className="w-4 h-4" />}>
             <Slider label="Velocidade (M220)" value={speed} min={20} max={200} onChange={setSpeed} onCommit={(v) => send(`M220 S${v}`)} disabled={!connected} />

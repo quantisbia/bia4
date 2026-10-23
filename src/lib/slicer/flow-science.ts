@@ -170,3 +170,120 @@ export function diagnoseFlow(P: Pick<SliceParams, "lineWidth_mm" | "layerHeight_
 export function suggestedFactor(material?: string | null, cls?: BioinkClass): number {
   return BIOINK_CLASSES[cls ?? classifyBioink(material)].extrusionFactor
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  R27 · Limites de movimento do eixo E para SERINGA (por que o motor trava)
+ *  ─────────────────────────────────────────────────────────────────────
+ *  O firmware vem configurado para FILAMENTO: E-steps ≈ 93–400 steps/mm,
+ *  jerk E = 5 mm/s, aceleração E = 3 000–10 000 mm/s², feed máx. E = 25 mm/s.
+ *  Um extrusor de seringa com fuso + redução tem 2 000–9 000 steps/mm. Um
+ *  `G1 E1 F200` (3,3 mm/s) pede 6 600–30 000 steps/s DE UMA VEZ (jerk > v):
+ *  o driver perde passos, o Marlin responde "ok" e o êmbolo não anda — a
+ *  impressão segue "seca". Isto acontecia na pré-carga, no prime/retração
+ *  (F120) e na purga do joystick (F200).
+ *
+ *  Regra prática (Cordova 2024 · Pusch 2018 · fóruns Marlin 8 bits):
+ *  taxa de passos segura ≈ 4 000 steps/s em placas 8 bits com outros eixos
+ *  em movimento; aceleração para atingir o máximo em ~0,25 s; jerk ≤ 0,2 mm/s.
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+/** Taxa de passos segura para o eixo E (steps/s) — 8 bits com XY em movimento. */
+export const SAFE_E_STEP_RATE = 4000
+/** E-steps assumidos quando o firmware não informa (conservador = alto). */
+export const ASSUMED_SYRINGE_ESTEPS = 3000
+
+export interface PlungerLimits {
+  /** steps/mm usados (lidos via M503 ou assumidos) */
+  eSteps: number
+  /** true quando usamos o valor assumido (não lido do firmware) */
+  assumed: boolean
+  /** velocidade máxima do êmbolo (mm/s) → M203 E */
+  maxFeed_mms: number
+  /** aceleração do êmbolo (mm/s²) → M201 E / M204 R */
+  accel_mms2: number
+  /** jerk do êmbolo (mm/s) → M205 E */
+  jerk_mms: number
+  /** taxa de passos resultante (steps/s) */
+  stepRate: number
+}
+
+/**
+ * Limites do êmbolo a partir dos E-steps. `maxOverride_mms` força um teto
+ * (perfil/usuário); nunca ultrapassa a taxa de passos segura.
+ */
+export function plungerLimits(eSteps?: number | null, maxOverride_mms?: number | null): PlungerLimits {
+  const assumed = !(eSteps && eSteps > 0)
+  const steps = assumed ? ASSUMED_SYRINGE_ESTEPS : (eSteps as number)
+  let maxFeed = SAFE_E_STEP_RATE / steps
+  maxFeed = Math.max(0.3, Math.min(5, maxFeed))
+  if (maxOverride_mms && maxOverride_mms > 0) maxFeed = Math.min(maxFeed, maxOverride_mms)
+  const r = (n: number, d = 3) => Math.round(n * 10 ** d) / 10 ** d
+  return {
+    eSteps: steps, assumed,
+    maxFeed_mms: r(maxFeed),
+    accel_mms2: r(Math.max(1, maxFeed * 4), 1),
+    jerk_mms: r(Math.min(0.2, maxFeed / 4)),
+    stepRate: Math.round(maxFeed * steps),
+  }
+}
+
+/** Linhas G-code (Marlin/RepRap) que aplicam os limites — sem M500 (não grava EEPROM). */
+export function plungerLimitsGcode(L: PlungerLimits, withComments = true): string[] {
+  const c = (s: string, k: string) => (withComments ? `${s.padEnd(22)} ; ${k}` : s)
+  return [
+    c(`M203 E${L.maxFeed_mms}`, `êmbolo máx ${L.maxFeed_mms} mm/s (${L.stepRate} steps/s @ ${L.eSteps}${L.assumed ? " assumidos" : ""} steps/mm)`),
+    c(`M201 E${L.accel_mms2}`, `aceleração do êmbolo`),
+    c(`M204 R${L.accel_mms2}`, `aceleração de movimentos só-E (prime/retração/purga)`),
+    c(`M205 E${L.jerk_mms}`, `jerk do êmbolo (sem solavanco → sem perda de passos)`),
+  ]
+}
+
+/** Lê E-steps de uma linha do M503 / M92 do Marlin: `echo:  M92 X80.00 Y80.00 Z400.00 E2000.00`. */
+export function parseEsteps(line: string): number | null {
+  const m = line.match(/\bM92\b[^\n]*?\bE(-?[\d.]+)/)
+  if (!m) return null
+  const v = parseFloat(m[1])
+  return Number.isFinite(v) && v > 0 ? v : null
+}
+
+/**
+ * Feed (mm/min) para mover `e_mm` de êmbolo em ~`seconds`, limitado pelos
+ * limites da seringa e com piso de 0,05 mm/s (fora do stick-slip).
+ */
+export function safePlungerFeed_mmmin(e_mm: number, seconds: number, L: PlungerLimits): number {
+  const v = Math.abs(e_mm) / Math.max(0.2, seconds)
+  const clamped = Math.max(0.05, Math.min(L.maxFeed_mms, v))
+  return Math.max(3, Math.round(clamped * 60))
+}
+
+export interface PushPlan { lines: string[]; e_mm: number; f_mmmin: number; seconds: number; flowCompensated: boolean }
+
+/**
+ * Empurra `uL` REAIS pela agulha com M83 e G1 E, compensando o M221 ativo
+ * (o Marlin multiplica TODO movimento de E pelo fluxo %, inclusive só-E).
+ * `rate_uLs` = vazão desejada (padrão 10 µL/s — agulha 22G a ~75 mm/s de jato).
+ */
+export function pushVolumePlan(uL: number, syringeArea_mm2: number, L: PlungerLimits, flowPercent = 100, rate_uLs = 10): PushPlan {
+  const fp = flowPercent > 0 ? flowPercent / 100 : 1
+  const eReal = uL / syringeArea_mm2
+  const eCmd = eReal / fp
+  const seconds = Math.max(0.5, uL / Math.max(0.5, rate_uLs))
+  const f = safePlungerFeed_mmmin(eCmd, seconds, L)
+  const actualSeconds = Math.abs(eCmd) / (f / 60)
+  return {
+    lines: ["M83", `G1 E${eCmd.toFixed(4)} F${f}`],
+    e_mm: Math.round(eCmd * 1e4) / 1e4, f_mmmin: f,
+    seconds: Math.round(actualSeconds * 10) / 10,
+    flowCompensated: Math.abs(fp - 1) > 1e-6,
+  }
+}
+
+/** Purga contínua: `rate_uLs` por `seconds` (volume = rate × s), com M221 compensado. */
+export function purgePlan(rate_uLs: number, seconds: number, syringeArea_mm2: number, L: PlungerLimits, flowPercent = 100): PushPlan {
+  return pushVolumePlan(rate_uLs * seconds, syringeArea_mm2, L, flowPercent, rate_uLs)
+}
+
+/** Remove overrides de fluxo/velocidade (M220/M221) de um G-code — o host aplica os seus. */
+export function isFlowOverrideLine(cmd: string): boolean {
+  return /^\s*M22[01]\b/i.test(cmd)
+}

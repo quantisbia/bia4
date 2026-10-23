@@ -31,11 +31,20 @@ export interface FlowBoostPanelProps {
   onPushNow?: (uL: number) => void
   /** Área da seringa (mm²) para mostrar quanto o êmbolo vai andar. */
   syringeArea_mm2?: number
+  /** R27 · E-steps lidos do firmware (null = assumidos) e teto do êmbolo (mm/s). */
+  eSteps?: number | null
+  plungerMax_mms?: number
 }
 
 export function FlowBoostPanel(p: FlowBoostPanelProps) {
-  const { flowPercent, appliedPercent, connected, streaming, materialLabel, memory, onChange, onConfirmGood, onPushNow, syringeArea_mm2 } = p
+  const { flowPercent, appliedPercent, connected, streaming, materialLabel, memory, onChange, onConfirmGood, onPushNow, syringeArea_mm2, eSteps, plungerMax_mms } = p
   const mmFor = (uL: number) => (syringeArea_mm2 ? ` (${(uL / syringeArea_mm2).toFixed(2)} mm de êmbolo)` : "")
+  const secFor = (uL: number) => {
+    if (!syringeArea_mm2 || !plungerMax_mms) return ""
+    const e = uL / syringeArea_mm2
+    const s = Math.max(uL / 10, e / plungerMax_mms)
+    return ` · ~${s < 10 ? s.toFixed(1) : Math.round(s)} s`
+  }
   const applied = appliedPercent === flowPercent
   const tone = flowPercent < 80 ? "amber" : flowPercent <= 160 ? "emerald" : "violet"
   const bump = nextFlowBump(flowPercent)
@@ -87,9 +96,15 @@ export function FlowBoostPanel(p: FlowBoostPanelProps) {
               ))}
             </div>
             <p className="text-[10.5px] text-rose-200/80 leading-snug">
-              Agulha 22G + luer têm ~45 µL de volume morto: até encher, nada aparece. O M221 só multiplica o E das próximas linhas —
-              em seringa de 10 mL isso é quase nada por mm. Empurre 50 µL e observe a ponta; repita até o filamento aparecer, depois imprima.
+              Agulha 22G + luer têm ~45 µL de volume morto: até encher, nada aparece. Empurre 50 µL{secFor(50)} e observe a ponta; repita até o filamento aparecer.
+              Durante a impressão o comando entra entre duas linhas do G-code (0,1–1 s) e o volume é <b>real</b> — já compensa o M221 ativo.
             </p>
+            {eSteps === null && (
+              <p className="text-[10.5px] text-amber-200/90 leading-snug flex gap-1"><AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" /> E-steps não lidos do firmware — êmbolo limitado a {plungerMax_mms ?? 1.33} mm/s (3000 steps/mm assumidos). Use <b>E-steps (M503)</b> nos Comandos rápidos para ler o valor real.</p>
+            )}
+            {typeof eSteps === "number" && plungerMax_mms && (
+              <p className="text-[10px] text-gray-400">E-steps {eSteps} steps/mm · êmbolo máx {plungerMax_mms} mm/s (limites M203/M201/M205 aplicados)</p>
+            )}
           </div>
         )}
 
@@ -99,7 +114,7 @@ export function FlowBoostPanel(p: FlowBoostPanelProps) {
             onClick={() => onChange(bump)}
             disabled={!connected || flowPercent >= FLOW_MAX}
             className="col-span-2 py-3.5 rounded-xl text-base font-bold bg-gradient-to-r from-amber-400 to-orange-400 text-black hover:from-amber-300 hover:to-orange-300 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-amber-900/30"
-            title={`Sobe o fluxo para ${bump} % imediatamente (M221)`}
+            title={`Sobe o fluxo para ${bump} % (M221) — vale a partir da próxima linha do G-code (0,1–1 s)`}
           >
             <AlertTriangle className="w-5 h-5" /> Não está saindo — aumentar para {bump} %
           </button>

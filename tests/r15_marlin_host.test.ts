@@ -48,10 +48,16 @@ describe("R15 · utilitários do host", () => {
     expect(stripComment("G1 X1 ; move")).toBe("G1 X1")
     expect(stripComment("; só comentário")).toBe("")
   })
-  it("macros de seringa convertem µL → mm de êmbolo", () => {
+  it("macros de seringa convertem µL → mm de êmbolo (R27: feed limitado pelo êmbolo, nunca F fixo)", () => {
     const ctx = { syringeArea_mm2: 165.13, plungerSpeed_mms: 2 }
-    expect(macroPrimeUl(16.513, ctx)[1]).toMatch(/^G1 E0\.1000 F120$/)
+    // 16,5 µL a ~10 µL/s = 1,65 s → 0,1 mm / 1,65 s = 0,06 mm/s → F4 (não mais F120 = 2 mm/s)
+    expect(macroPrimeUl(16.513, ctx)[1]).toMatch(/^G1 E0\.1000 F\d+$/)
+    const f = +(/F(\d+)/.exec(macroPrimeUl(16.513, ctx)[1])![1])
+    expect(f).toBeLessThanOrEqual(ctx.plungerSpeed_mms * 60)
+    expect(f).toBeGreaterThanOrEqual(3)
     expect(macroPurge(1, 10, ctx)[1]).toMatch(/^G1 E0\.0606/)
+    // compensação do M221: a 200 % o E comandado cai pela metade (volume real igual)
+    expect(macroPrimeUl(16.513, { ...ctx, flowPercent: 200 })[1]).toMatch(/^G1 E0\.0500/)
   })
 })
 
