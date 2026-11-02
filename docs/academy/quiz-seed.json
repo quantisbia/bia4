@@ -1,0 +1,848 @@
+{
+ "M00": {
+  "moduleSlug": "curso-pratico-intro",
+  "passingScore": 70,
+  "questions": [
+   {
+    "prompt": "Ao conectar a bioimpressora na BIA, o que deve acontecer antes de iniciar o G-code?",
+    "options": [
+     "Enviar `G28` para encontrar a origem mecânica",
+     "Posicionar o bico sobre o alvo e zerar com `G92`",
+     "Aquecer o hotend a 170 °C",
+     "Desligar os motores com `M18`"
+    ],
+    "correctIndex": 1,
+    "explanation": "bioimpressoras preservam bandeja/cartucho; a origem é definida onde o bico está (`G92 X0 Y0 Z0 E0`). `G28` pode colidir com a placa; não há hotend; `M18` solta os motores e perde a posição."
+   },
+   {
+    "prompt": "Você pede `E+10` e o êmbolo anda 1 mm. O firmware mostra `M92 E93`. Qual o novo valor?",
+    "options": [
+     "9,3",
+     "93",
+     "930",
+     "9 300"
+    ],
+    "correctIndex": 2,
+    "explanation": "novo = atual × pedido ÷ medido = 93 × 10 ÷ 1 = 930 steps/mm."
+   },
+   {
+    "prompt": "Por que a BIA faz uma \"pré-carga\" antes do primeiro cordão?",
+    "options": [
+     "Para aquecer a biotinta",
+     "Para encher o volume morto da agulha e do luer (~45 µL)",
+     "Para testar o motor X",
+     "Para limpar a mesa"
+    ],
+    "correctIndex": 1,
+    "explanation": "até a agulha encher, o êmbolo avança e nada sai na ponta — a cabeça \"imprime seco\"."
+   },
+   {
+    "prompt": "O fluxo (M221) já está em 200 % e ainda sai pouca biotinta. A atitude correta é:",
+    "options": [
+     "Subir para 400 %",
+     "Investigar E-steps, tamanho da seringa, agulha e temperatura",
+     "Aumentar a velocidade de impressão",
+     "Trocar o G-code por um de FDM"
+    ],
+    "correctIndex": 1,
+    "explanation": "M221 multiplica um E que pode ser quase zero; acima de ~150 % o sinal é de erro de calibração ou de material, não de fluxo."
+   },
+   {
+    "prompt": "Qual seringa faz o êmbolo andar mais por microlitro?",
+    "options": [
+     "BD 20 mL",
+     "BD 10 mL",
+     "BD 5 mL",
+     "BD 3 mL"
+    ],
+    "correctIndex": 3,
+    "explanation": "E = V ÷ área. A 3 mL (59 mm²) anda 2,8× mais que a 10 mL (165 mm²) para o mesmo volume — melhor resolução e menos stick-slip."
+   },
+   {
+    "prompt": "`M302 S0 P1` serve para:",
+    "options": [
+     "Zerar o eixo E",
+     "Gravar E-steps na EEPROM",
+     "Permitir extrusão com o hotend frio",
+     "Definir o fluxo em 100 %"
+    ],
+    "correctIndex": 2,
+    "explanation": "Marlin bloqueia `G1 E` abaixo de 170 °C por padrão (PREVENT_COLD_EXTRUSION); bioimpressão acontece a 4–37 °C."
+   },
+   {
+    "prompt": "O que o `M500` faz depois de `M92 E930`?",
+    "options": [
+     "Testa o motor",
+     "Salva a configuração na EEPROM (sobrevive ao desligar)",
+     "Move o êmbolo 500 passos",
+     "Reseta o firmware"
+    ],
+    "correctIndex": 1,
+    "explanation": "sem `M500`, o valor volta ao padrão no próximo boot — é a causa clássica de \"calibrei ontem e hoje desandou\"."
+   },
+   {
+    "prompt": "Qual destas NÃO é uma das 6 fases da BIA?",
+    "options": [
+     "Biotinta",
+     "Fatiamento",
+     "Esterilização em autoclave",
+     "Maturação"
+    ],
+    "correctIndex": 2,
+    "explanation": "as fases são Modelo de tecido · Biotinta · Fatiamento · Bioimpressão · Análise · Maturação. Esterilização é etapa do protocolo de laboratório, não uma fase da plataforma."
+   }
+  ]
+ },
+ "M01": {
+  "moduleSlug": "introducao-biofabricacao",
+  "passingScore": 70,
+  "questions": [
+   {
+    "prompt": "A característica essencial que distingue biofabricação de engenharia tecidual clássica é:",
+    "options": [
+     "Uso obrigatório de células-tronco",
+     "Automação do processo de fabricação",
+     "Impressão em 3D",
+     "Uso apenas de biomateriais sintéticos"
+    ],
+    "correctIndex": 1,
+    "explanation": "Groll et al. definem o campo pela geração *automatizada*; bioimpressão é um dos meios, não a definição."
+   },
+   {
+    "prompt": "\"Bioassembly\" refere-se a:",
+    "options": [
+     "Montar a bioimpressora",
+     "Montar construtos a partir de blocos celulares pré-formados (esferoides, organoides)",
+     "Esterilizar biomateriais",
+     "Semear células em scaffold acelular"
+    ],
+    "correctIndex": 1,
+    "explanation": "é o caminho scaffold-free da biofabricação, complementar à bioimpressão."
+   },
+   {
+    "prompt": "A tríade clássica da engenharia tecidual é:",
+    "options": [
+     "Impressora, tinta, software",
+     "Células, scaffold e sinais bioativos",
+     "Osso, cartilagem e pele",
+     "Síntese, reticulação e degradação"
+    ],
+    "correctIndex": 1,
+    "explanation": "Langer & Vacanti 1993; a biofabricação acrescenta o controle do *processo*."
+   },
+   {
+    "prompt": "Qual aplicação já é rotina em laboratórios e indústria hoje?",
+    "options": [
+     "Transplante de rim bioimpresso",
+     "Modelos de tecido para teste de fármacos e toxicologia",
+     "Coração funcional em escala humana",
+     "Fígado vascularizado implantável"
+    ],
+    "correctIndex": 1,
+    "explanation": "modelos *in vitro* (pele, fígado, tumor) não precisam de vascularização em escala e já substituem parte dos testes em animais."
+   },
+   {
+    "prompt": "O limite de difusão de oxigênio e nutrientes em tecido sem vasos é cerca de:",
+    "options": [
+     "2 µm",
+     "20 µm",
+     "200 µm",
+     "2 cm"
+    ],
+    "correctIndex": 2,
+    "explanation": "por isso construtos espessos precisam de canais vasculares ou perfusão — o maior gargalo do campo."
+   },
+   {
+    "prompt": "Qual dos itens abaixo NÃO é um gargalo reconhecido da biofabricação?",
+    "options": [
+     "Vascularização",
+     "Fonte e variabilidade celular",
+     "Custo do filamento PLA",
+     "Regulação como terapia avançada"
+    ],
+    "correctIndex": 2,
+    "explanation": "PLA é insumo de FDM; não é biotinta nem limitação científica do campo."
+   },
+   {
+    "prompt": "No Brasil, um construto bioimpresso com células para uso clínico seria regulado como:",
+    "options": [
+     "Cosmético",
+     "Dispositivo médico classe I",
+     "Produto de terapia avançada (ANVISA RDC 505/2021)",
+     "Suplemento"
+    ],
+    "correctIndex": 2,
+    "explanation": "produtos com células manipuladas entram na categoria de terapias avançadas, com exigências de boas práticas e ensaios clínicos."
+   },
+   {
+    "prompt": "A \"maturação\" de um construto bioimpresso acontece:",
+    "options": [
+     "Dentro da agulha",
+     "No slicer",
+     "Em cultura/biorreator após a impressão, por dias a semanas",
+     "No freezer a −80 °C"
+    ],
+    "correctIndex": 2,
+    "explanation": "células proliferam, depositam matriz e remodelam o construto; a impressão é só o começo (Fase 6 da BIA)."
+   }
+  ]
+ },
+ "M02": {
+  "moduleSlug": "biomateriais",
+  "passingScore": 70,
+  "questions": [
+   {
+    "prompt": "A principal vantagem dos biomateriais naturais (colágeno, gelatina, fibrina) é:",
+    "options": [
+     "Reprodutibilidade entre lotes",
+     "Presença nativa de sítios de adesão celular e degradação enzimática",
+     "Alta resistência mecânica",
+     "Ausência de endotoxinas"
+    ],
+    "correctIndex": 1,
+    "explanation": "células reconhecem motivos como RGD e clivam a matriz por MMPs; o preço é a variabilidade lote a lote."
+   },
+   {
+    "prompt": "Segundo Engler (2006), MSCs cultivadas em substrato de ~30 kPa tendem a:",
+    "options": [
+     "Neurogênese",
+     "Adipogênese",
+     "Osteogênese",
+     "Apoptose"
+    ],
+    "correctIndex": 2,
+    "explanation": "rigidez semelhante à do osteoide pré-mineralizado direciona para osso; ~1 kPa (cérebro) → neurônio; ~10 kPa (músculo) → mioblasto."
+   },
+   {
+    "prompt": "O alginato reticula instantaneamente em contato com:",
+    "options": [
+     "Luz UV",
+     "Íons cálcio (Ca²⁺)",
+     "Trombina",
+     "Calor a 37 °C"
+    ],
+    "correctIndex": 1,
+    "explanation": "modelo \"egg-box\": blocos G do alginato coordenam cátions divalentes. Reversível com quelantes (EDTA, citrato)."
+   },
+   {
+    "prompt": "GelMA precisa, para reticular, de:",
+    "options": [
+     "Apenas resfriamento",
+     "Fotoiniciador (LAP/Irgacure) + luz 365–405 nm",
+     "Cloreto de cálcio",
+     "pH ácido"
+    ],
+    "correctIndex": 1,
+    "explanation": "os grupos metacrilato polimerizam por radicais gerados pelo fotoiniciador. LAP é preferido (405 nm, menos citotóxico que Irgacure 2959 a 365 nm)."
+   },
+   {
+    "prompt": "Um scaffold que degrada em 3 dias para um defeito ósseo que leva 3 meses para regenerar é:",
+    "options": [
+     "Ideal — libera espaço para a célula",
+     "Inadequado — colapsa antes da neoformação de matriz",
+     "Indiferente",
+     "Melhor que PCL"
+    ],
+    "correctIndex": 1,
+    "explanation": "a taxa de degradação deve acompanhar a deposição de matriz nova; descompasso para qualquer lado compromete o resultado."
+   },
+   {
+    "prompt": "Qual material sintético é usado como reforço mecânico em scaffolds híbridos para osso?",
+    "options": [
+     "Pluronic F127",
+     "PCL",
+     "Gelatina",
+     "Ácido hialurônico"
+    ],
+    "correctIndex": 1,
+    "explanation": "PCL (módulo ~300–400 MPa, degradação por hidrólise em anos) imprime por fusão e dá sustentação enquanto o hidrogel carrega as células."
+   },
+   {
+    "prompt": "\"Biocompatibilidade\" significa:",
+    "options": [
+     "O material é inerte em qualquer contexto",
+     "O material produz a resposta adequada do hospedeiro na aplicação específica",
+     "O material é de origem natural",
+     "O material não degrada"
+    ],
+    "correctIndex": 1,
+    "explanation": "definição de Williams (2008): depende da aplicação, do local e do tempo. Nenhum material é universalmente biocompatível."
+   },
+   {
+    "prompt": "dECM (matriz extracelular descelularizada) é valorizada em biofabricação porque:",
+    "options": [
+     "É mais rígida que PCL",
+     "Preserva a composição bioquímica específica do tecido de origem",
+     "Não precisa de reticulação",
+     "É totalmente sintética"
+    ],
+    "correctIndex": 1,
+    "explanation": "mantém colágenos, GAGs e fatores de crescimento do tecido (fígado, coração, pele) — sinais que hidrogéis genéricos não têm."
+   }
+  ]
+ },
+ "M03": {
+  "moduleSlug": "biotintas",
+  "passingScore": 70,
+  "questions": [
+   {
+    "prompt": "O que diferencia uma biotinta de um biomaterial?",
+    "options": [
+     "Biotinta é sempre sintética",
+     "Biotinta é a formulação ajustada para ser impressa com células viáveis",
+     "Biomaterial não pode ser reticulado",
+     "Não há diferença — são sinônimos"
+    ],
+    "correctIndex": 1,
+    "explanation": "o biomaterial é o componente; a biotinta é o sistema completo (polímero + células + aditivos + reticulação) dentro da janela de printabilidade."
+   },
+   {
+    "prompt": "Um gel \"pseudoplástico\" (shear-thinning) é desejável porque:",
+    "options": [
+     "Fica mais viscoso quando cisalhado, protegendo as células",
+     "Afina ao passar pela agulha e recupera a viscosidade ao sair",
+     "Nunca reticula",
+     "Dispensa pré-carga"
+    ],
+    "correctIndex": 1,
+    "explanation": "baixa viscosidade dentro da agulha (menos cisalhamento nas células) e alta fora (cordão mantém forma) — o melhor dos dois mundos."
+   },
+   {
+    "prompt": "Para a mesma biotinta e o mesmo cordão, trocar a seringa de 10 mL por 3 mL faz o êmbolo:",
+    "options": [
+     "Andar ~2,8× menos por microlitro",
+     "Andar ~2,8× mais por microlitro",
+     "Andar a mesma distância",
+     "Parar de funcionar com M221"
+    ],
+    "correctIndex": 1,
+    "explanation": "E = V ÷ A. A área cai de 165 para 59 mm² → o mesmo volume exige 2,8× mais deslocamento, saindo da zona de stick-slip do fuso."
+   },
+   {
+    "prompt": "O fator de extrusão de 1,6× recomendado para hidrogéis moles existe porque:",
+    "options": [
+     "O slicer erra o cálculo de volume",
+     "O gel comprime, escorrega na parede e incha ao sair (die-swell)",
+     "As células ocupam 60 % do volume",
+     "A agulha 22G é muito larga"
+    ],
+    "correctIndex": 1,
+    "explanation": "o volume que realmente sai fica 20–60 % abaixo do teórico (Ribeiro 2017, Lee 2020); o fator compensa."
+   },
+   {
+    "prompt": "Segundo Blaeser (2016), qual faixa de tensão de cisalhamento na parede mantém viabilidade ≈ 96 %?",
+    "options": [
+     "< 5 kPa",
+     "5–10 kPa",
+     "10–20 kPa",
+     "> 20 kPa"
+    ],
+    "correctIndex": 0,
+    "explanation": "acima de 10 kPa a viabilidade cai para ≤ 76 %. A BIA calcula τ no BioSlicer quando você informa a viscosidade."
+   },
+   {
+    "prompt": "Para reduzir o cisalhamento sem trocar de biotinta, a medida mais eficaz é:",
+    "options": [
+     "Aumentar a velocidade de impressão",
+     "Usar agulha de diâmetro maior",
+     "Aumentar o fator de extrusão",
+     "Resfriar a mesa"
+    ],
+    "correctIndex": 1,
+    "explanation": "τ ∝ 1/R³ — dobrar o raio divide a tensão por 8. Velocidade maior *aumenta* Q e τ."
+   },
+   {
+    "prompt": "Pluronic F127 a 30 % deve ser carregado na seringa:",
+    "options": [
+     "A 37 °C",
+     "Frio (≈ 4 °C), pois é líquido abaixo de ~15 °C",
+     "Após reticulação com Ca²⁺",
+     "Misturado a fotoiniciador"
+    ],
+    "correctIndex": 1,
+    "explanation": "é um gel termorreversível invertido: líquido frio, gel morno. Carrega frio sem bolhas, imprime a ~25 °C."
+   },
+   {
+    "prompt": "Um cordão de alginato colapsa logo após sair da agulha. A causa mais provável é:",
+    "options": [
+     "Fator de extrusão muito baixo",
+     "Falta de pré-reticulação / yield stress insuficiente",
+     "Agulha muito fina",
+     "Velocidade de travel alta"
+    ],
+    "correctIndex": 1,
+    "explanation": "sem yield stress o gel escorre; adicionar gelatina, um pouco de Ca²⁺ ou resfriar o cartucho dá estrutura ao cordão antes do banho final."
+   }
+  ]
+ },
+ "M04": {
+  "moduleSlug": "bioimpressao-3d",
+  "passingScore": 70,
+  "questions": [
+   {
+    "prompt": "Qual técnica de bioimpressão aceita biotintas mais viscosas e maior densidade celular?",
+    "options": [
+     "Jato de tinta (inkjet)",
+     "Extrusão",
+     "Estereolitografia",
+     "Laser-assisted"
+    ],
+    "correctIndex": 1,
+    "explanation": "extrusão trabalha de 10 a > 1000 Pa·s e com 10⁶–10⁸ células/mL; inkjet exige < 10 mPa·s e poucas células por gota."
+   },
+   {
+    "prompt": "A regra prática para altura de camada em hidrogel é:",
+    "options": [
+     "Igual ao diâmetro da agulha",
+     "70–90 % do diâmetro da agulha",
+     "2× o diâmetro da agulha",
+     "Sempre 0,1 mm"
+    ],
+    "correctIndex": 1,
+    "explanation": "um pouco menor que a agulha garante que o cordão toque e adira à camada anterior sem ser esmagado."
+   },
+   {
+    "prompt": "Você aumentou a velocidade de 6 para 12 mm/s sem mudar mais nada. O cordão deve ficar:",
+    "options": [
+     "Mais largo",
+     "Mais fino e com falhas",
+     "Igual — o slicer compensa sozinho",
+     "Mais alto"
+    ],
+    "correctIndex": 1,
+    "explanation": "o slicer já calculou E por mm para a velocidade original; na impressora, mudar só a velocidade (M220) mantém E/mm, mas a pressão do gel não acompanha e o cordão estira."
+   },
+   {
+    "prompt": "Para um scaffold que precisa de poros interconectados ~300 µm para nutrição por difusão, o infill mais indicado é:",
+    "options": [
+     "Concêntrico 100 %",
+     "Rectilinear 0/90 com espaçamento calculado",
+     "Sem infill (só paredes)",
+     "Gradiente 90 %"
+    ],
+    "correctIndex": 1,
+    "explanation": "o woodpile 0/90 produz poros quadrados previsíveis (espaçamento − largura) e canais retos interconectados em Z."
+   },
+   {
+    "prompt": "O que o padrão \"zigzag\" melhora em relação ao \"rectilinear\"?",
+    "options": [
+     "Aumenta a resistência mecânica",
+     "Reduz arranques de extrusão (menos gotas)",
+     "Permite agulhas menores",
+     "Elimina a necessidade de retração"
+    ],
+    "correctIndex": 1,
+    "explanation": "as linhas são conectadas em um caminho contínuo, então o êmbolo não para e recomeça a cada linha."
+   },
+   {
+    "prompt": "Por que o G-code da BIA NÃO contém `G28`?",
+    "options": [
+     "Porque é mais rápido",
+     "Porque a bioimpressora pode ter placa/cartucho montados e o home mecânico colidiria",
+     "Porque o Marlin não aceita G28",
+     "Porque G92 é mais preciso que G28"
+    ],
+    "correctIndex": 1,
+    "explanation": "a origem é definida onde o bico está (G92). Home mecânico destruiria a amostra ou o cartucho."
+   },
+   {
+    "prompt": "Um cordão de 0,47 mm de largura com espaçamento de 0,5 mm entre linhas tende a:",
+    "options": [
+     "Formar poros nítidos",
+     "Fundir com o vizinho",
+     "Quebrar",
+     "Não aderir"
+    ],
+    "correctIndex": 1,
+    "explanation": "Ribeiro 2017 — espaçamento < 1,4× o cordão (aqui 0,66 mm) leva à fusão de filamentos e fechamento dos poros."
+   },
+   {
+    "prompt": "\"Pré-carga\" e \"retração\" no G-code da BIA servem, respectivamente, para:",
+    "options": [
+     "Aquecer e resfriar a agulha",
+     "Encher a agulha antes do 1º cordão e aliviar pressão em travels longos",
+     "Mover em X e em Y",
+     "Zerar o E e medir o cordão"
+    ],
+    "correctIndex": 1,
+    "explanation": "a pré-carga cobre o volume morto (~45 µL); a retração evita que o gel continue saindo enquanto a cabeça viaja sem imprimir."
+   }
+  ]
+ },
+ "M05": {
+  "moduleSlug": "arquitetura-3d",
+  "passingScore": 70,
+  "questions": [
+   {
+    "prompt": "Um scaffold com 85 % de porosidade mas poros fechados (não interconectados) é:",
+    "options": [
+     "Ideal para osso",
+     "Inadequado — células do interior não recebem nutrientes",
+     "Melhor que um gyroid",
+     "Indicado para cartilagem"
+    ],
+    "correctIndex": 1,
+    "explanation": "interconectividade é o que permite difusão, migração e vascularização; porosidade total sozinha não diz nada."
+   },
+   {
+    "prompt": "A faixa de tamanho de poro mais citada para regeneração óssea vascularizada é:",
+    "options": [
+     "5–20 µm",
+     "50–100 µm",
+     "300–500 µm",
+     "1–2 mm"
+    ],
+    "correctIndex": 2,
+    "explanation": "Karageorgiou & Kaplan 2005: > 300 µm favorece vascularização e osteogênese direta."
+   },
+   {
+    "prompt": "A principal vantagem geométrica das superfícies TPMS (gyroid) sobre grades 0/90 é:",
+    "options": [
+     "Serem mais fáceis de imprimir",
+     "Curvatura suave com interconexão total e distribuição isotrópica de tensões",
+     "Poros maiores",
+     "Não precisarem de suporte"
+    ],
+    "correctIndex": 1,
+    "explanation": "curvatura média zero → sem concentradores de tensão; permeabilidade e área superficial altas para a mesma porosidade."
+   },
+   {
+    "prompt": "Com agulha 22G (cordão ≈ 0,47 mm) e espaçamento de 0,8 mm, o poro resultante num woodpile 0/90 é aproximadamente:",
+    "options": [
+     "0,8 mm",
+     "0,47 mm",
+     "0,33 mm",
+     "1,27 mm"
+    ],
+    "correctIndex": 2,
+    "explanation": "poro ≈ espaçamento − largura do cordão = 0,80 − 0,47 = 0,33 mm."
+   },
+   {
+    "prompt": "Scaffolds com gradiente de porosidade são indicados para:",
+    "options": [
+     "Peças homogêneas de teste",
+     "Interfaces entre tecidos (osteocondral, derme-epiderme)",
+     "Reduzir tempo de impressão",
+     "Evitar reticulação"
+    ],
+    "correctIndex": 1,
+    "explanation": "reproduzem a transição natural (osso cortical→esponjoso, cartilagem zonal); a BIA gera por faixas de camadas."
+   },
+   {
+    "prompt": "Querer poros de 80 µm com agulha 22G por extrusão é:",
+    "options": [
+     "Possível aumentando a velocidade",
+     "Fisicamente inviável — o cordão é 5× maior que o poro desejado",
+     "Possível com fator de extrusão 0,5×",
+     "Recomendado para cartilagem"
+    ],
+    "correctIndex": 1,
+    "explanation": "resolução da extrusão ≈ diâmetro da agulha; para < 100 µm, use agulha ≤ 30G ou técnica por luz (DLP/2-fóton)."
+   },
+   {
+    "prompt": "Infill concêntrico é mais indicado para:",
+    "options": [
+     "Osso trabecular",
+     "Geometrias anelares/tubulares (vasos, córnea)",
+     "Pele",
+     "Esferoides"
+    ],
+    "correctIndex": 1,
+    "explanation": "anéis seguem o contorno e dão boa compressão radial, mas têm baixa interconexão em XY — ruim para blocos maciços."
+   },
+   {
+    "prompt": "\"Curvatura\" de uma superfície de scaffold influencia a célula porque:",
+    "options": [
+     "Muda a cor do material",
+     "Altera a tensão do citoesqueleto e a deposição de matriz (mecanotransdução)",
+     "Acelera a degradação",
+     "Não influencia"
+    ],
+    "correctIndex": 1,
+    "explanation": "células em superfícies côncavas depositam matriz mais rápido (Rumpler 2008); TPMS exploram isso."
+   }
+  ]
+ },
+ "M06": {
+  "moduleSlug": "celulas",
+  "passingScore": 70,
+  "questions": [
+   {
+    "prompt": "Por que modelos 3D predizem a resposta a fármacos melhor que cultura 2D?",
+    "options": [
+     "Porque usam mais células",
+     "Porque recuperam interações célula-célula/matriz e gradientes semelhantes ao tecido",
+     "Porque são mais baratos",
+     "Porque dispensam soro"
+    ],
+    "correctIndex": 1,
+    "explanation": "em 2D a célula achata e polariza artificialmente; em 3D morfologia, sinalização e difusão se aproximam do *in vivo*."
+   },
+   {
+    "prompt": "Para um modelo de triagem reprodutível em larga escala, a fonte celular mais adequada é:",
+    "options": [
+     "Primárias de cada paciente",
+     "Linhagem imortalizada",
+     "iPSC diferenciadas caso a caso",
+     "Biópsia fresca"
+    ],
+    "correctIndex": 1,
+    "explanation": "linhagens são homogêneas e ilimitadas; o preço é o desvio genético em relação ao tecido normal."
+   },
+   {
+    "prompt": "A densidade celular típica numa biotinta de extrusão é:",
+    "options": [
+     "10³–10⁴ células/mL",
+     "10⁶–2 × 10⁷ células/mL",
+     "10⁹ células/mL",
+     "1 célula por cordão"
+    ],
+    "correctIndex": 1,
+    "explanation": "abaixo de 1 milhão/mL não há tecido; acima de 20 milhões a tinta entope e o oxigênio não basta."
+   },
+   {
+    "prompt": "Um esferoide de 600 µm de diâmetro tende a apresentar:",
+    "options": [
+     "Proliferação uniforme",
+     "Núcleo hipóxico/necrótico",
+     "Fusão impossível",
+     "Ausência de matriz"
+    ],
+    "correctIndex": 1,
+    "explanation": "o limite de difusão (~200 µm da superfície) deixa o centro sem O₂ acima de ~400 µm de diâmetro."
+   },
+   {
+    "prompt": "A propriedade dos esferoides que fundamenta o bioassembly é:",
+    "options": [
+     "Serem transparentes",
+     "Fundirem-se espontaneamente quando em contato",
+     "Não produzirem matriz",
+     "Serem imortais"
+    ],
+    "correctIndex": 1,
+    "explanation": "tensão superficial tecidual leva agregados vizinhos a coalescer — princípio do Kenzan e da bioimpressão por aspiração."
+   },
+   {
+    "prompt": "O ensaio Live/Dead (calceína AM / etídio homodímero) mede:",
+    "options": [
+     "Proliferação ao longo de dias",
+     "Viabilidade por integridade de membrana em um instante",
+     "Diferenciação",
+     "Expressão gênica"
+    ],
+    "correctIndex": 1,
+    "explanation": "calceína marca células com esterases ativas (vivas, verde); etídio entra só em membranas rompidas (mortas, vermelho). É instantâneo; proliferação exige ensaio metabólico."
+   },
+   {
+    "prompt": "Qual fonte celular carrega risco de formação de teratoma se indiferenciada?",
+    "options": [
+     "MSC de tecido adiposo",
+     "Fibroblastos primários",
+     "iPSC",
+     "Condrócitos"
+    ],
+    "correctIndex": 2,
+    "explanation": "células pluripotentes residuais podem formar tumores de três folhetos; protocolos clínicos exigem purificação rigorosa."
+   },
+   {
+    "prompt": "Uma viabilidade de 85 % no dia 0 que sobe para 95 % no dia 7 indica:",
+    "options": [
+     "Erro de contagem",
+     "Perda inicial por cisalhamento seguida de proliferação/recuperação — resultado esperado",
+     "Contaminação",
+     "Falha de reticulação"
+    ],
+    "correctIndex": 1,
+    "explanation": "a impressão mata parte das células (cisalhamento, pressão); as sobreviventes proliferam e a proporção de vivas sobe."
+   }
+  ]
+ },
+ "M07": {
+  "moduleSlug": "tecidos",
+  "passingScore": 70,
+  "questions": [
+   {
+    "prompt": "Para estratificar a epiderme de uma pele bioimpressa, a etapa indispensável é:",
+    "options": [
+     "Reticulação com Ca²⁺",
+     "Cultura em interface ar-líquido por 7–14 dias",
+     "Compressão dinâmica",
+     "Perfusão imediata"
+    ],
+    "correctIndex": 1,
+    "explanation": "queratinócitos só formam camadas córneas quando expostos ao ar; submersos, não diferenciam."
+   },
+   {
+    "prompt": "Por que scaffolds ósseos para carga são híbridos (PCL/cerâmica + hidrogel)?",
+    "options": [
+     "Porque hidrogel não reticula com células",
+     "Porque hidrogel celularizado não sustenta carga mecânica; o polímero/cerâmica dá o esqueleto",
+     "Porque PCL é osteoindutor",
+     "Porque é mais barato"
+    ],
+    "correctIndex": 1,
+    "explanation": "módulo de hidrogéis (kPa) é 10³–10⁶× menor que o do osso (GPa); o reforço dá forma e rigidez enquanto o hidrogel carrega células."
+   },
+   {
+    "prompt": "Condrócitos em cultura 2D por muitas passagens:",
+    "options": [
+     "Proliferam mais e mantêm fenótipo",
+     "Desdiferenciam para fenótipo fibroblástico (colágeno I em vez de II)",
+     "Tornam-se osteoblastos",
+     "Morrem em 24 h"
+    ],
+    "correctIndex": 1,
+    "explanation": "use passagem ≤ 2 ou re-diferencie em 3D com TGF-β; é o erro clássico em cartilagem."
+   },
+   {
+    "prompt": "Qual estratégia de vascularização usa uma tinta que é removida depois da impressão?",
+    "options": [
+     "Coaxial",
+     "Canais sacrificiais (Pluronic, gelatina, carboidrato)",
+     "Pré-vascularização por auto-organização",
+     "FRESH"
+    ],
+    "correctIndex": 1,
+    "explanation": "o material sacrificial ocupa o lugar do canal, é dissolvido (frio, água, enzima) e o canal é perfundido e endotelizado."
+   },
+   {
+    "prompt": "Na bioimpressão coaxial de um vaso, o núcleo e a casca contêm, tipicamente:",
+    "options": [
+     "Núcleo: HAp · casca: PCL",
+     "Núcleo: células endoteliais/meio ou sacrificial · casca: hidrogel estrutural",
+     "Núcleo: queratinócitos · casca: fibroblastos",
+     "Núcleo: ar · casca: alginato"
+    ],
+    "correctIndex": 1,
+    "explanation": "a casca de alginato/GelMA reticula ao sair (CaCl₂ no núcleo ou externo) formando um tubo oco já com endotélio."
+   },
+   {
+    "prompt": "A maior vantagem da cartilagem para a biofabricação é ser:",
+    "options": [
+     "Altamente vascularizada",
+     "Avascular — não exige rede de vasos para sobreviver",
+     "Rica em células",
+     "De regeneração rápida"
+    ],
+    "correctIndex": 1,
+    "explanation": "nutrição por difusão a partir do líquido sinovial; a desvantagem é a baixa celularidade e capacidade regenerativa."
+   },
+   {
+    "prompt": "O meio osteogênico padrão contém:",
+    "options": [
+     "TGF-β3 e insulina",
+     "Dexametasona, β-glicerofosfato e ácido ascórbico",
+     "Trombina e fibrinogênio",
+     "EGF e KGF"
+    ],
+    "correctIndex": 1,
+    "explanation": "o trio induz MSC a osteoblastos e fornece fosfato para mineralização (ALP↑, nódulos de cálcio em 21 d)."
+   },
+   {
+    "prompt": "Um construto de pele de 2 mm de espessura sem vascularização, após 7 dias, provavelmente mostrará:",
+    "options": [
+     "Epiderme perfeita e derme viável",
+     "Necrose central da derme por limite de difusão",
+     "Mineralização",
+     "Formação espontânea de vasos"
+    ],
+    "correctIndex": 1,
+    "explanation": "2 mm ≫ 200 µm de difusão; derme espessa exige pré-vascularização ou canais perfundidos."
+   }
+  ]
+ },
+ "M09": {
+  "moduleSlug": "avaliacao-celular",
+  "passingScore": 70,
+  "questions": [
+   {
+    "prompt": "Um poro impresso tem perímetro L = 4 mm e área A = 0,8 mm². O Pr é:",
+    "options": [
+     "0,5",
+     "1,0",
+     "1,25",
+     "5,0"
+    ],
+    "correctIndex": 2,
+    "explanation": "Pr = L²/16A = 16/(16 × 0,8) = 1,25 → cordão irregular, gel sobre-gelificado (ou muito viscoso)."
+   },
+   {
+    "prompt": "Pr < 1 indica:",
+    "options": [
+     "Poro perfeito",
+     "Gel escorreu / sub-gelificado (poros arredondados)",
+     "Cordão quebradiço",
+     "Agulha entupida"
+    ],
+    "correctIndex": 1,
+    "explanation": "bordas se arredondam porque o gel flui depois de depositado; aumente pré-reticulação ou viscosidade."
+   },
+   {
+    "prompt": "Por que medir viabilidade em vários planos Z do construto?",
+    "options": [
+     "Para gastar menos reagente",
+     "Porque a superfície pode estar viva e o centro morto (difusão)",
+     "Porque o confocal exige",
+     "Não é necessário"
+    ],
+    "correctIndex": 1,
+    "explanation": "oxigênio e corante penetram ~200 µm; só a superfície dá um número otimista e falso."
+   },
+   {
+    "prompt": "Qual ensaio permite acompanhar a proliferação",
+    "options": [
+     "MTT",
+     "alamarBlue (resazurina)",
+     "Live/Dead com fixação",
+     "Histologia H&E"
+    ],
+    "correctIndex": 1,
+    "explanation": "a resazurina é reduzida por células metabolicamente ativas e o meio é trocado; a amostra segue em cultura. MTT precipita formazan e mata."
+   },
+   {
+    "prompt": "Para confirmar mineralização num scaffold ósseo, a coloração indicada é:",
+    "options": [
+     "Alcian blue",
+     "Alizarin red / von Kossa",
+     "Safranin O",
+     "Oil red O"
+    ],
+    "correctIndex": 1,
+    "explanation": "Alizarin red liga cálcio; von Kossa, fosfato. Alcian blue e Safranin O marcam GAG (cartilagem); Oil red, lipídio (adiposo)."
+   },
+   {
+    "prompt": "Em cartilagem engenheirada, a razão colágeno II / colágeno I alta indica:",
+    "options": [
+     "Fibrose",
+     "Fenótipo condrocítico hialino preservado",
+     "Mineralização",
+     "Morte celular"
+    ],
+    "correctIndex": 1,
+    "explanation": "colágeno II é marca da cartilagem hialina; colágeno I predomina em fibrocartilagem/desdiferenciação."
+   },
+   {
+    "prompt": "Um controle negativo adequado para provar osteoindução é:",
+    "options": [
+     "Scaffold sem células",
+     "Mesmo scaffold + células em meio **sem** indutores osteogênicos",
+     "Placa 2D com células",
+     "Nenhum — a coloração positiva basta"
+    ],
+    "correctIndex": 1,
+    "explanation": "sem o controle, não se distingue efeito do scaffold/células do efeito do meio."
+   },
+   {
+    "prompt": "A largura do cordão medida é 0,70 mm para agulha de 0,41 mm (1,7×). Interpretação:",
+    "options": [
+     "Normal — die-swell esperado",
+     "Sobre-extrusão ou altura de camada baixa esmagando o cordão",
+     "Agulha errada",
+     "Velocidade alta demais"
+    ],
+    "correctIndex": 1,
+    "explanation": "die-swell típico é 1,0–1,3×; 1,7× indica excesso de material ou esmagamento — reduza fluxo (M221) ou aumente a altura de camada."
+   }
+  ]
+ }
+}
