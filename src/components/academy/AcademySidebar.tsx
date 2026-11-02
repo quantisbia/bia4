@@ -29,6 +29,7 @@ import {
 import { cn } from "@/lib/utils/helpers"
 import { ThemeToggle } from "@/components/ui/ThemeToggle"
 import { LocaleSwitcher } from "@/components/ui/LocaleSwitcher"
+import { NotificationBell } from "@/components/academy/NotificationBell"
 
 export const ACADEMY_NAV_ITEMS = [
   { href: "/academy/dashboard",  label: "Dashboard",     icon: LayoutDashboard, exact: true,
@@ -239,6 +240,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       {/* ── Bottom section ── */}
       <div className="px-2 pb-3 border-t border-white/[0.06] pt-2 space-y-0.5">
+        {/* R28 · sininho de notificações (material novo, aulas, avisos) */}
+        <NotificationBell onNavigate={onNavigate} />
         {BOTTOM_ITEMS.map(item => {
           const active = isActive(item.href, item.exact)
           return (

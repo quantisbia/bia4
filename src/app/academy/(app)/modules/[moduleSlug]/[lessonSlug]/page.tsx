@@ -46,6 +46,7 @@ export default async function AcademyLessonPage({ params }: PageProps) {
         where: { slug: lessonSlug },
         include: {
           attachments: { orderBy: { createdAt: "asc" } },
+          files: { where: { ready: true }, orderBy: { createdAt: "asc" }, select: { id: true, title: true, fileName: true, sizeBytes: true } }, // R28
           quiz: { select: { id: true, passingScore: true } },
         },
       },
@@ -120,6 +121,7 @@ export default async function AcademyLessonPage({ params }: PageProps) {
           title: a.title,
           url: a.url,
         })),
+        files: lesson.files,
         hasQuiz: !!lesson.quiz,
         quizPassingScore: lesson.quiz?.passingScore ?? null,
       }}

@@ -26,7 +26,7 @@ const UpdateLessonSchema = z.object({
   slug: z.string().min(2).max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
   order: z.number().int().min(1).max(99).optional(),
   title: z.string().min(3).max(200).optional(),
-  youtubeInput: z.string().min(1).optional(),
+  youtubeInput: z.string().max(300).nullable().optional(), // R28: "" ou null remove o vídeo
   objective: z.string().max(5000).nullable().optional(),
   summary: z.string().max(20000).nullable().optional(),
   durationMin: z.number().int().min(0).max(600).optional(),
@@ -84,14 +84,19 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
 
   // YouTube: extract se veio
   if (parsed.data.youtubeInput !== undefined) {
-    const extracted = extractYoutubeId(parsed.data.youtubeInput)
-    if (!extracted) {
-      return NextResponse.json(
-        { error: "INVALID_YOUTUBE", message: "URL/ID do YouTube inválido." },
-        { status: 400 },
-      )
+    const raw = (parsed.data.youtubeInput ?? "").trim()
+    if (!raw) {
+      data.youtubeId = null // R28: aula sem vídeo (só PDF/anexos)
+    } else {
+      const extracted = extractYoutubeId(raw)
+      if (!extracted) {
+        return NextResponse.json(
+          { error: "INVALID_YOUTUBE", message: "URL/ID do YouTube inválido (deixe vazio para remover o vídeo)." },
+          { status: 400 },
+        )
+      }
+      data.youtubeId = extracted
     }
-    data.youtubeId = extracted
   }
 
   // Passthrough simples

@@ -9,6 +9,7 @@ import { buildYoutubeThumbnailUrl } from "@/lib/academy/youtube"
 import { ChevronLeft, ExternalLink } from "lucide-react"
 import { LessonEditForm } from "./_components/LessonEditForm"
 import { AttachmentsManager } from "./_components/AttachmentsManager"
+import { FilesManager } from "./_components/FilesManager"
 
 export const dynamic = "force-dynamic"
 
@@ -30,6 +31,7 @@ export default async function AdminLessonPage({ params }: PageProps) {
         where: { slug: lessonSlug },
         include: {
           attachments: { orderBy: { createdAt: "asc" } },
+          files: { orderBy: { createdAt: "asc" }, select: { id: true, title: true, fileName: true, sizeBytes: true, ready: true, createdAt: true } },
         },
       },
     },
@@ -37,7 +39,7 @@ export default async function AdminLessonPage({ params }: PageProps) {
   if (!mod || mod.lessons.length === 0) notFound()
 
   const lesson = mod.lessons[0]
-  const thumb = buildYoutubeThumbnailUrl(lesson.youtubeId)
+  const thumb = lesson.youtubeId ? buildYoutubeThumbnailUrl(lesson.youtubeId) : null
 
   const biaHookObj = (lesson.biaHook as { tool?: string; label?: string; params?: Record<string, unknown> } | null) ?? null
 
@@ -73,7 +75,7 @@ export default async function AdminLessonPage({ params }: PageProps) {
             }`}>
               {lesson.isPublished ? "Publicada" : "Rascunho"}
             </span>
-            <span>YouTube ID: <code className="text-gray-400">{lesson.youtubeId}</code></span>
+            <span>{lesson.youtubeId ? <>YouTube ID: <code className="text-gray-400">{lesson.youtubeId}</code></> : <span className="text-amber-300/90">📄 Aula de leitura (sem vídeo)</span>}</span>
             {lesson.isPublished && (
               <Link
                 href={`/academy/modules/${mod.slug}/${lesson.slug}`}
@@ -87,7 +89,7 @@ export default async function AdminLessonPage({ params }: PageProps) {
         </div>
 
         {/* Thumbnail YT */}
-        {thumb && !lesson.youtubeId.startsWith("PLACEHOLDER") && (
+        {thumb && lesson.youtubeId && !lesson.youtubeId.startsWith("PLACEHOLDER") && (
           <a
             href={`https://youtu.be/${lesson.youtubeId}`}
             target="_blank"
@@ -130,10 +132,17 @@ export default async function AdminLessonPage({ params }: PageProps) {
         />
       </section>
 
+      {/* R28 · PDFs (upload) */}
+      <section className="rounded-2xl border border-amber-400/20 bg-amber-500/[0.03] p-6">
+        <h2 className="text-sm font-bold text-white mb-1">📄 Materiais em PDF ({lesson.files.length})</h2>
+        <p className="text-[11px] text-gray-500 mb-4">Upload direto — fica guardado na BIA e só alunos com matrícula ativa conseguem abrir.</p>
+        <FilesManager lessonId={lesson.id} moduleSlug={mod.slug} lessonSlug={lesson.slug} files={lesson.files} />
+      </section>
+
       {/* Anexos */}
       <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-6">
         <h2 className="text-sm font-bold text-white mb-4">
-          📎 Anexos ({lesson.attachments.length})
+          🔗 Links externos ({lesson.attachments.length})
         </h2>
         <AttachmentsManager
           lessonId={lesson.id}

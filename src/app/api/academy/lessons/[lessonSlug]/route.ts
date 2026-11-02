@@ -74,6 +74,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
           attachments: {
             orderBy: { createdAt: "asc" },
           },
+          files: { where: { ready: true }, orderBy: { createdAt: "asc" }, select: { id: true, title: true, fileName: true, sizeBytes: true } }, // R28
           quiz: {
             include: {
               questions: {
@@ -161,6 +162,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
       level: lesson.level,
       biaHook: lesson.biaHook,
       attachments: lesson.attachments,
+      files: lesson.files,
       quiz: lesson.quiz,
     },
     module: {

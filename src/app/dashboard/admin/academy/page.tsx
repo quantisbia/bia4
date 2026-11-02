@@ -108,6 +108,25 @@ export default async function AcademyAdminHomePage() {
         </div>
       </div>
 
+      {/* Card: Avisos para a turma (R28) */}
+      <Link
+        href="/dashboard/admin/academy/notifications"
+        data-testid="admin-academy-notifications-card"
+        className="group flex items-center gap-4 rounded-xl border border-cyan-500/30 bg-gradient-to-r from-cyan-500/[0.06] to-fuchsia-500/[0.04] hover:border-cyan-500/50 hover:from-cyan-500/[0.1] p-4 transition-all"
+      >
+        <div className="w-12 h-12 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center shrink-0">
+          <Sparkles className="w-6 h-6 text-cyan-300" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <h2 className="text-base font-bold text-white">Avisos para a turma</h2>
+            <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-200">R28</span>
+          </div>
+          <p className="text-xs text-gray-400 line-clamp-1">Material novo, aula publicada ou comunicado → sininho de todos os alunos + e-mail (Resend) com descadastro.</p>
+        </div>
+        <ArrowRight className="w-5 h-5 text-cyan-300 group-hover:translate-x-1 transition-transform shrink-0" />
+      </Link>
+
       {/* Card: Leads da biblioteca (R13.14.1) */}
       <Link
         href="/dashboard/admin/academy/leads"

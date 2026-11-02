@@ -129,14 +129,13 @@ export function NewLessonForm({
       <div>
         <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1.5 mb-1.5">
           <Video className="w-3 h-3 text-red-400" />
-          URL do YouTube (ou ID de 11 caracteres)
+          URL do YouTube (ou ID) — opcional
         </label>
         <input
           type="text"
           value={youtubeInput}
           onChange={e => setYoutubeInput(e.target.value)}
-          required
-          placeholder="ex: https://youtu.be/dQw4w9WgXcQ  ou  https://youtube.com/watch?v=…  ou  dQw4w9WgXcQ"
+          placeholder="opcional — deixe vazio para aula só com PDF (ex: https://youtu.be/dQw4w9WgXcQ)"
           data-testid="new-lesson-youtube"
           className={`${INPUT_CLASS} font-mono text-xs`}
         />
@@ -187,7 +186,7 @@ export function NewLessonForm({
       <div className="flex justify-end pt-1">
         <button
           type="submit"
-          disabled={busy || !title.trim() || !slug.trim() || !youtubeInput.trim()}
+          disabled={busy || !title.trim() || !slug.trim()}
           data-testid="new-lesson-submit"
           className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 px-4 py-2 rounded-xl shadow-lg shadow-fuchsia-900/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >

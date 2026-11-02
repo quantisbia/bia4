@@ -14,7 +14,7 @@ type LessonData = {
   slug: string
   order: number
   title: string
-  youtubeId: string
+  youtubeId: string | null
   objective: string | null
   summary: string | null
   durationMin: number
@@ -44,7 +44,7 @@ export function LessonEditForm({ lesson, moduleSlug }: { lesson: LessonData; mod
   const [slug, setSlug] = useState(lesson.slug)
   const [order, setOrder] = useState(String(lesson.order))
   const [title, setTitle] = useState(lesson.title)
-  const [youtubeInput, setYoutubeInput] = useState(lesson.youtubeId)
+  const [youtubeInput, setYoutubeInput] = useState(lesson.youtubeId ?? "")
   const [objective, setObjective] = useState(lesson.objective ?? "")
   const [summary, setSummary] = useState(lesson.summary ?? "")
   const [durationMin, setDurationMin] = useState(String(lesson.durationMin))
@@ -91,7 +91,7 @@ export function LessonEditForm({ lesson, moduleSlug }: { lesson: LessonData; mod
           slug: slug.trim() !== lesson.slug ? slug.trim() : undefined,
           order: Number(order),
           title: title.trim(),
-          youtubeInput: youtubeInput.trim() !== lesson.youtubeId ? youtubeInput.trim() : undefined,
+          youtubeInput: youtubeInput.trim() !== (lesson.youtubeId ?? "") ? youtubeInput.trim() : undefined,
           objective: objective.trim() || null,
           summary: summary.trim() || null,
           durationMin: Number(durationMin) || 0,

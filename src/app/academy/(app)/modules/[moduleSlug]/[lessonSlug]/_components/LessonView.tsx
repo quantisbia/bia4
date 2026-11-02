@@ -46,7 +46,9 @@ export type LessonViewProps = {
     title: string
     objective: string | null
     summary: string | null
-    youtubeId: string
+    youtubeId: string | null
+    /** R28 · PDFs enviados pelo admin (servidos por /api/academy/files/[id]) */
+    files?: Array<{ id: string; title: string; fileName: string; sizeBytes: number }>
     durationMin: number
     level: string
     biaHook: BiaHook
@@ -224,19 +226,57 @@ export function LessonView({ lesson, module: mod, progress, navigation }: Lesson
         )}
       </header>
 
-      {/* Player YouTube (iframe simples — R13.04 vira IFrame API) */}
-      <div
-        data-testid="lesson-video-frame"
-        className="relative aspect-video rounded-2xl overflow-hidden bg-black border border-white/[0.08]"
-      >
-        <iframe
-          src={`https://www.youtube.com/embed/${lesson.youtubeId}?rel=0&modestbranding=1`}
-          title={lesson.title}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
-          className="absolute inset-0 w-full h-full"
-        />
-      </div>
+      {/* Player YouTube (iframe simples — R13.04 vira IFrame API). R28: aula sem vídeo = aula de leitura */}
+      {lesson.youtubeId && !lesson.youtubeId.startsWith("PLACEHOLDER") ? (
+        <div
+          data-testid="lesson-video-frame"
+          className="relative aspect-video rounded-2xl overflow-hidden bg-black border border-white/[0.08]"
+        >
+          <iframe
+            src={`https://www.youtube.com/embed/${lesson.youtubeId}?rel=0&modestbranding=1`}
+            title={lesson.title}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            className="absolute inset-0 w-full h-full"
+          />
+        </div>
+      ) : (
+        <div data-testid="lesson-reading-banner" className="rounded-2xl border border-amber-400/25 bg-gradient-to-br from-amber-500/[0.08] to-fuchsia-500/[0.04] p-5 flex items-start gap-4">
+          <div className="w-11 h-11 rounded-xl bg-amber-400/15 border border-amber-400/30 flex items-center justify-center shrink-0">
+            <FileText className="w-5 h-5 text-amber-200" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-white">Aula de leitura</p>
+            <p className="text-xs text-gray-300 mt-0.5 leading-relaxed">
+              Esta aula não tem vídeo: o conteúdo está no resumo abaixo e nos materiais em PDF.
+              {lesson.files && lesson.files.length > 0 ? ` ${lesson.files.length} arquivo${lesson.files.length > 1 ? "s" : ""} para baixar.` : ""}
+              {" "}Leia, abra a BIA pelo botão da aula e marque como concluída.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* R28 · PDFs da aula (upload do admin) */}
+      {lesson.files && lesson.files.length > 0 && (
+        <section className="space-y-2" data-testid="lesson-files">
+          <h2 className="text-[10px] font-bold uppercase tracking-widest text-amber-300/80">Materiais em PDF</h2>
+          <ul className="grid sm:grid-cols-2 gap-2">
+            {lesson.files.map((f) => (
+              <li key={f.id} className="group flex items-center gap-3 px-4 py-3 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-amber-400/30 transition-all">
+                <div className="w-9 h-9 rounded-lg bg-amber-400/10 border border-amber-400/25 flex items-center justify-center shrink-0">
+                  <FileText className="w-4 h-4 text-amber-200" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-white truncate">{f.title}</p>
+                  <p className="text-[10px] text-gray-500">{(f.sizeBytes / 1048576).toFixed(1)} MB · PDF</p>
+                </div>
+                <a href={`/api/academy/files/${f.id}`} target="_blank" rel="noopener noreferrer" className="text-[11px] font-semibold text-amber-200 hover:text-white px-2 py-1 rounded-md border border-amber-400/30 hover:bg-amber-400/15">Abrir</a>
+                <a href={`/api/academy/files/${f.id}?download=1`} className="text-[11px] font-semibold text-gray-300 hover:text-white px-2 py-1 rounded-md border border-white/10 hover:bg-white/10">Baixar</a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Barra de ações */}
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4">

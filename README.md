@@ -2099,3 +2099,22 @@ Calibrador ganhou **"Já sei o valor — gravar direto"** (ex.: 930 → `M92 E93
 4. **Tabela de aprendizado** (`src/lib/bioprint/learning-table.ts`, Prisma `PrintLearning`, `/api/learning`) — após cada bioimpressão (Fase 4: `/execute` e BIA Host) o modal pergunta **"1. A biotinta saiu da agulha e formou cordão?"** (sim / não / em excesso) e **"2. Como foi a bioimpressão?"** (nota 1–5 + relato). Cada resposta vira uma linha *material × aplicação × geometria → parâmetros, fluiu?, nota, sintomas, ajustes, fator efetivo*. Na próxima biotinta igual, o card aplica a mediana das impressões boas (nota ≥ 4) e os ajustes pendentes da última ruim ("não fluiu" → fator ×1,25, prime +1 µL). Fase 5 (`/review`) exibe a tabela com estatísticas por material e exportação CSV.
 
 **Validação:** vitest 1798/1798 (56 arquivos, inclui `tests/r26_print_recommend_learning.test.ts`); tsc focado e eslint limpos nos arquivos alterados; migração `20261023000001_r26_print_learning` aplicada no Neon.
+
+## R28 · BIA Academy — Módulo 0 (curso prático), PDFs por aula e avisos para a turma
+
+**Pedido:** *"na bia academy, preciso de um módulo — aulas introdutórias do curso prático. e que eu possa subir os arquivos em PDF e tenha um sistema de notificação para enviar msg para os alunos quando tiver material novo."*
+
+**O que mudou**
+1. **Aulas de leitura (sem vídeo).** `AcademyLesson.youtubeId` passou a ser opcional. Sem vídeo, o aluno vê o banner *"📄 Aula de leitura"* e o conteúdo em markdown + PDFs. Formulários do admin (criar/editar aula) não exigem mais YouTube.
+2. **Módulo 0 · "Aulas introdutórias do curso prático"** (`curso-pratico-intro`, order 0 → aparece antes do M01). Aula 0.1 *"Antes de ligar a bioimpressora"* (leitura, 15 min, nível básico) com o texto do reforço M0, 2 PDFs (Guia do Aluno 2026 + Reforço M0) e quiz de 8 questões (nota mínima 70 %). Seed idempotente: `scripts/seed-academy-module-0.ts` + `seed-academy-quizzes.ts --only=M00`.
+3. **Upload de PDF por aula** (`FilesManager` em `/dashboard/admin/academy/<módulo>/<aula>`): envio em **pedaços de 3 MB** (limite de 4,5 MB por request na Vercel) até 40 MB, bytes gravados no Postgres (`academy_files.data BYTEA`, `ready` só após o último pedaço), renomear, excluir, barra de progresso e atalho *"Avisar os alunos agora"*. Download autenticado em `/api/academy/files/<id>` (`?download=1` para baixar) — admin sempre; aluno só com matrícula ativa e aula/módulo publicados.
+4. **Avisos para a turma** (`/dashboard/admin/academy/notifications`): tipo (material novo / aula nova / comunicado), aula vinculada (URL e lista de PDFs entram no e-mail), título e corpo, caixa *enviar e-mail*, botão **"Enviar só para mim (teste)"**, histórico com enviados/falhas/pulados e leituras. Lib `src/lib/academy/notifications.ts`: grava o aviso (sininho de todos os alunos ativos) e envia e-mail individual via Resend (fetch direto, lotes de 5) só para quem tem `notifyEmail = true`. Sem `RESEND_API_KEY` → grava e informa que não enviou.
+5. **Lado do aluno:** sininho na sidebar (`NotificationBell`, poll a cada 120 s, badge de não lidas, marcar como lida), página `/academy/notifications` (lista completa + chave *receber por e-mail*). Link de **descadastro assinado (HMAC)** em cada e-mail + cabeçalhos `List-Unsubscribe` / `List-Unsubscribe-Post` — desliga só o e-mail, os avisos continuam na plataforma.
+
+**Dados:** migração `20261024000001_r28_intro_module_files_notifications` (aplicada no Neon) — `academy_lessons.youtubeId` nullable, `academy_enrollments.notifyEmail`, tabelas `academy_files`, `academy_notifications`, `academy_notification_reads`.
+
+**Rotas novas**
+- Admin: `GET/POST /api/admin/academy/files` (multipart em pedaços), `PATCH/DELETE /api/admin/academy/files/:id`, `GET/POST /api/admin/academy/notifications`.
+- Aluno: `GET /api/academy/files/:id`, `GET/PATCH /api/academy/notifications` (markRead, notifyEmail), `GET/POST /api/academy/notifications/unsubscribe?e=&t=`.
+
+**Validação:** `tests/r28_academy_notifications.test.ts` (18 testes — token HMAC, template, envio/pulos/falhas, onlyEmails, listForStudent, markRead); tsc focado limpo nos arquivos do R28. *A BIA continua sem tocar em M203/M201/M204/M205 (regra R27.3).*

@@ -42,7 +42,8 @@ const CreateLessonSchema = z.object({
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug deve ser kebab-case"),
   order: z.number().int().min(1).max(99),
   title: z.string().min(3).max(200),
-  youtubeInput: z.string().min(1, "Cole a URL do YouTube ou o ID do vídeo"),
+  // R28: opcional — aula de leitura (só PDF/anexos) nasce sem vídeo
+  youtubeInput: z.string().max(300).optional().nullable(),
   objective: z.string().max(5000).optional().nullable(),
   summary: z.string().max(20000).optional().nullable(),
   durationMin: z.number().int().min(0).max(600).default(0),
@@ -73,13 +74,14 @@ export async function POST(req: NextRequest) {
     objective, summary, durationMin, level, biaHook, isPublished,
   } = parsed.data
 
-  // Extrai video ID
-  const youtubeId = extractYoutubeId(youtubeInput)
-  if (!youtubeId) {
+  // Extrai video ID (R28: vazio = aula sem vídeo)
+  const ytRaw = (youtubeInput ?? "").trim()
+  const youtubeId = ytRaw ? extractYoutubeId(ytRaw) : null
+  if (ytRaw && !youtubeId) {
     return NextResponse.json(
       {
         error: "INVALID_YOUTUBE",
-        message: "Não consegui extrair o ID do vídeo do YouTube. Cole a URL completa (ex: https://youtu.be/dQw4w9WgXcQ) ou o ID de 11 caracteres.",
+        message: "Não consegui extrair o ID do vídeo do YouTube. Cole a URL completa (ex: https://youtu.be/dQw4w9WgXcQ) ou o ID de 11 caracteres — ou deixe vazio para uma aula só com PDF.",
       },
       { status: 400 },
     )

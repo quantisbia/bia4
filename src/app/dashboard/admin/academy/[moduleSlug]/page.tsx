@@ -137,7 +137,7 @@ export default async function AdminModulePage({ params }: PageProps) {
                       <span>·</span>
                       <span>{LEVEL_LABEL[lesson.level] ?? lesson.level}</span>
                       <span>·</span>
-                      <span>YT: <code className="text-gray-600">{lesson.youtubeId.substring(0, 11)}</code></span>
+                      <span>{lesson.youtubeId ? <>YT: <code className="text-gray-600">{lesson.youtubeId.substring(0, 11)}</code></> : <span className="text-amber-300/80">📄 leitura</span>}</span>
                       {lesson._count.attachments > 0 && (
                         <>
                           <span>·</span>

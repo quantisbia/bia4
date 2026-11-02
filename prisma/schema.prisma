@@ -499,8 +499,11 @@ model AcademyEnrollment {
   // R13.02 · Respostas do onboarding (opcional — o aluno pode pular)
   //   Formato: { preferredArea?, experienceLevel?, mainGoal?, answeredAt? }
   onboarding     Json?
+  // R28 · receber e-mail quando houver material novo (aluno pode desligar)
+  notifyEmail    Boolean   @default(true)
 
   user                User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notificationReads   AcademyNotificationRead[]  // R28
   progress            AcademyProgress[]
   project             AcademyProject?
   certificate         AcademyCertificate?
@@ -537,7 +540,7 @@ model AcademyLesson {
   title       String
   objective   String? // markdown
   summary     String? // markdown
-  youtubeId   String // ex: "dQw4w9WgXcQ" (vídeo não listado)
+  youtubeId   String?   // ex: "dQw4w9WgXcQ" (vídeo não listado). R28: null = aula de leitura (só PDF/anexos)
   durationMin Int       @default(0)
   level       String    @default("intermediate") // basic | intermediate | advanced
   isPublished Boolean   @default(false)
@@ -549,6 +552,8 @@ model AcademyLesson {
 
   module       AcademyModule              @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   attachments  AcademyAttachment[]
+  files        AcademyFile[]              // R28 · PDFs enviados pelo admin
+  notifications AcademyNotification[]     // R28 · avisos "material novo"
   quiz         AcademyQuiz?
   progress     AcademyProgress[]
   certificates AcademyLessonCertificate[] // R13.14 · certificado por aula
@@ -572,6 +577,67 @@ model AcademyAttachment {
 
   @@index([lessonId])
   @@map("academy_attachments")
+}
+
+// R28 · Arquivo (PDF) enviado pelo admin direto na aula. Bytes ficam no
+// Postgres (Neon) — sem S3/Blob. Servido por /api/academy/files/[id]
+// só para alunos com matrícula ativa (ou admins).
+model AcademyFile {
+  id          String   @id @default(cuid())
+  lessonId    String
+  title       String
+  fileName    String
+  mimeType    String   @default("application/pdf")
+  sizeBytes   Int
+  data        Bytes
+  /** upload em partes (limite 4,5 MB/req na Vercel): true quando todos os bytes chegaram */
+  ready       Boolean  @default(false)
+  uploadedBy  String? // userId do admin
+  createdAt   DateTime @default(now())
+
+  lesson AcademyLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId])
+  @@map("academy_files")
+}
+
+// R28 · Aviso enviado aos alunos ("material novo", "aula publicada", "aviso").
+model AcademyNotification {
+  id         String   @id @default(cuid())
+  kind       String   // NEW_MATERIAL | NEW_LESSON | ANNOUNCEMENT
+  title      String
+  body       String   // texto curto (markdown simples)
+  url        String?  // link dentro da Academy (ex.: /academy/modules/intro/aula-1)
+  lessonId   String?
+  sentById   String?  // admin
+  createdAt  DateTime @default(now())
+  // e-mail
+  emailSent     Int      @default(0)
+  emailFailed   Int      @default(0)
+  emailSkipped  Int      @default(0)
+  emailedAt     DateTime?
+
+  lesson AcademyLesson?            @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  reads  AcademyNotificationRead[]
+
+  @@index([createdAt])
+  @@index([lessonId])
+  @@map("academy_notifications")
+}
+
+// R28 · Leitura do aviso pelo aluno (sininho).
+model AcademyNotificationRead {
+  id             String   @id @default(cuid())
+  notificationId String
+  enrollmentId   String
+  readAt         DateTime @default(now())
+
+  notification AcademyNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  enrollment   AcademyEnrollment   @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, enrollmentId])
+  @@index([enrollmentId])
+  @@map("academy_notification_reads")
 }
 
 model AcademyQuiz {
