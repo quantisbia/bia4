@@ -1,9 +1,11 @@
 ---
-title: "Limitações e desafios do estado da arte em biofabricação"
-subtitle: "Complemento de leitura · Módulo 1 · Introdução à Biofabricação · Parte 5 · Leitura estratégica 2024–2026"
+title: "Limitações e desafios da biofabricação"
+subtitle: "O estado da arte em 2024–2026 e o que ele significa para o seu projeto · Complemento de leitura · Módulo 1 · Parte 5"
 ---
 
-# Limitações e desafios do estado da arte em biofabricação
+# Limitações e desafios da biofabricação
+
+*O estado da arte em 2024–2026 e o que ele significa para o seu projeto*
 
 > **Leitura: 45–60 min · Nível: intermediário · Complementa a Parte 5 da aula "Introdução à Biofabricação"**
 >
