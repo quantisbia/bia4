@@ -1,0 +1,156 @@
+/*
+ * BIA · Academy · Estilos do documento de impressão — R30
+ *
+ * Tela: pré-visualização em folha A4 centralizada + barra de ações.
+ * Impressão: @page A4, margens 18 mm, cabeçalho de tabela repetido,
+ * títulos presos ao conteúdo, linhas/figuras sem quebra interna.
+ * Paleta Quantis: violeta #4E008F / roxo #26004A / lavanda #EDE7F6.
+ */
+
+.academy-print-root {
+  --q-violet: #4e008f;
+  --q-deep: #26004a;
+  --q-lav: #ede7f6;
+  --q-lav-2: #f6f2fb;
+  --q-ink: #1f1b2e;
+  --q-muted: #5b556d;
+  --q-line: #d9d2e6;
+  font-family: var(--font-inter, Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+  color: var(--q-ink);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ── Barra de ações (só tela) ───────────────────────────────────── */
+.print-actions {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  padding: 10px 16px;
+  background: var(--q-deep); color: #fff;
+  font-size: 13px;
+}
+.print-actions .spacer { flex: 1; }
+.print-actions a, .print-actions button {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border-radius: 8px; font-weight: 600; font-size: 13px;
+  border: 1px solid rgba(255,255,255,.25); color: #fff; background: transparent; cursor: pointer;
+  text-decoration: none;
+}
+.print-actions .primary { background: #fff; color: var(--q-deep); border-color: #fff; }
+.print-actions .hint { opacity: .8; font-size: 12px; }
+
+/* ── Folha ──────────────────────────────────────────────────────── */
+.print-doc {
+  max-width: 180mm; margin: 24px auto 48px; padding: 0 16px;
+  font-size: 10.5pt; line-height: 1.55;
+}
+@media screen {
+  .print-doc { background: #fff; box-shadow: 0 2px 24px rgba(38,0,74,.08); padding: 18mm 18mm; border-radius: 6px; }
+}
+
+/* Capa */
+.print-cover { padding-bottom: 14mm; border-bottom: 2px solid var(--q-violet); margin-bottom: 10mm; break-after: page; }
+.print-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 26mm; }
+.print-brand-mark {
+  width: 34px; height: 34px; border-radius: 9px; background: var(--q-violet); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px;
+}
+.print-brand strong { display: block; font-size: 13pt; color: var(--q-deep); letter-spacing: .3px; }
+.print-brand small { display: block; font-size: 8.5pt; color: var(--q-muted); }
+.print-kicker { font-size: 9pt; letter-spacing: 1.6px; text-transform: uppercase; color: var(--q-violet); font-weight: 700; margin: 0 0 8px; }
+.print-cover h1 { font-size: 24pt; line-height: 1.15; color: var(--q-deep); margin: 0 0 8px; font-weight: 800; }
+.print-module { font-size: 11.5pt; color: var(--q-muted); margin: 0 0 16mm; }
+.print-meta { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 18px; margin: 0 0 12mm; }
+.print-meta div { border-left: 3px solid var(--q-lav); padding-left: 10px; }
+.print-meta dt { font-size: 8pt; text-transform: uppercase; letter-spacing: 1px; color: var(--q-muted); }
+.print-meta dd { margin: 0; font-weight: 600; color: var(--q-ink); }
+.print-objective { background: var(--q-lav-2); border: 1px solid var(--q-line); border-radius: 8px; padding: 12px 14px; margin-bottom: 10mm; }
+.print-objective-label { font-size: 8pt; text-transform: uppercase; letter-spacing: 1.4px; color: var(--q-violet); font-weight: 700; margin: 0 0 4px; }
+.print-objective p { margin: 0; }
+.print-cover-foot { font-size: 8.5pt; color: var(--q-muted); margin: 0; }
+
+/* Sumário */
+.print-toc { break-after: page; }
+.print-toc h2 { font-size: 15pt; color: var(--q-deep); margin: 0 0 10px; }
+.print-toc ol { list-style: none; padding: 0; margin: 0; }
+.print-toc > ol > li { padding: 6px 0; border-bottom: 1px dotted var(--q-line); }
+.print-toc > ol > li > a { font-weight: 600; color: var(--q-ink); text-decoration: none; }
+.print-toc ol ol { margin: 4px 0 0 26px; }
+.print-toc ol ol li { padding: 2px 0; font-size: 9.5pt; }
+.print-toc ol ol a { color: var(--q-muted); text-decoration: none; }
+.print-toc-n { display: inline-block; min-width: 20px; color: var(--q-violet); font-variant-numeric: tabular-nums; }
+
+/* Corpo */
+.print-section { margin-bottom: 9mm; }
+.print-section + .print-section { padding-top: 2mm; }
+.print-body h2 {
+  font-size: 16pt; color: var(--q-deep); margin: 0 0 8px; padding-bottom: 6px;
+  border-bottom: 2px solid var(--q-violet); break-after: avoid; break-inside: avoid;
+}
+.print-h2-n { display: inline-block; min-width: 28px; color: var(--q-violet); }
+.print-body h3 { font-size: 12.5pt; color: var(--q-violet); margin: 14px 0 6px; break-after: avoid; }
+.print-body h4 { font-size: 11pt; color: var(--q-deep); margin: 12px 0 4px; break-after: avoid; }
+.print-body h4.print-label strong { color: var(--q-violet); }
+.print-body p { margin: 0 0 8px; orphans: 3; widows: 3; }
+.print-body ul, .print-body ol { margin: 0 0 8px; padding-left: 20px; }
+.print-body li { margin: 0 0 4px; break-inside: avoid; }
+.print-body li ul { margin-top: 3px; }
+.print-body strong { color: var(--q-deep); }
+.print-body em { color: #3b2a5a; }
+.print-body code {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: .92em; background: var(--q-lav-2); border: 1px solid var(--q-line); border-radius: 4px; padding: 0 4px;
+}
+.print-body pre {
+  background: var(--q-lav-2); border: 1px solid var(--q-line); border-radius: 8px; padding: 10px 12px;
+  font-size: 9pt; line-height: 1.5; white-space: pre-wrap; word-break: break-word; break-inside: avoid; margin: 0 0 10px;
+}
+.print-body pre code { background: none; border: 0; padding: 0; }
+.print-body blockquote {
+  margin: 10px 0; padding: 8px 14px; border-left: 4px solid var(--q-violet); background: var(--q-lav-2);
+  font-style: italic; color: #3b2a5a; break-inside: avoid;
+}
+.print-body a { color: var(--q-violet); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+.print-body a.print-doi { white-space: nowrap; font-family: var(--font-mono, ui-monospace, Menlo, monospace); font-size: .92em; }
+.print-body hr { border: 0; border-top: 1px solid var(--q-line); margin: 12px 0; }
+
+/* Tabelas */
+.print-table-wrap { margin: 8px 0 12px; }
+.print-body table { width: 100%; border-collapse: collapse; font-size: 9pt; line-height: 1.4; table-layout: auto; }
+.print-body thead { display: table-header-group; }
+.print-body tfoot { display: table-footer-group; }
+.print-body th {
+  background: var(--q-deep); color: #fff; text-align: left; font-weight: 700; font-size: 8.5pt;
+  letter-spacing: .3px; padding: 6px 8px; border: 1px solid var(--q-deep); vertical-align: bottom;
+}
+.print-body td { padding: 5px 8px; border: 1px solid var(--q-line); vertical-align: top; overflow-wrap: anywhere; }
+.print-body tbody tr:nth-child(even) td { background: var(--q-lav-2); }
+.print-body tr { break-inside: avoid; }
+.print-body td:first-child { font-weight: 600; color: var(--q-deep); }
+.print-table-wrap[data-cols="5"] table, .print-table-wrap[data-cols="6"] table { font-size: 8.3pt; }
+.print-table-wrap[data-cols="7"] table, .print-table-wrap[data-cols="8"] table { font-size: 7.8pt; }
+
+/* Artigos */
+.print-articles { padding-left: 20px; }
+.print-article { margin-bottom: 7px; break-inside: avoid; }
+p.print-article { padding-left: 14px; text-indent: -14px; }
+.print-article-authors { font-weight: 600; color: var(--q-deep); }
+.print-article-title { font-weight: 500; }
+
+/* Seções especiais */
+.print-section[data-kind="mistakes"] ol { border: 1px solid #f2c4cf; background: #fff6f8; border-radius: 8px; padding: 10px 10px 10px 30px; }
+.print-section[data-kind="challenges"] ol { border: 1px solid #f3dcae; background: #fffaf0; border-radius: 8px; padding: 10px 10px 10px 30px; }
+
+/* Rodapé final */
+.print-end { margin-top: 14mm; padding-top: 6px; border-top: 1px solid var(--q-line); font-size: 8.5pt; color: var(--q-muted); }
+.print-end p { margin: 0; }
+
+/* ── Impressão ──────────────────────────────────────────────────── */
+@page { size: A4; margin: 18mm 16mm 20mm; }
+@media print {
+  .print-actions { display: none !important; }
+  .academy-print-root { background: #fff; }
+  .print-doc { max-width: none; margin: 0; padding: 0; box-shadow: none; border-radius: 0; font-size: 10pt; }
+  .print-cover { padding-top: 20mm; }
+  a[href^="http"]::after { content: ""; }
+}

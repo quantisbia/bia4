@@ -397,7 +397,11 @@ export function LessonView({ lesson, module: mod, progress, navigation }: Lesson
           data-testid="lesson-rich-content-section"
           className="rounded-2xl border border-white/[0.06] bg-white/[0.015] p-5 sm:p-8"
         >
-          <RichLessonContent markdown={lesson.summary} />
+          <RichLessonContent
+            markdown={lesson.summary}
+            lessonId={lesson.id}
+            printHref={`/academy/modules/${mod.slug}/${lesson.slug}/print`}
+          />
         </section>
       )}
 

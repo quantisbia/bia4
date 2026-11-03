@@ -43,6 +43,11 @@ const VIEW_PATH = resolve(ROOT, "src/app/academy/(app)/modules/[moduleSlug]/[les
 
 const RICH_SRC = readFileSync(RICH_PATH, "utf8")
 const VIEW_SRC = readFileSync(VIEW_PATH, "utf8")
+// R30: parser extraído para módulo puro e testado (src/lib/academy/lesson-markdown.ts).
+// As asserções de parsing abaixo passam a olhar o módulo (e o comportamento), não o componente.
+const PARSER_PATH = resolve(ROOT, "src/lib/academy/lesson-markdown.ts")
+const PARSER_SRC = readFileSync(PARSER_PATH, "utf8")
+import { parseBlocks } from "@/lib/academy/lesson-markdown"
 
 describe("R13.13 · Arquivo RichLessonContent existe e é public component", () => {
 
@@ -111,7 +116,7 @@ describe("R13.13 · Parser detecta os 8 tipos de seção", () => {
   })
 
   it("C.2) Parser reconhece heading Contexto → context", () => {
-    expect(RICH_SRC).toMatch(/\/contexto\/i.*return.*"context"/s)
+    expect(PARSER_SRC).toMatch(/\/contexto\/i.*return.*"context"/s)
   })
 
   it("C.3) Parser reconhece 📄 → articles kind", () => {
@@ -183,11 +188,11 @@ describe("R13.13 · Componentes visuais especializados", () => {
 
   it("H) InlineRun processa bold, italic, code, link", () => {
     expect(RICH_SRC).toMatch(/function InlineRun/)
-    // parseInline gera 4 tipos de node
-    expect(RICH_SRC).toMatch(/type:\s*"bold"/)
-    expect(RICH_SRC).toMatch(/type:\s*"italic"/)
-    expect(RICH_SRC).toMatch(/type:\s*"code"/)
-    expect(RICH_SRC).toMatch(/type:\s*"link"/)
+    // parseInline (R30: em lesson-markdown.ts) gera 4 tipos de node
+    expect(PARSER_SRC).toMatch(/type:\s*"bold"/)
+    expect(PARSER_SRC).toMatch(/type:\s*"italic"/)
+    expect(PARSER_SRC).toMatch(/type:\s*"code"/)
+    expect(PARSER_SRC).toMatch(/type:\s*"link"/)
   })
 
   it("H.2) Links com DOI abrem em nova aba", () => {
@@ -264,31 +269,37 @@ describe("R13.13 · Metadata do conteúdo (palavras + tempo de leitura)", () => 
   })
 })
 
-describe("R13.13 · Parser markdown robusto", () => {
+describe("R13.13 · Parser markdown robusto (R30: comportamental, via lesson-markdown.ts)", () => {
 
   it("Parseia heading nível 2 (##)", () => {
-    expect(RICH_SRC).toMatch(/\^##\\s\+/)
+    expect(parseBlocks("## Contexto")[0]).toMatchObject({ type: "heading", level: 2, text: "Contexto" })
   })
 
   it("Parseia heading nível 3 (###)", () => {
-    expect(RICH_SRC).toMatch(/\^###\\s\+/)
+    expect(parseBlocks("### Sub")[0]).toMatchObject({ type: "heading", level: 3, text: "Sub" })
   })
 
   it("Parseia listas não-ordenadas (- )", () => {
-    expect(RICH_SRC).toMatch(/\^-\\s\+/)
+    const b = parseBlocks("- a\n- b")[0] as any
+    expect(b).toMatchObject({ type: "list", ordered: false })
+    expect(b.items.map((i: any) => i.text)).toEqual(["a", "b"])
   })
 
   it("Parseia listas ordenadas (1. )", () => {
-    expect(RICH_SRC).toMatch(/\^\\d\+\\\.\\s\+/)
+    const b = parseBlocks("1. a\n2. b")[0] as any
+    expect(b).toMatchObject({ type: "list", ordered: true, start: 1 })
+    expect(b.items).toHaveLength(2)
   })
 
-  it("Parseia tabelas GitHub-style", () => {
-    // Detecta linha separator |---|---|
-    expect(RICH_SRC).toMatch(/\[\\s:\-\|\]\+\\\|/)
+  it("Parseia tabelas GitHub-style (separador |---|---| reconhecido — bug corrigido no R30)", () => {
+    const b = parseBlocks("| A | B |\n|---|---|\n| 1 | 2 |")[0] as any
+    expect(b.type).toBe("table")
+    expect(b.headers).toEqual(["A", "B"])
+    expect(b.rows).toEqual([["1", "2"]])
   })
 
   it("Parseia blockquotes (> )", () => {
-    expect(RICH_SRC).toMatch(/startsWith\("> "\)/)
+    expect(parseBlocks("> citação")[0]).toMatchObject({ type: "blockquote", text: "citação" })
   })
 })
 

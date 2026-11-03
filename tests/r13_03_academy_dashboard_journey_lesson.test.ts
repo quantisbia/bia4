@@ -676,9 +676,9 @@ describe("R13.03.J · Página de aula (server + LessonView client)", () => {
     expect(viewSrc).toContain("lesson-nav-next")
   })
 
-  it("LessonView renderiza card de quiz \"em breve\" quando hasQuiz=true", () => {
-    expect(viewSrc).toContain("lesson-quiz-card")
-    expect(viewSrc).toMatch(/hasQuiz/)
+  it("LessonView renderiza o quiz interativo (QuizPanel, R29) quando hasQuiz=true — substituiu o card \"em breve\"", () => {
+    expect(viewSrc).toMatch(/lesson\.hasQuiz\s*&&/)
+    expect(viewSrc).toMatch(/<QuizPanel[\s\S]*?lessonId=\{lesson\.id\}/)
   })
 
   it("Analytics usa keepalive: true + .catch fire-and-forget", () => {
