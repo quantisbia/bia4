@@ -90,6 +90,9 @@ export function renderNotificationEmail(inp: EmailInput, to: { name: string | nu
 }
 
 // ─── Envio ────────────────────────────────────────────────────────────
+const BATCH = 4
+const BATCH_PAUSE_MS = 1000
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 async function sendOne(to: string, subject: string, html: string, text: string, unsub: string, apiKey: string): Promise<{ ok: boolean; error?: string }> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 15000)
@@ -163,10 +166,11 @@ export async function createNotification(inp: CreateNotificationInput): Promise<
   const only = inp.onlyEmails?.map((e) => e.toLowerCase().trim()).filter(Boolean)
   const emailInput: EmailInput = { kind: inp.kind, title: inp.title, body: inp.body, url, lessonTitle: lesson?.title, moduleTitle: lesson?.module.title, files: lesson?.files }
 
-  // envia em lotes de 5 em paralelo (Resend aceita ~10 req/s)
+  // envia em lotes de 4 em paralelo com pausa de 1 s entre lotes (Resend limita a 10 req/s)
   const targets = students.filter((s) => (only ? only.includes(s.email.toLowerCase()) : true))
-  for (let i = 0; i < targets.length; i += 5) {
-    const batch = targets.slice(i, i + 5)
+  for (let i = 0; i < targets.length; i += BATCH) {
+    if (i > 0) await sleep(BATCH_PAUSE_MS)
+    const batch = targets.slice(i, i + BATCH)
     const outs = await Promise.all(batch.map(async (s) => {
       if (!s.notifyEmail) return { skipped: true as const }
       const { subject, html, text } = renderNotificationEmail(emailInput, { name: s.name, email: s.email, enrollmentId: s.enrollmentId })
@@ -213,4 +217,37 @@ export async function markRead(enrollmentId: string, notificationIds: string[] |
     skipDuplicates: true,
   })
   return r.count
+}
+
+/**
+ * Reenvia o e-mail de um aviso JÁ GRAVADO apenas para os endereços informados
+ * (ex.: os que falharam por 429). Não cria aviso novo; atualiza os contadores
+ * (emailSent += ok, emailFailed = max(0, emailFailed − ok)).
+ */
+export async function resendNotificationEmails(notificationId: string, emails: string[]): Promise<{ sent: number; failed: number; errors: string[] }> {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) return { sent: 0, failed: emails.length, errors: ["RESEND_API_KEY ausente"] }
+  const n = await prisma.academyNotification.findUnique({
+    where: { id: notificationId },
+    include: { lesson: { select: { title: true, module: { select: { title: true } }, files: { where: { ready: true }, select: { title: true, sizeBytes: true }, orderBy: { createdAt: "asc" } } } } },
+  })
+  if (!n) throw new Error("aviso não encontrado")
+  const want = new Set(emails.map((e) => e.toLowerCase().trim()))
+  const targets = (await listActiveStudents()).filter((s) => want.has(s.email.toLowerCase()) && s.notifyEmail)
+  const emailInput: EmailInput = { kind: n.kind as NotificationKind, title: n.title, body: n.body, url: n.url, lessonTitle: n.lesson?.title, moduleTitle: n.lesson?.module.title, files: n.lesson?.files }
+  let sent = 0; const errors: string[] = []
+  for (let i = 0; i < targets.length; i += BATCH) {
+    if (i > 0) await sleep(BATCH_PAUSE_MS)
+    const outs = await Promise.all(targets.slice(i, i + BATCH).map(async (s) => {
+      const { subject, html, text } = renderNotificationEmail(emailInput, { name: s.name, email: s.email, enrollmentId: s.enrollmentId })
+      const r = await sendOne(s.email, subject, html, text, unsubscribeUrl(s.enrollmentId), apiKey)
+      return { email: s.email, ...r }
+    }))
+    for (const o of outs) { if (o.ok) sent++; else errors.push(`${o.email}: ${o.error}`) }
+  }
+  await prisma.academyNotification.update({
+    where: { id: notificationId },
+    data: { emailSent: n.emailSent + sent, emailFailed: Math.max(0, n.emailFailed - sent), emailedAt: new Date() },
+  })
+  return { sent, failed: targets.length - sent, errors }
 }
