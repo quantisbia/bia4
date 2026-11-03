@@ -165,6 +165,47 @@ export const QUANTIS_WHITE_PAPERS: QuantisWhitePaper[] = [
       "Dernowsek, J. et al. Biofabricação em Ortopedia — do defeito ósseo crítico ao implante bioimpresso paciente-específico. " +
       "BIA Academy / Quantis Biotechnology, 1ª ed., 2026, 53p. Exclusivo para alunos da BIA Academy — biaquantis.bio/academy",
   },
+  {
+    id: "ebook-limitacoes-desafios-biofabricacao-2026",
+    kind: "ebook",
+    title: "Limitações e desafios da biofabricação",
+    subtitle: "O estado da arte em 2024–2026 e o que ele significa para o seu projeto",
+    authors: ["BIA Academy", "Equipe editorial Quantis Biotechnology"],
+    year: 2026,
+    category: "Estado da arte · Estratégia de projeto",
+    audience: "Alunos de pós-graduação, pesquisadores e empreendedores que vão desenhar um projeto em biofabricação",
+    abstract:
+      "Leitura estratégica de 18 páginas que atualiza a Parte 5 da aula Introdução à Biofabricação com as 27 principais revisões publicadas entre 2024 e 2026 (todas com DOI verificado). " +
+      "Mapeia o que mudou em cada gargalo — vascularização (da geometria do canal à maturação biológica do vaso), trilema resolução × velocidade × volume, trade-off das biotintas, " +
+      "controle de qualidade em tempo real, organoides como blocos de construção, imunidade como parâmetro de projeto, bioimpressão in situ / in vivo e os limites de validação da IA. " +
+      "Inclui o panorama regulatório comparado (UE · EUA · China · Austrália · ANVISA), o que os ensaios clínicos registrados ensinam, uma matriz maturidade × oportunidade com 10 frentes, " +
+      "as 7 decisões que separam projetos que avançam, um guia para ler revisões criticamente e a ponte com as 6 fases da BIA. Cada seção termina com 'O que isso muda para o seu projeto'.",
+    keywords: [
+      "estado da arte",
+      "vascularização",
+      "reprodutibilidade",
+      "biotintas",
+      "organoides",
+      "bioimpressão in situ",
+      "IA",
+      "regulação",
+      "ANVISA",
+      "translação clínica",
+      "estratégia de projeto",
+      "revisões 2024–2026",
+    ],
+    pdfUrl: "/api/library/download/ebook-limitacoes-desafios-biofabricacao-2026",
+    privateFilePath: "src/content/ebooks/ebook-limitacoes-desafios-biofabricacao-2026.pdf",
+    coverUrl: "/library/ebook-assets/cover-limitacoes-desafios-2026.jpg",
+    pages: 18,
+    sizeMb: 0.13,
+    language: "pt-BR",
+    openAccess: false,
+    restrictedToStudents: true,
+    citation:
+      "BIA Academy. Limitações e desafios da biofabricação — o estado da arte em 2024–2026 e o que ele significa para o seu projeto. " +
+      "Quantis Biotechnology, complemento de leitura do Módulo 1, novembro de 2026, 18p. Exclusivo para alunos da BIA Academy — biaquantis.bio/academy",
+  },
 ]
 
 /* ─────────────────────────────────────────────────────────────────────────
