@@ -98,92 +98,169 @@
   "passingScore": 70,
   "questions": [
    {
-    "prompt": "A característica essencial que distingue biofabricação de engenharia tecidual clássica é:",
+    "prompt": "Segundo a definição consensual de Groll et al. (2016), o que distingue biofabricação de simplesmente \"fazer tecido no laboratório\"?",
     "options": [
-     "Uso obrigatório de células-tronco",
-     "Automação do processo de fabricação",
-     "Impressão em 3D",
-     "Uso apenas de biomateriais sintéticos"
+     "O uso obrigatório de células-tronco pluripotentes",
+     "A geração automatizada, reprodutível e com organização estrutural, por bioimpressão ou bioassembly",
+     "A impressão exclusivamente em hidrogéis fotocuráveis",
+     "A finalidade exclusivamente terapêutica"
     ],
     "correctIndex": 1,
-    "explanation": "Groll et al. definem o campo pela geração *automatizada*; bioimpressão é um dos meios, não a definição."
+    "explanation": "A palavra-chave da definição é automação: um processo controlado por computador que produz o mesmo constructo N vezes com variação mínima. Bioimpressão é um dos meios; não é a definição."
    },
    {
     "prompt": "\"Bioassembly\" refere-se a:",
     "options": [
-     "Montar a bioimpressora",
-     "Montar construtos a partir de blocos celulares pré-formados (esferoides, organoides)",
-     "Esterilizar biomateriais",
-     "Semear células em scaffold acelular"
+     "Montar e calibrar a bioimpressora antes do uso",
+     "Construir tecidos a partir de blocos celulares pré-formados (esferoides, organoides, microtecidos)",
+     "Esterilizar e preparar biomateriais para impressão",
+     "Semear células manualmente em um scaffold acelular"
     ],
     "correctIndex": 1,
-    "explanation": "é o caminho scaffold-free da biofabricação, complementar à bioimpressão."
+    "explanation": "Bioassembly é o caminho scaffold-free (ou de blocos de construção) da biofabricação, complementar à bioimpressão. Revisões recentes tratam organoides como matéria-prima desse processo."
    },
    {
-    "prompt": "A tríade clássica da engenharia tecidual é:",
+    "prompt": "Qual afirmação sobre a relação entre os termos está CORRETA?",
     "options": [
-     "Impressora, tinta, software",
-     "Células, scaffold e sinais bioativos",
-     "Osso, cartilagem e pele",
-     "Síntese, reticulação e degradação"
-    ],
-    "correctIndex": 1,
-    "explanation": "Langer & Vacanti 1993; a biofabricação acrescenta o controle do *processo*."
-   },
-   {
-    "prompt": "Qual aplicação já é rotina em laboratórios e indústria hoje?",
-    "options": [
-     "Transplante de rim bioimpresso",
-     "Modelos de tecido para teste de fármacos e toxicologia",
-     "Coração funcional em escala humana",
-     "Fígado vascularizado implantável"
-    ],
-    "correctIndex": 1,
-    "explanation": "modelos *in vitro* (pele, fígado, tumor) não precisam de vascularização em escala e já substituem parte dos testes em animais."
-   },
-   {
-    "prompt": "O limite de difusão de oxigênio e nutrientes em tecido sem vasos é cerca de:",
-    "options": [
-     "2 µm",
-     "20 µm",
-     "200 µm",
-     "2 cm"
+     "Biofabricação, engenharia tecidual e bioimpressão são sinônimos",
+     "Bioimpressão é o campo mais amplo; biofabricação é uma técnica dentro dela",
+     "Biofabricação é o campo mais amplo (automação + reprodutibilidade + hierarquia); bioimpressão é uma técnica; engenharia tecidual define o objetivo terapêutico",
+     "Engenharia tecidual só existe quando há bioimpressão 3D envolvida"
     ],
     "correctIndex": 2,
-    "explanation": "por isso construtos espessos precisam de canais vasculares ou perfusão — o maior gargalo do campo."
+    "explanation": "Biofabricação cobre toda a cadeia automatizada (modelo → biotinta → impressão → maturação). Bioimpressão é uma técnica de deposição camada a camada. TE é o objetivo de restaurar/substituir tecido — e pode usar métodos manuais."
+   },
+   {
+    "prompt": "A tríade clássica da engenharia tecidual (Langer & Vacanti, Science 1993) é:",
+    "options": [
+     "Impressora, biotinta e software de fatiamento",
+     "Scaffold (matriz 3D), células e sinais bioativos",
+     "Osso, cartilagem e pele",
+     "Síntese, reticulação e degradação do polímero"
+    ],
+    "correctIndex": 1,
+    "explanation": "Scaffold dá forma e superfície de adesão; células são o componente ativo; sinais (fatores de crescimento, RGD, estímulos físicos) dirigem o comportamento celular. A biofabricação acrescenta o controle do processo."
+   },
+   {
+    "prompt": "Por que biomateriais descelularizados (dECM) do próprio tecido-alvo costumam dar melhores resultados em muitos casos?",
+    "options": [
+     "Porque são mais baratos e fáceis de esterilizar",
+     "Porque preservam a assinatura bioquímica local da MEC (ex.: fígado rico em laminina; cartilagem em colágeno II + agrecano)",
+     "Porque têm viscosidade ideal para qualquer técnica de impressão",
+     "Porque não geram nenhuma resposta imune"
+    ],
+    "correctIndex": 1,
+    "explanation": "Cada tecido tem uma assinatura de MEC própria. O dECM mantém proteínas adesivas, GAGs e fatores ligados à matriz do tecido de origem. Ainda assim, dECM sofre variação lote a lote e exige caracterização."
+   },
+   {
+    "prompt": "Qual pareamento fator bioativo → efeito está CORRETO?",
+    "options": [
+     "VEGF → condrogênese",
+     "BMP-2 → osteogênese",
+     "TGF-β → angiogênese",
+     "Sequência RGD → mineralização óssea"
+    ],
+    "correctIndex": 1,
+    "explanation": "BMP-2 induz formação óssea (osteogênese); VEGF induz angiogênese; TGF-β dirige condrogênese; RGD é um peptídeo de adesão celular via integrinas."
+   },
+   {
+    "prompt": "Na bioimpressão por extrusão (a mais usada, inclusive na BIA), qual é a combinação típica de vantagem e limitação?",
+    "options": [
+     "Resolução de 10 µm, mas só aceita biotintas de baixíssima viscosidade",
+     "Aceita biotintas viscosas e alta densidade celular, mas tem resolução moderada (100–500 µm) e shear stress no bico",
+     "Sem contato com a biotinta, mas exige fotoiniciador",
+     "Alta velocidade por gotas, mas entope com frequência"
+    ],
+    "correctIndex": 1,
+    "explanation": "Extrusão é a melhor relação custo-benefício para tecidos de mm a cm com hidrogéis densos em células; o preço é a resolução e o cisalhamento no bico, que pode danificar células."
+   },
+   {
+    "prompt": "Qual técnica cura uma camada inteira de uma vez com projetor de luz, oferecendo resolução de 10–50 µm sem shear stress, mas exigindo biomaterial fotoativável?",
+    "options": [
+     "Jato de tinta (inkjet)",
+     "Extrusão pneumática",
+     "DLP (Digital Light Processing)",
+     "FRESH"
+    ],
+    "correctIndex": 2,
+    "explanation": "DLP projeta a imagem de cada camada em uma resina fotossensível (GelMA, PEGDA, HAMA). Tempo de impressão independe da complexidade da camada; a toxicidade do fotoiniciador precisa ser controlada."
+   },
+   {
+    "prompt": "A técnica FRESH (Freeform Reversible Embedding of Suspended Hydrogels) resolve qual problema?",
+    "options": [
+     "A baixa densidade celular do jato de tinta",
+     "O colapso de estruturas moles e complexas durante a impressão, usando um banho de suporte (gelatina) que é dissolvido depois",
+     "A toxicidade do fotoiniciador em SLA/DLP",
+     "A necessidade de G-code na extrusão"
+    ],
+    "correctIndex": 1,
+    "explanation": "Imprimir dentro de um leito de suporte permite geometrias moles e ocas (coração, vasos) que desabariam no ar. Depois, o banho é derretido (37 °C) e o constructo é liberado."
+   },
+   {
+    "prompt": "Qual aplicação da biofabricação JÁ É rotina clínica aprovada (uso real em pacientes)?",
+    "options": [
+     "Rim bioimpresso para transplante",
+     "Pele bioengenheirada (ex.: Apligraf®, aprovado pela FDA desde 1998) e cartilagem autóloga (MACI®, FDA 2016)",
+     "Coração funcional em escala humana",
+     "Fígado sólido bioimpresso"
+    ],
+    "correctIndex": 1,
+    "explanation": "Tecidos finos e avasculares (pele, cartilagem) chegaram à clínica. Órgãos sólidos complexos seguem pré-clínicos — proof-of-concept em animais."
+   },
+   {
+    "prompt": "Qual é o uso REALISTA dos organoides hoje, segundo a aula?",
+    "options": [
+     "Implante direto como substituto de órgão",
+     "Plataforma de teste farmacológico e modelo de doença in vitro",
+     "Matéria-prima para próteses metálicas",
+     "Substituto de enxerto ósseo em ortopedia"
+    ],
+    "correctIndex": 1,
+    "explanation": "Organoides atingem poucos milímetros e são fenotipicamente imaturos; seu valor imediato é como modelo in vitro. O horizonte (revisões 2025) é usá-los como blocos de construção na bioimpressão."
+   },
+   {
+    "prompt": "Por que a vascularização é o gargalo nº 1 para constructos espessos?",
+    "options": [
+     "Porque os vasos encarecem a biotinta",
+     "Porque células a mais de ~200 µm de uma fonte de nutrientes morrem por hipóxia em 24–48 h",
+     "Porque o G-code não suporta canais",
+     "Porque reguladores proíbem canais em hidrogéis"
+    ],
+    "correctIndex": 1,
+    "explanation": "O limite de difusão de O₂ e nutrientes é de 100–200 µm. Canais sacrificiais (Pluronic), coaxial e redes por DLP ajudam, mas falta hierarquia funcional e anastomose rápida com o hospedeiro."
    },
    {
     "prompt": "Qual dos itens abaixo NÃO é um gargalo reconhecido da biofabricação?",
     "options": [
-     "Vascularização",
-     "Fonte e variabilidade celular",
-     "Custo do filamento PLA",
-     "Regulação como terapia avançada"
+     "Reprodutibilidade e controle de qualidade lote a lote",
+     "Maturação pós-impressão em biorreator",
+     "Disponibilidade de impressoras 3D de PLA de baixo custo",
+     "Classificação regulatória e harmonização entre agências"
     ],
     "correctIndex": 2,
-    "explanation": "PLA é insumo de FDM; não é biotinta nem limitação científica do campo."
+    "explanation": "Impressoras de PLA são abundantes e não são o problema. Os gargalos reais são biológicos (vascularização, maturação), de processo (reprodutibilidade, CQ) e regulatórios/econômicos."
    },
    {
-    "prompt": "No Brasil, um construto bioimpresso com células para uso clínico seria regulado como:",
+    "prompt": "No Brasil, um constructo bioimpresso COM células vivas para uso clínico seria regulado pela ANVISA como:",
     "options": [
-     "Cosmético",
-     "Dispositivo médico classe I",
-     "Produto de terapia avançada (ANVISA RDC 505/2021)",
-     "Suplemento"
+     "Dispositivo médico Classe I, com notificação simples",
+     "Produto de terapia avançada (RDC 505/2021), com ensaios clínicos, GMP e CMC",
+     "Cosmético, se aplicado na pele",
+     "Medicamento genérico"
     ],
-    "correctIndex": 2,
-    "explanation": "produtos com células manipuladas entram na categoria de terapias avançadas, com exigências de boas práticas e ensaios clínicos."
+    "correctIndex": 1,
+    "explanation": "Com célula viva, a via é a de terapia avançada (ATMP na UE; CBER/RMAT nos EUA; RDC 505/2021 na ANVISA). Dispositivos impressos acelulares (PCL, PLA) seguem a via de dispositivo — confundir os caminhos custa anos."
    },
    {
-    "prompt": "A \"maturação\" de um construto bioimpresso acontece:",
+    "prompt": "Segundo as revisões de 2024–2026 (Agarwal 2025; Matavosian & Bonassar 2025) destacadas no complemento da aula, para onde o gargalo central do campo se deslocou?",
     "options": [
-     "Dentro da agulha",
-     "No slicer",
-     "Em cultura/biorreator após a impressão, por dias a semanas",
-     "No freezer a −80 °C"
+     "De \"conseguimos imprimir?\" para \"conseguimos imprimir igual, todo dia, com evidência de função e de um jeito que o regulador aceite?\"",
+     "Da extrusão para o jato de tinta",
+     "Da pesquisa acadêmica para a impressão doméstica",
+     "Da regulação para o marketing"
     ],
-    "correctIndex": 2,
-    "explanation": "células proliferam, depositam matriz e remodelam o construto; a impressão é só o começo (Fase 6 da BIA)."
+    "correctIndex": 0,
+    "explanation": "Padronização de sistema, métricas de imprimibilidade, relato de viabilidade e monitoramento em tempo real (CQAs) viraram a agenda — a bioimpressora precisa deixar de ser ferramenta de laboratório e virar instrumento de manufatura."
    }
   ]
  },

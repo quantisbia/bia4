@@ -11,7 +11,7 @@
  *  - Botão "Marcar como concluída" (decisão #3)
  *  - biaHook em botão que abre BIA em NOVA aba (decisão #5)
  *  - Lista de anexos (PDF/LINK/STL/GCODE/IMAGE)
- *  - Card de quiz (só link — funcional em R13.05)
+ *  - Quiz interativo (R29 · QuizPanel — corrigido em /api/academy/quiz/[lessonId])
  *  - Navegação prev/next
  *
  * Trackeia eventos via /api/academy/analytics (fire-and-forget):
@@ -28,6 +28,7 @@ import {
   Loader2, Trophy, ChevronRight, HelpCircle, Target,
 } from "lucide-react"
 import { RichLessonContent } from "./RichLessonContent"
+import { QuizPanel } from "./QuizPanel"
 
 type BiaHook = { tool: string; label: string; params?: Record<string, unknown> } | null
 
@@ -434,25 +435,9 @@ export function LessonView({ lesson, module: mod, progress, navigation }: Lesson
         </section>
       )}
 
-      {/* Quiz */}
+      {/* Quiz · R29 · interativo (corrigido no servidor, grava melhor nota) */}
       {lesson.hasQuiz && (
-        <section
-          data-testid="lesson-quiz-card"
-          className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-5 flex items-center gap-4"
-        >
-          <div className="w-10 h-10 rounded-xl bg-fuchsia-500/10 border border-fuchsia-500/20 flex items-center justify-center shrink-0">
-            <HelpCircle className="w-4 h-4 text-fuchsia-300" />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-white">Quiz desta aula</p>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Nota mínima para aprovação: {lesson.quizPassingScore ?? 70}%. Interface interativa chega em R13.05.
-            </p>
-          </div>
-          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded bg-white/[0.06] text-gray-400">
-            Em breve
-          </span>
-        </section>
+        <QuizPanel lessonId={lesson.id} passingScore={lesson.quizPassingScore ?? 70} />
       )}
 
       {/* Navegação prev/next */}
