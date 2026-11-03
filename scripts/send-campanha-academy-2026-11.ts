@@ -101,7 +101,7 @@ async function main() {
   const subjectFor = (c: Contact) => FOLLOWUP ? SUBJECT_F1 : (c.first ? SUBJECT_A(c.first) : SUBJECT_B)
 
   if (TEST) {
-    const c: Contact = { nome: "Teste", first: "Janaina", email: TEST }
+    const c: Contact = { nome: "Teste", first: flag("noname") ? "" : "Janaina", email: TEST }
     const r = await send(apiKey, c, subjectFor(c), fill(html, c, pre), true)
     console.log("TESTE →", TEST, r); return
   }
