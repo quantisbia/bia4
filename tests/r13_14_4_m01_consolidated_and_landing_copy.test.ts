@@ -148,8 +148,9 @@ describe("R13.14.4 · landing /academy · copy vendedora", () => {
     expect(src).toMatch(/white\s*papers.*Quantis/i)
   })
 
-  it("Programa: menciona certificado por aula + certificado final", () => {
-    expect(src).toMatch(/certificado por aula/i)
+  it("Programa: menciona só o certificado final de conclusão (R30: sem 'por aula')", () => {
+    expect(src).toMatch(/Certificado final de conclusão/i)
+    expect(src).not.toMatch(/certificado por aula/i)
   })
 
   it("Módulos: nova seção com 'Todos os módulos liberados no 1º dia'", () => {
@@ -181,8 +182,11 @@ describe("R13.14.4 · landing /academy · copy vendedora", () => {
     expect(src).toMatch(/Dra\.\s*Kamila/i)
   })
 
-  it("FAQ: menciona os 3 formatos de certificado", () => {
-    expect(src).toMatch(/3 formatos de certificado/i)
+  it("FAQ: certificado único final + BIA incluída (12 meses · 300 créditos/mês) + idiomas", () => {
+    expect(src).toMatch(/certificado final de conclusão da BIA Academy/i)
+    expect(src).not.toMatch(/3 formatos de certificado/i)
+    expect(src).toMatch(/300 créditos por mês/i)
+    expect(src).toMatch(/português e inglês/i)
   })
 
   it("CTA final: headline 'sair da teoria e colocar a mão na massa'", () => {

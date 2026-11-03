@@ -133,7 +133,7 @@ const FAQ = [
   },
   {
     q: "Como funciona a integração com a plataforma BIA?",
-    a: "Dentro de cada aula, você tem um botão que abre a ferramenta correspondente da BIA (Formulador Pro para biotintas, Bioimpressão 3D para fatiar modelos, Organoid Builder para design 3D, etc). Tudo o que você criar fica salvo no seu Notebook com versionamento automático V1/V2/V3 — totalmente rastreável para publicação acadêmica.",
+    a: "A plataforma de IA BIA está **incluída por 12 meses, com 300 créditos por mês**. Dentro de cada aula, um botão abre a ferramenta correspondente da BIA (Formulador Pro para biotintas, Bioimpressão 3D para fatiar modelos, Organoid Builder para design 3D, etc). Tudo o que você criar fica salvo no seu Notebook com versionamento automático V1/V2/V3 — totalmente rastreável para publicação acadêmica. A BIA pode ser usada em **português e inglês**; a versão em espanhol está em estudo. As aulas são ministradas em português.",
   },
   {
     q: "Existem práticas presenciais?",
@@ -141,7 +141,7 @@ const FAQ = [
   },
   {
     q: "Recebo certificado?",
-    a: "Sim — e são **3 formatos de certificado**: por aula (a cada aula concluída, perfeito para LinkedIn progressivo), declaração parcial de progresso (enquanto estiver no meio do caminho) e o certificado final de conclusão (ao completar 100% + entregar o Projeto Final). Todos em PDF com código único de verificação pública.",
+    a: "Sim — ao concluir 100% das aulas e entregar o Projeto Final, você recebe o **certificado final de conclusão da BIA Academy** em PDF, com código único de verificação pública. Durante o percurso, o painel mostra seu progresso por módulo.",
   },
   {
     q: "O que acontece depois dos 12 meses?",
@@ -320,10 +320,10 @@ export default function AcademyLandingPage() {
                 "12 módulos completos de conteúdo técnico (aulas gravadas, assista no seu ritmo)",
                 "12 meses de acesso completo à plataforma — mesmo depois do fim do curso",
                 "3 encontros online ao vivo com a Dra. Kamila Leichtweis e o time científico Quantis",
-                "Acesso ilimitado à BIA — a mesma IA científica usada por laboratórios parceiros",
+                "Plataforma de IA BIA incluída por 12 meses (300 créditos/mês) — a mesma IA científica usada por laboratórios parceiros",
                 "Biblioteca com 65+ artigos, 20 patentes e 15 protocolos curados pela nossa equipe",
                 "Meu Projeto de Biofabricação — seu protocolo próprio, versionado automaticamente e exportável em PDF/DOCX",
-                "Certificado por aula + certificado final de conclusão com código único de verificação pública",
+                "Certificado final de conclusão com código único de verificação pública",
                 "White papers institucionais da Quantis (QMatrix, biotintas, etc) incluídos como material de apoio",
                 "Práticas presenciais disponíveis apenas para cursos corporativos, institucionais ou grupos fechados",
               ].map((item, i) => (
@@ -771,9 +771,9 @@ export default function AcademyLandingPage() {
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span><strong className="text-white">Todos os 12 módulos</strong> liberados no 1º dia</span></li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span><strong className="text-white">12 meses</strong> de acesso completo</span></li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span>3 encontros ao vivo com a Dra. Kamila</span></li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span>Plataforma BIA integrada em todas as aulas</span></li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span>Plataforma BIA integrada (12 meses · 300 créditos/mês)</span></li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span>Biblioteca com 65+ artigos e white papers</span></li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span>Certificado por aula + certificado final</span></li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span>Certificado final de conclusão verificável</span></li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span><strong className="text-white">7 dias de garantia</strong> incondicional</span></li>
               </ul>
               <a
