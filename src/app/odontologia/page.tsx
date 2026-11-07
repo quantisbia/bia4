@@ -36,6 +36,8 @@ export const metadata: Metadata = {
 const WHATSAPP = "https://wa.me/11968632231?text=" + encodeURIComponent("Olá! Tenho interesse no curso de Biofabricação e Bioimpressão 3D aplicadas à Odontologia (grupo de 5 a 8 profissionais).")
 const MAILTO = "mailto:suporte@quantis.bio?subject=" + encodeURIComponent("Interesse — Biofabricação aplicada à Odontologia (turma fechada)")
 const PROPOSTA_PDF = "/odontologia/proposta-quantis-biofabricacao-odontologia.pdf"
+// Link de pagamento Asaas (inscrição individual / garantir vaga)
+const ASAAS_LINK = "https://www.asaas.com/000/c/o2jlmlwo6rxd5y1d"
 
 const PRICE_GROUP = 34300
 const PRICE_PER_PRO = 4287.5
@@ -138,14 +140,18 @@ export default function OdontologiaLandingPage() {
                 <li key={t} className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />{t}</li>
               ))}
             </ul>
-            <div className="mt-8 flex flex-col sm:flex-row gap-3">
-              <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" data-testid="odonto-cta-whatsapp" className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 shadow-lg shadow-fuchsia-900/30 transition-all">
-                <MessageCircle className="w-5 h-5" /> Quero montar minha turma <ArrowRight className="w-4 h-4" />
+            <div className="mt-8 flex flex-col sm:flex-row flex-wrap gap-3">
+              <a href={ASAAS_LINK} target="_blank" rel="noopener noreferrer" data-testid="odonto-cta-asaas" className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 shadow-lg shadow-fuchsia-900/30 transition-all">
+                <GraduationCap className="w-5 h-5" /> Eu quero me capacitar <ArrowRight className="w-4 h-4" />
+              </a>
+              <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" data-testid="odonto-cta-whatsapp" className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-semibold border border-emerald-400/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-100 transition-all">
+                <MessageCircle className="w-5 h-5" /> Montar minha turma (WhatsApp)
               </a>
               <a href={PROPOSTA_PDF} target="_blank" rel="noopener noreferrer" data-testid="odonto-cta-pdf" className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-semibold border border-white/15 bg-white/[0.03] hover:bg-white/[0.07] transition-all">
-                <Download className="w-5 h-5" /> Baixar a proposta (PDF)
+                <Download className="w-5 h-5" /> Proposta (PDF)
               </a>
             </div>
+            <p className="mt-3 text-xs text-gray-500">Pagamento seguro via Asaas. Vaga individual garantida; turma formada com 5 a 8 profissionais.</p>
             <p className="mt-4 text-xs text-gray-500">Datas em aberto — a agenda é definida junto com o grupo. Práticas em São Paulo/SP.</p>
           </div>
 
@@ -260,8 +266,11 @@ export default function OdontologiaLandingPage() {
                 <li key={t} className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />{t}</li>
               ))}
             </ul>
-            <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" className="mt-7 w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 transition-all">
-              <MessageCircle className="w-5 h-5" /> Reservar datas para o meu grupo
+            <a href={ASAAS_LINK} target="_blank" rel="noopener noreferrer" data-testid="odonto-pricing-asaas" className="mt-7 w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 transition-all">
+              <GraduationCap className="w-5 h-5" /> Eu quero me capacitar <ArrowRight className="w-4 h-4" />
+            </a>
+            <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" className="mt-3 w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold border border-emerald-400/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-100 transition-all">
+              <MessageCircle className="w-4 h-4" /> Reservar datas para o meu grupo (WhatsApp)
             </a>
             <a href={MAILTO} className="mt-3 w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold border border-white/15 hover:bg-white/[0.05] transition-all">Prefiro falar por e-mail · suporte@quantis.bio</a>
           </div>
@@ -292,8 +301,9 @@ export default function OdontologiaLandingPage() {
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight">Monte sua turma e traga a biofabricação para a sua prática</h2>
           <p className="mt-3 text-gray-300">Responda em poucas linhas: tamanho do grupo, cidade e disponibilidade. Nós organizamos a agenda com você.</p>
-          <div className="mt-7 flex flex-col sm:flex-row gap-3 justify-center">
-            <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl font-bold bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 transition-all"><MessageCircle className="w-5 h-5" /> WhatsApp (11) 96863-2231</a>
+          <div className="mt-7 flex flex-col sm:flex-row flex-wrap gap-3 justify-center">
+            <a href={ASAAS_LINK} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl font-bold bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 transition-all"><GraduationCap className="w-5 h-5" /> Eu quero me capacitar</a>
+            <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl font-semibold border border-emerald-400/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-100 transition-all"><MessageCircle className="w-5 h-5" /> WhatsApp (11) 96863-2231</a>
             <a href={MAILTO} className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl font-semibold border border-white/15 hover:bg-white/[0.05] transition-all">suporte@quantis.bio</a>
           </div>
         </div>
