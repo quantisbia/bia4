@@ -77,3 +77,32 @@ describe("R31.1 · Kit didático · Guia Prático em espiral", () => {
     expect(copySrc).toContain("Practical Guide to Biofabrication and Bioprinting")
   })
 })
+
+describe("R31.2 · tópicos com ícones próprios + seção Scaffolds PCL + PDF Quantis", () => {
+  const iconsSrc = read("src/app/odontologia/_components/icons.tsx")
+  it("ícones vetoriais da área (dente, implante, scaffold, bico, mandíbula, CBCT, osso, membrana) existem e são usados", () => {
+    for (const n of ["ToothIcon", "ImplantIcon", "ScaffoldIcon", "NozzleIcon", "JawIcon", "ScanIcon", "BoneCellIcon", "MembraneIcon"]) {
+      expect(iconsSrc).toContain(`export function ${n}`)
+      expect(landingSrc).toContain(n)
+    }
+    expect(landingSrc).toContain('data-testid="odonto-topics"')
+  })
+  it("cada tópico PT/EN tem icon, tag e 2 pontos-chave", () => {
+    const topicLines = copySrc.split("\n").filter(l => /^\s*\{ icon: "/.test(l) && /tag: "/.test(l) && /pts: \[/.test(l))
+    expect(topicLines.length).toBe(12) // 6 PT + 6 EN
+  })
+  it("seção #scaffolds com conteúdo de PCL para odontologia e CTA do PDF (link ou solicitação via WhatsApp)", () => {
+    expect(landingSrc).toContain('id="scaffolds"')
+    expect(landingSrc).toContain('data-testid="odonto-pcl-pdf"')
+    expect(landingSrc).toContain('data-testid="odonto-pcl-pdf-link"')
+    expect(landingSrc).toContain('data-testid="odonto-pcl-pdf-request"')
+    expect(copySrc).toContain("Scaffolds de PCL para odontologia regenerativa")
+    expect(copySrc).toContain("PCL scaffolds for regenerative dentistry")
+    expect(copySrc).toContain("regeneração óssea guiada (ROG)")
+    expect(copySrc).toMatch(/export const PCL_PDF = "(\/odontologia\/[^"]+\.pdf)?"/)
+  })
+  it("figura PCL referenciada é o asset CC-BY já existente", () => {
+    expect(existsSync(resolve(ROOT, "public/library/ebook-assets/lit-pcl-bg-scaffold.jpg"))).toBe(true)
+    expect(copySrc).toContain("/library/ebook-assets/lit-pcl-bg-scaffold.jpg")
+  })
+})

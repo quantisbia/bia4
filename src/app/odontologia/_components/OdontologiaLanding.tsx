@@ -8,15 +8,32 @@
  * seção "Kit didático" com o Guia Prático em mockup espiral; alternância PT/EN.
  */
 import Link from "next/link"
+import type { ComponentType, SVGProps } from "react"
 import {
   ArrowRight, CheckCircle2, Clock3, MapPin, Users, Sparkles, Download,
-  FlaskConical, Bone, Layers3, Printer, Cpu, Stethoscope, GraduationCap,
+  Cpu, GraduationCap, FileText,
   MessageCircle, Building2, Globe2, ShieldCheck, Languages, BookOpen,
 } from "lucide-react"
 import {
   ASAAS_LINK, PROPOSTA_PDF, GUIDE_MOCKUP, PRICE_PER_PRO, PHONE_DISPLAY,
-  COUNTRIES, INSTITUTIONS, PHOTO_ALTS, COPY, type Lang,
+  PCL_PDF, PCL_PDF_REQUEST_MSG, PCL_FIGURE,
+  COUNTRIES, INSTITUTIONS, PHOTO_ALTS, COPY, type Lang, type TopicIcon,
 } from "./copy"
+import { ToothIcon, ImplantIcon, ScaffoldIcon, NozzleIcon, JawIcon, ScanIcon, BoneCellIcon, MembraneIcon } from "./icons"
+
+const TOPIC_ICON: Record<TopicIcon, ComponentType<SVGProps<SVGSVGElement>>> = {
+  tooth: ToothIcon, implant: ImplantIcon, scaffold: ScaffoldIcon, nozzle: NozzleIcon,
+  jaw: JawIcon, scan: ScanIcon, bonecell: BoneCellIcon, membrane: MembraneIcon,
+}
+/** Gradiente por tópico para os ícones ficarem atrativos e distintos */
+const TOPIC_GRADIENTS = [
+  "from-fuchsia-500 to-violet-600",
+  "from-emerald-400 to-teal-600",
+  "from-violet-400 to-indigo-600",
+  "from-sky-400 to-blue-600",
+  "from-amber-400 to-orange-600",
+  "from-rose-400 to-pink-600",
+]
 
 const PHOTO_FILES = [
   { src: "/odontologia/01-turma-bioimpressora.jpg", w: 1600, h: 900 },
@@ -31,7 +48,6 @@ const PHOTO_FILES = [
   { src: "/odontologia/10-foto-turma.jpg", w: 1600, h: 900 },
 ]
 
-const TOPIC_ICONS = [Printer, Bone, Layers3, Cpu, Stethoscope, FlaskConical]
 const STAT_ICONS = [Users, Clock3, MapPin]
 const CLOSING_ICONS = [ShieldCheck, Cpu, Users, MapPin]
 
@@ -57,6 +73,7 @@ export default function OdontologiaLanding({ lang }: { lang: Lang }) {
   const photos: PhotoT[] = PHOTO_FILES.map((f, i) => ({ ...f, alt: PHOTO_ALTS[lang][i] }))
   const [hero, scaffold, construto, bioimpressora, bancada, esferoides, pipeta, instrutora, turmaPratica, turmaFoto] = photos
   const whatsapp = "https://wa.me/11968632231?text=" + encodeURIComponent(c.whatsappMsg)
+  const whatsappPcl = "https://wa.me/11968632231?text=" + encodeURIComponent(PCL_PDF_REQUEST_MSG[lang])
   const mailto = "mailto:suporte@quantis.bio?subject=" + encodeURIComponent(c.mailSubject)
 
   const ctaPrimary = "inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 shadow-lg shadow-fuchsia-900/30 transition-all"
@@ -79,6 +96,7 @@ export default function OdontologiaLanding({ lang }: { lang: Lang }) {
           </Link>
           <div className="hidden lg:flex items-center gap-6 text-sm text-gray-400">
             <a href="#conteudo" className="hover:text-white transition-colors">{c.nav.content}</a>
+            <a href="#scaffolds" className="hover:text-white transition-colors">{c.nav.scaffolds}</a>
             <a href="#formato" className="hover:text-white transition-colors">{c.nav.format}</a>
             <a href="#kit" className="hover:text-white transition-colors">{c.nav.kit}</a>
             <a href="#galeria" className="hover:text-white transition-colors">{c.nav.gallery}</a>
@@ -174,14 +192,25 @@ export default function OdontologiaLanding({ lang }: { lang: Lang }) {
           <p className="text-[11px] font-bold uppercase tracking-widest text-violet-300 mb-2">{c.contentKicker}</p>
           <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight">{c.contentTitle}</h2>
           <p className="mt-3 text-gray-300 max-w-2xl">{c.contentLead}</p>
-          <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {c.topics.map(({ t, d }, i) => {
-              const Icon = TOPIC_ICONS[i]
+          <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-5" data-testid="odonto-topics">
+            {c.topics.map(({ icon, tag, t, d, pts }, i) => {
+              const Icon = TOPIC_ICON[icon]
+              const grad = TOPIC_GRADIENTS[i % TOPIC_GRADIENTS.length]
               return (
-                <article key={t} className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 hover:border-violet-500/40 transition-colors">
-                  <div className="w-10 h-10 rounded-xl bg-violet-500/15 border border-violet-500/30 flex items-center justify-center mb-3"><Icon className="w-5 h-5 text-violet-200" /></div>
-                  <h3 className="font-bold text-white leading-snug">{t}</h3>
-                  <p className="mt-1.5 text-sm text-gray-400 leading-relaxed">{d}</p>
+                <article key={t} className="group relative rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-transparent p-6 hover:border-violet-400/50 hover:from-violet-500/[0.08] transition-all">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className={`relative w-16 h-16 rounded-2xl bg-gradient-to-br ${grad} flex items-center justify-center shadow-lg shadow-black/40 group-hover:scale-105 transition-transform`}>
+                      <Icon className="w-9 h-9 text-white drop-shadow" />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-violet-200/80 px-2.5 py-1 rounded-full border border-violet-500/30 bg-violet-500/10">{tag}</span>
+                  </div>
+                  <h3 className="mt-5 text-lg font-extrabold text-white leading-snug">{t}</h3>
+                  <p className="mt-2 text-sm text-gray-400 leading-relaxed">{d}</p>
+                  <ul className="mt-4 space-y-1.5">
+                    {pts.map(p => (
+                      <li key={p} className="flex items-start gap-2 text-xs text-gray-300"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />{p}</li>
+                    ))}
+                  </ul>
                 </article>
               )
             })}
@@ -189,8 +218,73 @@ export default function OdontologiaLanding({ lang }: { lang: Lang }) {
         </div>
       </section>
 
+      {/* Scaffolds PCL · foco especial + PDF Quantis */}
+      <section id="scaffolds" className="px-4 sm:px-6 py-16 bg-white/[0.015] border-y border-white/5 scroll-mt-20" data-testid="odonto-scaffolds">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-10 items-start">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-violet-300 mb-2">{c.scafKicker}</p>
+              <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight">{c.scafTitle}</h2>
+              <p className="mt-4 text-gray-300 leading-relaxed">{c.scafLead}</p>
+              <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {c.scafSpecs.map(s => (
+                  <div key={s.l} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-center">
+                    <p className="text-xl sm:text-2xl font-extrabold bg-gradient-to-r from-violet-300 to-fuchsia-300 bg-clip-text text-transparent">{s.v}</p>
+                    <p className="mt-1 text-[11px] text-gray-400 leading-tight">{s.l}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <figure className="rounded-3xl overflow-hidden border border-white/10 bg-white/[0.02]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={PCL_FIGURE.src} alt={c.scafFigureCaption} width={PCL_FIGURE.w} height={PCL_FIGURE.h} loading="lazy" decoding="async" className="w-full h-auto" />
+              <figcaption className="px-4 py-3 text-[11px] text-gray-500 leading-snug">{c.scafFigureCaption}</figcaption>
+            </figure>
+          </div>
+
+          <h3 className="mt-12 text-lg font-bold text-white">{c.scafBlocksTitle}</h3>
+          <div className="mt-5 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {c.scafBlocks.map(({ icon, t, d }, i) => {
+              const Icon = TOPIC_ICON[icon]
+              return (
+                <article key={t} className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 hover:border-violet-500/40 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 shrink-0 rounded-xl bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center"><Icon className="w-6 h-6 text-white" /></div>
+                    <span className="text-[11px] font-bold text-violet-300">0{i + 1}</span>
+                  </div>
+                  <h4 className="mt-4 font-bold text-white leading-snug">{t}</h4>
+                  <p className="mt-1.5 text-sm text-gray-400 leading-relaxed">{d}</p>
+                </article>
+              )
+            })}
+          </div>
+
+          {/* PDF Quantis · Scaffolds PCL */}
+          <div className="mt-10 rounded-3xl border border-fuchsia-500/30 bg-gradient-to-r from-violet-600/15 via-fuchsia-600/10 to-transparent p-6 sm:p-8 flex flex-col md:flex-row md:items-center gap-6" data-testid="odonto-pcl-pdf">
+            <div className="w-16 h-16 shrink-0 rounded-2xl bg-gradient-to-br from-fuchsia-500 to-violet-600 flex items-center justify-center shadow-lg shadow-fuchsia-900/40"><FileText className="w-8 h-8 text-white" /></div>
+            <div className="flex-1">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-violet-300">{c.scafPdfKicker}</p>
+              <h3 className="mt-1 text-xl sm:text-2xl font-extrabold text-white">{c.scafPdfTitle}</h3>
+              <p className="mt-2 text-sm text-gray-300 leading-relaxed max-w-2xl">{c.scafPdfLead}</p>
+              <p className="mt-2 text-[11px] text-gray-500">{c.scafPdfNote}</p>
+            </div>
+            <div className="flex flex-col gap-2 md:items-end">
+              {PCL_PDF ? (
+                <a href={PCL_PDF} target="_blank" rel="noopener noreferrer" data-testid="odonto-pcl-pdf-link" className={ctaPrimary}>
+                  <Download className="w-5 h-5" /> {c.scafPdfCta}
+                </a>
+              ) : (
+                <a href={whatsappPcl} target="_blank" rel="noopener noreferrer" data-testid="odonto-pcl-pdf-request" className={ctaWhats}>
+                  <MessageCircle className="w-5 h-5" /> {c.scafPdfRequestCta}
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Formato + fotos */}
-      <section id="formato" className="px-4 sm:px-6 py-16 bg-white/[0.015] border-y border-white/5 scroll-mt-20">
+      <section id="formato" className="px-4 sm:px-6 py-16 scroll-mt-20">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-10 items-center">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-widest text-violet-300 mb-2">{c.formatKicker}</p>
@@ -220,7 +314,7 @@ export default function OdontologiaLanding({ lang }: { lang: Lang }) {
       </section>
 
       {/* Kit didático · Guia Prático (mockup espiral) */}
-      <section id="kit" className="px-4 sm:px-6 py-16 scroll-mt-20" data-testid="odonto-kit">
+      <section id="kit" className="px-4 sm:px-6 py-16 bg-white/[0.015] border-y border-white/5 scroll-mt-20" data-testid="odonto-kit">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-[0.9fr_1.1fr] gap-10 lg:gap-14 items-center">
           <figure className="relative mx-auto w-full max-w-[380px] sm:max-w-[440px]">
             <div className="absolute -inset-8 rounded-[3rem] bg-gradient-to-br from-violet-600/25 via-fuchsia-600/10 to-transparent blur-2xl" aria-hidden="true" />
@@ -263,7 +357,7 @@ export default function OdontologiaLanding({ lang }: { lang: Lang }) {
       </section>
 
       {/* Galeria */}
-      <section id="galeria" className="px-4 sm:px-6 py-16 bg-white/[0.015] border-y border-white/5 scroll-mt-20" data-testid="odonto-gallery">
+      <section id="galeria" className="px-4 sm:px-6 py-16 scroll-mt-20" data-testid="odonto-gallery">
         <div className="max-w-7xl mx-auto">
           <p className="text-[11px] font-bold uppercase tracking-widest text-violet-300 mb-2">{c.galleryKicker}</p>
           <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight">{c.galleryTitle}</h2>
@@ -278,7 +372,7 @@ export default function OdontologiaLanding({ lang }: { lang: Lang }) {
       </section>
 
       {/* Investimento */}
-      <section id="investimento" className="px-4 sm:px-6 py-16 scroll-mt-20" data-testid="odonto-pricing">
+      <section id="investimento" className="px-4 sm:px-6 py-16 bg-white/[0.015] border-y border-white/5 scroll-mt-20" data-testid="odonto-pricing">
         <div className="max-w-5xl mx-auto grid lg:grid-cols-[1fr_1.1fr] gap-8 items-stretch">
           <div className="rounded-3xl border border-violet-500/30 bg-gradient-to-b from-violet-500/[0.10] to-transparent p-7 sm:p-8">
             <p className="text-[11px] font-bold uppercase tracking-widest text-violet-300">{c.pricingKicker}</p>
@@ -321,7 +415,7 @@ export default function OdontologiaLanding({ lang }: { lang: Lang }) {
       </section>
 
       {/* CTA final */}
-      <section className="px-4 sm:px-6 py-16 bg-white/[0.015] border-t border-white/5">
+      <section className="px-4 sm:px-6 py-16">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight">{c.finalTitle}</h2>
           <p className="mt-3 text-gray-300">{c.finalLead}</p>

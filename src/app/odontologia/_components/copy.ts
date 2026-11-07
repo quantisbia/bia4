@@ -11,6 +11,21 @@ export const ASAAS_LINK = "https://www.asaas.com/000/c/o2jlmlwo6rxd5y1d"
 export const PROPOSTA_PDF = "/odontologia/proposta-quantis-biofabricacao-odontologia.pdf"
 export const GUIDE_MOCKUP = { webp: "/odontologia/guia-pratico-espiral.webp", png: "/odontologia/guia-pratico-espiral.png", w: 929, h: 1203 }
 export const PRICE_PER_PRO = 4287.5
+/**
+ * PDF técnico Quantis sobre impressão de scaffolds em PCL (material de envio).
+ * Enquanto for "" (arquivo ainda não colocado em public/odontologia/), a landing
+ * mostra "Solicitar PDF" via WhatsApp em vez de um link quebrado.
+ */
+export const PCL_PDF = ""
+export const PCL_PDF_REQUEST_MSG: Record<Lang, string> = {
+  pt: "Olá! Gostaria de receber o PDF da Quantis sobre impressão de scaffolds em PCL para odontologia.",
+  en: "Hello! I'd like to receive Quantis' PDF on PCL scaffold printing for dentistry.",
+}
+/** Imagem CC-BY 4.0 (Springer, J Biol Eng 2023, doi:10.1186/s13036-023-00401-4) já usada no e-book Ortopedia */
+export const PCL_FIGURE = { src: "/library/ebook-assets/lit-pcl-bg-scaffold.jpg", w: 1200, h: 337 }
+
+/** Ícone de cada tópico (resolvido em OdontologiaLanding.tsx) */
+export type TopicIcon = "nozzle" | "bonecell" | "scaffold" | "scan" | "implant" | "membrane" | "tooth" | "jaw"
 export const PHONE_DISPLAY = "(11) 96863-2231"
 
 export const COUNTRIES: Record<Lang, string[]> = {
@@ -62,7 +77,7 @@ const pt = {
   priceFmt: (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 }),
 
   navTagline: "Biofabricação · Odontologia regenerativa",
-  nav: { content: "Conteúdo", format: "Formato", kit: "Kit didático", gallery: "Laboratório", pricing: "Investimento" },
+  nav: { content: "Conteúdo", scaffolds: "Scaffolds PCL", format: "Formato", kit: "Kit didático", gallery: "Laboratório", pricing: "Investimento" },
   navCta: "Falar com a Quantis",
   navCtaShort: "WhatsApp",
 
@@ -91,17 +106,41 @@ const pt = {
   proofInstDesc: "Universidades, institutos de pesquisa, hospitais e empresas.",
   proofInstAria: "Instituições",
 
-  contentKicker: "Conteúdo central",
+  contentKicker: "O que você vai dominar",
   contentTitle: "Do desafio clínico ao projeto de biofabricação",
-  contentLead: "Seis eixos que conectam odontologia regenerativa, biomateriais e bioimpressão 3D — com leitura translacional da literatura e prática guiada.",
+  contentLead: "Seis eixos que conectam odontologia regenerativa, biomateriais e bioimpressão 3D — com leitura translacional da literatura e prática guiada na bancada.",
   topics: [
-    { t: "Impressão 3D e bioimpressão aplicadas à odontologia", d: "Técnicas, equipamentos e quando cada uma faz sentido na clínica e na pesquisa." },
-    { t: "Regeneração óssea alveolar e defeitos periodontais", d: "Do defeito ao desenho do enxerto: critérios biológicos e mecânicos." },
-    { t: "Scaffolds, biomateriais, hidrogéis e PCL", d: "Seleção, preparo e caracterização dos materiais usados nas práticas." },
-    { t: "Planejamento digital, modelagem e parâmetros de fabricação", d: "STL, fatiamento, G-code e parâmetros que preservam a viabilidade." },
-    { t: "Implantodontia, periodontia e cirurgia bucomaxilofacial", d: "Aplicações reais e o que a literatura recente já sustenta." },
-    { t: "Raciocínio translacional", d: "Do desafio clínico ao projeto de biofabricação — método para levar adiante." },
+    { icon: "nozzle" as TopicIcon, tag: "Tecnologia", t: "Impressão 3D e bioimpressão aplicadas à odontologia", d: "Extrusão de termoplásticos, bioimpressão de hidrogéis e fotopolimerização: equipamentos, limites e quando cada técnica faz sentido na clínica e na pesquisa.", pts: ["Extrusão PCL · bioextrusão · DLP/SLA", "Escolha da técnica por indicação clínica"] },
+    { icon: "bonecell" as TopicIcon, tag: "Biologia", t: "Regeneração óssea alveolar e defeitos periodontais", d: "Do defeito ao desenho do enxerto: osteocondução, osteoindução, espaço, estabilidade e vascularização como critérios de projeto.", pts: ["Alvéolo pós-extração · defeitos intraósseos", "Critérios biológicos e mecânicos do enxerto"] },
+    { icon: "scaffold" as TopicIcon, tag: "Biomateriais", t: "Scaffolds, biomateriais, hidrogéis e PCL", d: "Seleção, preparo e caracterização de PCL, PCL + hidroxiapatita/β-TCP, GelMA, alginato e colágeno para as práticas.", pts: ["Porosidade, interconectividade e degradação", "Compósitos osteocondutores"] },
+    { icon: "scan" as TopicIcon, tag: "Digital", t: "Planejamento digital, modelagem e parâmetros de fabricação", d: "Da tomografia (CBCT) ao STL, fatiamento, G-code e parâmetros que preservam geometria e viabilidade celular.", pts: ["CBCT → segmentação → STL", "Fatiamento e G-code com a BIA"] },
+    { icon: "implant" as TopicIcon, tag: "Clínica", t: "Implantodontia, periodontia e cirurgia bucomaxilofacial", d: "Enxertos paciente-específicos, regeneração óssea guiada, levantamento de seio e reconstruções: o que a literatura recente já sustenta.", pts: ["ROG · seio maxilar · reconstrução", "Evidência clínica e pré-clínica"] },
+    { icon: "jaw" as TopicIcon, tag: "Método", t: "Raciocínio translacional", d: "Do desafio clínico ao projeto de biofabricação — método para transformar um caso real em protótipo, protocolo e projeto de pesquisa.", pts: ["Caso clínico → requisitos → protótipo", "Caminho regulatório e ética"] },
   ],
+
+  scafKicker: "Foco especial · impressão de scaffolds",
+  scafTitle: "Scaffolds de PCL para odontologia regenerativa",
+  scafLead: "A policaprolactona (PCL) é o termoplástico mais usado em scaffolds ósseos impressos em 3D: biocompatível, aprovado para dispositivos implantáveis (FDA/CE), funde a ~60 °C e permite imprimir arquiteturas porosas controladas que servem de suporte à regeneração óssea. Na jornada você aprende a projetar, imprimir e caracterizar esses scaffolds — do STL ao protótipo na mão.",
+  scafSpecs: [
+    { v: "~60 °C", l: "ponto de fusão do PCL" },
+    { v: "90–110 °C", l: "temperatura de extrusão" },
+    { v: "300–500 µm", l: "poros para osteocondução" },
+    { v: "24–36 meses", l: "degradação in vivo" },
+  ],
+  scafBlocksTitle: "O que você aprende na prática",
+  scafBlocks: [
+    { icon: "scan" as TopicIcon, t: "Projeto paciente-específico", d: "Da tomografia (CBCT/DICOM) à segmentação do defeito e geração do STL do enxerto; arquiteturas 0/90°, triangular e gyroid (TPMS); porosidade e espessura de filamento." },
+    { icon: "nozzle" as TopicIcon, t: "Impressão por extrusão a quente", d: "Parâmetros de temperatura, pressão, velocidade e altura de camada; fatiamento e G-code gerados com a BIA; impressão de scaffolds em PCL puro e PCL + cerâmicas bioativas." },
+    { icon: "scaffold" as TopicIcon, t: "Funcionalização e caracterização", d: "PCL + hidroxiapatita/β-TCP, tratamento de superfície (NaOH, plasma) e recobrimento com hidrogéis (GelMA, colágeno); avaliação de porosidade, interconectividade e resistência à compressão." },
+    { icon: "membrane" as TopicIcon, t: "Aplicações clínicas em odontologia", d: "Preservação de alvéolo, regeneração óssea guiada (ROG), levantamento de seio maxilar, defeitos periodontais e reconstruções maxilomandibulares com enxertos customizados." },
+  ],
+  scafFigureCaption: "Scaffold de PCL impresso em 3D com vidro bioativo e hidrogel para regeneração óssea. Fonte: J Biol Eng 2023 (CC-BY 4.0).",
+  scafPdfKicker: "Material técnico Quantis",
+  scafPdfTitle: "Impressão de scaffolds em PCL",
+  scafPdfLead: "PDF técnico da Quantis com fundamentos, parâmetros de impressão e aplicações de scaffolds de PCL — o mesmo material que enviamos para instituições parceiras.",
+  scafPdfCta: "Baixar PDF · Scaffolds PCL",
+  scafPdfRequestCta: "Solicitar o PDF (WhatsApp)",
+  scafPdfNote: "Gratuito · formato PDF · em português",
 
   formatKicker: "Formato da jornada",
   formatTitle: "Prático, sequencial e no ritmo do seu grupo",
@@ -174,7 +213,7 @@ const en: Copy = {
   priceFmt: (v: number) => "R$ " + v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
 
   navTagline: "Biofabrication · Regenerative dentistry",
-  nav: { content: "Content", format: "Format", kit: "Learning kit", gallery: "Laboratory", pricing: "Investment" },
+  nav: { content: "Content", scaffolds: "PCL scaffolds", format: "Format", kit: "Learning kit", gallery: "Laboratory", pricing: "Investment" },
   navCta: "Talk to Quantis",
   navCtaShort: "WhatsApp",
 
@@ -203,17 +242,41 @@ const en: Copy = {
   proofInstDesc: "Universities, research institutes, hospitals and companies.",
   proofInstAria: "Institutions",
 
-  contentKicker: "Core content",
+  contentKicker: "What you will master",
   contentTitle: "From the clinical challenge to the biofabrication project",
-  contentLead: "Six axes connecting regenerative dentistry, biomaterials and 3D bioprinting — with a translational reading of the literature and guided practice.",
+  contentLead: "Six axes connecting regenerative dentistry, biomaterials and 3D bioprinting — with a translational reading of the literature and guided bench practice.",
   topics: [
-    { t: "3D printing and bioprinting applied to dentistry", d: "Techniques, equipment and when each one makes sense in the clinic and in research." },
-    { t: "Alveolar bone regeneration and periodontal defects", d: "From the defect to the graft design: biological and mechanical criteria." },
-    { t: "Scaffolds, biomaterials, hydrogels and PCL", d: "Selection, preparation and characterisation of the materials used in the sessions." },
-    { t: "Digital planning, modelling and fabrication parameters", d: "STL, slicing, G-code and the parameters that preserve viability." },
-    { t: "Implantology, periodontics and oral & maxillofacial surgery", d: "Real applications and what the recent literature already supports." },
-    { t: "Translational reasoning", d: "From the clinical challenge to the biofabrication project — a method to carry it forward." },
+    { icon: "nozzle" as TopicIcon, tag: "Technology", t: "3D printing and bioprinting applied to dentistry", d: "Thermoplastic extrusion, hydrogel bioprinting and photopolymerisation: equipment, limits and when each technique makes sense in the clinic and in research.", pts: ["PCL extrusion · bioextrusion · DLP/SLA", "Choosing the technique by clinical indication"] },
+    { icon: "bonecell" as TopicIcon, tag: "Biology", t: "Alveolar bone regeneration and periodontal defects", d: "From the defect to the graft design: osteoconduction, osteoinduction, space, stability and vascularisation as design criteria.", pts: ["Post-extraction socket · intrabony defects", "Biological and mechanical graft criteria"] },
+    { icon: "scaffold" as TopicIcon, tag: "Biomaterials", t: "Scaffolds, biomaterials, hydrogels and PCL", d: "Selection, preparation and characterisation of PCL, PCL + hydroxyapatite/β-TCP, GelMA, alginate and collagen for the sessions.", pts: ["Porosity, interconnectivity and degradation", "Osteoconductive composites"] },
+    { icon: "scan" as TopicIcon, tag: "Digital", t: "Digital planning, modelling and fabrication parameters", d: "From CBCT to STL, slicing, G-code and the parameters that preserve geometry and cell viability.", pts: ["CBCT → segmentation → STL", "Slicing and G-code with BIA"] },
+    { icon: "implant" as TopicIcon, tag: "Clinical", t: "Implantology, periodontics and oral & maxillofacial surgery", d: "Patient-specific grafts, guided bone regeneration, sinus lift and reconstructions: what the recent literature already supports.", pts: ["GBR · maxillary sinus · reconstruction", "Clinical and preclinical evidence"] },
+    { icon: "jaw" as TopicIcon, tag: "Method", t: "Translational reasoning", d: "From the clinical challenge to the biofabrication project — a method to turn a real case into prototype, protocol and research project.", pts: ["Clinical case → requirements → prototype", "Regulatory pathway and ethics"] },
   ],
+
+  scafKicker: "Special focus · scaffold printing",
+  scafTitle: "PCL scaffolds for regenerative dentistry",
+  scafLead: "Polycaprolactone (PCL) is the most widely used thermoplastic for 3D-printed bone scaffolds: biocompatible, cleared for implantable devices (FDA/CE), melts at ~60 °C and allows controlled porous architectures that support bone regeneration. During the journey you learn to design, print and characterise these scaffolds — from STL to the prototype in your hand.",
+  scafSpecs: [
+    { v: "~60 °C", l: "PCL melting point" },
+    { v: "90–110 °C", l: "extrusion temperature" },
+    { v: "300–500 µm", l: "pores for osteoconduction" },
+    { v: "24–36 months", l: "in vivo degradation" },
+  ],
+  scafBlocksTitle: "What you learn hands-on",
+  scafBlocks: [
+    { icon: "scan" as TopicIcon, t: "Patient-specific design", d: "From CBCT/DICOM to defect segmentation and graft STL; 0/90°, triangular and gyroid (TPMS) architectures; porosity and strand thickness." },
+    { icon: "nozzle" as TopicIcon, t: "Hot-melt extrusion printing", d: "Temperature, pressure, speed and layer-height parameters; slicing and G-code generated with BIA; printing scaffolds in pure PCL and PCL + bioactive ceramics." },
+    { icon: "scaffold" as TopicIcon, t: "Functionalisation and characterisation", d: "PCL + hydroxyapatite/β-TCP, surface treatment (NaOH, plasma) and hydrogel coating (GelMA, collagen); porosity, interconnectivity and compressive strength assessment." },
+    { icon: "membrane" as TopicIcon, t: "Clinical applications in dentistry", d: "Socket preservation, guided bone regeneration (GBR), maxillary sinus lift, periodontal defects and maxillomandibular reconstructions with customised grafts." },
+  ],
+  scafFigureCaption: "3D-printed PCL scaffold with bioactive glass and hydrogel for bone regeneration. Source: J Biol Eng 2023 (CC-BY 4.0).",
+  scafPdfKicker: "Quantis technical material",
+  scafPdfTitle: "PCL scaffold printing",
+  scafPdfLead: "Quantis technical PDF (in Portuguese) with fundamentals, printing parameters and applications of PCL scaffolds — the same material we send to partner institutions.",
+  scafPdfCta: "Download PDF · PCL scaffolds",
+  scafPdfRequestCta: "Request the PDF (WhatsApp)",
+  scafPdfNote: "Free · PDF · Portuguese",
 
   formatKicker: "Journey format",
   formatTitle: "Hands-on, sequential and at your group's pace",
