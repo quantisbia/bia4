@@ -7,9 +7,13 @@ import {
   CreditCard, RefreshCw, ExternalLink, Calendar, Crown,
   ChevronDown, ChevronUp, FlaskConical,
   Brain, Microscope, Package, ArrowRight,
-  ShieldCheck, Timer, Info, GraduationCap,
+  ShieldCheck, Timer, Info, GraduationCap, Tag, Flame,
 } from "lucide-react"
 import { CreditProgressBar, CreditBadge } from "@/components/credits/CreditWidgets"
+import {
+  isBlackFridayActive, bfPrice, bfSavings, bfPercentLabel, bfPaymentLink, brl,
+  BF_ENDS_LABEL, BF_COUPON, BF_LABEL,
+} from "@/lib/promo/black-friday"
 import { useToast } from "@/components/ui/Toast"
 import { cn } from "@/lib/utils/helpers"
 
@@ -245,10 +249,72 @@ const PLAN_CREDITS_MAX: Record<string, number> = {
 // não há mais ciclo de cobrança (compra única de créditos).
 
 /* ─────────────────────────────────────────────────────────────────────────
+   R32 · Black Friday — banner + preço promocional
+   22% OFF em toda a loja (planos + pacotes), EXCETO cursos (BIA Academy,
+   turmas presenciais). Config em src/lib/promo/black-friday.ts.
+───────────────────────────────────────────────────────────────────────── */
+function BlackFridayBanner({ compact = false }: { compact?: boolean }) {
+  if (!isBlackFridayActive()) return null
+  return (
+    <div
+      data-testid="billing-black-friday-banner"
+      className={cn(
+        "relative overflow-hidden rounded-2xl border border-amber-400/40 bg-gradient-to-r from-[#1a0b00] via-[#2a0f05] to-[#1a0633]",
+        compact ? "px-4 py-3" : "px-4 sm:px-6 py-4 sm:py-5"
+      )}
+    >
+      <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-amber-500/20 blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-12 left-1/3 w-48 h-48 rounded-full bg-fuchsia-600/15 blur-3xl pointer-events-none" />
+      <div className="relative flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 shrink-0 rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-900/50">
+            <Flame className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">{BF_LABEL} · até {BF_ENDS_LABEL}</p>
+            <p className="text-base sm:text-lg font-extrabold text-white leading-tight">
+              A Black Friday já começou aqui! <span className="bg-gradient-to-r from-amber-300 to-orange-400 bg-clip-text text-transparent">{bfPercentLabel()}</span> em toda a loja
+            </p>
+          </div>
+        </div>
+        <div className="sm:ml-auto flex flex-wrap items-center gap-2 text-[11px]">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-amber-400/40 bg-amber-500/10 text-amber-200 font-semibold">
+            <Tag className="w-3 h-3" /> Planos e pacotes de créditos
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-white/10 bg-white/[0.04] text-gray-400">
+            <GraduationCap className="w-3 h-3" /> Cursos não participam
+          </span>
+        </div>
+      </div>
+      {!compact && (
+        <p className="relative mt-3 text-[11px] text-gray-400">
+          Desconto de {bfPercentLabel()} aplicado no checkout promocional Asaas. Se o checkout exibir o valor cheio, informe o cupom <strong className="text-amber-200">{BF_COUPON}</strong> ou fale com <a href="mailto:financeiro@quantis.bio" className="text-amber-200 underline underline-offset-2">financeiro@quantis.bio</a> para receber o link com desconto.
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** Preço com destaque Black Friday: original riscado + valor com desconto. */
+function BfPrice({ original, size = "md", className }: { original: number; size?: "sm" | "md" | "lg"; className?: string }) {
+  const active = isBlackFridayActive()
+  const big = size === "lg" ? "text-2xl" : size === "md" ? "text-lg" : "text-xs"
+  if (!active) return <p className={cn(big, "font-bold text-white", className)}>{brl(original)}</p>
+  return (
+    <div className={cn("flex flex-col", className)} data-testid="bf-price">
+      <span className="text-[11px] text-gray-500 line-through">{brl(original)}</span>
+      <span className={cn(big, "font-bold text-white leading-tight")}>{brl(bfPrice(original))}</span>
+      <span className="text-[10px] font-bold text-amber-300">{bfPercentLabel()} · economize {brl(bfSavings(original))}</span>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
    Credit Packs Section
 ───────────────────────────────────────────────────────────────────────── */
 function CreditPacksSection() {
   const [selectedPack, setSelectedPack] = useState<string | null>(null)
+  const bf = isBlackFridayActive()
 
   return (
     <div className="space-y-4 animate-fadeIn">
@@ -286,6 +352,11 @@ function CreditPacksSection() {
               )}
 
               {/* Bonus badge */}
+              {bf && (
+                <span className="absolute -top-2.5 right-3 bg-gradient-to-r from-amber-400 to-orange-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-lg z-10">
+                  -22% BF
+                </span>
+              )}
               {pack.bonus && (
                 <span className={cn(
                   "absolute -top-2 right-3 text-[9px] font-bold px-2 py-0.5 rounded-full",
@@ -309,18 +380,16 @@ function CreditPacksSection() {
                   </p>
                   <p className="text-[10px] text-gray-500">créditos</p>
                 </div>
-                <div className="w-full pt-2 border-t border-white/[0.05]">
-                  <p className="text-lg font-bold text-white">
-                    R$ {pack.price.toLocaleString("pt-BR")}
-                  </p>
-                  <p className="text-[10px] text-gray-500">
-                    R$ {pack.pricePerCredit.toFixed(2)}/crédito
+                <div className="w-full pt-2 border-t border-white/[0.05] flex flex-col items-center">
+                  <BfPrice original={pack.price} size="md" className="items-center" />
+                  <p className="text-[10px] text-gray-500 mt-0.5">
+                    R$ {(bf ? bfPrice(pack.price) / pack.credits : pack.pricePerCredit).toFixed(2)}/crédito
                   </p>
                 </div>
 
                 {/* CTA */}
                 <a
-                  href={pack.paymentUrl}
+                  href={bfPaymentLink(pack.id, pack.paymentUrl).href}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
@@ -507,7 +576,8 @@ export function BillingClient({
   /* For paid plans: redirect to Asaas payment */
   const handlePaymentRedirect = (planId: string, plan: typeof PLANS[0]) => {
     if (planId === currentPlan) { info("Plano atual", "Você já está neste plano."); return }
-    window.open(plan.paymentUrl, "_blank", "noopener,noreferrer")
+    // R32 · Black Friday: usa link promocional quando cadastrado
+    window.open(bfPaymentLink(planId, plan.paymentUrl).href, "_blank", "noopener,noreferrer")
   }
 
   const planIndex = (id: string) => PLANS.findIndex(p => p.id === id)
@@ -516,11 +586,14 @@ export function BillingClient({
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-5 sm:space-y-7 max-w-5xl mx-auto w-full">
 
+      {/* ── R32 · Black Friday ── */}
+      <BlackFridayBanner />
+
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-white mb-0.5">Créditos</h1>
-          <p className="text-xs sm:text-sm text-gray-400">Compre créditos e acompanhe seu consumo</p>
+          <p className="text-xs sm:text-sm text-gray-400">Compre créditos e acompanhe seu consumo{isBlackFridayActive() && <span className="text-amber-300 font-semibold"> · Black Friday: {bfPercentLabel()} em planos e pacotes</span>}</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-gray-600 uppercase tracking-wider font-medium">Saldo</span>
@@ -621,12 +694,12 @@ export function BillingClient({
                     isCur ? `${c.border} ${c.bg} ring-1 ${c.ring}` : "border-white/[0.08] bg-white/[0.02] hover:border-white/15"
                   )}>
                   {/* Badge */}
-                  {plan.badge && (
+                  {plan.badge && !isCur && (
                     <span className={cn(
-                      "absolute -top-3 left-1/2 -translate-x-1/2 text-white text-[10px] font-bold px-3 py-0.5 rounded-full shadow-lg z-10",
-                      c.badgeBg
+                      "absolute -top-3 left-1/2 -translate-x-1/2 text-white text-[10px] font-bold px-3 py-0.5 rounded-full shadow-lg z-10 whitespace-nowrap",
+                      isBlackFridayActive() ? "bg-gradient-to-r from-amber-400 to-orange-600" : c.badgeBg
                     )}>
-                      {plan.badge}
+                      {isBlackFridayActive() ? `BLACK FRIDAY · ${bfPercentLabel()}` : plan.badge}
                     </span>
                   )}
                   {isCur && (
@@ -643,9 +716,8 @@ export function BillingClient({
                         <span className="text-sm font-bold">{plan.name_short ?? plan.name}</span>
                       </div>
                       <div className="flex items-baseline gap-1.5">
-                        <p className="text-2xl font-bold text-white">
-                          R$ {price.toLocaleString("pt-BR")}
-                        </p>
+                        <BfPrice original={price} size="lg" />
+                        <span className="text-xs text-gray-500 font-normal">/{plan.period}</span>
                         {plan.id === "GUIDE" && (
                           <span className="text-xs text-gray-500 font-normal">
                             /mês
@@ -756,9 +828,17 @@ export function BillingClient({
                         {plan.name}
                       </p>
                       <div className="flex items-center gap-2 mt-1">
-                        <p className={cn("text-xs font-medium", c.text)}>
-                          R$ {price.toLocaleString("pt-BR")}
-                        </p>
+                        {isBlackFridayActive() ? (
+                          <p className="text-xs font-medium flex items-baseline gap-1.5">
+                            <span className="text-gray-500 line-through">{brl(price)}</span>
+                            <span className={c.text}>{brl(bfPrice(price))}</span>
+                            <span className="text-[9px] font-black text-amber-300">-22%</span>
+                          </p>
+                        ) : (
+                          <p className={cn("text-xs font-medium", c.text)}>
+                            R$ {price.toLocaleString("pt-BR")}
+                          </p>
+                        )}
                         <span className="text-gray-600">·</span>
                         <span className={cn("text-xs", c.text)}>{plan.credits.toLocaleString("pt-BR")} cr</span>
                       </div>
@@ -791,7 +871,7 @@ export function BillingClient({
                         </div>
                       ) : (
                         <a
-                          href={plan.paymentUrl}
+                          href={bfPaymentLink(plan.id, plan.paymentUrl).href}
                           target="_blank"
                           rel="noopener noreferrer"
                           className={cn(
@@ -848,6 +928,11 @@ export function BillingClient({
                     <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-fuchsia-500/20 text-fuchsia-200 border border-fuchsia-500/30">
                       Novo
                     </span>
+                    {isBlackFridayActive() && (
+                      <span data-testid="billing-academy-bf-excluded" className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/[0.04] text-gray-400 border border-white/10">
+                        Curso · fora da Black Friday
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-gray-400 leading-relaxed mb-3">
                     Formação em biofabricação e bioimpressão 3D com plataforma BIA integrada.
