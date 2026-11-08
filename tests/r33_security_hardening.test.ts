@@ -131,3 +131,13 @@ describe("R33-B · rotas endurecidas (análise estática)", () => {
     expect(page).toContain("const emailSentOnly = result?.ok && result.accountExists && !result.resetUrl")
   })
 })
+
+describe("R33-B · remetente de e-mail transacional", () => {
+  it("reset e alertas usam o domínio verificado biaquantis.bio como default (nunca onboarding@resend.dev)", () => {
+    for (const f of ["src/lib/email/send-password-reset.ts", "src/lib/security/request-guard.ts"]) {
+      const s = read(f)
+      expect(s).toContain("contato@biaquantis.bio")
+      expect(s).not.toContain("onboarding@resend.dev")
+    }
+  })
+})

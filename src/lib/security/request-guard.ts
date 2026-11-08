@@ -150,7 +150,7 @@ export interface SecurityAlertParams {
 export async function sendSecurityAlert({ subject, lines }: SecurityAlertParams): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY?.trim()
   if (!apiKey) { console.warn("[security-alert] RESEND_API_KEY ausente:", subject, lines.join(" | ")); return false }
-  const from = (process.env.RESEND_FROM_EMAIL || "BIA <onboarding@resend.dev>").trim()
+  const from = (process.env.RESEND_FROM_EMAIL || "BIA <contato@biaquantis.bio>").trim()
   const html = `<div style="font-family:system-ui,sans-serif;max-width:640px"><h2 style="color:#7c3aed">🛡️ BIA · Alerta de segurança</h2><p><strong>${escapeHtml(subject)}</strong></p><ul>${lines.map(l => `<li>${escapeHtml(l)}</li>`).join("")}</ul><p style="color:#666;font-size:12px">Gerado automaticamente por src/lib/security/request-guard.ts · ${new Date().toISOString()}</p></div>`
   try {
     const res = await fetch("https://api.resend.com/emails", {

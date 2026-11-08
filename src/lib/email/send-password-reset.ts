@@ -56,7 +56,7 @@ export async function sendPasswordResetEmail(
   const { to, resetUrl, userName, expiresInMin } = params
 
   const apiKey = process.env.RESEND_API_KEY?.trim()
-  const fromAddress = (process.env.RESEND_FROM_EMAIL || "BIA <onboarding@resend.dev>").trim()
+  const fromAddress = (process.env.RESEND_FROM_EMAIL || "BIA <contato@biaquantis.bio>").trim()
 
   // Sem RESEND configurado → modo fallback
   if (!apiKey) {
