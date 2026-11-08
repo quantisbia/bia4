@@ -1,11 +1,14 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
- *  POST /api/auth/forgot-password (R12.31 — revisado)
+ *  POST /api/auth/forgot-password (R12.31 — revisado · R33-B endurecido)
  *  ─────────────────────────────────────────────────────────────────────
- *  R12.31 muda a postura: o link de reset SEMPRE aparece na resposta
- *  quando o email existe. Email continua sendo enviado quando RESEND
- *  está configurado, mas o usuário NUNCA fica preso esperando algo
- *  que pode não chegar (spam, DNS, infra não configurada).
+ *  R33-B (08/11/2026): o `resetUrl` NÃO é mais devolvido na resposta HTTP.
+ *  A política R12.31 (link sempre visível) permitia que QUALQUER pessoa que
+ *  soubesse o e-mail de um usuário redefinisse a senha dele sem acesso à
+ *  caixa de entrada — exatamente o fluxo sondado por `ss.keyprobe.01`.
+ *  Hoje o Resend está operacional; o link vai SÓ por e-mail. Se o envio
+ *  falhar, a resposta informa e orienta a contatar o suporte.
+ *  Exceção controlada: RESET_LINK_IN_RESPONSE=1 (apenas dev/local).
  *
  *  Bootstrap da tabela: chama ensurePasswordResetTable() antes do
  *  INSERT — torna o endpoint resiliente a migrations não aplicadas.
@@ -28,39 +31,25 @@ import {
 } from "@/lib/auth/password-reset-token"
 import { ensurePasswordResetTable } from "@/lib/auth/password-reset-bootstrap"
 import { sendPasswordResetEmail } from "@/lib/email/send-password-reset"
+import { getClientInfo, checkRateLimit } from "@/lib/security/request-guard"
+
+// R33-B · só em desenvolvimento local, nunca em produção
+const RESET_LINK_IN_RESPONSE = process.env.RESET_LINK_IN_RESPONSE === "1" && process.env.NODE_ENV !== "production"
 
 const forgotSchema = z.object({
   email: z.string().email("Email inválido").max(254),
 })
 
-// Rate limit simples em memória (por IP)
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000 // 15 min
-const RATE_LIMIT_MAX = 10 // R12.31: subido de 5→10 para diminuir fricção
-const rateLimitBucket = new Map<string, { count: number; resetAt: number }>()
-
-function checkRateLimit(ip: string): { allowed: boolean; retryAfterSec?: number } {
-  const now = Date.now()
-  const entry = rateLimitBucket.get(ip)
-  if (!entry || entry.resetAt < now) {
-    rateLimitBucket.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS })
-    return { allowed: true }
-  }
-  if (entry.count >= RATE_LIMIT_MAX) {
-    return { allowed: false, retryAfterSec: Math.ceil((entry.resetAt - now) / 1000) }
-  }
-  entry.count++
-  return { allowed: true }
-}
+// Rate limit por IP (R33-B: volta a 5 / 15 min — o link agora só vai por e-mail)
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000
+const RATE_LIMIT_MAX = 5
 
 export async function POST(req: NextRequest) {
-  const ip =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    req.headers.get("x-real-ip") ??
-    "unknown"
-  const userAgent = req.headers.get("user-agent")?.slice(0, 256) ?? null
+  // R33-B · IP real + user-agent (x-vercel-forwarded-for / primeiro IP público)
+  const { ip, userAgent, country } = getClientInfo(req)
 
   // Rate limit
-  const rl = checkRateLimit(ip)
+  const rl = checkRateLimit("forgot-password", ip, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS)
   if (!rl.allowed) {
     return NextResponse.json(
       {
@@ -179,29 +168,43 @@ export async function POST(req: NextRequest) {
           userId: user.id,
           action: "password_reset_requested",
           entity: "user",
+          ip: ip !== "unknown" ? ip : null,
           metadata: {
             email: user.email,
             emailSent: emailResult.emailSent,
             emailProvider: emailResult.provider,
             emailError: emailResult.error ?? null,
             ip,
+            userAgent,
+            country,
           },
         },
       })
       .catch(() => {})
 
-    // ─── R12.31: SEMPRE devolve o resetUrl quando a conta existe ──
-    // O usuário pode usar imediatamente sem depender do email chegar.
-    // Isso resolve o problema de "o email não chega" definitivamente.
+    // ─── R33-B: o link vai SÓ por e-mail. Nunca na resposta em produção. ──
+    if (RESET_LINK_IN_RESPONSE) {
+      return successResponse({ accountExists: true, emailDelivered: emailResult.emailSent, resetUrl, message: "[DEV] Link de redefinição (apenas ambiente local):" })
+    }
+    if (!emailResult.emailSent) {
+      console.error(`[forgot-password] e-mail NÃO enviado para ${user.email}: ${emailResult.error ?? emailResult.provider}`)
+      return NextResponse.json(
+        {
+          ok: false,
+          emailDelivered: false,
+          error:
+            "Não conseguimos enviar o e-mail de redefinição agora. Tente novamente em alguns minutos " +
+            "ou escreva para suporte@quantis.bio informando o e-mail da sua conta.",
+        },
+        { status: 502 },
+      )
+    }
     return successResponse({
       accountExists: true,
-      emailDelivered: emailResult.emailSent,
-      emailProvider: emailResult.provider,
-      resetUrl,
-      message: emailResult.emailSent
-        ? "Enviamos um link de redefinição para o seu email. " +
-          "Você também pode usar o link abaixo agora mesmo (sem esperar o email):"
-        : "Link de redefinição gerado. Use o botão abaixo para criar uma nova senha agora:",
+      emailDelivered: true,
+      message:
+        "Enviamos um link de redefinição para o seu e-mail. " +
+        `Ele vale por ${TOKEN_TTL_MIN} minutos — verifique também a pasta de spam.`,
     })
   } catch (e) {
     console.error("[forgot-password] erro:", e instanceof Error ? e.message : String(e))

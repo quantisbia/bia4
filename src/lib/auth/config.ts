@@ -1,6 +1,7 @@
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
+import { getClientInfo } from "@/lib/security/request-guard"
 import { prisma } from "@/lib/db/prisma"
 import { getUserByEmail } from "@/lib/db/queries"
 import { z } from "zod"
@@ -23,7 +24,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Senha", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         try {
           const parsed = loginSchema.safeParse(credentials)
           if (!parsed.success) return null
@@ -36,13 +37,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const valid = await bcrypt.compare(password, user.password)
           if (!valid) return null
 
-          // Log login (fire-and-forget)
+          // Log login (fire-and-forget) — R33-B: agora com IP real + user-agent
+          const client = getClientInfo({ headers: new Headers((request as { headers?: HeadersInit } | undefined)?.headers ?? {}) })
           prisma.auditLog.create({
             data: {
               userId: user.id,
               action: "user_login",
               entity: "session",
-              metadata: { email: user.email },
+              ip: client.ip !== "unknown" ? client.ip : null,
+              metadata: { email: user.email, userAgent: client.userAgent, country: client.country },
             },
           }).catch(() => {})
 
