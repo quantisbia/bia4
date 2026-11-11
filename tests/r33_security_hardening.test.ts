@@ -141,3 +141,20 @@ describe("R33-B · remetente de e-mail transacional", () => {
     }
   })
 })
+
+describe("R34 · download do e-book na biblioteca", () => {
+  it("outputFileTracingIncludes usa glob que CASA a rota normalizada /api/library/download/[id]", async () => {
+    const cfg = read("next.config.mjs")
+    const m = cfg.match(/outputFileTracingIncludes:\s*\{\s*"([^"]+)"/)
+    expect(m).toBeTruthy()
+    const pm = (await import("picomatch")).default
+    expect(pm(m![1], { dot: true, contains: true })("/api/library/download/[id]")).toBe(true)
+    // regressão: a chave antiga não casava
+    expect(pm("/api/library/download/[id]/route", { dot: true, contains: true })("/api/library/download/[id]")).toBe(false)
+  })
+  it("redirect de não-logado aponta para /auth/login (não /login, que é 404)", () => {
+    const r = read("src/app/api/library/download/[id]/route.ts")
+    expect(r).toContain('new URL("/auth/login", req.url)')
+    expect(r).not.toContain('new URL("/login", req.url)')
+  })
+})

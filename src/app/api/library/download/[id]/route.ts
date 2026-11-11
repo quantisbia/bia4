@@ -48,8 +48,9 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
   const session = await auth()
   const email = session?.user?.email?.toLowerCase().trim()
   if (!email) {
-    const loginUrl = new URL("/login", req.url)
-    loginUrl.searchParams.set("callbackUrl", `/academy#ebooks`)
+    // R34 fix: a página de login é /auth/login ("/login" dava 404)
+    const loginUrl = new URL("/auth/login", req.url)
+    loginUrl.searchParams.set("callbackUrl", `/academy/library`)
     loginUrl.searchParams.set("intent", "download-ebook")
     return NextResponse.redirect(loginUrl)
   }
@@ -95,14 +96,21 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
   // R13.15.4: PDFs agora ficam em /src/content/ebooks/ (dentro de /src),
   // o que garante inclusão no bundle Vercel sem depender de configuração
   // específica. process.cwd() na Vercel é a raiz do bundle.
-  const absPath = resolve(process.cwd(), material.privateFilePath!)
-  let fileBuf: Buffer
-  try {
-    fileBuf = await readFile(absPath)
-  } catch (err) {
-    console.error(`[library/download] Arquivo não encontrado no disco: ${absPath}`, err)
+  // R34: tenta cwd e, em fallback, o diretório do bundle (Vercel pode montar
+  // o trace em /var/task). Loga os caminhos tentados para diagnóstico.
+  const candidates = [
+    resolve(process.cwd(), material.privateFilePath!),
+    resolve("/var/task", material.privateFilePath!),
+    resolve(process.cwd(), ".next/server", material.privateFilePath!),
+  ]
+  let fileBuf: Buffer | null = null
+  for (const p of candidates) {
+    try { fileBuf = await readFile(p); break } catch { /* tenta o próximo */ }
+  }
+  if (!fileBuf) {
+    console.error(`[library/download] Arquivo não encontrado. cwd=${process.cwd()} tentativas=${candidates.join(" | ")}`)
     return NextResponse.json(
-      { error: "Arquivo temporariamente indisponível. Contate o suporte." },
+      { error: "Arquivo temporariamente indisponível. Contate o suporte.", id },
       { status: 500 },
     )
   }

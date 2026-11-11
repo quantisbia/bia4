@@ -17,9 +17,14 @@ const nextConfig = {
     // IMPORTANTE: em Next 14.2.35, outputFileTracingIncludes vai DENTRO de
     // `experimental` (schema validado em node_modules/next/dist/server/config-schema.js).
     // Em Next 15+ ele sai de experimental para o top-level.
-    // Chave usa o padrão do route handler: /api/library/download/[id]/route
+    // R34 (fix) · A chave é um glob (picomatch, contains:true) casado contra a rota
+    // NORMALIZADA ("/api/library/download/[id]", sem "/route"). A chave antiga
+    // "/api/library/download/[id]/route" NUNCA casava: (a) tinha o sufixo /route;
+    // (b) "[id]" em glob é classe de caracteres (casa só "i" ou "d"), não o literal.
+    // Resultado: PDFs fora do bundle → 500 "Arquivo temporariamente indisponível".
+    // Usamos wildcard para casar qualquer segmento dinâmico.
     outputFileTracingIncludes: {
-      "/api/library/download/[id]/route": ["./src/content/ebooks/**/*"],
+      "/api/library/download/**": ["./src/content/ebooks/**/*"],
     },
   },
 
