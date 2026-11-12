@@ -119,6 +119,44 @@ export const QUANTIS_WHITE_PAPERS: QuantisWhitePaper[] = [
     relatedPatent: "BR102021019538-0A",
   },
   {
+    // R34.1 · Documento institucional da imersão em Odontologia (mesmo PDF
+    // da landing /odontologia). Open-access: já é público na landing.
+    id: "quantis-biofabricacao-odontologia-2026",
+    kind: "white-paper",
+    title: "Biofabricação e Bioimpressão 3D Aplicadas à Odontologia",
+    subtitle: "Regeneração óssea, biomateriais, scaffolds e planejamento digital para aplicações odontológicas",
+    authors: ["Quantis Biotechnology", "Coordenação: Dra. Janaina Dernowsek"],
+    year: 2026,
+    category: "Aplicações Clínicas · Odontologia",
+    audience: "Cirurgiões-dentistas, implantodontistas, periodontistas, cirurgiões bucomaxilofaciais e pesquisadores em odontologia regenerativa",
+    abstract:
+      "Documento institucional da imersão prática em biofabricação aplicada à odontologia regenerativa, realizada no laboratório da Quantis (Campus Bayer, São Paulo). " +
+      "Apresenta a estrutura executiva da jornada — 1 aula online prévia + 2 práticas presenciais sequenciais de bioimpressão 3D + aprofundamento online — e os seis eixos de conteúdo: " +
+      "impressão 3D e bioimpressão aplicadas à odontologia; regeneração óssea alveolar e defeitos periodontais; scaffolds, biomateriais, hidrogéis e PCL; " +
+      "planejamento digital, modelagem e parâmetros de fabricação; aplicações em implantodontia, periodontia e cirurgia bucomaxilofacial; e raciocínio translacional, do desafio clínico ao projeto de biofabricação. " +
+      "Inclui os diferenciais da formação (kit didático com guia prático impresso, scaffolds, biomateriais, seringas e modelos; 6 meses de acesso à plataforma BIA) e as condições para turmas fechadas de 5 a 8 profissionais.",
+    keywords: [
+      "odontologia regenerativa",
+      "regeneração óssea",
+      "scaffolds",
+      "PCL",
+      "biomateriais",
+      "bioimpressão 3D",
+      "planejamento digital",
+      "implantodontia",
+      "periodontia",
+      "bucomaxilofacial",
+    ],
+    pdfUrl: "/library/quantis-biofabricacao-odontologia-2026.pdf",
+    pages: 3,
+    sizeMb: 0.92,
+    language: "pt-BR",
+    openAccess: true,
+    citation:
+      "Quantis Biotechnology. Biofabricação e Bioimpressão 3D Aplicadas à Odontologia — proposta institucional de capacitação técnica e desenvolvimento translacional. " +
+      "São Paulo, novembro de 2026, 3p. Disponível em biaquantis.bio/odontologia",
+  },
+  {
     id: "ebook-biofabricacao-ortopedia-2026",
     kind: "ebook",
     title: "Biofabricação em Ortopedia",
