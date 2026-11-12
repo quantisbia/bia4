@@ -119,42 +119,51 @@ export const QUANTIS_WHITE_PAPERS: QuantisWhitePaper[] = [
     relatedPatent: "BR102021019538-0A",
   },
   {
-    // R34.1 · Documento institucional da imersão em Odontologia (mesmo PDF
-    // da landing /odontologia). Open-access: já é público na landing.
-    id: "quantis-biofabricacao-odontologia-2026",
-    kind: "white-paper",
-    title: "Biofabricação e Bioimpressão 3D Aplicadas à Odontologia",
-    subtitle: "Regeneração óssea, biomateriais, scaffolds e planejamento digital para aplicações odontológicas",
-    authors: ["Quantis Biotechnology", "Coordenação: Dra. Janaina Dernowsek"],
+    // R34.2 · E-book técnico Vol. 02 (substitui o documento institucional da
+    // imersão, que saiu da biblioteca). Restrito a alunos, como o Vol. 01.
+    id: "ebook-biofabricacao-odontologia-2026",
+    kind: "ebook",
+    title: "Biofabricação em Odontologia",
+    subtitle: "Do dente perdido ao tecido oral bioimpresso",
+    authors: ["Equipe editorial Quantis Biotechnology", "BIA Academy"],
     year: 2026,
     category: "Aplicações Clínicas · Odontologia",
-    audience: "Cirurgiões-dentistas, implantodontistas, periodontistas, cirurgiões bucomaxilofaciais e pesquisadores em odontologia regenerativa",
+    audience: "Cirurgiões-dentistas, cirurgiões bucomaxilofaciais, endodontistas, periodontistas, implantodontistas, residentes, pós-graduandos em engenharia biomédica e pesquisadores em regeneração oral",
     abstract:
-      "Documento institucional da imersão prática em biofabricação aplicada à odontologia regenerativa, realizada no laboratório da Quantis (Campus Bayer, São Paulo). " +
-      "Apresenta a estrutura executiva da jornada — 1 aula online prévia + 2 práticas presenciais sequenciais de bioimpressão 3D + aprofundamento online — e os seis eixos de conteúdo: " +
-      "impressão 3D e bioimpressão aplicadas à odontologia; regeneração óssea alveolar e defeitos periodontais; scaffolds, biomateriais, hidrogéis e PCL; " +
-      "planejamento digital, modelagem e parâmetros de fabricação; aplicações em implantodontia, periodontia e cirurgia bucomaxilofacial; e raciocínio translacional, do desafio clínico ao projeto de biofabricação. " +
-      "Inclui os diferenciais da formação (kit didático com guia prático impresso, scaffolds, biomateriais, seringas e modelos; 6 meses de acesso à plataforma BIA) e as condições para turmas fechadas de 5 a 8 profissionais.",
+      "E-book técnico-educacional de 50 páginas (Vol. 02 da coleção BIA Academy) que percorre a biofabricação oral do dente perdido ao tecido bioimpresso. " +
+      "Em 11 capítulos ilustrados com figuras open-access (CC-BY) e ilustrações originais Quantis, o guia cobre: o problema odontológico (edentulismo, limites do implante, remodelação do rebordo); " +
+      "anatomia oral para engenheiros (esmalte, dentina, polpa, cemento, PDL, osso alveolar); biomateriais odontológicos (PCL, PLGA, β-TCP, HA, biovidro, GelMA, fibrina, dECM); " +
+      "arquitetura tecido-específica (complexo dentina–polpa, microcanais, PDL orientado, TPMS); células da cavidade oral (DPSC, SCAP, PDLSC, GMSC); polpa e endodontia regenerativa; " +
+      "periodonto e mucosa oral (GTR, scaffolds multifásicos, epitélio estratificado); casos clínicos reais (mandíbula impressa, ATM 5 anos, metanálise maxilofacial); " +
+      "avaliação pré-clínica (μCT, histologia, DSPP/DMP-1, push-out); caminho regulatório (RDC 751/2022, RDC 338/2020, 510(k) × PMA, ISO 13485/10993); " +
+      "e como um dentista começa (pipeline CBCT → CAD → impressão, checklist, armadilhas). Inclui glossário, referências essenciais, pesquisadores de referência e sociedades/congressos.",
     keywords: [
       "odontologia regenerativa",
-      "regeneração óssea",
-      "scaffolds",
+      "engenharia tecidual oral",
+      "osso alveolar",
+      "complexo dentina–polpa",
+      "endodontia regenerativa",
+      "periodonto",
+      "DPSC",
       "PCL",
-      "biomateriais",
-      "bioimpressão 3D",
-      "planejamento digital",
-      "implantodontia",
-      "periodontia",
-      "bucomaxilofacial",
+      "β-TCP",
+      "GelMA",
+      "CBCT → CAD",
+      "ANVISA",
+      "ISO 13485",
     ],
-    pdfUrl: "/library/quantis-biofabricacao-odontologia-2026.pdf",
-    pages: 3,
-    sizeMb: 0.92,
+    // pdfUrl é o PATH PÚBLICO da rota protegida; o arquivo real está em src/content/ebooks/.
+    pdfUrl: "/api/library/download/ebook-biofabricacao-odontologia-2026",
+    privateFilePath: "src/content/ebooks/ebook-biofabricacao-odontologia-2026.pdf",
+    coverUrl: "/library/ebook-assets/cover-odontologia-2026.jpg",
+    pages: 50,
+    sizeMb: 9.1,
     language: "pt-BR",
-    openAccess: true,
+    openAccess: false,          // ⬅ PRIVADO
+    restrictedToStudents: true, // ⬅ só alunos BIA Academy ACTIVE/COMPLETED
     citation:
-      "Quantis Biotechnology. Biofabricação e Bioimpressão 3D Aplicadas à Odontologia — proposta institucional de capacitação técnica e desenvolvimento translacional. " +
-      "São Paulo, novembro de 2026, 3p. Disponível em biaquantis.bio/odontologia",
+      "Dernowsek, J. et al. Biofabricação em Odontologia — do dente perdido ao tecido oral bioimpresso. " +
+      "BIA Academy / Quantis Biotechnology, 1ª ed., 2026, 50p. Exclusivo para alunos da BIA Academy — biaquantis.bio/academy",
   },
   {
     id: "ebook-biofabricacao-ortopedia-2026",
