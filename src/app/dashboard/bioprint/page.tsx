@@ -19,7 +19,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   Box, Droplets, Layers, Gamepad2, Beaker, ClipboardCheck,
-  ArrowRight, RotateCcw, Info, CheckCircle2, Circle,
+  ArrowRight, RotateCcw, Info, CheckCircle2, Circle, Printer,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import {
@@ -251,6 +251,24 @@ export default function BioprintHubPage() {
       {/* R24.6: os cards "Execução USB direta", "G-code Hub" e "BTIE" foram
           removidos — eram atalhos para ferramentas que já são as Fases 3 e 4.
           Uma ferramenta, um lugar: G-code na Fase 3, impressão na Fase 4. */}
+
+      {/* R35 · Caminho básico (racional MIA) — para quem não precisa das 6 fases */}
+      <Link href="/dashboard/print-basic" data-testid="bioprint-basic-card"
+        className="block rounded-2xl border border-violet-500/25 bg-gradient-to-br from-violet-500/10 to-fuchsia-500/[0.03] hover:border-violet-400/50 transition-colors p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="w-11 h-11 rounded-xl border border-violet-500/30 bg-violet-500/15 flex items-center justify-center shrink-0">
+            <Printer className="w-5 h-5 text-violet-300" />
+          </div>
+          <div className="flex-1 min-w-[220px]">
+            <div className="text-[10px] uppercase tracking-wider font-semibold text-violet-200/70">Caminho básico · novo</div>
+            <h3 className="text-base font-bold text-white">Impressão Básica</h3>
+            <p className="text-[11px] text-gray-400 leading-relaxed">
+              Superfície (mesa, Petri, lâmina ou placa multiwell) → objetos simples → até 3 cabeçotes com extrusão pneumática, mecânica/volumétrica ou filamento → G-code Marlin. Sem STL, sem 6 fases.
+            </p>
+          </div>
+          <span className="text-xs px-3 py-1.5 rounded-lg bg-violet-500/20 text-violet-100 border border-violet-400/30">Abrir →</span>
+        </div>
+      </Link>
 
       {/* ─── Ações secundárias ─────────────────────────────────────── */}
       <section className="rounded-2xl bg-white/[0.02] border border-white/5 p-4 flex flex-wrap items-center gap-3">

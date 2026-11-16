@@ -138,6 +138,8 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/dashboard/bioprint",       label: "Bioimpressão · 6 fases", labelKey: "nav_bioprint", icon: Printer,
         info: "1 Modelo de tecido → 2 Biotinta → 3 Fatiamento (único local de geometria) → 4 Bioimpressão → 5 Análise → 6 Maturação & caracterizações.", badge: "principal" },
+      { href: "/dashboard/print-basic",    label: "Impressão Básica", icon: Printer,
+        info: "Módulo básico (racional MIA): escolha a superfície (mesa, Petri, lâmina ou placa multiwell), monte objetos simples (disco, quadrado, anel, malha, linhas), configure até 3 cabeçotes com extrusão pneumática, mecânica/volumétrica ou filamento e gere o G-code Marlin. 6 créditos por G-code.", badge: "novo" },
       { href: "/dashboard/bioprint/model", label: "Fase 1 · Modelo de tecido", icon: CircleDot,
         info: "Definição do construto: tecido-alvo, aplicação pretendida, dimensão e população celular. Sem geometria — a BIA recomenda modelo, perfil e biotinta para as fases seguintes." },
       { href: "/dashboard/bioprint/bioink", label: "Fase 2 · Biotinta", icon: Atom,
