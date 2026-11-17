@@ -275,9 +275,10 @@ export function describeShape(s: Shape): string {
 }
 
 /* ───────────────────────── configurações ───────────────────────── */
-export type InfillPattern = "grid" | "honeycomb" | "meandering" | "linear" | "concentric" | "spiral" | "none"
+export type InfillPattern = "grid" | "gyroid" | "honeycomb" | "meandering" | "linear" | "concentric" | "spiral" | "none"
 export const INFILL: { id: InfillPattern; label: string; hint: string }[] = [
   { id: "grid", label: "Grade", hint: "Duas famílias de linhas a 90° — poros quadrados, o padrão clássico de scaffold." },
+  { id: "gyroid", label: "Giroide", hint: "Superfície mínima triplamente periódica (TPMS): poros interconectados em 3D, resistência isotrópica e ótima difusão de nutrientes — o padrão de referência para scaffolds." },
   { id: "honeycomb", label: "Favo de mel", hint: "Hexágonos — alta resistência com pouco material." },
   { id: "meandering", label: "Meandro (serpentina)", hint: "Linhas paralelas ligadas em zigue-zague — poucos saltos, bom para hidrogéis." },
   { id: "linear", label: "Linear", hint: "Linhas paralelas numa direção (alterne 90° por camada para formar poros)." },
@@ -444,6 +445,68 @@ export function infillHoneycomb(regions: Region, lineWidth: number, density: num
   return out
 }
 
+/**
+ * Giroide — seção transversal exata da superfície sin(x)cos(y)+sin(y)cos(z)+sin(z)cos(x)=0 na altura z
+ * (marching squares), recortada pela região. Período P = 2·lw/densidade (mesma relação da grade).
+ */
+export function infillGyroid(regions: Region, lineWidth: number, density: number, z: number): Pt[][] {
+  if (!regions.length) return []
+  const b = regionBBox(regions)
+  const P = clamp((2 * lineWidth) / Math.max(0.02, density), lineWidth * 2.5, 60)
+  const k = (2 * Math.PI) / P
+  const res = P / 16
+  const x0 = b.minX - res, y0 = b.minY - res
+  const nx = Math.ceil((b.w + 2 * res) / res), ny = Math.ceil((b.h + 2 * res) / res)
+  if (nx * ny > 400000) return infillLinear(regions, lineWidth / Math.max(0.02, density), 45) // salvaguarda
+  const sz = Math.sin(k * z), cz = Math.cos(k * z)
+  const f = (x: number, y: number) => Math.sin(k * x) * Math.cos(k * y) + Math.sin(k * y) * cz + sz * Math.cos(k * x)
+  const F = new Float64Array((nx + 1) * (ny + 1))
+  for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) F[j * (nx + 1) + i] = f(x0 + i * res, y0 + j * res)
+  const segs: [Pt, Pt][] = []
+  const lerp = (xa: number, ya: number, fa: number, xb: number, yb: number, fb: number): Pt => { const t = fa / (fa - fb); return { x: xa + (xb - xa) * t, y: ya + (yb - ya) * t } }
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const xa = x0 + i * res, xb = xa + res, ya = y0 + j * res, yb = ya + res
+    const f00 = F[j * (nx + 1) + i], f10 = F[j * (nx + 1) + i + 1], f01 = F[(j + 1) * (nx + 1) + i], f11 = F[(j + 1) * (nx + 1) + i + 1]
+    const idx = (f00 > 0 ? 1 : 0) | (f10 > 0 ? 2 : 0) | (f11 > 0 ? 4 : 0) | (f01 > 0 ? 8 : 0)
+    if (idx === 0 || idx === 15) continue
+    const pts: Pt[] = []
+    if ((idx & 1) !== ((idx >> 1) & 1)) pts.push(lerp(xa, ya, f00, xb, ya, f10))   // bottom
+    if (((idx >> 1) & 1) !== ((idx >> 2) & 1)) pts.push(lerp(xb, ya, f10, xb, yb, f11)) // right
+    if (((idx >> 2) & 1) !== ((idx >> 3) & 1)) pts.push(lerp(xb, yb, f11, xa, yb, f01)) // top
+    if (((idx >> 3) & 1) !== (idx & 1)) pts.push(lerp(xa, yb, f01, xa, ya, f00))   // left
+    if (pts.length === 2) segs.push([pts[0], pts[1]])
+    else if (pts.length === 4) { // caso ambíguo: usa o valor central
+      const fc = (f00 + f10 + f11 + f01) / 4
+      if ((fc > 0) === (f00 > 0)) { segs.push([pts[0], pts[1]], [pts[2], pts[3]]) } else { segs.push([pts[0], pts[3]], [pts[1], pts[2]]) }
+    }
+  }
+  // encadeia segmentos em polilinhas
+  const key = (p: Pt) => Math.round(p.x * 500) + "," + Math.round(p.y * 500)
+  const adj = new Map<string, number[]>()
+  segs.forEach((sg, i) => { for (const q of sg) { const kk = key(q); if (!adj.has(kk)) adj.set(kk, []); adj.get(kk)!.push(i) } })
+  const used = new Uint8Array(segs.length)
+  const lines: Pt[][] = []
+  for (let i = 0; i < segs.length; i++) {
+    if (used[i]) continue; used[i] = 1
+    const line: Pt[] = [segs[i][0], segs[i][1]]
+    for (const dir of [1, -1] as const) {
+      let guard = 0
+      while (guard++ < segs.length) {
+        const tail = dir === 1 ? line[line.length - 1] : line[0]
+        const cands = (adj.get(key(tail)) || []).filter((j) => !used[j])
+        if (!cands.length) break
+        const j = cands[0]; used[j] = 1
+        const sg = segs[j]; const next = key(sg[0]) === key(tail) ? sg[1] : sg[0]
+        if (dir === 1) line.push(next); else line.unshift(next)
+      }
+    }
+    if (line.length > 1) lines.push(line)
+  }
+  const out: Pt[][] = []
+  for (const l of lines) for (const c of clipPathToPolySet(l, regions)) if (c.length > 1 && polyLength(c) > lineWidth) out.push(c)
+  return out
+}
+
 /** anéis concêntricos por offset até esgotar a região */
 export function infillConcentric(regions: Region, spacing: number): Pt[][] {
   const out: Pt[][] = []
@@ -491,10 +554,11 @@ export function infillSpiral(regions: Region, spacing: number): Pt[][] {
   return path.length ? [path] : []
 }
 
-export function generateInfill(pattern: InfillPattern, regions: Region, lineWidth: number, density: number, angleDeg: number): Pt[][] {
+export function generateInfill(pattern: InfillPattern, regions: Region, lineWidth: number, density: number, angleDeg: number, z = 0): Pt[][] {
   if (!regions.length || density <= 0 || pattern === "none") return []
   const d = clamp(density, 0.01, 1)
   switch (pattern) {
+    case "gyroid": return infillGyroid(regions, lineWidth, d, z)
     case "linear": return infillLinear(regions, lineWidth / d, angleDeg)
     case "grid": return infillLinear(regions, (2 * lineWidth) / d, angleDeg).concat(infillLinear(regions, (2 * lineWidth) / d, angleDeg + 90))
     case "meandering": return infillLinear(regions, lineWidth / d, angleDeg, true)
@@ -534,7 +598,8 @@ function regionPaths(head: number, regions: Region, lw: number, layerIndex: numb
   if (solid && ls.infillPattern !== "none" && inner.length) {
     let ang = ls.infillAngle || 0
     if (ls.alternate && layerIndex % 2 === 1) ang += 90
-    for (const l of generateInfill(ls.infillPattern, inner, lw, clamp(ls.infillDensity, 0, 100) / 100, ang)) if (l.length > 1) paths.push({ head, kind: "infill", pts: l, closed: false })
+    const z = firstLayerH(ls) + layerIndex * ls.layerHeight
+    for (const l of generateInfill(ls.infillPattern, inner, lw, clamp(ls.infillDensity, 0, 100) / 100, ang, z)) if (l.length > 1) paths.push({ head, kind: "infill", pts: l, closed: false })
   }
   return paths
 }

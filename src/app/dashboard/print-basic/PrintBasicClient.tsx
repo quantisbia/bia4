@@ -383,6 +383,27 @@ export function PrintBasicClient({ initialStep }: { initialStep?: string } = {})
             <label className="block text-xs text-gray-400">Camada {Math.min(layerIdx, previewLayers.length - 1) + 1} / {layers ? previewLayers.length : `${nLayers} (prévia das ${previewLayers.length} primeiras)`}
               <input type="range" min={0} max={previewLayers.length - 1} value={Math.min(layerIdx, previewLayers.length - 1)} onChange={(e) => setLayerIdx(+e.target.value)} className="w-full accent-violet-400" /></label>
           )}
+          {step !== "print" && (
+            <div className={cardCls + " space-y-2.5"} data-testid="pb-key-params">
+              <div className="text-[10px] uppercase tracking-wider text-gray-400 flex items-center gap-1.5"><Settings2 className="w-3 h-3" /> Parâmetros principais <span className="text-gray-600 normal-case tracking-normal">· editáveis aqui</span></div>
+              <div className="grid grid-cols-2 gap-2">
+                <Num label="Altura de camada" suffix="mm" value={state.layerSettings.layerHeight} onChange={(x) => setLS({ layerHeight: x })} step={0.01} min={0.05} max={3} testId="pb-key-layer-height" />
+                <Num label="Densidade" suffix="%" value={state.layerSettings.infillDensity} onChange={(x) => setLS({ infillDensity: x })} min={0} max={100} testId="pb-key-density" />
+                <div className="col-span-2"><Sel label="Preenchimento" value={state.layerSettings.infillPattern} onChange={(x) => setLS({ infillPattern: x as InfillPattern })} options={INFILL.map((i) => ({ v: i.id, l: i.label }))} testId="pb-key-infill" /></div>
+              </div>
+              <div>
+                <span className={labelCls}>Velocidade de impressão <span className="text-gray-500 normal-case tracking-normal">(mm/s · por cabeçote)</span></span>
+                <div className="space-y-1.5">
+                  {state.heads.filter((h) => h.enabled).map((h) => (
+                    <div key={h.id} className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: h.color }} /><span className="text-[11px] text-gray-400 w-24 truncate">T{h.id - 1} · {h.label}</span>
+                      <input data-testid={`pb-key-speed-${h.id}`} type="number" step={0.5} min={0.5} max={200} value={h.speed} onChange={(e) => { const v = parseFloat(e.target.value.replace(",", ".")); if (Number.isFinite(v)) setHead(h.id, { speed: v }) }} className="flex-1 min-w-0 bg-black/30 border border-white/10 rounded-md px-2 py-1 text-sm text-gray-100 text-right" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           <div className={cardCls + " text-xs space-y-1.5"}>
             <div className="flex justify-between"><span className="text-gray-400">Superfície</span><span className="text-gray-200 text-right">{ext.label}</span></div>
             {state.surface.kind === "multiwell" && <div className="flex justify-between"><span className="text-gray-400">Poços</span><span className="text-gray-200">{offs.length} ({offs.slice(0, 6).map((w) => w.name).join(", ")}{offs.length > 6 ? "…" : ""})</span></div>}
@@ -412,6 +433,7 @@ function InfillIcon({ id, active }: { id: InfillPattern; active: boolean }) {
       {id === "grid" && <g {...common}>{[10, 20, 30].map((v) => <g key={v}><line x1={v} y1={5} x2={v} y2={35} /><line x1={5} y1={v} x2={35} y2={v} /></g>)}</g>}
       {id === "linear" && <g {...common}>{[8, 14, 20, 26, 32].map((v) => <line key={v} x1={6} y1={v} x2={34} y2={v} />)}</g>}
       {id === "meandering" && <path {...common} d="M6 8 H34 V14 H6 V20 H34 V26 H6 V32 H34" />}
+      {id === "gyroid" && <g {...common}>{[0, 1].map((r) => <path key={r} d={Array.from({ length: 41 }, (_, i) => { const x = 5 + (i / 40) * 30; const y = 20 + (r ? -1 : 1) * 6 * Math.sin((x - 5) / 30 * Math.PI * 2) + (r ? -7 : 7); return `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}` }).join(" ")} />)}<path d={Array.from({ length: 41 }, (_, i) => { const x = 5 + (i / 40) * 30; const y = 20 + 5 * Math.cos((x - 5) / 30 * Math.PI * 2); return `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}` }).join(" ")} /></g>}
       {id === "honeycomb" && <g {...common}>{[[12, 12], [28, 12], [20, 26]].map(([x, y], i) => <polygon key={i} points={Array.from({ length: 6 }, (_, k) => { const a = (k / 6) * Math.PI * 2 + Math.PI / 6; return `${x + 7 * Math.cos(a)},${y + 7 * Math.sin(a)}` }).join(" ")} />)}</g>}
       {id === "concentric" && <g {...common}>{[15, 10, 5].map((r) => <circle key={r} cx={20} cy={20} r={r} />)}</g>}
       {id === "spiral" && <path {...common} d={Array.from({ length: 80 }, (_, i) => { const t = i / 79; const a = t * Math.PI * 7; const r = 2 + t * 13; return `${i ? "L" : "M"}${(20 + r * Math.cos(a)).toFixed(1)} ${(20 + r * Math.sin(a)).toFixed(1)}` }).join(" ")} />}

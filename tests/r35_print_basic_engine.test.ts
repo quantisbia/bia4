@@ -105,7 +105,7 @@ describe("R36 · preenchimentos (6 padrões MIA) e desenho livre", () => {
   const disc = () => shapeRegion({ ...defaultShape("disc", 1), size: 10 })
   const ring = () => shapeRegion({ ...defaultShape("ring", 1), size: 8, size2: 4 })
   it("lista os 6 padrões + nenhum", () => {
-    expect(INFILL.map((i) => i.id)).toEqual(["grid", "honeycomb", "meandering", "linear", "concentric", "spiral", "none"])
+    expect(INFILL.map((i) => i.id)).toEqual(["grid", "gyroid", "honeycomb", "meandering", "linear", "concentric", "spiral", "none"])
   })
   it("cada padrão gera trajetórias dentro do disco e termina (sem anéis infinitos)", () => {
     for (const p of INFILL) {
@@ -122,6 +122,21 @@ describe("R36 · preenchimentos (6 padrões MIA) e desenho livre", () => {
     expect(n).toBeLessThan(10)
     const conc = generateInfill("concentric", ring(), 0.41, 0.3, 0)
     expect(conc.length).toBeGreaterThan(0); expect(conc.length).toBeLessThan(40)
+  })
+  it("giroide: seção da TPMS por camada, dentro da região, variando com z", () => {
+    const z0 = generateInfill("gyroid", disc(), 0.41, 0.3, 0, 0), z1 = generateInfill("gyroid", disc(), 0.41, 0.3, 0, 0.8)
+    expect(z0.length).toBeGreaterThan(3); expect(z1.length).toBeGreaterThan(3)
+    for (const l of [...z0, ...z1]) for (const q of l) expect(Math.hypot(q.x, q.y)).toBeLessThanOrEqual(5 + 0.05)
+    // muda com a altura (sin(z)·cos(x) termo)
+    const sig = (L: typeof z0) => L.reduce((n, l) => n + l.length, 0)
+    expect(sig(z0)).not.toBe(sig(z1))
+    // integra no fatiamento: camadas diferentes → trajetórias diferentes
+    const s = defaultState(); s.layerSettings = { ...s.layerSettings, infillPattern: "gyroid", layerHeight: 0.4, firstLayerPct: 100, infillDensity: 30 }
+    s.shapes = [{ ...defaultShape("disc", 1), id: "d", size: 10, height: 1.2 }]
+    const tp = buildToolpaths(s)
+    expect(tp).toHaveLength(3)
+    const a = tp[0].paths.filter((p) => p.kind === "infill"), b = tp[1].paths.filter((p) => p.kind === "infill")
+    expect(a.length).toBeGreaterThan(0); expect(JSON.stringify(a[0].pts.slice(0, 3))).not.toBe(JSON.stringify(b[0].pts.slice(0, 3)))
   })
   it("espiral é uma trajetória contínua única em região simples", () => {
     const sp = generateInfill("spiral", disc(), 0.41, 0.3, 0)
