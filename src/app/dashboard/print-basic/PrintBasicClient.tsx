@@ -10,24 +10,27 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
   ArrowLeft, ArrowRight, Check, Circle, Download, Grid3X3, Layers, Minus, Plus, Printer, Settings2,
-  Square, Trash2, Zap, AlertTriangle, Info, Gamepad2, RefreshCw, Target, FlaskConical,
+  Square, Trash2, Zap, AlertTriangle, Info, Gamepad2, RefreshCw, Target, FlaskConical, Pencil, Usb, Shapes,
 } from "lucide-react"
 import {
-  type BasicState, type Shape, type ShapeType, type Head, type SurfaceKind, type ToolLayer,
-  defaultState, defaultShape, describeShape, surfaceExtent, wellOffsets, allWells, MULTIWELL, PETRI, SLIDES,
+  type BasicState, type Shape, type ShapeType, type Head, type SurfaceKind, type ToolLayer, type InfillPattern,
+  defaultState, defaultShape, describeShape, surfaceExtent, wellOffsets, allWells, MULTIWELL, PETRI, SLIDES, shapePts,
   BED_ROUND, BED_SQUARE, GAUGES, HEAD_TYPES, INFILL, PLATE_W, PLATE_H, validate, buildToolpaths, generateGcode,
   layerCount, syncBed, fmtDot, lineWidthOf, firstLayerH, summarize, type GcodeStats,
 } from "@/lib/print-basic/engine"
 import { sendToExecute } from "@/lib/bioprint/execute-handoff"
+import { DrawCanvas, ShapeThumb } from "./_components/DrawCanvas"
+import { PrintStep } from "./_components/PrintStep"
 
 const STORAGE_KEY = "bia.print-basic.state.v1"
 const STEPS = [
-  { id: "surface", label: "Superfície", icon: Target },
-  { id: "objects", label: "Objetos", icon: Square },
-  { id: "layers", label: "Camadas", icon: Layers },
-  { id: "heads", label: "Cabeçotes", icon: FlaskConical },
-  { id: "printer", label: "Impressora", icon: Settings2 },
-  { id: "summary", label: "G-code", icon: Zap },
+  { id: "surface", label: "Superfície", desc: "Onde imprimir", icon: Target },
+  { id: "objects", label: "Desenho", desc: "O que imprimir", icon: Pencil },
+  { id: "layers", label: "Camadas", desc: "Preenchimento", icon: Layers },
+  { id: "heads", label: "Cabeçotes", desc: "Biotinta & firmware", icon: FlaskConical },
+  { id: "printer", label: "Impressora", desc: "Ajustes gerais", icon: Settings2 },
+  { id: "summary", label: "G-code", desc: "Revisar & gerar", icon: Zap },
+  { id: "print", label: "Imprimir", desc: "USB & joystick", icon: Usb },
 ] as const
 type StepId = (typeof STEPS)[number]["id"]
 
@@ -102,6 +105,7 @@ function SurfacePreview({ state, layers, layerIdx }: { state: BasicState; layers
           }) : state.shapes.map((s) => {
             const hd = state.heads[s.head - 1]; const c = toSvg(s.x + o.x, s.y + o.y)
             const col = hd?.color ?? "#fff"
+            if (s.type === "polygon" || s.type === "path") { const p = shapePts(s); if (p.length < 2) return null; return <path key={s.id} d={p.map((q, k) => { const cc = toSvg(q.x + o.x, q.y + o.y); return `${k ? "L" : "M"}${cc.x.toFixed(2)} ${cc.y.toFixed(2)}` }).join(" ") + (s.type === "polygon" ? " Z" : "")} fill={s.type === "polygon" && s.solid ? col + "33" : "none"} stroke={col} strokeWidth={0.4} /> }
             if (s.type === "disc" || s.type === "ring") return <g key={s.id}><circle cx={c.x} cy={c.y} r={s.size / 2} fill={s.type === "disc" ? col + "33" : "none"} stroke={col} strokeWidth={0.4} />{s.type === "ring" && <circle cx={c.x} cy={c.y} r={s.size2 / 2} fill="none" stroke={col} strokeWidth={0.4} />}</g>
             if (s.type === "lines") return <g key={s.id}>{Array.from({ length: s.count }).map((_, i) => { const y = c.y - ((-((s.count - 1) * s.size2) / 2) + i * s.size2); return <line key={i} x1={c.x - s.size / 2} x2={c.x + s.size / 2} y1={y} y2={y} stroke={col} strokeWidth={0.4} /> })}</g>
             return <rect key={s.id} x={c.x - s.size / 2} y={c.y - s.size / 2} width={s.size} height={s.size} fill={s.type === "square" ? col + "33" : "none"} stroke={col} strokeWidth={0.4} strokeDasharray={s.type === "lattice" ? "1 0.6" : undefined} />
@@ -119,6 +123,8 @@ export function PrintBasicClient({ initialStep }: { initialStep?: string } = {})
   const [state, setState] = useState<BasicState>(() => defaultState())
   const [step, setStep] = useState<StepId>(() => (STEPS.some((s) => s.id === initialStep) ? (initialStep as StepId) : "surface"))
   const [curHead, setCurHead] = useState(1)
+  const [drawHead, setDrawHead] = useState(1)
+  const [drawHeight, setDrawHeight] = useState(2)
   const [layers, setLayers] = useState<ToolLayer[] | null>(null)
   const [layerIdx, setLayerIdx] = useState(0)
   const [result, setResult] = useState<{ gcode: string; stats: GcodeStats } | null>(null)
@@ -181,7 +187,7 @@ export function PrintBasicClient({ initialStep }: { initialStep?: string } = {})
   // preview da camada atual (só computa quando necessário e leve)
   const previewLayers = useMemo(() => {
     if (layers) return layers
-    if (step === "layers" || step === "objects") { try { return v.errors.length ? null : buildToolpaths(state).slice(0, 2) } catch { return null } }
+    if (step === "layers" || step === "objects") { try { return v.errors.length ? null : buildToolpaths(state).slice(0, 4) } catch { return null } }
     return null
   }, [layers, step, state, v.errors.length])
 
@@ -200,9 +206,9 @@ export function PrintBasicClient({ initialStep }: { initialStep?: string } = {})
         </div>
         <nav aria-label="Etapas" className="px-4 sm:px-6 pb-3 max-w-7xl mx-auto flex gap-1 overflow-x-auto">
           {STEPS.map((s, i) => { const Icon = s.icon; const done = i < stepIdx; const active = s.id === step
-            return <button key={s.id} data-testid={`pb-step-${s.id}`} onClick={() => setStep(s.id)} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-colors ${active ? "bg-violet-500/20 text-violet-100 font-semibold" : "text-gray-400 hover:text-gray-200"}`}>
-              <span className={`w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px] font-bold border ${done ? "bg-emerald-500 border-emerald-500 text-white" : active ? "bg-violet-500 border-violet-500 text-white" : "border-white/20"}`}>{done ? <Check className="w-3 h-3" /> : i + 1}</span>
-              <Icon className="w-3.5 h-3.5" />{s.label}</button> })}
+            return <button key={s.id} data-testid={`pb-step-${s.id}`} onClick={() => setStep(s.id)} className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-left whitespace-nowrap transition-colors border ${active ? "bg-violet-500/20 border-violet-400/40 text-white" : "border-transparent text-gray-400 hover:text-gray-200 hover:bg-white/[0.04]"}`}>
+              <span className={`w-6 h-6 rounded-full inline-flex items-center justify-center text-[11px] font-bold border shrink-0 ${done ? "bg-emerald-500 border-emerald-500 text-white" : active ? "bg-violet-500 border-violet-500 text-white" : "border-white/20"}`}>{done ? <Check className="w-3.5 h-3.5" /> : i + 1}</span>
+              <span className="leading-tight"><span className="text-xs font-semibold flex items-center gap-1.5"><Icon className="w-3.5 h-3.5" />{s.label}</span><span className="block text-[10px] text-gray-500">{s.desc}</span></span></button> })}
         </nav>
       </header>
 
@@ -247,40 +253,54 @@ export function PrintBasicClient({ initialStep }: { initialStep?: string } = {})
             </div>
           )}
 
-          {/* ───── 2 OBJETOS ───── */}
+          {/* ───── 2 DESENHO / OBJETOS ───── */}
           {step === "objects" && (
             <div className="space-y-4">
-              <div><h2 className="text-xl font-bold">2 · Objetos</h2><p className="text-sm text-gray-400">Formas simples, cada uma atribuída a um cabeçote. Em placas multiwell, o conjunto é replicado em cada poço selecionado.</p></div>
-              <div className="flex flex-wrap gap-2">
+              <div><h2 className="text-xl font-bold">2 · Desenhe ou escolha objetos</h2><p className="text-sm text-gray-400">Desenhe direto sobre a área útil (contorno fechado vira peça sólida com altura) ou adicione formas prontas. Cada objeto é atribuído a um cabeçote. Em placas multiwell, o conjunto é replicado em cada poço selecionado.</p></div>
+              <div className={cardCls + " space-y-3"}>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-xs text-gray-400">Novos objetos vão para:</span>
+                  <div className="flex gap-1">{state.heads.map((h) => <button key={h.id} data-testid={`pb-draw-head-${h.id}`} onClick={() => setDrawHead(h.id)} className={`px-2.5 py-1 rounded-lg text-xs border flex items-center gap-1.5 ${drawHead === h.id ? "border-white/40 bg-white/10 text-white" : "border-white/10 text-gray-400"} ${h.enabled ? "" : "opacity-50"}`}><span className="w-2 h-2 rounded-full" style={{ background: h.color }} />T{h.id - 1} · {h.label}</button>)}</div>
+                  <label className="flex items-center gap-2 text-xs text-gray-400 ml-auto">Altura <input data-testid="pb-draw-height" type="number" step={0.1} min={0} value={drawHeight} onChange={(e) => setDrawHeight(Math.max(0, parseFloat(e.target.value) || 0))} className="w-16 bg-black/30 border border-white/10 rounded-md px-2 py-1 text-sm text-gray-100" /> mm</label>
+                </div>
+                <DrawCanvas state={state} head={drawHead} height={drawHeight} onAdd={(sh) => upd((st) => ({ ...st, shapes: [...st.shapes, sh] }))} onRemoveLast={() => upd((st) => ({ ...st, shapes: st.shapes.slice(0, -1) }))} />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-gray-400 flex items-center gap-1.5 mr-1"><Shapes className="w-3.5 h-3.5" /> Formas prontas:</span>
                 {([["disc", "Disco"], ["square", "Quadrado"], ["ring", "Anel"], ["lattice", "Malha (scaffold)"], ["lines", "Linhas"]] as [ShapeType, string][]).map(([t, l]) => (
-                  <button key={t} data-testid={`pb-add-${t}`} onClick={() => addShape(t)} className="px-3 py-1.5 rounded-lg border border-white/10 hover:border-violet-400/50 text-sm flex items-center gap-1.5"><Plus className="w-3.5 h-3.5" />{l}</button>
+                  <button key={t} data-testid={`pb-add-${t}`} onClick={() => upd((st) => ({ ...st, shapes: [...st.shapes, { ...defaultShape(t, drawHead), height: t === "lines" ? 0 : drawHeight }] }))} className="px-3 py-1.5 rounded-lg border border-white/10 hover:border-violet-400/50 text-xs flex items-center gap-1.5"><Plus className="w-3.5 h-3.5" />{l}</button>
                 ))}
               </div>
-              {state.shapes.length === 0 && <div className={cardCls + " text-sm text-gray-400"}>Nenhum objeto. Adicione um disco, quadrado, anel, malha ou linhas.</div>}
+              {state.shapes.length === 0 && <div className={cardCls + " text-sm text-gray-400"}>Nenhum objeto ainda. Desenhe acima ou adicione uma forma pronta.</div>}
+              <div className="space-y-2">
               {state.shapes.map((s) => {
                 const hd = state.heads[s.head - 1]
+                const drawn = s.type === "polygon" || s.type === "path"
                 return (
-                  <div key={s.id} data-testid="pb-shape" className={cardCls + " space-y-3"}>
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full" style={{ background: hd?.color }} />
-                      <input className="bg-transparent border-b border-white/10 focus:border-violet-400/60 focus:outline-none text-sm font-semibold flex-1 min-w-0" value={s.name} onChange={(e) => setShape(s.id, { name: e.target.value })} />
-                      <span className="text-xs text-gray-500 hidden sm:inline">{describeShape(s)}</span>
-                      <button onClick={() => removeShape(s.id)} className="text-gray-500 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      <Sel label="Cabeçote" value={s.head} onChange={(x) => setShape(s.id, { head: +x })} options={state.heads.map((h) => ({ v: h.id, l: `${h.id} · ${h.label}${h.enabled ? "" : " (desativado)"}` }))} />
-                      <Num label={s.type === "disc" || s.type === "ring" ? "Ø externo" : s.type === "lines" ? "Comprimento" : "Lado"} suffix="mm" value={s.size} onChange={(x) => setShape(s.id, { size: x })} step={0.5} min={0.5} />
+                  <details key={s.id} data-testid="pb-shape" className={cardCls + " group"} open={!drawn}>
+                    <summary className="flex items-center gap-3 cursor-pointer list-none">
+                      <ShapeThumb s={s} color={hd?.color ?? "#fff"} />
+                      <div className="flex-1 min-w-0">
+                        <input className="bg-transparent border-b border-transparent hover:border-white/10 focus:border-violet-400/60 focus:outline-none text-sm font-semibold w-full" value={s.name} onClick={(e) => e.preventDefault()} onChange={(e) => setShape(s.id, { name: e.target.value })} />
+                        <div className="text-[11px] text-gray-500 truncate">{describeShape(s)} · <span style={{ color: hd?.color }}>T{s.head - 1}</span></div>
+                      </div>
+                      {(s.type === "disc" || s.type === "square" || s.type === "ring" || s.type === "polygon") && <button type="button" onClick={(e) => { e.preventDefault(); setShape(s.id, { solid: !s.solid }) }} className={`px-2 py-1 rounded-md text-[10px] border ${s.solid ? "border-violet-400/50 bg-violet-500/15 text-violet-100" : "border-white/10 text-gray-400"}`}>{s.solid ? "Sólido" : "Só contorno"}</button>}
+                      <button type="button" onClick={(e) => { e.preventDefault(); removeShape(s.id) }} className="text-gray-500 hover:text-red-400 p-1"><Trash2 className="w-4 h-4" /></button>
+                    </summary>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 pt-3 border-t border-white/5">
+                      <Sel label="Cabeçote" value={s.head} onChange={(x) => setShape(s.id, { head: +x })} options={state.heads.map((h) => ({ v: h.id, l: `T${h.id - 1} · ${h.label}${h.enabled ? "" : " (off)"}` }))} />
+                      {!drawn && <Num label={s.type === "disc" || s.type === "ring" ? "Ø externo" : s.type === "lines" ? "Comprimento" : "Lado"} suffix="mm" value={s.size} onChange={(x) => setShape(s.id, { size: x })} step={0.5} min={0.5} />}
                       {s.type === "ring" && <Num label="Ø interno" suffix="mm" value={s.size2} onChange={(x) => setShape(s.id, { size2: x })} step={0.5} min={0.2} />}
                       {s.type === "lattice" && <Num label="Passo dos filetes" suffix="mm" value={s.size2} onChange={(x) => setShape(s.id, { size2: x })} step={0.1} min={0.1} />}
                       {s.type === "lines" && (<><Num label="Espaçamento" suffix="mm" value={s.size2} onChange={(x) => setShape(s.id, { size2: x })} step={0.5} min={0.1} /><Num label="Nº de linhas" value={s.count} onChange={(x) => setShape(s.id, { count: Math.max(1, Math.round(x)) })} min={1} max={50} /></>)}
-                      {s.type !== "lines" && <Num label="Altura" suffix="mm" value={s.height} onChange={(x) => setShape(s.id, { height: x })} step={0.1} min={0} />}
-                      <Num label="Posição X" suffix="mm" value={s.x} onChange={(x) => setShape(s.id, { x })} step={0.5} />
-                      <Num label="Posição Y" suffix="mm" value={s.y} onChange={(y) => setShape(s.id, { y })} step={0.5} />
-                      {(s.type === "disc" || s.type === "square" || s.type === "ring") && <div className="flex items-end pb-1"><Toggle label="Preencher" checked={s.solid} onChange={(x) => setShape(s.id, { solid: x })} /></div>}
+                      {s.type !== "lines" && s.type !== "path" && <Num label="Altura" suffix="mm" value={s.height} onChange={(x) => setShape(s.id, { height: x })} step={0.1} min={0} />}
+                      <Num label="Deslocar X" suffix="mm" value={s.x} onChange={(x) => setShape(s.id, { x })} step={0.5} />
+                      <Num label="Deslocar Y" suffix="mm" value={s.y} onChange={(y) => setShape(s.id, { y })} step={0.5} />
                     </div>
-                  </div>
+                  </details>
                 )
               })}
+              </div>
             </div>
           )}
 
@@ -292,10 +312,22 @@ export function PrintBasicClient({ initialStep }: { initialStep?: string } = {})
                 <Num label="Altura de camada" suffix="mm" value={state.layerSettings.layerHeight} onChange={(x) => setLS({ layerHeight: x })} step={0.01} min={0.05} max={3} testId="pb-layer-height" />
                 <Num label={`Primeira camada (${fmtDot(firstLayerH(state.layerSettings), 3)} mm)`} suffix="%" value={state.layerSettings.firstLayerPct} onChange={(x) => setLS({ firstLayerPct: x })} min={20} max={200} />
                 <Num label="Perímetros" value={state.layerSettings.perimeters} onChange={(x) => setLS({ perimeters: Math.max(0, Math.round(x)) })} min={0} max={10} />
-                <Sel label="Preenchimento" value={state.layerSettings.infillPattern} onChange={(x) => setLS({ infillPattern: x as BasicState["layerSettings"]["infillPattern"] })} options={INFILL.map((i) => ({ v: i.id, l: i.label }))} testId="pb-infill" />
-                <Num label="Densidade" suffix="%" value={state.layerSettings.infillDensity} onChange={(x) => setLS({ infillDensity: x })} min={0} max={100} />
-                <Num label="Ângulo" suffix="°" value={state.layerSettings.infillAngle} onChange={(x) => setLS({ infillAngle: x })} min={0} max={180} step={5} />
-                <div className="sm:col-span-3"><Toggle label="Alternar 90° a cada camada" checked={state.layerSettings.alternate} onChange={(x) => setLS({ alternate: x })} /></div>
+              </div>
+              <div className={cardCls + " space-y-3"}>
+                <div><span className={labelCls}>Padrão de preenchimento</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" data-testid="pb-infill">
+                    {INFILL.map((i) => { const on = state.layerSettings.infillPattern === i.id
+                      return <button key={i.id} data-testid={`pb-infill-${i.id}`} onClick={() => setLS({ infillPattern: i.id })} title={i.hint} className={`rounded-xl border p-2.5 text-left transition-colors ${on ? "border-violet-400/70 bg-violet-500/15" : "border-white/10 bg-white/[0.02] hover:border-white/25"}`}>
+                        <InfillIcon id={i.id} active={on} />
+                        <div className="text-xs font-semibold mt-1.5">{i.label}</div></button> })}
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-2">{INFILL.find((i) => i.id === state.layerSettings.infillPattern)?.hint}</p>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <Num label="Densidade" suffix="%" value={state.layerSettings.infillDensity} onChange={(x) => setLS({ infillDensity: x })} min={0} max={100} />
+                  <Num label="Ângulo" suffix="°" value={state.layerSettings.infillAngle} onChange={(x) => setLS({ infillAngle: x })} min={0} max={180} step={5} />
+                  <div className="flex items-end pb-1"><Toggle label="Alternar 90° a cada camada" checked={state.layerSettings.alternate} onChange={(x) => setLS({ alternate: x })} /></div>
+                </div>
               </div>
               <p className="text-xs text-gray-500"><b className="text-gray-300">{nLayers}</b> camada(s) físicas para a altura máxima de {fmtDot(state.shapes.reduce((h, s) => Math.max(h, s.height), 0), 2)} mm. Use o controle deslizante do painel ao lado para inspecionar camada por camada.</p>
             </div>
@@ -333,10 +365,13 @@ export function PrintBasicClient({ initialStep }: { initialStep?: string } = {})
           {/* ───── 6 RESUMO / G-CODE ───── */}
           {step === "summary" && <SummaryStep state={state} v={v} result={result} busy={busy} charged={charged} error={error} slice={slice} download={download} toExecute={toExecute} />}
 
+          {/* ───── 7 IMPRIMIR ───── */}
+          {step === "print" && <PrintStep state={state} gcode={result && (!charged || charged.ok) ? result.gcode : null} hasGcode={!!result && (!charged || charged.ok)} />}
+
           <footer className="flex items-center justify-between pt-2">
             <button onClick={() => go(-1)} disabled={stepIdx === 0} className="px-4 py-2 rounded-lg border border-white/10 text-sm disabled:opacity-30 flex items-center gap-2"><ArrowLeft className="w-4 h-4" /> Anterior</button>
             {stepIdx < STEPS.length - 1
-              ? <button data-testid="pb-next" onClick={() => go(1)} className="px-4 py-2 rounded-lg bg-violet-500 hover:bg-violet-400 text-white text-sm font-semibold flex items-center gap-2">Próximo <ArrowRight className="w-4 h-4" /></button>
+              ? <button data-testid="pb-next" onClick={() => go(1)} className="px-4 py-2 rounded-lg bg-violet-500 hover:bg-violet-400 text-white text-sm font-semibold flex items-center gap-2">{STEPS[stepIdx + 1].label} <ArrowRight className="w-4 h-4" /></button>
               : <span />}
           </footer>
         </section>
@@ -345,7 +380,7 @@ export function PrintBasicClient({ initialStep }: { initialStep?: string } = {})
         <aside className="space-y-3 lg:sticky lg:top-[112px] self-start">
           <SurfacePreview state={state} layers={previewLayers} layerIdx={layerIdx} />
           {previewLayers && previewLayers.length > 1 && (
-            <label className="block text-xs text-gray-400">Camada {Math.min(layerIdx, previewLayers.length - 1) + 1} / {layers ? previewLayers.length : `${nLayers} (prévia das 2 primeiras)`}
+            <label className="block text-xs text-gray-400">Camada {Math.min(layerIdx, previewLayers.length - 1) + 1} / {layers ? previewLayers.length : `${nLayers} (prévia das ${previewLayers.length} primeiras)`}
               <input type="range" min={0} max={previewLayers.length - 1} value={Math.min(layerIdx, previewLayers.length - 1)} onChange={(e) => setLayerIdx(+e.target.value)} className="w-full accent-violet-400" /></label>
           )}
           <div className={cardCls + " text-xs space-y-1.5"}>
@@ -364,6 +399,24 @@ export function PrintBasicClient({ initialStep }: { initialStep?: string } = {})
         </aside>
       </main>
     </div>
+  )
+}
+
+/* ─────────────── Ícones dos padrões de preenchimento ─────────────── */
+function InfillIcon({ id, active }: { id: InfillPattern; active: boolean }) {
+  const c = active ? "#c4b5fd" : "#8b8ba7"
+  const common = { fill: "none", stroke: c, strokeWidth: 1.2, strokeLinecap: "round" as const }
+  return (
+    <svg viewBox="0 0 40 40" className="w-full h-10">
+      <rect x={2} y={2} width={36} height={36} rx={4} fill={active ? "#7c3aed22" : "#ffffff08"} stroke={c} strokeWidth={0.8} />
+      {id === "grid" && <g {...common}>{[10, 20, 30].map((v) => <g key={v}><line x1={v} y1={5} x2={v} y2={35} /><line x1={5} y1={v} x2={35} y2={v} /></g>)}</g>}
+      {id === "linear" && <g {...common}>{[8, 14, 20, 26, 32].map((v) => <line key={v} x1={6} y1={v} x2={34} y2={v} />)}</g>}
+      {id === "meandering" && <path {...common} d="M6 8 H34 V14 H6 V20 H34 V26 H6 V32 H34" />}
+      {id === "honeycomb" && <g {...common}>{[[12, 12], [28, 12], [20, 26]].map(([x, y], i) => <polygon key={i} points={Array.from({ length: 6 }, (_, k) => { const a = (k / 6) * Math.PI * 2 + Math.PI / 6; return `${x + 7 * Math.cos(a)},${y + 7 * Math.sin(a)}` }).join(" ")} />)}</g>}
+      {id === "concentric" && <g {...common}>{[15, 10, 5].map((r) => <circle key={r} cx={20} cy={20} r={r} />)}</g>}
+      {id === "spiral" && <path {...common} d={Array.from({ length: 80 }, (_, i) => { const t = i / 79; const a = t * Math.PI * 7; const r = 2 + t * 13; return `${i ? "L" : "M"}${(20 + r * Math.cos(a)).toFixed(1)} ${(20 + r * Math.sin(a)).toFixed(1)}` }).join(" ")} />}
+      {id === "none" && <circle {...common} cx={20} cy={20} r={13} strokeDasharray="3 2" />}
+    </svg>
   )
 }
 

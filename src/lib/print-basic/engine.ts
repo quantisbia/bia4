@@ -19,6 +19,8 @@
  * ═══════════════════════════════════════════════════════════════════════
  */
 
+import { offsetPolySet, offsetPolygon, clipSegmentToPolySet, clipPathToPolySet, pointInPolySet, normalizeContours, simplify as rdpSimplify, signedArea } from "@/lib/slicer/polygon-ops"
+
 /* ───────────────────────── utilidades ───────────────────────── */
 export const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v))
 export const fmtDot = (v: number, d = 3) => (+v).toFixed(d).replace(/\.?0+$/, (m) => (m.startsWith(".") ? "" : m)) || "0"
@@ -198,7 +200,7 @@ export function wellOffsets(s: Surface): { name: string; x: number; y: number }[
 }
 
 /* ───────────────────────── objetos (formas simples) ───────────────────────── */
-export type ShapeType = "disc" | "square" | "ring" | "lattice" | "lines"
+export type ShapeType = "disc" | "square" | "ring" | "lattice" | "lines" | "polygon" | "path"
 
 export interface Shape {
   id: string
@@ -210,7 +212,8 @@ export interface Shape {
   size2: number       // Ø interno (ring) · pitch dos filetes (lattice) · espaçamento (lines)
   count: number       // nº de linhas (lines)
   height: number      // mm (altura total do objeto)
-  solid: boolean      // disc/square: preencher (true) ou só perímetros (false)
+  solid: boolean      // disc/square/polygon: preencher (true) ou só perímetros (false)
+  pts?: Pt[]          // polygon (fechado) / path (aberto) — coordenadas relativas ao centro da superfície
 }
 
 export function defaultShape(type: ShapeType, head = 1): Shape {
@@ -221,8 +224,43 @@ export function defaultShape(type: ShapeType, head = 1): Shape {
     case "ring": return { ...base, name: "Anel", size: 10, size2: 6, height: 2, solid: false }
     case "lattice": return { ...base, name: "Malha (scaffold)", size: 10, size2: 1.0, height: 2, solid: false }
     case "lines": return { ...base, name: "Linhas", size: 20, size2: 2, count: 5, height: 0, solid: false }
+    case "polygon": return { ...base, name: "Desenho", size: 0, height: 2, solid: true, pts: [] }
+    case "path": return { ...base, name: "Traço", size: 0, height: 0, solid: false, pts: [] }
   }
 }
+
+/** Cria um objeto a partir de um traço desenhado (mm, relativo ao centro). Fechado → sólido; aberto → traço. */
+export function shapeFromStroke(raw: Pt[], closed: boolean, head = 1, height = 2): Shape | null {
+  let pts = raw.filter((p, i) => i === 0 || Math.hypot(p.x - raw[i - 1].x, p.y - raw[i - 1].y) > 0.05)
+  if (pts.length < 2) return null
+  pts = rdpSimplify(pts, 0.12, closed)
+  pts = chaikin(pts, closed)
+  if (closed) {
+    if (pts.length < 3 || Math.abs(signedArea(pts)) < 0.5) return null
+    if (signedArea(pts) < 0) pts = pts.slice().reverse()
+    const b = bbox(pts)
+    return { ...defaultShape("polygon", head), pts, x: 0, y: 0, size: Math.max(b.w, b.h), height }
+  }
+  const b = bbox(pts)
+  return { ...defaultShape("path", head), pts, x: 0, y: 0, size: Math.max(b.w, b.h), height: 0 }
+}
+
+/** suavização Chaikin (1 passo) mantendo extremos — copiado da MIA */
+export function chaikin(pts: Pt[], closed: boolean): Pt[] {
+  if (pts.length < 3) return pts.slice()
+  const out: Pt[] = []; const n = pts.length; const lim = closed ? n : n - 1
+  if (!closed) out.push(pts[0])
+  for (let i = 0; i < lim; i++) {
+    const p = pts[i], q = pts[(i + 1) % n]
+    out.push({ x: 0.75 * p.x + 0.25 * q.x, y: 0.75 * p.y + 0.25 * q.y })
+    out.push({ x: 0.25 * p.x + 0.75 * q.x, y: 0.25 * p.y + 0.75 * q.y })
+  }
+  if (!closed) out.push(pts[n - 1])
+  return out
+}
+
+/** pontos absolutos (com deslocamento x,y do objeto) */
+export function shapePts(s: Shape): Pt[] { return (s.pts ?? []).map((p) => ({ x: p.x + s.x, y: p.y + s.y })) }
 
 export function describeShape(s: Shape): string {
   switch (s.type) {
@@ -231,13 +269,21 @@ export function describeShape(s: Shape): string {
     case "ring": return `Anel Ø ${fmtDot(s.size, 2)} / Ø ${fmtDot(s.size2, 2)} × ${fmtDot(s.height, 2)} mm`
     case "lattice": return `Malha ${fmtDot(s.size, 1)} mm · passo ${fmtDot(s.size2, 2)} mm × ${fmtDot(s.height, 2)} mm`
     case "lines": return `${s.count} linha(s) de ${fmtDot(s.size, 1)} mm · espaçamento ${fmtDot(s.size2, 2)} mm`
+    case "polygon": { const b = bbox(s.pts ?? []); return `Desenho ${fmtDot(b.w, 1)} × ${fmtDot(b.h, 1)} × ${fmtDot(s.height, 2)} mm (${(s.pts ?? []).length} v)` }
+    case "path": { const b = bbox(s.pts ?? []); return `Traço ${fmtDot(polyLength(s.pts ?? []), 1)} mm (${fmtDot(b.w, 1)} × ${fmtDot(b.h, 1)})` }
   }
 }
 
 /* ───────────────────────── configurações ───────────────────────── */
-export type InfillPattern = "grid" | "linear" | "concentric" | "none"
-export const INFILL: { id: InfillPattern; label: string }[] = [
-  { id: "grid", label: "Grade" }, { id: "linear", label: "Linear" }, { id: "concentric", label: "Concêntrico" }, { id: "none", label: "Sem preenchimento" },
+export type InfillPattern = "grid" | "honeycomb" | "meandering" | "linear" | "concentric" | "spiral" | "none"
+export const INFILL: { id: InfillPattern; label: string; hint: string }[] = [
+  { id: "grid", label: "Grade", hint: "Duas famílias de linhas a 90° — poros quadrados, o padrão clássico de scaffold." },
+  { id: "honeycomb", label: "Favo de mel", hint: "Hexágonos — alta resistência com pouco material." },
+  { id: "meandering", label: "Meandro (serpentina)", hint: "Linhas paralelas ligadas em zigue-zague — poucos saltos, bom para hidrogéis." },
+  { id: "linear", label: "Linear", hint: "Linhas paralelas numa direção (alterne 90° por camada para formar poros)." },
+  { id: "concentric", label: "Concêntrico", hint: "Anéis que seguem o contorno — ótimo para discos e anéis." },
+  { id: "spiral", label: "Espiral", hint: "Trajetória contínua do contorno ao centro — sem interrupção de fluxo." },
+  { id: "none", label: "Sem preenchimento", hint: "Só perímetros (casca)." },
 ]
 
 export interface LayerSettings {
@@ -248,6 +294,9 @@ export interface LayerSettings {
 
 export interface PrinterSettings {
   firmware: "marlin"
+  /** needle = origem (0,0,0) no ponto onde a usuária clicou "Zerar" com a agulha sobre a superfície (sem G28);
+   *  bed = coordenadas absolutas da mesa (G28 + offset do centro), racional MIA. */
+  origin: "needle" | "bed"
   travelSpeed: number; homeFirst: boolean
   bedTempControl: boolean; bedTemp: number
   photocrosslinking: boolean; uvNm: number; uvSeconds: number; uvEvery: "end" | "layer"; uvOnCmd: string; uvOffCmd: string
@@ -274,7 +323,7 @@ export function defaultState(): BasicState {
     shapes: [{ ...defaultShape("disc", 1), id: "s1" }],
     layerSettings: { layerHeight: GAUGES[22], firstLayerPct: 80, infillPattern: "grid", infillDensity: 25, infillAngle: 45, alternate: true, perimeters: 1 },
     heads,
-    printer: { firmware: "marlin", travelSpeed: 50, homeFirst: true, bedTempControl: false, bedTemp: 20, photocrosslinking: false, uvNm: 365, uvSeconds: 10, uvEvery: "end", uvOnCmd: "M42 P4 S255", uvOffCmd: "M42 P4 S0", chamberLights: false },
+    printer: { firmware: "marlin", origin: "needle", travelSpeed: 50, homeFirst: false, bedTempControl: false, bedTemp: 20, photocrosslinking: false, uvNm: 365, uvSeconds: 10, uvEvery: "end", uvOnCmd: "M42 P4 S255", uvOffCmd: "M42 P4 S0", chamberLights: false },
   }
 }
 
@@ -305,63 +354,190 @@ export function bbox(pts: Pt[]) {
   return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 }
 }
 
-/** Recorta um segmento por polígono convexo (Cyrus–Beck). Retorna null se fora. */
-export function clipSegConvex(a: Pt, b: Pt, poly: Pt[]): [Pt, Pt] | null {
-  let t0 = 0, t1 = 1
-  const dx = b.x - a.x, dy = b.y - a.y
-  // orientação do polígono
-  let area = 0
-  for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length]; area += p.x * q.y - q.x * p.y }
-  const sgn = area >= 0 ? 1 : -1
-  for (let i = 0; i < poly.length; i++) {
-    const p = poly[i], q = poly[(i + 1) % poly.length]
-    const ex = q.x - p.x, ey = q.y - p.y
-    // normal interna
-    const nx = -ey * sgn, ny = ex * sgn
-    const num = nx * (a.x - p.x) + ny * (a.y - p.y)
-    const den = nx * dx + ny * dy
-    if (Math.abs(den) < 1e-12) { if (num < 0) return null; continue }
-    const t = -num / den
-    if (den > 0) { if (t > t0) t0 = t } else { if (t < t1) t1 = t }
-    if (t0 > t1) return null
+/* ───────────────────────── preenchimentos (6 padrões, racional MIA) ───────────────────────── */
+export type Region = Pt[][]   // conjunto de polígonos (outer CCW + furos CW), já normalizados
+
+/**
+ * Encolhe a região em `d` mm (polygon-ops usa delta>0 = para dentro; a MIA usa o sinal oposto).
+ * Robustez para anéis finos: quando um furo (CW), ao crescer, alcança/ultrapassa o contorno externo
+ * (CCW) que o contém, o par é descartado — sem isso o offset oscila e gera anéis infinitos.
+ */
+export function inset(regions: Region, d: number): Region {
+  if (!regions.length) return []
+  const outs: Pt[][] = [], holes: Pt[][] = []
+  for (const poly of regions) {
+    const o = offsetPolygon(poly, d)
+    if (o.length < 3) continue
+    if (signedArea(poly) > 0) { if (signedArea(o) > 0) outs.push(o) }
+    else if (signedArea(o) < 0) holes.push(o)
   }
-  if (t1 - t0 < 1e-9) return null
-  return [{ x: a.x + dx * t0, y: a.y + dy * t0 }, { x: a.x + dx * t1, y: a.y + dy * t1 }]
+  const keepOut = outs.map(() => true)
+  const keptHoles: Pt[][] = []
+  for (const h of holes) {
+    const c = h[0]
+    let parent = -1
+    for (let i = 0; i < outs.length; i++) if (keepOut[i] && pointInPolySet(c, [outs[i]])) { parent = i; break }
+    if (parent < 0) continue // furo fora de qualquer externo → some
+    const ao = Math.abs(signedArea(outs[parent])), ah = Math.abs(signedArea(h))
+    // furo ocupa quase tudo, ou algum vértice do furo saiu do externo → região consumida
+    const escaped = h.some((q) => !pointInPolySet(q, [outs[parent]]))
+    if (ah >= ao * 0.98 || escaped) { keepOut[parent] = false; continue }
+    keptHoles.push(h)
+  }
+  const kept = outs.filter((_, i) => keepOut[i])
+  return kept.concat(keptHoles.filter((h) => kept.some((o) => pointInPolySet(h[0], [o]))))
 }
 
-/** Linhas paralelas (ângulo em graus) com espaçamento, recortadas por polígono convexo */
-export function linearInfill(poly: Pt[], spacing: number, angleDeg: number): Pt[][] {
-  if (spacing <= 0.01 || poly.length < 3) return []
-  const b = bbox(poly)
+function regionBBox(regions: Region) { return bbox(regions.flat()) }
+
+/** linhas paralelas infinitas em um ângulo, recortadas pela região (com furos) */
+export function infillLinear(regions: Region, spacing: number, angleDeg: number, serpentine = false): Pt[][] {
+  if (spacing <= 0.01 || !regions.length) return []
+  const b = regionBBox(regions)
   const rad = (angleDeg * Math.PI) / 180, dx = Math.cos(rad), dy = Math.sin(rad), nx = -dy, ny = dx
   const R = Math.hypot(b.w, b.h) / 2 + spacing
   const n = Math.ceil(R / spacing)
   const out: Pt[][] = []
-  let flip = false
+  let cur: Pt[] | null = null; let dir = 1
   for (let i = -n; i <= n; i++) {
     const off = i * spacing
     const px = b.cx + nx * off, py = b.cy + ny * off
-    const seg = clipSegConvex({ x: px - dx * R, y: py - dy * R }, { x: px + dx * R, y: py + dy * R }, poly)
-    if (seg) { out.push(flip ? [seg[1], seg[0]] : [seg[0], seg[1]]); flip = !flip }
+    const segs = clipSegmentToPolySet({ x: px - dx * R, y: py - dy * R }, { x: px + dx * R, y: py + dy * R }, regions)
+    if (!serpentine) { for (const s of segs) out.push([s[0], s[1]]); continue }
+    // serpentina (meandering): só liga quando há um único segmento na faixa e a ponte está dentro da região
+    if (segs.length !== 1) { if (cur) { out.push(cur); cur = null } for (const s of segs) out.push([s[0], s[1]]); continue }
+    let seg: Pt[] = [segs[0][0], segs[0][1]]; if (dir < 0) seg = [seg[1], seg[0]]
+    if (cur) {
+      const a = cur[cur.length - 1], c = seg[0]
+      const mid = { x: (a.x + c.x) / 2, y: (a.y + c.y) / 2 }
+      if (pointInPolySet(mid, regions) && Math.hypot(a.x - c.x, a.y - c.y) < spacing * 3) cur.push(seg[0], seg[1])
+      else { out.push(cur); cur = [seg[0], seg[1]] }
+    } else cur = [seg[0], seg[1]]
+    dir = -dir
+  }
+  if (cur) out.push(cur)
+  return out
+}
+
+/** favo de mel — zigue-zagues + verticais curtas (geometria copiada da MIA) */
+export function infillHoneycomb(regions: Region, lineWidth: number, density: number, angleDeg: number): Pt[][] {
+  const b = regionBBox(regions)
+  const a = clamp((1.1547 * lineWidth) / Math.max(0.02, density), lineWidth * 1.2, 50)
+  const h = (a * Math.sqrt(3)) / 2
+  const R = Math.hypot(b.w, b.h) / 2 + 3 * a
+  const lines: Pt[][] = []
+  const rows = Math.ceil(R / h) + 1, cols = Math.ceil(R / (1.5 * a)) + 1
+  for (let r = -rows; r <= rows; r++) {
+    const y0 = r * h; const up = r % 2 === 0 ? 1 : -1
+    const zz: Pt[] = []
+    for (let c = -cols; c <= cols; c++) {
+      const x = c * 3 * a
+      zz.push({ x: x - a, y: y0 - (up * h) / 2 }, { x: x - a / 2, y: y0 + (up * h) / 2 }, { x: x + a / 2, y: y0 + (up * h) / 2 }, { x: x + a, y: y0 - (up * h) / 2 })
+    }
+    lines.push(zz)
+    for (let c = -cols; c <= cols; c++) { const x = c * 3 * a; lines.push([{ x: x - a, y: y0 - (up * h) / 2 }, { x: x - a, y: y0 - (up * h) / 2 - up * h }]) }
+  }
+  const rad = (angleDeg * Math.PI) / 180, cs = Math.cos(rad), sn = Math.sin(rad)
+  const placed = lines.map((l) => l.map((p) => ({ x: p.x * cs - p.y * sn + b.cx, y: p.x * sn + p.y * cs + b.cy })))
+  const out: Pt[][] = []
+  for (const l of placed) for (const c of clipPathToPolySet(l, regions)) if (c.length > 1) out.push(c)
+  return out
+}
+
+/** anéis concêntricos por offset até esgotar a região */
+export function infillConcentric(regions: Region, spacing: number): Pt[][] {
+  const out: Pt[][] = []
+  let cur = regions; let guard = 0
+  while (cur.length && guard++ < 400) {
+    for (const p of cur) if (p.length >= 3) out.push(p.concat([p[0]]))
+    cur = inset(cur, spacing)
   }
   return out
 }
 
-/** Anéis concêntricos (apenas círculo/retângulo) até o centro */
-export function concentricInfill(kind: "disc" | "square", cx: number, cy: number, size: number, spacing: number, stopAt = 0): Pt[][] {
-  const out: Pt[][] = []
-  let r = size / 2
-  let guard = 0
-  while (r > stopAt + spacing * 0.5 && guard++ < 400) {
-    out.push(kind === "disc" ? circlePts(cx, cy, r) : rectPts(cx, cy, 2 * r, 2 * r))
-    r -= spacing
+/** espiral contínua (anéis reamostrados e interpolados) — regiões simples; senão cai para concêntrico */
+export function infillSpiral(regions: Region, spacing: number): Pt[][] {
+  const rings: Region[] = []
+  let cur = regions; let guard = 0
+  while (cur.length && guard++ < 400) { rings.push(cur); cur = inset(cur, spacing) }
+  if (!rings.length) return []
+  if (!rings.every((r) => r.length === 1)) return infillConcentric(regions, spacing)
+  const N = 96
+  const resample = (poly: Pt[]) => {
+    const closed = poly.concat([poly[0]]); const L = polyLength(closed)
+    const pts: Pt[] = []; let acc = 0, i = 0
+    const seg = (k: number) => Math.hypot(closed[k + 1].x - closed[k].x, closed[k + 1].y - closed[k].y)
+    for (let k = 0; k < N; k++) {
+      const target = (L * k) / N
+      while (i < closed.length - 2 && acc + seg(i) < target) { acc += seg(i); i++ }
+      const segL = seg(i) || 1; const t = clamp((target - acc) / segL, 0, 1)
+      pts.push({ x: closed[i].x + (closed[i + 1].x - closed[i].x) * t, y: closed[i].y + (closed[i + 1].y - closed[i].y) * t })
+    }
+    return pts
   }
-  return out
+  const rs = rings.map((r) => resample(r[0]))
+  for (let i = 1; i < rs.length; i++) {
+    const ref = rs[i - 1][0]; let best = 0, bd = Infinity
+    rs[i].forEach((p, k) => { const d = Math.hypot(p.x - ref.x, p.y - ref.y); if (d < bd) { bd = d; best = k } })
+    rs[i] = rs[i].slice(best).concat(rs[i].slice(0, best))
+    if (signedArea(rs[i]) * signedArea(rs[i - 1]) < 0) rs[i] = [rs[i][0]].concat(rs[i].slice(1).reverse())
+  }
+  const path: Pt[] = []
+  for (let i = 0; i < rs.length; i++) {
+    const A = rs[i], B = rs[i + 1]
+    for (let k = 0; k < N; k++) { const t = k / N; path.push(B ? { x: A[k].x + (B[k].x - A[k].x) * t, y: A[k].y + (B[k].y - A[k].y) * t } : A[k]) }
+  }
+  if (path.length) path.push(rs[rs.length - 1][0])
+  return path.length ? [path] : []
+}
+
+export function generateInfill(pattern: InfillPattern, regions: Region, lineWidth: number, density: number, angleDeg: number): Pt[][] {
+  if (!regions.length || density <= 0 || pattern === "none") return []
+  const d = clamp(density, 0.01, 1)
+  switch (pattern) {
+    case "linear": return infillLinear(regions, lineWidth / d, angleDeg)
+    case "grid": return infillLinear(regions, (2 * lineWidth) / d, angleDeg).concat(infillLinear(regions, (2 * lineWidth) / d, angleDeg + 90))
+    case "meandering": return infillLinear(regions, lineWidth / d, angleDeg, true)
+    case "honeycomb": return infillHoneycomb(regions, lineWidth, d, angleDeg)
+    case "concentric": return infillConcentric(inset(regions, lineWidth / d), lineWidth / d)
+    case "spiral": return infillSpiral(inset(regions, lineWidth / d), lineWidth / d)
+  }
+  return []
 }
 
 /* ───────────────────────── trajetórias ───────────────────────── */
 export interface Path { head: number; kind: "external perimeter" | "perimeter" | "infill" | "line"; pts: Pt[]; closed: boolean }
 export interface ToolLayer { z: number; h: number; paths: Path[] }
+
+/** Região 2D (polígonos) de uma forma fechada — outer CCW, furos CW */
+export function shapeRegion(s: Shape): Region {
+  switch (s.type) {
+    case "disc": return normalizeContours([circlePts(s.x, s.y, s.size / 2)])
+    case "square": return normalizeContours([rectPts(s.x, s.y, s.size, s.size)])
+    case "ring": return s.size2 < s.size ? normalizeContours([circlePts(s.x, s.y, s.size / 2), circlePts(s.x, s.y, s.size2 / 2)]) : []
+    case "polygon": { const p = shapePts(s); return p.length >= 3 ? normalizeContours([p]) : [] }
+    default: return []
+  }
+}
+
+/** perímetros + preenchimento de uma região (racional MIA Slicer.pathsFor) */
+function regionPaths(head: number, regions: Region, lw: number, layerIndex: number, ls: LayerSettings, solid: boolean): Path[] {
+  const paths: Path[] = []
+  const per = solid ? Math.max(0, ls.perimeters) : Math.max(1, ls.perimeters)
+  let inner = regions
+  for (let i = 0; i < per; i++) {
+    const ring = inset(regions, (lw / 2 + i * lw))
+    for (const p of ring) paths.push({ head, kind: i === 0 ? "external perimeter" : "perimeter", pts: p, closed: true })
+    inner = ring
+  }
+  inner = per === 0 ? inset(regions, lw / 2) : inset(inner, lw / 2)
+  if (solid && ls.infillPattern !== "none" && inner.length) {
+    let ang = ls.infillAngle || 0
+    if (ls.alternate && layerIndex % 2 === 1) ang += 90
+    for (const l of generateInfill(ls.infillPattern, inner, lw, clamp(ls.infillDensity, 0, 100) / 100, ang)) if (l.length > 1) paths.push({ head, kind: "infill", pts: l, closed: false })
+  }
+  return paths
+}
 
 /** Trajetórias de UMA forma numa camada (coordenadas relativas ao centro da superfície) */
 export function shapePaths(s: Shape, layerIndex: number, ls: LayerSettings, heads: Head[]): Path[] {
@@ -369,53 +545,11 @@ export function shapePaths(s: Shape, layerIndex: number, ls: LayerSettings, head
   const lw = lineWidthOf(hd)
   const head = hd.id
   const paths: Path[] = []
-  const density = clamp(ls.infillDensity, 0, 100) / 100
-  let ang = ls.infillAngle || 0
-  if (ls.alternate && layerIndex % 2 === 1) ang += 90
-
   switch (s.type) {
-    case "disc":
-    case "square": {
-      const isDisc = s.type === "disc"
-      let r = s.size / 2 - lw / 2
-      const per = s.solid ? Math.max(0, ls.perimeters) : Math.max(1, ls.perimeters)
-      for (let i = 0; i < per && r > lw / 4; i++) {
-        paths.push({ head, kind: i === 0 ? "external perimeter" : "perimeter", pts: isDisc ? circlePts(s.x, s.y, r) : rectPts(s.x, s.y, 2 * r, 2 * r), closed: true })
-        r -= lw
-      }
-      if (s.solid && ls.infillPattern !== "none" && density > 0) {
-        const inner = r + lw / 2 // borda interna da região (já descontados perímetros)
-        const rIn = per === 0 ? s.size / 2 - lw / 2 : inner - lw / 2
-        if (rIn > lw / 2) {
-          const region = isDisc ? circlePts(s.x, s.y, rIn, 72) : rectPts(s.x, s.y, 2 * rIn, 2 * rIn)
-          if (ls.infillPattern === "concentric") {
-            for (const ring of concentricInfill(isDisc ? "disc" : "square", s.x, s.y, 2 * rIn, lw / density)) paths.push({ head, kind: "infill", pts: ring, closed: true })
-          } else {
-            const spacing = ls.infillPattern === "grid" ? (2 * lw) / density : lw / density
-            let lines = linearInfill(region, spacing, ang)
-            if (ls.infillPattern === "grid") lines = lines.concat(linearInfill(region, spacing, ang + 90))
-            for (const l of lines) paths.push({ head, kind: "infill", pts: l, closed: false })
-          }
-        }
-      }
-      break
-    }
-    case "ring": {
-      const rOut = s.size / 2, rIn = s.size2 / 2
-      if (rOut <= rIn) break
-      const per = Math.max(1, ls.perimeters)
-      // perímetros externos (para dentro) e internos (para fora)
-      for (let i = 0; i < per; i++) {
-        const ro = rOut - lw / 2 - i * lw, ri = rIn + lw / 2 + i * lw
-        if (ro <= ri) break
-        paths.push({ head, kind: i === 0 ? "external perimeter" : "perimeter", pts: circlePts(s.x, s.y, ro), closed: true })
-        paths.push({ head, kind: i === 0 ? "external perimeter" : "perimeter", pts: circlePts(s.x, s.y, ri), closed: true })
-      }
-      if (s.solid && ls.infillPattern !== "none" && density > 0) {
-        const a = rOut - lw / 2 - per * lw, b = rIn + lw / 2 + per * lw
-        const spacing = lw / density
-        for (let r = a - spacing; r > b + spacing * 0.5; r -= spacing) paths.push({ head, kind: "infill", pts: circlePts(s.x, s.y, r), closed: true })
-      }
+    case "disc": case "square": case "ring": case "polygon":
+      return regionPaths(head, shapeRegion(s), lw, layerIndex, ls, s.solid)
+    case "path": {
+      const p = shapePts(s); if (p.length > 1) paths.push({ head, kind: "line", pts: p, closed: false })
       break
     }
     case "lattice": {
@@ -520,10 +654,17 @@ export function validate(state: BasicState): { errors: string[]; warnings: strin
   for (const s of state.shapes) {
     const hd = state.heads[s.head - 1]
     if (!hd?.enabled) errors.push(`"${s.name || s.type}" usa o cabeçote ${s.head}, que está desativado.`)
-    const half = s.size / 2 + Math.max(Math.abs(s.x), Math.abs(s.y))
-    const fitsW = s.size + 2 * Math.abs(s.x) <= ext.usableW + 1e-6
-    const fitsH = (s.type === "lines" ? (s.count - 1) * s.size2 : s.size) + 2 * Math.abs(s.y) <= ext.usableH + 1e-6
-    const fits = ext.usableRound ? half <= ext.usableW / 2 + 1e-6 : fitsW && fitsH
+    let fits: boolean
+    if (s.type === "polygon" || s.type === "path") {
+      const p = shapePts(s)
+      if (p.length < 2) { errors.push(`"${s.name || s.type}": desenho vazio.`); continue }
+      fits = ext.usableRound ? p.every((q) => Math.hypot(q.x, q.y) <= ext.usableW / 2 + 1e-6) : p.every((q) => Math.abs(q.x) <= ext.usableW / 2 + 1e-6 && Math.abs(q.y) <= ext.usableH / 2 + 1e-6)
+    } else {
+      const half = s.size / 2 + Math.max(Math.abs(s.x), Math.abs(s.y))
+      const fitsW = s.size + 2 * Math.abs(s.x) <= ext.usableW + 1e-6
+      const fitsH = (s.type === "lines" ? (s.count - 1) * s.size2 : s.size) + 2 * Math.abs(s.y) <= ext.usableH + 1e-6
+      fits = ext.usableRound ? half <= ext.usableW / 2 + 1e-6 : fitsW && fitsH
+    }
     if (!fits) errors.push(`"${s.name || s.type}" (${fmtDot(s.size, 1)} mm) não cabe na área útil (${fmtDot(ext.usableW, 1)} × ${fmtDot(ext.usableH, 1)} mm).`)
     if (s.type === "ring" && s.size2 >= s.size) errors.push(`"${s.name}": o Ø interno precisa ser menor que o externo.`)
     if (hd && s.type === "lattice" && s.size2 < lineWidthOf(hd)) warnings.push(`"${s.name}": passo menor que a largura do filete — os filetes vão se sobrepor.`)
@@ -555,7 +696,12 @@ export function generateGcode(state: BasicState, toolpaths?: ToolLayer[]): { lin
   const offsets = wellOffsets(state.surface)
   const stats: GcodeStats = { layers: TP.length, pathMM: 0, travelMM: 0, volumeMM3: 0, seconds: 0, moves: 0, perHead: {}, wells: offsets.length }
   headsUsed.forEach((h) => (stats.perHead[h] = { pathMM: 0, volumeMM3: 0, seconds: 0 }))
-  const bx = state.bed.cx, by = state.bed.cy, zOff = state.bed.zOffset || 0
+  const needle = (P.origin ?? "needle") === "needle"
+  // ponto zero na agulha: origem = centro da superfície (ou centro do 1º poço selecionado); sem home
+  const ref = needle && offsets.length ? offsets[0] : { x: 0, y: 0, name: "" }
+  const wellOffs = needle ? offsets.map((w) => ({ ...w, x: w.x - ref.x, y: w.y - ref.y })) : offsets
+  const bx = needle ? 0 : state.bed.cx, by = needle ? 0 : state.bed.cy, zOff = needle ? 0 : state.bed.zOffset || 0
+  const homeFirst = needle ? false : P.homeFirst
   const travelF = Math.round((P.travelSpeed || 50) * 60)
   const ext = surfaceExtent(state.surface)
 
@@ -573,8 +719,10 @@ export function generateGcode(state: BasicState, toolpaths?: ToolLayer[]): { lin
     push("; Printhead " + h + " (T" + (h - 1) + ", " + hd.color + "): " + (t?.label ?? hd.type) + " · " + hd.gauge + " G (" + F3(lineWidthOf(hd)) + " mm) · mode " + hd.extrusionMode + (hd.extrusionMode === "pneumatic" ? " · " + hd.pressure + " kPa" : hd.extrusionMode === "filament" ? " · filament " + hd.filamentD + " mm" : " · E in mm3") + " · " + hd.speed + " mm/s · flow " + hd.flow + " % · temp " + (hd.temp > 0 ? hd.temp + " C" : "Off"))
   }
   push("; Printer: Marlin · printbed " + (P.bedTempControl ? P.bedTemp + " C" : "Off") + " · photocrosslinking " + (P.photocrosslinking ? P.uvNm + " nm / " + P.uvSeconds + " s (" + P.uvEvery + ")" : "Off"))
-  push("; Bed origin offset: X" + bx + " Y" + by + " Z" + zOff)
-  push("; BIA_META " + JSON.stringify({ generator: "bia-print-basic-r35", surface: state.surface.kind, wells: offsets.length, heads: headsUsed.map((h) => ({ t: h - 1, mode: extMode(h) })) }))
+  push(needle
+    ? "; Origin: NEEDLE ZERO — position the needle at the center of the " + (offsets.length > 1 ? "well " + offsets[0].name : "surface") + ", touching the substrate, and send G92 X0 Y0 Z0 before printing"
+    : "; Origin: BED — absolute bed coordinates, offset X" + bx + " Y" + by + " Z" + zOff)
+  push("; BIA_META " + JSON.stringify({ generator: "bia-print-basic-r36", origin: needle ? "needle" : "bed", surface: state.surface.kind, wells: offsets.length, heads: headsUsed.map((h) => ({ t: h - 1, mode: extMode(h) })) }))
   push("")
   push("G21 ; set units to millimeters")
   push("G90 ; use absolute coordinates")
@@ -585,7 +733,8 @@ export function generateGcode(state: BasicState, toolpaths?: ToolLayer[]): { lin
   if (P.bedTempControl) push("M140 S" + P.bedTemp + " ; printbed temperature")
   for (const h of headsUsed) { const hd = H(h); if (hd.temp > 0) push("M104 T" + (h - 1) + " S" + hd.temp + " ; printhead " + h + " temperature") }
   if (P.chamberLights) push("M355 S1 ; chamber lights on")
-  if (P.homeFirst) { push("G28 ; home all axes"); push("G1 Z10 F600 ; lift") }
+  if (homeFirst) { push("G28 ; home all axes"); push("G1 Z10 F600 ; lift") }
+  if (needle) push("G92 X0 Y0 Z0 ; needle zero = origin (set by the user in the Print step)")
   if (P.bedTempControl) push("M190 S" + P.bedTemp + " ; wait for printbed temperature")
   for (const h of headsUsed) { const hd = H(h); if (hd.temp > 0) push("M109 T" + (h - 1) + " S" + hd.temp + " ; wait for printhead " + h) }
 
@@ -640,8 +789,8 @@ export function generateGcode(state: BasicState, toolpaths?: ToolLayer[]): { lin
   }
 
   let wellIdx = 0
-  for (const w of offsets) {
-    if (offsets.length > 1) { push(""); push("; ===== WELL " + w.name + " (" + (++wellIdx) + "/" + offsets.length + ") =====") }
+  for (const w of wellOffs) {
+    if (wellOffs.length > 1) { push(""); push("; ===== WELL " + w.name + " (" + (++wellIdx) + "/" + wellOffs.length + ") =====") }
     TP.forEach((L, li) => {
       const z = L.z + zOff
       push("")
@@ -668,9 +817,9 @@ export function generateGcode(state: BasicState, toolpaths?: ToolLayer[]): { lin
   push("; ----- end of print -----")
   if (curHead !== null) stopExtrude(H(curHead), curHead)
   if (P.photocrosslinking && P.uvEvery !== "layer") uv("end")
-  const zEnd = Math.min(state.bed.z, (TP.length ? TP[TP.length - 1].z : 0) + zOff + 20)
+  const zEnd = needle ? (TP.length ? TP[TP.length - 1].z : 0) + 15 : Math.min(state.bed.z, (TP.length ? TP[TP.length - 1].z : 0) + zOff + 20)
   push("G1 Z" + F3(zEnd) + " F600 ; lift")
-  push("G0 X" + F3(Math.max(0, bx - 60)) + " Y" + F3(Math.min(state.bed.y - 5, by + 80)) + " F" + travelF + " ; park")
+  if (!needle) push("G0 X" + F3(Math.max(0, bx - 60)) + " Y" + F3(Math.min(state.bed.y - 5, by + 80)) + " F" + travelF + " ; park")
   for (const h of headsUsed) { const hd = H(h); if (hd.temp > 0) push("M104 T" + (h - 1) + " S0") }
   if (P.bedTempControl) push("M140 S0")
   push("M84 ; disable motors")

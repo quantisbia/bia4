@@ -6,7 +6,8 @@
 import { describe, it, expect } from "vitest"
 import {
   defaultState, defaultHead, defaultShape, buildToolpaths, generateGcode, validate,
-  wellOffsets, allWells, surfaceExtent, MULTIWELL, GAUGES, HEAD_TYPES, MAX_HEADS, layerCount, linearInfill, rectPts,
+  wellOffsets, allWells, surfaceExtent, MULTIWELL, GAUGES, HEAD_TYPES, MAX_HEADS, layerCount, infillLinear, rectPts,
+  INFILL, generateInfill, shapeRegion, shapeFromStroke, inset,
 } from "@/lib/print-basic/engine"
 
 describe("R35 · estado padrão e cabeçotes", () => {
@@ -83,9 +84,9 @@ describe("R35 · validação e camadas", () => {
     s.shapes = [{ ...defaultShape("lines", 1), id: "l" }]
     expect(layerCount(s)).toBe(1)
   })
-  it("infill linear recorta por polígono convexo", () => {
+  it("infill linear recorta por polígono", () => {
     const sq = rectPts(0, 0, 10, 10)
-    const lines = linearInfill(sq, 1, 0)
+    const lines = infillLinear([sq], 1, 0)
     expect(lines.length).toBeGreaterThanOrEqual(9)
     for (const l of lines) for (const p of l) { expect(Math.abs(p.x)).toBeLessThanOrEqual(5 + 1e-6); expect(Math.abs(p.y)).toBeLessThanOrEqual(5 + 1e-6) }
   })
@@ -97,6 +98,64 @@ describe("R35 · validação e camadas", () => {
     const horiz = tp[0].paths.every((p) => Math.abs(p.pts[0].y - p.pts[1].y) < 1e-9)
     const vert = tp[1].paths.every((p) => Math.abs(p.pts[0].x - p.pts[1].x) < 1e-9)
     expect(horiz).toBe(true); expect(vert).toBe(true)
+  })
+})
+
+describe("R36 · preenchimentos (6 padrões MIA) e desenho livre", () => {
+  const disc = () => shapeRegion({ ...defaultShape("disc", 1), size: 10 })
+  const ring = () => shapeRegion({ ...defaultShape("ring", 1), size: 8, size2: 4 })
+  it("lista os 6 padrões + nenhum", () => {
+    expect(INFILL.map((i) => i.id)).toEqual(["grid", "honeycomb", "meandering", "linear", "concentric", "spiral", "none"])
+  })
+  it("cada padrão gera trajetórias dentro do disco e termina (sem anéis infinitos)", () => {
+    for (const p of INFILL) {
+      const lines = generateInfill(p.id, disc(), 0.41, 0.3, 45)
+      if (p.id === "none") { expect(lines).toHaveLength(0); continue }
+      expect(lines.length).toBeGreaterThan(0)
+      expect(lines.length).toBeLessThan(200)
+      for (const l of lines) for (const q of l) expect(Math.hypot(q.x, q.y)).toBeLessThanOrEqual(5 + 0.05)
+    }
+  })
+  it("anel: inset consome o par externo/furo quando se encontram (concêntrico finito)", () => {
+    let cur = ring(); let n = 0
+    while (cur.length && n < 50) { cur = inset(cur, 0.8); n++ }
+    expect(n).toBeLessThan(10)
+    const conc = generateInfill("concentric", ring(), 0.41, 0.3, 0)
+    expect(conc.length).toBeGreaterThan(0); expect(conc.length).toBeLessThan(40)
+  })
+  it("espiral é uma trajetória contínua única em região simples", () => {
+    const sp = generateInfill("spiral", disc(), 0.41, 0.3, 0)
+    expect(sp).toHaveLength(1); expect(sp[0].length).toBeGreaterThan(96)
+  })
+  it("meandro liga faixas em serpentina (menos trajetórias que linear)", () => {
+    const lin = generateInfill("linear", disc(), 0.41, 0.3, 0), me = generateInfill("meandering", disc(), 0.41, 0.3, 0)
+    expect(me.length).toBeLessThan(lin.length)
+  })
+  it("desenho fechado vira sólido com perímetro + preenchimento; aberto vira traço", () => {
+    const star = Array.from({ length: 40 }, (_, i) => { const a = (i / 40) * Math.PI * 2; const r = i % 2 ? 4 : 8; return { x: r * Math.cos(a), y: r * Math.sin(a) } })
+    const poly = shapeFromStroke(star, true, 1, 1.2)!
+    expect(poly.type).toBe("polygon"); expect(poly.solid).toBe(true); expect(poly.pts!.length).toBeGreaterThan(10)
+    const open = shapeFromStroke([{ x: -10, y: 0 }, { x: 0, y: 2 }, { x: 10, y: 0 }], false, 2)!
+    expect(open.type).toBe("path"); expect(open.head).toBe(2); expect(open.height).toBe(0)
+    const s = defaultState(); s.heads[1].enabled = true
+    s.layerSettings = { ...s.layerSettings, layerHeight: 0.4, firstLayerPct: 100, infillPattern: "grid" }
+    s.shapes = [poly, open]
+    expect(validate(s).errors).toEqual([])
+    const tp = buildToolpaths(s)
+    expect(tp).toHaveLength(3)
+    const kinds = new Set(tp[0].paths.map((p) => p.kind))
+    expect(kinds.has("external perimeter")).toBe(true); expect(kinds.has("infill")).toBe(true); expect(kinds.has("line")).toBe(true)
+    expect(tp[1].paths.some((p) => p.kind === "line")).toBe(false) // traço aberto só na 1ª camada
+    expect(shapeFromStroke([{ x: 0, y: 0 }], true)).toBeNull()
+  })
+  it("origem na agulha: G92 X0 Y0 Z0, sem G28, coordenadas relativas ao centro", () => {
+    const s = defaultState(); s.shapes = [{ ...defaultShape("disc", 1), id: "d", size: 4, height: 0.4 }]
+    s.layerSettings = { ...s.layerSettings, layerHeight: 0.4, firstLayerPct: 100 }
+    const { lines } = generateGcode(s)
+    expect(lines.some((l) => l.startsWith("G92 X0 Y0 Z0"))).toBe(true)
+    expect(lines.some((l) => l.startsWith("G28"))).toBe(false)
+    const xs = lines.filter((l) => /^G[01] X/.test(l)).map((l) => +/X(-?[\d.]+)/.exec(l)![1])
+    expect(Math.max(...xs)).toBeLessThanOrEqual(2.1); expect(Math.min(...xs)).toBeGreaterThanOrEqual(-2.1)
   })
 })
 
@@ -162,6 +221,7 @@ describe("R35 · G-code (porta do MIA slicer)", () => {
     s.shapes = [{ ...defaultShape("disc", 1), id: "d", size: 4, height: 0.4 }]
     s.layerSettings = { ...s.layerSettings, layerHeight: 0.4, firstLayerPct: 100 }
     s.surface = { ...s.surface, kind: "multiwell", wells: 24, selectedWells: ["A1", "B2"] }
+    s.printer = { ...s.printer, origin: "bed", homeFirst: true }
     const { lines, stats } = generateGcode(s)
     expect(stats.wells).toBe(2)
     expect(lines.filter((l) => l.startsWith("; ===== WELL")).map((l) => l.split(" ")[3])).toEqual(["A1", "B2"])
@@ -182,7 +242,7 @@ describe("R35 · G-code (porta do MIA slicer)", () => {
     const { lines } = generateGcode(tri())
     const meta = lines.find((l) => l.startsWith("; BIA_META "))!
     const j = JSON.parse(meta.slice("; BIA_META ".length))
-    expect(j.generator).toBe("bia-print-basic-r35")
+    expect(j.generator).toBe("bia-print-basic-r36")
     expect(j.heads).toEqual([{ t: 0, mode: "pneumatic" }, { t: 1, mode: "volumetric" }, { t: 2, mode: "filament" }])
   })
 })
