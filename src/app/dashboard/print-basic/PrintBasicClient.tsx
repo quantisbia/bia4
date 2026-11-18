@@ -321,7 +321,7 @@ export function PrintBasicClient({ initialStep }: { initialStep?: string } = {})
           {step === "summary" && <SummaryStep state={state} v={v} result={result} busy={busy} charged={charged} error={error} slice={slice} download={download} toExecute={toExecute} />}
 
           {/* ───── 7 IMPRIMIR ───── */}
-          {step === "print" && <PrintStep state={state} gcode={result && (!charged || charged.ok) ? result.gcode : null} hasGcode={!!result && (!charged || charged.ok)} />}
+          {step === "print" && <PrintStep state={state} gcode={result && (!charged || charged.ok) ? result.gcode : null} hasGcode={!!result && (!charged || charged.ok)} onApplyState={(fn) => upd(fn)} />}
 
           <footer className="flex items-center justify-between pt-2">
             <button onClick={() => go(-1)} disabled={stepIdx === 0} className="px-4 py-2 rounded-lg border border-white/10 text-sm disabled:opacity-30 flex items-center gap-2"><ArrowLeft className="w-4 h-4" /> Anterior</button>

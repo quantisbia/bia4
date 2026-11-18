@@ -14,8 +14,10 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import {
   Usb, Unplug, Play, Pause, Square, OctagonX, Home, Crosshair, LocateFixed, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
   ChevronUp, ChevronDown, Gauge, Droplets, MoveVertical, Syringe, Power, Terminal, FlaskConical, CheckCircle2, AlertTriangle, Beaker,
+  ArrowUpFromLine, RotateCcw, Sparkles, Star, ClipboardList, Wand2,
 } from "lucide-react"
 import type { BasicState, Head } from "@/lib/print-basic/engine"
+import { analyzeFeedback, saveFeedback, SYMPTOMS, type PrintFeedback, type Suggestion, type Symptom } from "@/lib/print-basic/feedback"
 import { PrinterConnection, handshakeM115, type PrinterTransport, type FirmwareInfo } from "@/lib/bioprint/printer-connection"
 import { PrinterMock } from "@/lib/bioprint/printer-mock"
 import { PrinterController, type ControllerState, type StreamProgress } from "@/lib/bioprint/printer-controller"
@@ -24,7 +26,7 @@ import { PrintLogger, type LogEntry } from "@/lib/bioprint/print-logger"
 type Mode = "usb" | "mock"
 type Pos = { x: number; y: number; z: number }
 
-export function PrintStep({ state, gcode, hasGcode }: { state: BasicState; gcode: string | null; hasGcode: boolean }) {
+export function PrintStep({ state, gcode, hasGcode, onApplyState }: { state: BasicState; gcode: string | null; hasGcode: boolean; onApplyState?: (fn: (s: BasicState) => BasicState) => void }) {
   const loggerRef = useRef<PrintLogger>(new PrintLogger())
   const transportRef = useRef<PrinterTransport | null>(null)
   const ctrlRef = useRef<PrinterController | null>(null)
@@ -48,6 +50,18 @@ export function PrintStep({ state, gcode, hasGcode }: { state: BasicState; gcode
   const [supported, setSupported] = useState(true)
   const [extruding, setExtruding] = useState(false)
   const [showLog, setShowLog] = useState(false)
+  const [extSpeed, setExtSpeed] = useState(2)       // mm/s do eixo E (êmbolo/filamento)
+  const [extAmount, setExtAmount] = useState(5)     // mm³ ou mm
+  const [stopped, setStopped] = useState(false)     // parada suave: motores religados, pronto para novo início
+  const [babyMode, setBabyMode] = useState<"auto" | "m290" | "g91">("auto")
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [fbRating, setFbRating] = useState<1 | 2 | 3 | 4 | 5>(4)
+  const [fbSymptoms, setFbSymptoms] = useState<Symptom[]>([])
+  const [fbNotes, setFbNotes] = useState("")
+  const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null)
+  const [applied, setApplied] = useState<Set<string>>(new Set())
+  const startedAtRef = useRef<number>(0)
+  const finishedRef = useRef(false)
 
   useEffect(() => { setSupported(PrinterConnection.isSupported()); if (!PrinterConnection.isSupported()) setMode("mock") }, [])
   useEffect(() => loggerRef.current.subscribe((e) => setLog(e.slice(-120))), [])
@@ -74,7 +88,16 @@ export function PrintStep({ state, gcode, hasGcode }: { state: BasicState; gcode
         t = real
       }
       transportRef.current = t
-      const ctrl = new PrinterController(t, loggerRef.current, { onState: setCtrlState, onProgress: setProgress }, { okTimeoutMs: 30000, maxRetries: 2 })
+      const ctrl = new PrinterController(t, loggerRef.current, {
+        onState: setCtrlState, onProgress: setProgress,
+        onLine: (line, kind) => { if (kind === "rx" && /unknown command.*M290/i.test(line)) { setBabyMode("g91"); loggerRef.current.warn("Firmware sem BABYSTEPPING (M290) — ajuste de altura passa a usar G91/G1 Z.", "basic") } },
+        onFinished: (ok, reason) => {
+          if (finishedRef.current) return; finishedRef.current = true
+          // religa motores e deixa pronta para outro início
+          void (async () => { try { await t.write("M17"); await t.write("M18 S0"); await t.write("G90") } catch { /* noop */ } })()
+          if (ok || reason === "cancel" || reason === "cancelled") { setShowFeedback(true); setSuggestions(null); setApplied(new Set()) }
+        },
+      }, { okTimeoutMs: 30000, maxRetries: 2, safetyFooter: ["M104 S0", "M140 S0", "M107", "M17", "M18 S0"] })
       ctrlRef.current = ctrl
       setConnected(true)
       try { const fw = await handshakeM115(t, 4000); setFirmware(fw); loggerRef.current.ok(`Firmware: ${fw.name ?? fw.family}`, "basic") }
@@ -118,28 +141,77 @@ export function PrintStep({ state, gcode, hasGcode }: { state: BasicState; gcode
 
   const applyFlow = useCallback(async (v: number) => { setFlow(v); await send(`M221 S${v}`, false) }, [send])
   const applySpeed = useCallback(async (v: number) => { setSpeed(v); await send(`M220 S${v}`, false) }, [send])
+  /**
+   * Ajuste fino de altura que FUNCIONA:
+   *  • parado → G91 / G1 Z / G90 (movimento real imediato)
+   *  • imprimindo → por padrão G92 em Z (desloca a origem lógica: todas as próximas camadas saem ±d)
+   *    injetado entre linhas do stream; "m290" usa baby-step se o firmware tiver BABYSTEPPING.
+   */
   const babyZ = useCallback(async (d: number) => {
+    const c = ctrlRef.current; if (!c) return
     const nv = +(zBaby + d).toFixed(2); setZBaby(nv)
-    // M290 (baby-step) se o firmware suportar; fallback: movimento relativo em Z durante idle
-    if (streaming) await send(`M290 Z${d}`, false)
-    else { await send("G91"); await send(`G1 Z${d} F300`); await send("G90"); setPos((p) => ({ ...p, z: +(p.z + d).toFixed(2) })) }
-  }, [zBaby, streaming, send])
+    if (!streaming) { await send("G91", true); await send(`G1 Z${d.toFixed(2)} F300`, true); await send("G90", true); setPos((p) => ({ ...p, z: +(p.z + d).toFixed(2) })); return }
+    if (babyMode === "m290") { c.inject(`M290 Z${d.toFixed(2)}`, "babyz"); return }
+    // G92 Z(atual − d): a impressora "acha" que está mais baixa/alta → próxima G1 Z compensa movendo d real
+    c.inject("G91", "babyz"); c.inject(`G1 Z${d.toFixed(2)} F300`, "babyz"); c.inject("G90", "babyz"); c.inject("M114", "babyz")
+    loggerRef.current.info(`Altura ${d > 0 ? "+" : ""}${d.toFixed(2)} mm aplicada na próxima linha do G-code (acumulado ${nv > 0 ? "+" : ""}${nv.toFixed(2)} mm).`, "basic")
+  }, [zBaby, streaming, send, babyMode])
 
   const extrude = useCallback(async (sign: 1 | -1) => {
     if (!connected || busy) return
     await send(`T${head.id - 1}`, true)
     if (head.extrusionMode === "pneumatic") { const on = sign > 0; setExtruding(on); await send(on ? head.onCmd : head.offCmd, true); return }
-    const e = head.extrusionMode === "volumetric" ? 5 : 2 // 5 mm³ ou 2 mm de filamento
-    await send("M83", true); await send(`G1 E${sign * e} F${head.extrusionMode === "volumetric" ? 120 : 180}`, true)
-  }, [connected, busy, head, send])
+    // F em mm/min do eixo E. Volumétrico: E em mm³ → F = velocidade·área_filamento? Não — M200 D0 interpreta F como mm³/min? Marlin mantém F em mm/min lineares
+    // do eixo E, então usamos a velocidade pedida diretamente (mm/s × 60).
+    await send("M83", true); await send(`G1 E${(sign * extAmount).toFixed(2)} F${Math.max(10, Math.round(extSpeed * 60))}`, true)
+  }, [connected, busy, head, send, extAmount, extSpeed])
 
   const start = useCallback(async () => {
     if (!gcode || !ctrlRef.current) return
     if (!zeroed && state.printer.origin === "needle" && !confirm("Você ainda não clicou em ZERAR. A impressão vai começar onde a agulha está agora. Continuar?")) return
-    setErr(null)
+    setErr(null); setStopped(false); finishedRef.current = false; setShowFeedback(false); startedAtRef.current = Date.now()
     try { await ctrlRef.current.start(gcode) } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
   }, [gcode, zeroed, state.printer.origin])
-  const emergency = useCallback(async () => { try { await ctrlRef.current?.emergency() } catch { /* noop */ } setCtrlState("error"); loggerRef.current.error("PARADA DE EMERGÊNCIA (M112) enviada.", "basic") }, [])
+
+  const submitFeedback = useCallback(() => {
+    const fb: PrintFeedback = { rating: fbRating, symptoms: fbSymptoms, notes: fbNotes || undefined, live: { flow, speed, zBaby }, job: { layers: progress?.currentLayer ?? 0, minutes: Math.round((Date.now() - (startedAtRef.current || Date.now())) / 60000), heads: state.heads.filter((h) => h.enabled).map((h) => h.id) }, at: new Date().toISOString() }
+    saveFeedback(fb)
+    setSuggestions(analyzeFeedback(fb, state))
+  }, [fbRating, fbSymptoms, fbNotes, flow, speed, zBaby, progress, state])
+  const applySuggestion = useCallback((sg: Suggestion) => { if (!sg.apply || !onApplyState) return; onApplyState(sg.apply); setApplied((a) => new Set(a).add(sg.id)) }, [onApplyState])
+  /** PARAR suave: interrompe o stream, desliga válvula/aquecimento, sobe 10 mm, RELIGA motores e fica pronta. */
+  const softStop = useCallback(async () => {
+    const c = ctrlRef.current, t = transportRef.current; if (!c || !t) return
+    setBusy(true)
+    try {
+      if (streaming) { c.cancel(); await new Promise((r) => setTimeout(r, 400)) }
+      for (const h of state.heads) if (h.enabled && h.extrusionMode === "pneumatic" && h.offCmd) await t.write(h.offCmd).catch(() => {})
+      await t.write("M107").catch(() => {})
+      await t.write("G91").catch(() => {}); await t.write("G1 Z10 F600").catch(() => {}); await t.write("G90").catch(() => {})
+      await t.write("M17").catch(() => {}); await t.write("M18 S0").catch(() => {})
+      setPos((p) => ({ ...p, z: +(p.z + 10).toFixed(2) })); setExtruding(false); setStopped(true)
+      loggerRef.current.ok("■ Parada segura: válvulas desligadas, agulha +10 mm, motores religados. Pronta para zerar/imprimir de novo.", "basic")
+    } finally { setBusy(false) }
+  }, [streaming, state.heads])
+  /** Emergência real (M112): o firmware trava até reset — só para colisão/perigo. */
+  const emergency = useCallback(async () => {
+    if (!confirm("PARADA DE EMERGÊNCIA (M112): a impressora trava e precisa ser religada/reconectada. Use só em risco de colisão. Para parar e continuar depois use PARAR.")) return
+    try { await ctrlRef.current?.emergency() } catch { /* noop */ } setCtrlState("error"); loggerRef.current.error("M112 enviado — reconecte a impressora.", "basic")
+  }, [])
+  /** Religar: M17 + M18 S0 + G90, limpa estado de parada */
+  const rearm = useCallback(async () => {
+    const t = transportRef.current; if (!t) return
+    await t.write("M17").catch(() => {}); await t.write("M18 S0").catch(() => {}); await t.write("G90").catch(() => {}); await t.write("M83").catch(() => {})
+    ctrlRef.current?.resetOkDebt(); setStopped(false); setCtrlState("ready"); setProgress(null)
+    loggerRef.current.ok("Motores ligados (M17). Pronta.", "basic")
+  }, [])
+  /** Colocar seringa: sobe 50 mm e para no lugar — fácil de encaixar/trocar a seringa. */
+  const loadSyringe = useCallback(async () => {
+    if (!canJog) return
+    await send("G91", true); await send("G1 Z50 F900", true); await send("G90", true)
+    setPos((p) => ({ ...p, z: +(p.z + 50).toFixed(2) }))
+    loggerRef.current.info("Cabeçote +50 mm — encaixe a seringa. Depois use Z− ou 'Ir ao zero' para voltar.", "basic")
+  }, [canJog, send])
 
   const stateLabel: Record<ControllerState, string> = { idle: "Ocioso", connecting: "Conectando…", ready: "Pronto", streaming: "Imprimindo", paused: "Pausado", aborting: "Cancelando…", completed: "Concluído", error: "Erro / parado" }
   const card = "rounded-2xl border border-white/10 bg-white/[0.03] p-4"
@@ -197,6 +269,7 @@ export function PrintStep({ state, gcode, hasGcode }: { state: BasicState; gcode
             <button data-testid="pb-go-zero" onClick={goZero} disabled={!canJog} className="px-2 py-1.5 rounded-lg border border-white/10 hover:border-violet-400/40 text-xs flex items-center justify-center gap-1.5 disabled:opacity-30"><Crosshair className="w-3.5 h-3.5" /> Ir ao zero</button>
             <button onClick={home} disabled={!canJog} className="px-2 py-1.5 rounded-lg border border-white/10 hover:border-violet-400/40 text-xs flex items-center justify-center gap-1.5 disabled:opacity-30"><Home className="w-3.5 h-3.5" /> Home (G28)</button>
           </div>
+          <button data-testid="pb-load-syringe" onClick={loadSyringe} disabled={!canJog} className="w-full py-2.5 rounded-xl border border-fuchsia-400/40 bg-fuchsia-500/10 hover:bg-fuchsia-500/20 text-fuchsia-100 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-30"><ArrowUpFromLine className="w-4 h-4" /> Colocar seringa <span className="text-[10px] font-normal text-fuchsia-200/70">(sobe 50 mm)</span></button>
           <p className="text-[11px] text-gray-500">Mesa de referência: {state.printer.origin === "needle" ? "ponto zero na agulha — o G-code começa em (0,0,0) onde você zerar." : "coordenadas absolutas da mesa (G28 no início)."}</p>
         </div>
 
@@ -211,7 +284,11 @@ export function PrintStep({ state, gcode, hasGcode }: { state: BasicState; gcode
               <div className="grid grid-cols-4 gap-1.5">
                 {[-0.1, -0.02, 0.02, 0.1].map((d) => <button key={d} data-testid={`pb-babyz-${d}`} onClick={() => babyZ(d)} disabled={!connected} className={`py-2 rounded-lg border text-xs font-semibold disabled:opacity-30 ${d < 0 ? "border-amber-500/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20" : "border-cyan-500/30 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20"}`}>{d < 0 ? "▼" : "▲"} {Math.abs(d)}</button>)}
               </div>
-              <p className="text-[11px] text-gray-500 mt-1">▼ aproxima a agulha do substrato · ▲ afasta. Durante a impressão usa M290 (baby-step).</p>
+              <div className="flex flex-wrap items-center justify-between gap-2 mt-1">
+                <p className="text-[11px] text-gray-500">▼ aproxima a agulha do substrato · ▲ afasta. Parado: move na hora. Imprimindo: aplica na próxima linha do G-code.</p>
+                <label className="text-[10px] text-gray-500 flex items-center gap-1">método ao imprimir
+                  <select value={babyMode} onChange={(e) => setBabyMode(e.target.value as typeof babyMode)} className="bg-black/30 border border-white/10 rounded px-1 py-0.5 text-[10px] text-gray-300"><option value="auto">G91/G1 Z (universal)</option><option value="m290">M290 baby-step</option></select></label>
+              </div>
             </div>
           </div>
 
@@ -220,6 +297,18 @@ export function PrintStep({ state, gcode, hasGcode }: { state: BasicState; gcode
               <h3 className="text-sm font-semibold flex items-center gap-2"><Syringe className="w-4 h-4 text-fuchsia-300" /> Extrusão manual</h3>
               <div className="flex gap-1">{state.heads.filter((h) => h.enabled).map((h) => <button key={h.id} onClick={() => setCurHead(h.id)} className={`px-2 py-1 rounded-md text-[11px] border flex items-center gap-1 ${curHead === h.id ? "border-white/40 bg-white/10 text-white" : "border-white/10 text-gray-400"}`}><span className="w-2 h-2 rounded-full" style={{ background: h.color }} />T{h.id - 1}</button>)}</div>
             </div>
+            {head.extrusionMode !== "pneumatic" && (
+              <div className="grid grid-cols-2 gap-3" data-testid="pb-ext-controls">
+                <div>
+                  <span className="block text-[11px] uppercase tracking-wider text-gray-400 mb-1">Velocidade do extrusor <span className="normal-case tracking-normal text-gray-500">(mm/s)</span></span>
+                  <div className="flex gap-1">{[0.5, 1, 2, 5, 10].map((v) => <button key={v} data-testid={`pb-ext-speed-${v}`} onClick={() => setExtSpeed(v)} className={`flex-1 py-1.5 rounded-md text-[11px] font-semibold border ${extSpeed === v ? "bg-fuchsia-500 border-fuchsia-400 text-white" : "border-white/10 text-gray-400"}`}>{v}</button>)}</div>
+                </div>
+                <div>
+                  <span className="block text-[11px] uppercase tracking-wider text-gray-400 mb-1">Quantidade <span className="normal-case tracking-normal text-gray-500">({head.extrusionMode === "volumetric" ? "mm³ ≈ µL" : "mm"})</span></span>
+                  <div className="flex gap-1">{[1, 2, 5, 10, 25].map((v) => <button key={v} onClick={() => setExtAmount(v)} className={`flex-1 py-1.5 rounded-md text-[11px] font-semibold border ${extAmount === v ? "bg-fuchsia-500 border-fuchsia-400 text-white" : "border-white/10 text-gray-400"}`}>{v}</button>)}</div>
+                </div>
+              </div>
+            )}
             {head.extrusionMode === "pneumatic" ? (
               <div className="flex gap-2">
                 <button onClick={() => extrude(1)} disabled={!connected || busy} className={`flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 border ${extruding ? "bg-emerald-500/30 border-emerald-400 text-white" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"} disabled:opacity-30`}><Power className="w-4 h-4" /> Ligar válvula ({head.onCmd})</button>
@@ -227,11 +316,11 @@ export function PrintStep({ state, gcode, hasGcode }: { state: BasicState; gcode
               </div>
             ) : (
               <div className="flex gap-2">
-                <button onClick={() => extrude(1)} disabled={!connected || busy} className="flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 border border-emerald-500/30 bg-emerald-500/10 text-emerald-200 disabled:opacity-30"><Syringe className="w-4 h-4" /> Extrudar {head.extrusionMode === "volumetric" ? "5 mm³" : "2 mm"}</button>
-                <button onClick={() => extrude(-1)} disabled={!connected || busy} className="flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 border border-amber-500/30 bg-amber-500/10 text-amber-200 disabled:opacity-30"><Syringe className="w-4 h-4 rotate-180" /> Retrair</button>
+                <button data-testid="pb-extrude" onClick={() => extrude(1)} disabled={!connected || busy} className="flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 border border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-30"><Syringe className="w-4 h-4" /> Extrudar {extAmount} {head.extrusionMode === "volumetric" ? "mm³" : "mm"} <span className="text-[10px] font-normal opacity-70">a {extSpeed} mm/s</span></button>
+                <button onClick={() => extrude(-1)} disabled={!connected || busy} className="flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 border border-amber-500/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 disabled:opacity-30"><Syringe className="w-4 h-4 rotate-180" /> Retrair {extAmount}</button>
               </div>
             )}
-            <p className="text-[11px] text-gray-500">Cabeçote T{head.id - 1} · {head.label} · modo {head.extrusionMode === "pneumatic" ? "pneumático" : head.extrusionMode === "volumetric" ? "mecânico/volumétrico" : "filamento"}. Use para escorvar a agulha antes de zerar.</p>
+            <p className="text-[11px] text-gray-500">Cabeçote T{head.id - 1} · {head.label} · modo {head.extrusionMode === "pneumatic" ? "pneumático" : head.extrusionMode === "volumetric" ? "mecânico/volumétrico" : "filamento"}. {head.extrusionMode !== "pneumatic" && "Se o êmbolo demorar, suba a velocidade (5–10 mm/s) para escorvar e volte a 1–2 mm/s para o ajuste fino. "}Escorve até o hidrogel sair uniforme, limpe a ponta e depois zere.</p>
           </div>
 
           <div className={card + " space-y-3"} data-testid="pb-stream">
@@ -242,9 +331,11 @@ export function PrintStep({ state, gcode, hasGcode }: { state: BasicState; gcode
                 : ctrlState === "paused"
                   ? <button onClick={() => ctrlRef.current?.resume()} className="px-4 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-semibold flex items-center gap-2"><Play className="w-4 h-4" /> Retomar</button>
                   : <button onClick={() => ctrlRef.current?.pause()} className="px-4 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold flex items-center gap-2"><Pause className="w-4 h-4" /> Pausar</button>}
-              {streaming && <button onClick={() => ctrlRef.current?.cancel()} className="px-3 py-2.5 rounded-xl border border-white/15 text-sm flex items-center gap-2"><Square className="w-4 h-4" /> Cancelar</button>}
-              <button data-testid="pb-emergency" onClick={emergency} disabled={!connected} className="px-3 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-bold flex items-center gap-2 disabled:opacity-30"><OctagonX className="w-4 h-4" /> PARAR</button>
+              <button data-testid="pb-stop" onClick={softStop} disabled={!connected || busy} className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-bold flex items-center gap-2 disabled:opacity-30" title="Para com segurança: desliga válvulas, sobe 10 mm e religa os motores — pronta para recomeçar"><Square className="w-4 h-4" /> PARAR</button>
+              {(stopped || ctrlState === "error" || ctrlState === "completed") && <button data-testid="pb-rearm" onClick={rearm} disabled={!connected} className="px-3 py-2.5 rounded-xl border border-emerald-400/40 bg-emerald-500/10 text-emerald-100 text-sm font-semibold flex items-center gap-2"><RotateCcw className="w-4 h-4" /> Religar motores</button>}
+              <button data-testid="pb-emergency" onClick={emergency} disabled={!connected} className="px-2.5 py-2.5 rounded-xl border border-red-500/40 text-red-300 hover:bg-red-500/10 text-xs font-semibold flex items-center gap-1.5 disabled:opacity-30" title="M112 — só em risco de colisão; a impressora trava até reconectar"><OctagonX className="w-4 h-4" /> Emergência</button>
             </div>
+            {stopped && <p className="text-xs text-emerald-300 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Parada segura concluída — motores ligados. Ajuste o que precisar, zere se necessário e clique Iniciar impressão.</p>}
             {!hasGcode && <p className="text-xs text-amber-300">Gere o G-code na etapa anterior antes de imprimir.</p>}
             {progress && (
               <div>
@@ -254,7 +345,46 @@ export function PrintStep({ state, gcode, hasGcode }: { state: BasicState; gcode
             )}
             <button onClick={() => setShowLog((v) => !v)} className="text-[11px] text-gray-400 flex items-center gap-1.5 hover:text-gray-200"><Terminal className="w-3.5 h-3.5" /> {showLog ? "Ocultar" : "Mostrar"} console ({log.length})</button>
             {showLog && <pre className="max-h-48 overflow-auto rounded-lg bg-black/40 border border-white/5 p-2 text-[10.5px] font-mono leading-relaxed">{log.map((e) => <div key={e.seq} className={e.severity === "error" ? "text-red-300" : e.severity === "warn" ? "text-amber-300" : e.severity === "ok" ? "text-emerald-300" : e.severity === "tx" ? "text-cyan-200" : "text-gray-400"}>{e.severity === "tx" ? "→ " : e.severity === "rx" || e.severity === "ok" ? "← " : "· "}{e.text}</div>)}</pre>}
+            {!showFeedback && (ctrlState === "completed" || stopped) && <button onClick={() => { setShowFeedback(true); setSuggestions(null) }} className="text-xs text-violet-300 hover:text-violet-200 flex items-center gap-1.5"><ClipboardList className="w-3.5 h-3.5" /> Avaliar esta impressão</button>}
           </div>
+
+          {/* ── feedback pós-impressão ── */}
+          {showFeedback && (
+            <div className={card + " space-y-4 border-violet-400/30"} data-testid="pb-feedback">
+              <div className="flex items-start justify-between gap-3">
+                <div><h3 className="text-sm font-semibold flex items-center gap-2"><Sparkles className="w-4 h-4 text-violet-300" /> Como foi a impressão?</h3><p className="text-[11px] text-gray-500">A BIA lê suas respostas e os ajustes que você fez ao vivo (fluxo {flow} % · velocidade {speed} % · altura {zBaby >= 0 ? "+" : ""}{zBaby.toFixed(2)} mm) e sugere o que mudar na próxima.</p></div>
+                <button onClick={() => setShowFeedback(false)} className="text-gray-500 hover:text-gray-300 text-xs">fechar</button>
+              </div>
+              {!suggestions ? (<>
+                <div className="flex items-center gap-1" data-testid="pb-fb-rating">{([1, 2, 3, 4, 5] as const).map((n) => <button key={n} onClick={() => setFbRating(n)} className={`w-9 h-9 rounded-lg border flex items-center justify-center ${fbRating >= n ? "bg-amber-400/20 border-amber-400/60 text-amber-300" : "border-white/10 text-gray-600"}`}><Star className="w-4 h-4" fill={fbRating >= n ? "currentColor" : "none"} /></button>)}<span className="text-xs text-gray-400 ml-2">{["", "Falhou", "Ruim", "Regular", "Boa", "Excelente"][fbRating]}</span></div>
+                <div>
+                  <span className="block text-[11px] uppercase tracking-wider text-gray-400 mb-1.5">O que você observou? <span className="normal-case tracking-normal text-gray-500">(marque todos)</span></span>
+                  <div className="grid sm:grid-cols-2 gap-1.5">
+                    {SYMPTOMS.map((sy) => { const on = fbSymptoms.includes(sy.id)
+                      return <button key={sy.id} data-testid={`pb-fb-${sy.id}`} onClick={() => setFbSymptoms((a) => sy.id === "ok" ? (on ? [] : ["ok"]) : (on ? a.filter((x) => x !== sy.id) : [...a.filter((x) => x !== "ok"), sy.id]))} title={sy.hint} className={`text-left px-3 py-2 rounded-lg border text-xs ${on ? "border-violet-400/60 bg-violet-500/15 text-white" : "border-white/10 text-gray-300 hover:border-white/25"}`}>{sy.label}</button> })}
+                  </div>
+                </div>
+                <textarea value={fbNotes} onChange={(e) => setFbNotes(e.target.value)} placeholder="Observações livres (opcional): ex. 'saiu bem só a partir da 3ª camada', 'hidrogel muito líquido hoje'…" rows={2} className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-violet-400/60" />
+                <button data-testid="pb-fb-submit" onClick={submitFeedback} className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-sm font-semibold flex items-center gap-2"><Wand2 className="w-4 h-4" /> Pedir sugestões à BIA</button>
+              </>) : (
+                <div className="space-y-2" data-testid="pb-suggestions">
+                  {suggestions.length === 0 && <p className="text-sm text-gray-300">Nada a corrigir — parâmetros registrados como referência.</p>}
+                  {suggestions.map((sg) => (
+                    <div key={sg.id} className={`rounded-xl border p-3 ${sg.priority === 1 ? "border-violet-400/40 bg-violet-500/10" : "border-white/10 bg-white/[0.02]"}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div><div className="text-sm font-semibold text-white">{sg.title}</div><p className="text-xs text-gray-300 mt-0.5">{sg.detail}</p></div>
+                        {sg.apply && onApplyState && (applied.has(sg.id)
+                          ? <span className="text-[11px] text-emerald-300 flex items-center gap-1 shrink-0"><CheckCircle2 className="w-3.5 h-3.5" /> aplicado</span>
+                          : <button onClick={() => applySuggestion(sg)} className="shrink-0 px-2.5 py-1.5 rounded-lg border border-emerald-400/40 bg-emerald-500/10 text-emerald-100 text-[11px] font-semibold">{sg.applyLabel ?? "Aplicar"}</button>)}
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-[11px] text-gray-500">Ajustes aplicados mudam os parâmetros do protocolo — gere o G-code de novo na etapa anterior antes da próxima impressão.</p>
+                  <button onClick={() => { setSuggestions(null) }} className="text-xs text-gray-400 hover:text-gray-200">← editar respostas</button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
