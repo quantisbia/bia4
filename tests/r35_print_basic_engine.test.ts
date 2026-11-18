@@ -7,7 +7,7 @@ import { describe, it, expect } from "vitest"
 import {
   defaultState, defaultHead, defaultShape, buildToolpaths, generateGcode, validate,
   wellOffsets, allWells, surfaceExtent, MULTIWELL, GAUGES, HEAD_TYPES, MAX_HEADS, layerCount, infillLinear, rectPts,
-  INFILL, generateInfill, shapeRegion, shapeFromStroke, inset,
+  INFILL, generateInfill, shapeRegion, shapeFromStroke, inset, infillAt, sandwichPreset, curvePts,
 } from "@/lib/print-basic/engine"
 
 describe("R35 · estado padrão e cabeçotes", () => {
@@ -171,6 +171,50 @@ describe("R36 · preenchimentos (6 padrões MIA) e desenho livre", () => {
     expect(lines.some((l) => l.startsWith("G28"))).toBe(false)
     const xs = lines.filter((l) => /^G[01] X/.test(l)).map((l) => +/X(-?[\d.]+)/.exec(l)![1])
     expect(Math.max(...xs)).toBeLessThanOrEqual(2.1); expect(Math.min(...xs)).toBeGreaterThanOrEqual(-2.1)
+  })
+})
+
+describe("R37 · zonas sanduíche e meia curva", () => {
+  it("infillAt resolve a zona pela altura e cai no padrão fora delas", () => {
+    const ls = { ...defaultState().layerSettings, infillPattern: "grid" as const, infillDensity: 25 }
+    ls.zones = [{ id: "a", zFrom: 0, zTo: 0.5, pattern: "concentric", density: 60 }, { id: "b", zFrom: 0.5, zTo: 1.5, pattern: "gyroid", density: 20, head: 2 }]
+    expect(infillAt(ls, 0.2).pattern).toBe("concentric")
+    expect(infillAt(ls, 0.5).pattern).toBe("gyroid"); expect(infillAt(ls, 0.5).head).toBe(2)
+    expect(infillAt(ls, 1.8).pattern).toBe("grid"); expect(infillAt(ls, 1.8).density).toBe(25)
+  })
+  it("preset denso·poroso·denso muda o padrão por camada e 2 materiais troca o cabeçote do infill", () => {
+    const s = defaultState(); s.heads[1].enabled = true
+    s.layerSettings = { ...s.layerSettings, layerHeight: 0.4, firstLayerPct: 100 }
+    s.shapes = [{ ...defaultShape("disc", 1), id: "d", size: 10, height: 2 }]
+    s.layerSettings.zones = sandwichPreset("dense-porous-dense", 2, s.layerSettings)
+    expect(s.layerSettings.zones).toHaveLength(3)
+    const tp = buildToolpaths(s)
+    const pat = tp.map((L) => infillAt(s.layerSettings, L.z - L.h / 2).pattern)
+    expect(pat[0]).toBe("concentric"); expect(pat[2]).toBe("gyroid"); expect(pat[4]).toBe("concentric")
+    s.layerSettings.zones = sandwichPreset("two-materials", 2, s.layerSettings)
+    const tp2 = buildToolpaths(s)
+    const infHeads = tp2.map((L) => Array.from(new Set(L.paths.filter((p) => p.kind === "infill").map((p) => p.head))))
+    expect(infHeads[0]).toEqual([1]); expect(infHeads[4]).toEqual([2])
+    // perímetros continuam no cabeçote do objeto
+    expect(tp2[4].paths.filter((p) => p.kind === "external perimeter").every((p) => p.head === 1)).toBe(true)
+    const { lines } = generateGcode(s, tp2)
+    expect(lines.some((l) => l.startsWith("T1 "))).toBe(true)
+  })
+  it("zona inválida gera erro de validação", () => {
+    const s = defaultState(); s.layerSettings.zones = [{ id: "x", zFrom: 1, zTo: 0.5, pattern: "grid", density: 20 }]
+    expect(validate(s).errors.some((e) => /Zona/.test(e))).toBe(true)
+  })
+  it("meia curva: contorno orgânico fechado, determinístico pela semente, cabe no tamanho", () => {
+    const a = curvePts(0, 0, 12, 0.55, 7), b = curvePts(0, 0, 12, 0.55, 7), c = curvePts(0, 0, 12, 0.55, 8)
+    expect(a.length).toBeGreaterThan(90)
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b)); expect(JSON.stringify(a)).not.toBe(JSON.stringify(c))
+    for (const p of a) expect(Math.hypot(p.x, p.y)).toBeLessThanOrEqual(6 * 1.3)
+    const s = defaultState(); s.layerSettings = { ...s.layerSettings, layerHeight: 0.4, firstLayerPct: 100 }
+    s.shapes = [{ ...defaultShape("curve", 1), id: "c", size: 14, height: 0.8 }]
+    expect(validate(s).errors).toEqual([])
+    const tp = buildToolpaths(s)
+    expect(tp[0].paths.some((p) => p.kind === "external perimeter")).toBe(true)
+    expect(tp[0].paths.some((p) => p.kind === "infill")).toBe(true)
   })
 })
 

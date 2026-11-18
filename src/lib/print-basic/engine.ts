@@ -200,7 +200,7 @@ export function wellOffsets(s: Surface): { name: string; x: number; y: number }[
 }
 
 /* ───────────────────────── objetos (formas simples) ───────────────────────── */
-export type ShapeType = "disc" | "square" | "ring" | "lattice" | "lines" | "polygon" | "path"
+export type ShapeType = "disc" | "square" | "ring" | "lattice" | "lines" | "polygon" | "path" | "curve"
 
 export interface Shape {
   id: string
@@ -224,6 +224,7 @@ export function defaultShape(type: ShapeType, head = 1): Shape {
     case "ring": return { ...base, name: "Anel", size: 10, size2: 6, height: 2, solid: false }
     case "lattice": return { ...base, name: "Malha (scaffold)", size: 10, size2: 1.0, height: 2, solid: false }
     case "lines": return { ...base, name: "Linhas", size: 20, size2: 2, count: 5, height: 0, solid: false }
+    case "curve": return { ...base, name: "Meia curva (anatômica)", size: 12, size2: 0.55, count: 7, height: 2, solid: true }
     case "polygon": return { ...base, name: "Desenho", size: 0, height: 2, solid: true, pts: [] }
     case "path": return { ...base, name: "Traço", size: 0, height: 0, solid: false, pts: [] }
   }
@@ -269,6 +270,7 @@ export function describeShape(s: Shape): string {
     case "ring": return `Anel Ø ${fmtDot(s.size, 2)} / Ø ${fmtDot(s.size2, 2)} × ${fmtDot(s.height, 2)} mm`
     case "lattice": return `Malha ${fmtDot(s.size, 1)} mm · passo ${fmtDot(s.size2, 2)} mm × ${fmtDot(s.height, 2)} mm`
     case "lines": return `${s.count} linha(s) de ${fmtDot(s.size, 1)} mm · espaçamento ${fmtDot(s.size2, 2)} mm`
+    case "curve": return `Meia curva ${fmtDot(s.size, 1)} mm · curvatura ${Math.round(s.size2 * 100)} % × ${fmtDot(s.height, 2)} mm`
     case "polygon": { const b = bbox(s.pts ?? []); return `Desenho ${fmtDot(b.w, 1)} × ${fmtDot(b.h, 1)} × ${fmtDot(s.height, 2)} mm (${(s.pts ?? []).length} v)` }
     case "path": { const b = bbox(s.pts ?? []); return `Traço ${fmtDot(polyLength(s.pts ?? []), 1)} mm (${fmtDot(b.w, 1)} × ${fmtDot(b.h, 1)})` }
   }
@@ -287,10 +289,45 @@ export const INFILL: { id: InfillPattern; label: string; hint: string }[] = [
   { id: "none", label: "Sem preenchimento", hint: "Só perímetros (casca)." },
 ]
 
+/** Zona de preenchimento ("sanduíche"): da altura zFrom (inclusive) até zTo (exclusivo), em mm */
+export interface InfillZone {
+  id: string
+  zFrom: number; zTo: number
+  pattern: InfillPattern; density: number
+  head?: number          // opcional: cabeçote que executa o preenchimento desta zona (perímetros seguem o objeto)
+  label?: string
+}
+
 export interface LayerSettings {
   layerHeight: number; firstLayerPct: number
   infillPattern: InfillPattern; infillDensity: number; infillAngle: number; alternate: boolean
   perimeters: number
+  /** zonas por altura — quando vazio, usa infillPattern/infillDensity em toda a altura */
+  zones?: InfillZone[]
+}
+
+/** Preenchimento efetivo na altura z (centro da camada) */
+export function infillAt(ls: LayerSettings, z: number): { pattern: InfillPattern; density: number; head?: number; zone?: InfillZone } {
+  const zs = ls.zones ?? []
+  for (const zn of zs) if (z >= zn.zFrom - 1e-6 && z < zn.zTo - 1e-6) return { pattern: zn.pattern, density: zn.density, head: zn.head, zone: zn }
+  return { pattern: ls.infillPattern, density: ls.infillDensity }
+}
+
+/** Presets de sanduíche prontos (altura total H) */
+export function sandwichPreset(kind: "dense-porous-dense" | "gradient" | "two-materials", H: number, base: LayerSettings): InfillZone[] {
+  const t = Math.max(base.layerHeight, +(H * 0.2).toFixed(2))
+  switch (kind) {
+    case "dense-porous-dense": return [
+      { id: uid(), zFrom: 0, zTo: t, pattern: "concentric", density: 60, label: "Base densa" },
+      { id: uid(), zFrom: t, zTo: H - t, pattern: "gyroid", density: 25, label: "Núcleo poroso" },
+      { id: uid(), zFrom: H - t, zTo: H + 1, pattern: "concentric", density: 60, label: "Topo denso" },
+    ]
+    case "gradient": { const n = 3; const out: InfillZone[] = []; for (let i = 0; i < n; i++) out.push({ id: uid(), zFrom: (H * i) / n, zTo: i === n - 1 ? H + 1 : (H * (i + 1)) / n, pattern: "grid", density: 45 - i * 15, label: `Gradiente ${45 - i * 15}%` }); return out }
+    case "two-materials": return [
+      { id: uid(), zFrom: 0, zTo: H / 2, pattern: "grid", density: 30, head: 1, label: "Camada A (T0)" },
+      { id: uid(), zFrom: H / 2, zTo: H + 1, pattern: "grid", density: 30, head: 2, label: "Camada B (T1)" },
+    ]
+  }
 }
 
 export interface PrinterSettings {
@@ -573,9 +610,30 @@ export function generateInfill(pattern: InfillPattern, regions: Region, lineWidt
 export interface Path { head: number; kind: "external perimeter" | "perimeter" | "infill" | "line"; pts: Pt[]; closed: boolean }
 export interface ToolLayer { z: number; h: number; paths: Path[] }
 
+/**
+ * Contorno orgânico "meia curva" (anatômico): meia-lua suavizada com ondulação determinística
+ * controlada por `seed` (s.count) e curvatura `size2` (0 = quase disco, 1 = crescente fino).
+ */
+export function curvePts(cx: number, cy: number, size: number, curvature = 0.55, seed = 7): Pt[] {
+  const R = size / 2
+  const c = clamp(curvature, 0, 0.95)
+  const N = 96
+  const rnd = (i: number) => { const x = Math.sin(i * 12.9898 + seed * 78.233) * 43758.5453; return x - Math.floor(x) }
+  const a1 = 0.08 + 0.06 * rnd(1), a2 = 0.05 + 0.05 * rnd(2), ph1 = rnd(3) * Math.PI * 2, ph2 = rnd(4) * Math.PI * 2
+  const pts: Pt[] = []
+  for (let i = 0; i < N; i++) {
+    const t = (i / N) * Math.PI * 2
+    const inner = Math.max(0, Math.cos(t))
+    const r = R * (1 - c * 0.75 * inner * inner) * (1 + a1 * Math.sin(3 * t + ph1) + a2 * Math.sin(5 * t + ph2))
+    pts.push({ x: cx + r * Math.cos(t) - R * c * 0.25, y: cy + r * Math.sin(t) })
+  }
+  return chaikin(pts, true)
+}
+
 /** Região 2D (polígonos) de uma forma fechada — outer CCW, furos CW */
 export function shapeRegion(s: Shape): Region {
   switch (s.type) {
+    case "curve": return normalizeContours([curvePts(s.x, s.y, s.size, s.size2, s.count)])
     case "disc": return normalizeContours([circlePts(s.x, s.y, s.size / 2)])
     case "square": return normalizeContours([rectPts(s.x, s.y, s.size, s.size)])
     case "ring": return s.size2 < s.size ? normalizeContours([circlePts(s.x, s.y, s.size / 2), circlePts(s.x, s.y, s.size2 / 2)]) : []
@@ -585,7 +643,7 @@ export function shapeRegion(s: Shape): Region {
 }
 
 /** perímetros + preenchimento de uma região (racional MIA Slicer.pathsFor) */
-function regionPaths(head: number, regions: Region, lw: number, layerIndex: number, ls: LayerSettings, solid: boolean): Path[] {
+function regionPaths(head: number, regions: Region, lw: number, layerIndex: number, ls: LayerSettings, solid: boolean, heads?: Head[]): Path[] {
   const paths: Path[] = []
   const per = solid ? Math.max(0, ls.perimeters) : Math.max(1, ls.perimeters)
   let inner = regions
@@ -595,11 +653,15 @@ function regionPaths(head: number, regions: Region, lw: number, layerIndex: numb
     inner = ring
   }
   inner = per === 0 ? inset(regions, lw / 2) : inset(inner, lw / 2)
-  if (solid && ls.infillPattern !== "none" && inner.length) {
+  const z = firstLayerH(ls) + layerIndex * ls.layerHeight
+  const zMid = z - (layerIndex === 0 ? firstLayerH(ls) : ls.layerHeight) / 2
+  const inf = infillAt(ls, zMid)
+  if (solid && inf.pattern !== "none" && inner.length) {
     let ang = ls.infillAngle || 0
     if (ls.alternate && layerIndex % 2 === 1) ang += 90
-    const z = firstLayerH(ls) + layerIndex * ls.layerHeight
-    for (const l of generateInfill(ls.infillPattern, inner, lw, clamp(ls.infillDensity, 0, 100) / 100, ang, z)) if (l.length > 1) paths.push({ head, kind: "infill", pts: l, closed: false })
+    const infHead = inf.head && heads && heads[inf.head - 1]?.enabled ? inf.head : head
+    const infLw = heads && infHead !== head ? lineWidthOf(heads[infHead - 1]) : lw
+    for (const l of generateInfill(inf.pattern, inner, infLw, clamp(inf.density, 0, 100) / 100, ang, z)) if (l.length > 1) paths.push({ head: infHead, kind: "infill", pts: l, closed: false })
   }
   return paths
 }
@@ -611,8 +673,8 @@ export function shapePaths(s: Shape, layerIndex: number, ls: LayerSettings, head
   const head = hd.id
   const paths: Path[] = []
   switch (s.type) {
-    case "disc": case "square": case "ring": case "polygon":
-      return regionPaths(head, shapeRegion(s), lw, layerIndex, ls, s.solid)
+    case "disc": case "square": case "ring": case "polygon": case "curve":
+      return regionPaths(head, shapeRegion(s), lw, layerIndex, ls, s.solid, heads)
     case "path": {
       const p = shapePts(s); if (p.length > 1) paths.push({ head, kind: "line", pts: p, closed: false })
       break
@@ -720,8 +782,8 @@ export function validate(state: BasicState): { errors: string[]; warnings: strin
     const hd = state.heads[s.head - 1]
     if (!hd?.enabled) errors.push(`"${s.name || s.type}" usa o cabeçote ${s.head}, que está desativado.`)
     let fits: boolean
-    if (s.type === "polygon" || s.type === "path") {
-      const p = shapePts(s)
+    if (s.type === "polygon" || s.type === "path" || s.type === "curve") {
+      const p = s.type === "curve" ? curvePts(s.x, s.y, s.size, s.size2, s.count) : shapePts(s)
       if (p.length < 2) { errors.push(`"${s.name || s.type}": desenho vazio.`); continue }
       fits = ext.usableRound ? p.every((q) => Math.hypot(q.x, q.y) <= ext.usableW / 2 + 1e-6) : p.every((q) => Math.abs(q.x) <= ext.usableW / 2 + 1e-6 && Math.abs(q.y) <= ext.usableH / 2 + 1e-6)
     } else {
@@ -741,6 +803,10 @@ export function validate(state: BasicState): { errors: string[]; warnings: strin
     if (h.extrusionMode === "filament" && !(h.filamentD > 0)) errors.push(`Cabeçote ${h.id}: Ø do filamento inválido.`)
     if (h.speed <= 0) errors.push(`Cabeçote ${h.id}: velocidade inválida.`)
     if (state.layerSettings.layerHeight > lineWidthOf(h) * 1.2) warnings.push(`Cabeçote ${h.id}: altura de camada (${fmtDot(state.layerSettings.layerHeight, 2)} mm) maior que a agulha (${fmtDot(lineWidthOf(h), 2)} mm) — risco de filete solto.`)
+  }
+  for (const zn of state.layerSettings.zones ?? []) {
+    if (zn.zTo <= zn.zFrom) errors.push(`Zona "${zn.label ?? zn.id}": altura final deve ser maior que a inicial.`)
+    if (zn.head && !state.heads[zn.head - 1]?.enabled) warnings.push(`Zona "${zn.label ?? zn.id}": cabeçote T${zn.head - 1} desativado — o preenchimento usará o cabeçote do objeto.`)
   }
   const n = layerCount(state)
   if (n > 400) warnings.push(`${n} camadas — impressão longa.`)

@@ -8,7 +8,7 @@
 
 import { useRef, useState } from "react"
 import { Pencil, Spline, Square, Circle, Eraser, Undo2 } from "lucide-react"
-import { type BasicState, type Pt, type Shape, shapeFromStroke, defaultShape, surfaceExtent, bbox, shapePts, circlePts } from "@/lib/print-basic/engine"
+import { type BasicState, type Pt, type Shape, shapeFromStroke, defaultShape, surfaceExtent, bbox, shapePts, circlePts, curvePts } from "@/lib/print-basic/engine"
 
 export type DrawTool = "solid" | "line" | "rect" | "circle"
 
@@ -95,10 +95,10 @@ export function DrawCanvas({ state, onAdd, onRemoveLast, head, height }: {
         {/* formas existentes */}
         {state.shapes.map((s) => {
           const col = state.heads[s.head - 1]?.color ?? "#fff"
-          if (s.type === "polygon" || s.type === "path") {
-            const p = shapePts(s); if (p.length < 2) return null
-            const d = p.map((q, i) => `${i ? "L" : "M"}${q.x} ${-q.y}`).join(" ") + (s.type === "polygon" ? " Z" : "")
-            return <path key={s.id} d={d} fill={s.type === "polygon" && s.solid ? col + "33" : "none"} stroke={col} strokeWidth={0.4} strokeLinejoin="round" strokeLinecap="round" />
+          if (s.type === "polygon" || s.type === "path" || s.type === "curve") {
+            const p = s.type === "curve" ? curvePts(s.x, s.y, s.size, s.size2, s.count) : shapePts(s); if (p.length < 2) return null
+            const d = p.map((q, i) => `${i ? "L" : "M"}${q.x.toFixed(2)} ${(-q.y).toFixed(2)}`).join(" ") + (s.type !== "path" ? " Z" : "")
+            return <path key={s.id} d={d} fill={s.type !== "path" && s.solid ? col + "33" : "none"} stroke={col} strokeWidth={0.4} strokeLinejoin="round" strokeLinecap="round" />
           }
           if (s.type === "disc" || s.type === "ring") return <g key={s.id}><circle cx={s.x} cy={-s.y} r={s.size / 2} fill={s.type === "disc" && s.solid ? col + "33" : "none"} stroke={col} strokeWidth={0.4} />{s.type === "ring" && <circle cx={s.x} cy={-s.y} r={s.size2 / 2} fill="#0b0b14" stroke={col} strokeWidth={0.4} />}</g>
           if (s.type === "lines") return <g key={s.id}>{Array.from({ length: s.count }).map((_, i) => { const y = s.y + (-((s.count - 1) * s.size2) / 2) + i * s.size2; return <line key={i} x1={s.x - s.size / 2} x2={s.x + s.size / 2} y1={-y} y2={-y} stroke={col} strokeWidth={0.4} /> })}</g>
@@ -116,12 +116,12 @@ export function DrawCanvas({ state, onAdd, onRemoveLast, head, height }: {
 
 /** mini-ícone de uma forma para listas */
 export function ShapeThumb({ s, color }: { s: Shape; color: string }) {
-  const pts = s.type === "polygon" || s.type === "path" ? shapePts(s) : s.type === "disc" || s.type === "ring" ? circlePts(s.x, s.y, s.size / 2, 36) : [{ x: s.x - s.size / 2, y: s.y - s.size / 2 }, { x: s.x + s.size / 2, y: s.y + s.size / 2 }]
+  const pts = s.type === "curve" ? curvePts(s.x, s.y, s.size, s.size2, s.count) : s.type === "polygon" || s.type === "path" ? shapePts(s) : s.type === "disc" || s.type === "ring" ? circlePts(s.x, s.y, s.size / 2, 36) : [{ x: s.x - s.size / 2, y: s.y - s.size / 2 }, { x: s.x + s.size / 2, y: s.y + s.size / 2 }]
   const b = bbox(pts); const m = Math.max(b.w, b.h, 1) * 1.15
-  const d = s.type === "polygon" || s.type === "path" ? pts.map((q, i) => `${i ? "L" : "M"}${q.x} ${-q.y}`).join(" ") + (s.type === "polygon" ? "Z" : "") : ""
+  const d = s.type === "polygon" || s.type === "path" || s.type === "curve" ? pts.map((q, i) => `${i ? "L" : "M"}${q.x.toFixed(2)} ${(-q.y).toFixed(2)}`).join(" ") + (s.type !== "path" ? "Z" : "") : ""
   return (
     <svg viewBox={`${b.cx - m / 2} ${-b.cy - m / 2} ${m} ${m}`} className="w-9 h-9 rounded-lg bg-black/30 border border-white/10 shrink-0">
-      {d ? <path d={d} fill={s.type === "polygon" && s.solid ? color + "44" : "none"} stroke={color} strokeWidth={m / 40} /> :
+      {d ? <path d={d} fill={s.type !== "path" && s.solid ? color + "44" : "none"} stroke={color} strokeWidth={m / 40} /> :
         s.type === "disc" || s.type === "ring" ? <><circle cx={s.x} cy={-s.y} r={s.size / 2} fill={s.type === "disc" && s.solid ? color + "44" : "none"} stroke={color} strokeWidth={m / 40} />{s.type === "ring" && <circle cx={s.x} cy={-s.y} r={s.size2 / 2} fill="none" stroke={color} strokeWidth={m / 40} />}</> :
         s.type === "lines" ? <>{Array.from({ length: s.count }).map((_, i) => { const y = s.y + (-((s.count - 1) * s.size2) / 2) + i * s.size2; return <line key={i} x1={s.x - s.size / 2} x2={s.x + s.size / 2} y1={-y} y2={-y} stroke={color} strokeWidth={m / 40} /> })}</> :
         <rect x={s.x - s.size / 2} y={-s.y - s.size / 2} width={s.size} height={s.size} fill={s.type === "square" && s.solid ? color + "44" : "none"} stroke={color} strokeWidth={m / 40} strokeDasharray={s.type === "lattice" ? `${m / 20} ${m / 30}` : undefined} />}

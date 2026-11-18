@@ -16,11 +16,12 @@ import {
   type BasicState, type Shape, type ShapeType, type Head, type SurfaceKind, type ToolLayer, type InfillPattern,
   defaultState, defaultShape, describeShape, surfaceExtent, wellOffsets, allWells, MULTIWELL, PETRI, SLIDES, shapePts,
   BED_ROUND, BED_SQUARE, GAUGES, HEAD_TYPES, INFILL, PLATE_W, PLATE_H, validate, buildToolpaths, generateGcode,
-  layerCount, syncBed, fmtDot, lineWidthOf, firstLayerH, summarize, type GcodeStats,
+  layerCount, syncBed, fmtDot, lineWidthOf, firstLayerH, summarize, type GcodeStats, type InfillZone, sandwichPreset, uid,
 } from "@/lib/print-basic/engine"
 import { sendToExecute } from "@/lib/bioprint/execute-handoff"
 import { DrawCanvas, ShapeThumb } from "./_components/DrawCanvas"
 import { PrintStep } from "./_components/PrintStep"
+import { View3D } from "./_components/View3D"
 
 const STORAGE_KEY = "bia.print-basic.state.v1"
 const STEPS = [
@@ -67,54 +68,6 @@ function Toggle({ label, checked, onChange, hint }: { label: string; checked: bo
       </button>
       <span className="text-sm text-gray-200">{label}{hint && <span className="block text-xs text-gray-500">{hint}</span>}</span>
     </label>
-  )
-}
-
-/* ─────────────── Preview SVG (vista superior) ─────────────── */
-function SurfacePreview({ state, layers, layerIdx }: { state: BasicState; layers: ToolLayer[] | null; layerIdx: number }) {
-  const ext = surfaceExtent(state.surface)
-  const W = ext.w, Hh = ext.h
-  const pad = 6
-  const offs = wellOffsets(state.surface)
-  const sp = state.surface.kind === "multiwell" ? MULTIWELL.find((m) => m.id === state.surface.wells) : null
-  const toSvg = (x: number, y: number) => ({ x: x + W / 2, y: Hh / 2 - y })
-  const L = layers?.[Math.min(layerIdx, (layers?.length ?? 1) - 1)]
-  return (
-    <svg data-testid="pb-preview" viewBox={`${-pad} ${-pad} ${W + 2 * pad} ${Hh + 2 * pad}`} className="w-full h-auto bg-[#0b0b14] rounded-xl border border-white/10" style={{ maxHeight: 360 }}>
-      {/* contorno da superfície */}
-      {ext.round
-        ? <circle cx={W / 2} cy={Hh / 2} r={W / 2} fill="#141425" stroke="#5b5b7a" strokeWidth={0.6} />
-        : <rect x={0} y={0} width={W} height={Hh} rx={state.surface.kind === "multiwell" ? 3 : 1} fill="#141425" stroke="#5b5b7a" strokeWidth={0.6} />}
-      {/* poços (todos, destacando selecionados) */}
-      {sp && allWells(sp).map((w) => {
-        const c = toSvg(w.x, w.y); const sel = offs.some((o) => o.name === w.name)
-        return <g key={w.name}><circle cx={c.x} cy={c.y} r={sp.wellD / 2} fill={sel ? "#1f1f3a" : "#10101c"} stroke={sel ? "#8b5cf6" : "#33334d"} strokeWidth={sel ? 0.5 : 0.3} />
-          {sp.id <= 24 && <text x={c.x} y={c.y - sp.wellD / 2 + 3} fontSize={sp.id <= 12 ? 3 : 2.2} fill="#6b6b8a" textAnchor="middle">{w.name}</text>}</g>
-      })}
-      {/* área útil (quando não multiwell) */}
-      {!sp && (ext.usableRound
-        ? <circle cx={W / 2} cy={Hh / 2} r={ext.usableW / 2} fill="none" stroke="#8b5cf6" strokeWidth={0.3} strokeDasharray="1.5 1" />
-        : <rect x={(W - ext.usableW) / 2} y={(Hh - ext.usableH) / 2} width={ext.usableW} height={ext.usableH} fill="none" stroke="#8b5cf6" strokeWidth={0.3} strokeDasharray="1.5 1" />)}
-      {/* objetos / trajetórias replicados por poço */}
-      {offs.map((o) => (
-        <g key={o.name || "c"}>
-          {L ? L.paths.map((p, i) => {
-            const hd = state.heads[p.head - 1]
-            const d = p.pts.map((q, k) => { const c = toSvg(q.x + o.x, q.y + o.y); return `${k ? "L" : "M"}${c.x.toFixed(2)} ${c.y.toFixed(2)}` }).join(" ") + (p.closed ? " Z" : "")
-            return <path key={i} d={d} fill="none" stroke={hd?.color ?? "#fff"} strokeWidth={Math.max(0.15, lineWidthOf(hd) * 0.9)} strokeLinecap="round" opacity={0.9} />
-          }) : state.shapes.map((s) => {
-            const hd = state.heads[s.head - 1]; const c = toSvg(s.x + o.x, s.y + o.y)
-            const col = hd?.color ?? "#fff"
-            if (s.type === "polygon" || s.type === "path") { const p = shapePts(s); if (p.length < 2) return null; return <path key={s.id} d={p.map((q, k) => { const cc = toSvg(q.x + o.x, q.y + o.y); return `${k ? "L" : "M"}${cc.x.toFixed(2)} ${cc.y.toFixed(2)}` }).join(" ") + (s.type === "polygon" ? " Z" : "")} fill={s.type === "polygon" && s.solid ? col + "33" : "none"} stroke={col} strokeWidth={0.4} /> }
-            if (s.type === "disc" || s.type === "ring") return <g key={s.id}><circle cx={c.x} cy={c.y} r={s.size / 2} fill={s.type === "disc" ? col + "33" : "none"} stroke={col} strokeWidth={0.4} />{s.type === "ring" && <circle cx={c.x} cy={c.y} r={s.size2 / 2} fill="none" stroke={col} strokeWidth={0.4} />}</g>
-            if (s.type === "lines") return <g key={s.id}>{Array.from({ length: s.count }).map((_, i) => { const y = c.y - ((-((s.count - 1) * s.size2) / 2) + i * s.size2); return <line key={i} x1={c.x - s.size / 2} x2={c.x + s.size / 2} y1={y} y2={y} stroke={col} strokeWidth={0.4} /> })}</g>
-            return <rect key={s.id} x={c.x - s.size / 2} y={c.y - s.size / 2} width={s.size} height={s.size} fill={s.type === "square" ? col + "33" : "none"} stroke={col} strokeWidth={0.4} strokeDasharray={s.type === "lattice" ? "1 0.6" : undefined} />
-          })}
-        </g>
-      ))}
-      {/* origem */}
-      <g opacity={0.5}><line x1={W / 2 - 3} x2={W / 2 + 3} y1={Hh / 2} y2={Hh / 2} stroke="#aaa" strokeWidth={0.2} /><line x1={W / 2} x2={W / 2} y1={Hh / 2 - 3} y2={Hh / 2 + 3} stroke="#aaa" strokeWidth={0.2} /></g>
-    </svg>
   )
 }
 
@@ -187,7 +140,7 @@ export function PrintBasicClient({ initialStep }: { initialStep?: string } = {})
   // preview da camada atual (só computa quando necessário e leve)
   const previewLayers = useMemo(() => {
     if (layers) return layers
-    if (step === "layers" || step === "objects") { try { return v.errors.length ? null : buildToolpaths(state).slice(0, 4) } catch { return null } }
+    if (step === "layers" || step === "objects" || step === "heads") { try { if (v.errors.length) return null; const n = layerCount(state); const tp = buildToolpaths(state); return n > 60 ? tp.slice(0, 60) : tp } catch { return null } }
     return null
   }, [layers, step, state, v.errors.length])
 
@@ -267,7 +220,7 @@ export function PrintBasicClient({ initialStep }: { initialStep?: string } = {})
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs text-gray-400 flex items-center gap-1.5 mr-1"><Shapes className="w-3.5 h-3.5" /> Formas prontas:</span>
-                {([["disc", "Disco"], ["square", "Quadrado"], ["ring", "Anel"], ["lattice", "Malha (scaffold)"], ["lines", "Linhas"]] as [ShapeType, string][]).map(([t, l]) => (
+                {([["disc", "Disco"], ["square", "Quadrado"], ["ring", "Anel"], ["curve", "Meia curva (anatômica)"], ["lattice", "Malha (scaffold)"], ["lines", "Linhas"]] as [ShapeType, string][]).map(([t, l]) => (
                   <button key={t} data-testid={`pb-add-${t}`} onClick={() => upd((st) => ({ ...st, shapes: [...st.shapes, { ...defaultShape(t, drawHead), height: t === "lines" ? 0 : drawHeight }] }))} className="px-3 py-1.5 rounded-lg border border-white/10 hover:border-violet-400/50 text-xs flex items-center gap-1.5"><Plus className="w-3.5 h-3.5" />{l}</button>
                 ))}
               </div>
@@ -284,13 +237,14 @@ export function PrintBasicClient({ initialStep }: { initialStep?: string } = {})
                         <input className="bg-transparent border-b border-transparent hover:border-white/10 focus:border-violet-400/60 focus:outline-none text-sm font-semibold w-full" value={s.name} onClick={(e) => e.preventDefault()} onChange={(e) => setShape(s.id, { name: e.target.value })} />
                         <div className="text-[11px] text-gray-500 truncate">{describeShape(s)} · <span style={{ color: hd?.color }}>T{s.head - 1}</span></div>
                       </div>
-                      {(s.type === "disc" || s.type === "square" || s.type === "ring" || s.type === "polygon") && <button type="button" onClick={(e) => { e.preventDefault(); setShape(s.id, { solid: !s.solid }) }} className={`px-2 py-1 rounded-md text-[10px] border ${s.solid ? "border-violet-400/50 bg-violet-500/15 text-violet-100" : "border-white/10 text-gray-400"}`}>{s.solid ? "Sólido" : "Só contorno"}</button>}
+                      {(s.type === "disc" || s.type === "square" || s.type === "ring" || s.type === "polygon" || s.type === "curve") && <button type="button" onClick={(e) => { e.preventDefault(); setShape(s.id, { solid: !s.solid }) }} className={`px-2 py-1 rounded-md text-[10px] border ${s.solid ? "border-violet-400/50 bg-violet-500/15 text-violet-100" : "border-white/10 text-gray-400"}`}>{s.solid ? "Sólido" : "Só contorno"}</button>}
                       <button type="button" onClick={(e) => { e.preventDefault(); removeShape(s.id) }} className="text-gray-500 hover:text-red-400 p-1"><Trash2 className="w-4 h-4" /></button>
                     </summary>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 pt-3 border-t border-white/5">
                       <Sel label="Cabeçote" value={s.head} onChange={(x) => setShape(s.id, { head: +x })} options={state.heads.map((h) => ({ v: h.id, l: `T${h.id - 1} · ${h.label}${h.enabled ? "" : " (off)"}` }))} />
                       {!drawn && <Num label={s.type === "disc" || s.type === "ring" ? "Ø externo" : s.type === "lines" ? "Comprimento" : "Lado"} suffix="mm" value={s.size} onChange={(x) => setShape(s.id, { size: x })} step={0.5} min={0.5} />}
                       {s.type === "ring" && <Num label="Ø interno" suffix="mm" value={s.size2} onChange={(x) => setShape(s.id, { size2: x })} step={0.5} min={0.2} />}
+                      {s.type === "curve" && (<><Num label="Curvatura" suffix="0–0,95" value={s.size2} onChange={(x) => setShape(s.id, { size2: Math.max(0, Math.min(0.95, x)) })} step={0.05} min={0} max={0.95} /><Num label="Variação (semente)" value={s.count} onChange={(x) => setShape(s.id, { count: Math.max(1, Math.round(x)) })} min={1} max={99} /></>)}
                       {s.type === "lattice" && <Num label="Passo dos filetes" suffix="mm" value={s.size2} onChange={(x) => setShape(s.id, { size2: x })} step={0.1} min={0.1} />}
                       {s.type === "lines" && (<><Num label="Espaçamento" suffix="mm" value={s.size2} onChange={(x) => setShape(s.id, { size2: x })} step={0.5} min={0.1} /><Num label="Nº de linhas" value={s.count} onChange={(x) => setShape(s.id, { count: Math.max(1, Math.round(x)) })} min={1} max={50} /></>)}
                       {s.type !== "lines" && s.type !== "path" && <Num label="Altura" suffix="mm" value={s.height} onChange={(x) => setShape(s.id, { height: x })} step={0.1} min={0} />}
@@ -329,6 +283,7 @@ export function PrintBasicClient({ initialStep }: { initialStep?: string } = {})
                   <div className="flex items-end pb-1"><Toggle label="Alternar 90° a cada camada" checked={state.layerSettings.alternate} onChange={(x) => setLS({ alternate: x })} /></div>
                 </div>
               </div>
+              <ZonesPanel state={state} setLS={setLS} />
               <p className="text-xs text-gray-500"><b className="text-gray-300">{nLayers}</b> camada(s) físicas para a altura máxima de {fmtDot(state.shapes.reduce((h, s) => Math.max(h, s.height), 0), 2)} mm. Use o controle deslizante do painel ao lado para inspecionar camada por camada.</p>
             </div>
           )}
@@ -378,11 +333,7 @@ export function PrintBasicClient({ initialStep }: { initialStep?: string } = {})
 
         {/* ───── painel lateral: preview + status ───── */}
         <aside className="space-y-3 lg:sticky lg:top-[112px] self-start">
-          <SurfacePreview state={state} layers={previewLayers} layerIdx={layerIdx} />
-          {previewLayers && previewLayers.length > 1 && (
-            <label className="block text-xs text-gray-400">Camada {Math.min(layerIdx, previewLayers.length - 1) + 1} / {layers ? previewLayers.length : `${nLayers} (prévia das ${previewLayers.length} primeiras)`}
-              <input type="range" min={0} max={previewLayers.length - 1} value={Math.min(layerIdx, previewLayers.length - 1)} onChange={(e) => setLayerIdx(+e.target.value)} className="w-full accent-violet-400" /></label>
-          )}
+          <View3D state={state} layers={previewLayers} layerIdx={layerIdx} onLayerIdx={setLayerIdx} />
           {step !== "print" && (
             <div className={cardCls + " space-y-2.5"} data-testid="pb-key-params">
               <div className="text-[10px] uppercase tracking-wider text-gray-400 flex items-center gap-1.5"><Settings2 className="w-3 h-3" /> Parâmetros principais <span className="text-gray-600 normal-case tracking-normal">· editáveis aqui</span></div>
@@ -419,6 +370,54 @@ export function PrintBasicClient({ initialStep }: { initialStep?: string } = {})
           )}
         </aside>
       </main>
+    </div>
+  )
+}
+
+/* ─────────────── Zonas de preenchimento ("sanduíche") ─────────────── */
+function ZonesPanel({ state, setLS }: { state: BasicState; setLS: (p: Partial<BasicState["layerSettings"]>) => void }) {
+  const zones = state.layerSettings.zones ?? []
+  const H = Math.max(state.layerSettings.layerHeight, state.shapes.reduce((h, s) => Math.max(h, s.height), 0))
+  const setZone = (id: string, patch: Partial<InfillZone>) => setLS({ zones: zones.map((z) => (z.id === id ? { ...z, ...patch } : z)) })
+  const remove = (id: string) => setLS({ zones: zones.filter((z) => z.id !== id) })
+  const add = () => { const last = zones[zones.length - 1]; const from = last ? Math.min(last.zTo, H) : 0; setLS({ zones: [...zones, { id: uid(), zFrom: +from.toFixed(2), zTo: +Math.max(from + state.layerSettings.layerHeight, H).toFixed(2), pattern: "grid", density: 25, label: `Zona ${zones.length + 1}` }] }) }
+  const sorted = zones.slice().sort((a, b) => a.zFrom - b.zFrom)
+  const colors = ["#8b5cf6", "#06b6d4", "#f59e0b", "#ec4899", "#22c55e", "#f97316"]
+  return (
+    <div className={cardCls + " space-y-3"} data-testid="pb-zones">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div><h3 className="text-sm font-semibold flex items-center gap-2"><Layers className="w-4 h-4 text-violet-300" /> Preenchimento por altura <span className="text-[10px] font-normal text-gray-500">(sanduíche)</span></h3>
+          <p className="text-[11px] text-gray-500">Divida a altura em zonas com padrões/densidades diferentes — ex.: base densa, núcleo poroso, topo denso. Fora das zonas vale o padrão acima.</p></div>
+        <div className="flex flex-wrap gap-1.5">
+          <button data-testid="pb-zone-preset-dpd" onClick={() => setLS({ zones: sandwichPreset("dense-porous-dense", H, state.layerSettings) })} className="px-2.5 py-1.5 rounded-lg border border-white/10 hover:border-violet-400/50 text-[11px]">Denso · poroso · denso</button>
+          <button onClick={() => setLS({ zones: sandwichPreset("gradient", H, state.layerSettings) })} className="px-2.5 py-1.5 rounded-lg border border-white/10 hover:border-violet-400/50 text-[11px]">Gradiente 45→15%</button>
+          <button onClick={() => setLS({ zones: sandwichPreset("two-materials", H, state.layerSettings) })} className="px-2.5 py-1.5 rounded-lg border border-white/10 hover:border-violet-400/50 text-[11px]">2 materiais (T0/T1)</button>
+          <button data-testid="pb-zone-add" onClick={add} className="px-2.5 py-1.5 rounded-lg border border-violet-400/40 bg-violet-500/10 text-violet-100 text-[11px] flex items-center gap-1"><Plus className="w-3 h-3" /> Zona</button>
+          {zones.length > 0 && <button onClick={() => setLS({ zones: [] })} className="px-2.5 py-1.5 rounded-lg border border-white/10 hover:border-red-400/40 text-[11px] text-gray-400">Limpar</button>}
+        </div>
+      </div>
+      {sorted.length > 0 && (
+        <div className="grid sm:grid-cols-[80px_1fr] gap-3">
+          {/* barra vertical da altura */}
+          <div className="relative h-full min-h-[140px] rounded-lg bg-black/30 border border-white/5 overflow-hidden" title="Altura total">
+            {sorted.map((z, i) => { const top = Math.max(0, Math.min(H, z.zFrom)), bot = Math.max(0, Math.min(H, z.zTo)); if (bot <= top) return null
+              return <div key={z.id} className="absolute left-0 right-0 flex items-center justify-center text-[9px] font-semibold text-white/90" style={{ bottom: `${(top / H) * 100}%`, height: `${((bot - top) / H) * 100}%`, background: colors[i % colors.length] + "aa", borderTop: "1px solid rgba(255,255,255,.25)" }}>{INFILL.find((p) => p.id === z.pattern)?.label} {z.density}%</div> })}
+            <div className="absolute top-1 right-1 text-[9px] text-gray-400">{H.toFixed(1)} mm</div><div className="absolute bottom-1 right-1 text-[9px] text-gray-400">0</div>
+          </div>
+          <div className="space-y-2">
+            {sorted.map((z, i) => (
+              <div key={z.id} className="rounded-xl border border-white/10 bg-white/[0.02] p-2.5 grid grid-cols-2 sm:grid-cols-6 gap-2 items-end">
+                <label className="block sm:col-span-6 flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: colors[i % colors.length] }} /><input className="bg-transparent border-b border-white/10 focus:border-violet-400/60 focus:outline-none text-xs font-semibold flex-1" value={z.label ?? ""} placeholder="Nome da zona" onChange={(e) => setZone(z.id, { label: e.target.value })} /><button onClick={() => remove(z.id)} className="text-gray-500 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button></label>
+                <Num label="De" suffix="mm" value={z.zFrom} onChange={(x) => setZone(z.id, { zFrom: x })} step={0.1} min={0} />
+                <Num label="Até" suffix="mm" value={z.zTo} onChange={(x) => setZone(z.id, { zTo: x })} step={0.1} min={0} />
+                <div className="col-span-2"><Sel label="Padrão" value={z.pattern} onChange={(x) => setZone(z.id, { pattern: x as InfillPattern })} options={INFILL.map((p) => ({ v: p.id, l: p.label }))} /></div>
+                <Num label="Densidade" suffix="%" value={z.density} onChange={(x) => setZone(z.id, { density: x })} min={0} max={100} />
+                <Sel label="Cabeçote do infill" value={z.head ?? 0} onChange={(x) => setZone(z.id, { head: +x || undefined })} options={[{ v: 0, l: "= do objeto" }, ...state.heads.map((h) => ({ v: h.id, l: `T${h.id - 1} · ${h.label}` }))]} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
