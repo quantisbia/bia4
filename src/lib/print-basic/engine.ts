@@ -330,8 +330,49 @@ export function sandwichPreset(kind: "dense-porous-dense" | "gradient" | "two-ma
   }
 }
 
+/**
+ * Estratégia de trajetória (R40).
+ *  continuous=true → a camada inteira é percorrida como um único filete: emendas curtas entre trajetórias
+ *  são feitas EXTRUDANDO (sem levantar, sem retrair, mesma velocidade); perímetro emenda no preenchimento;
+ *  a troca de camada sobe em Z sem parar. Só há levantamento/retração quando o salto > maxBridge mm
+ *  (ou nunca, se maxBridge = 0 → "nunca levantar").
+ */
+export interface PathStrategy {
+  continuous: boolean
+  /** maior emenda feita extrudando (mm) DENTRO de um mesmo objeto. 0 = nunca levantar/retrair dentro da peça.
+   *  Entre objetos diferentes o cabeçote sempre levanta/retrai (conforme liftOnLongTravel). */
+  maxBridge: number
+  /** uma velocidade só para tudo (perímetro, preenchimento, emendas) = velocidade do cabeçote.
+   *  false → perímetro externo a 80 % da velocidade (prática comum de fatiadores) */
+  singleSpeed: boolean
+  /** emendar o perímetro ao preenchimento (sem travel entre eles) */
+  joinPerimeter: boolean
+  /** subir em Z continuando a extrudar na troca de camada (sem parar) */
+  continuousZ: boolean
+  /** levantar/retrair no fim da peça (sempre) e nas emendas longas */
+  liftOnLongTravel: boolean
+  /** saia de escorva (skirt): volta(s) ao redor da peça na 1ª camada para encher a agulha antes de começar */
+  skirt: boolean
+  /** distância da saia até a peça (mm) */
+  skirtGap: number
+  /** número de voltas da saia */
+  skirtLoops: number
+  /** levantar o cabeçote e retrair ao terminar a saia (único levantamento "obrigatório" no modo contínuo) */
+  liftAfterSkirt: boolean
+}
+
+export const DEFAULT_STRATEGY: PathStrategy = { continuous: false, maxBridge: 0, singleSpeed: true, joinPerimeter: true, continuousZ: true, liftOnLongTravel: true, skirt: false, skirtGap: 3, skirtLoops: 1, liftAfterSkirt: true }
+
+/** Velocidade (mm/s) de um tipo de trajetória segundo a estratégia */
+export function speedFor(hd: Head, kind: string, strat: PathStrategy): number {
+  if (strat.singleSpeed) return hd.speed
+  if (kind === "external perimeter") return Math.max(0.5, hd.speed * 0.8)
+  return hd.speed
+}
+
 export interface PrinterSettings {
   firmware: "marlin"
+  strategy?: PathStrategy
   /** needle = origem (0,0,0) no ponto onde a usuária clicou "Zerar" com a agulha sobre a superfície (sem G28);
    *  bed = coordenadas absolutas da mesa (G28 + offset do centro), racional MIA. */
   origin: "needle" | "bed"
@@ -361,7 +402,7 @@ export function defaultState(): BasicState {
     shapes: [{ ...defaultShape("disc", 1), id: "s1" }],
     layerSettings: { layerHeight: GAUGES[22], firstLayerPct: 80, infillPattern: "grid", infillDensity: 25, infillAngle: 45, alternate: true, perimeters: 1 },
     heads,
-    printer: { firmware: "marlin", origin: "needle", travelSpeed: 50, homeFirst: false, bedTempControl: false, bedTemp: 20, photocrosslinking: false, uvNm: 365, uvSeconds: 10, uvEvery: "end", uvOnCmd: "M42 P4 S255", uvOffCmd: "M42 P4 S0", chamberLights: false },
+    printer: { firmware: "marlin", origin: "needle", strategy: { ...DEFAULT_STRATEGY }, travelSpeed: 50, homeFirst: false, bedTempControl: false, bedTemp: 20, photocrosslinking: false, uvNm: 365, uvSeconds: 10, uvEvery: "end", uvOnCmd: "M42 P4 S255", uvOffCmd: "M42 P4 S0", chamberLights: false },
   }
 }
 
@@ -591,9 +632,86 @@ export function infillSpiral(regions: Region, spacing: number): Pt[][] {
   return path.length ? [path] : []
 }
 
-export function generateInfill(pattern: InfillPattern, regions: Region, lineWidth: number, density: number, angleDeg: number, z = 0): Pt[][] {
+/**
+ * Serpentina contínua (R40): linhas paralelas em `angleDeg` ligadas em zigue-zague pela borda da região.
+ * Diferente de `meandering`, aqui a ligação é SEMPRE feita (caminhando pelo contorno quando a reta sai
+ * da região), produzindo uma única polilinha por região convexa-ish — a trajetória da imagem.
+ */
+export function infillSerpentine(regions: Region, spacing: number, angleDeg: number, startNear?: Pt): Pt[][] {
+  if (spacing <= 0.01 || !regions.length) return []
+  const b = regionBBox(regions)
+  const rad = (angleDeg * Math.PI) / 180, dx = Math.cos(rad), dy = Math.sin(rad), nx = -dy, ny = dx
+  const R = Math.hypot(b.w, b.h) / 2 + spacing
+  const n = Math.ceil(R / spacing)
+  const rows0: Pt[][][] = []
+  for (let i = -n; i <= n; i++) {
+    const off = i * spacing
+    const px = b.cx + nx * off, py = b.cy + ny * off
+    const segs = clipSegmentToPolySet({ x: px - dx * R, y: py - dy * R }, { x: px + dx * R, y: py + dy * R }, regions)
+    if (segs.length) rows0.push(segs.map((sg) => [sg[0], sg[1]]))
+  }
+  if (!rows0.length) return []
+  // 4 variantes (ordem das fileiras × sentido inicial) → escolhe a que COMEÇA mais perto de `startNear`
+  // (= onde o cabeçote está), para que a emenda anterior seja a menor possível
+  if (startNear) {
+    let best: Pt[][] | null = null, bd = Infinity
+    for (const rev of [false, true]) for (const d0 of [1, -1]) {
+      const v = serpentineWalk(rev ? rows0.slice().reverse() : rows0, dx, dy, d0, spacing, regions, b)
+      if (!v.length) continue
+      const p0 = v[0][0]; const d = Math.hypot(p0.x - startNear.x, p0.y - startNear.y)
+      if (d < bd) { bd = d; best = v }
+    }
+    return best ?? []
+  }
+  return serpentineWalk(rows0, dx, dy, 1, spacing, regions, b)
+}
+
+function serpentineWalk(rows: Pt[][][], dx: number, dy: number, dir0: number, spacing: number, regions: Region, b: { cx: number; cy: number }): Pt[][] {
+  // agrupa "faixas" por coluna de segmentos: percorre fileira a fileira alternando direção
+  const along = (p: Pt) => p.x * dx + p.y * dy
+  const out: Pt[][] = []
+  let cur: Pt[] = []
+  let dir = dir0
+  for (const segsRow of rows) {
+    // ordena segmentos da fileira na direção atual
+    const ordered = segsRow.map((sg) => (along(sg[0]) <= along(sg[1]) ? sg : [sg[1], sg[0]])).sort((a, c) => along(a[0]) - along(c[0]))
+    const seq = dir > 0 ? ordered : ordered.slice().reverse().map((sg) => [sg[1], sg[0]])
+    for (const sg of seq) {
+      if (cur.length) {
+        const a = cur[cur.length - 1], c = sg[0]
+        const gap = Math.hypot(a.x - c.x, a.y - c.y)
+        const mid = { x: (a.x + c.x) / 2, y: (a.y + c.y) / 2 }
+        // o ponto médio costuma cair EXATAMENTE sobre a borda (os dois extremos estão na mesma aresta):
+        // testa também um ponto empurrado 0,05 mm para dentro (em direção ao centro da região)
+        const vx = b.cx - mid.x, vy = b.cy - mid.y, vl = Math.hypot(vx, vy) || 1
+        const nudged = { x: mid.x + (vx / vl) * 0.05, y: mid.y + (vy / vl) * 0.05 }
+        const inside = pointInPolySet(mid, regions) || pointInPolySet(nudged, regions)
+        // emenda direta se o meio está dentro; senão fecha a polilinha (nova começa aqui)
+        if (gap <= spacing * 3 && inside) cur.push(c)
+        else { out.push(cur); cur = [c] }
+      } else cur.push(sg[0])
+      cur.push(sg[1])
+    }
+    dir = -dir
+  }
+  if (cur.length > 1) out.push(cur)
+  return out
+}
+
+export function generateInfill(pattern: InfillPattern, regions: Region, lineWidth: number, density: number, angleDeg: number, z = 0, continuous = false, startNear?: Pt): Pt[][] {
   if (!regions.length || density <= 0 || pattern === "none") return []
   const d = clamp(density, 0.01, 1)
+  if (continuous) {
+    // trajetória contínua: grade = duas serpentinas (0° e 90°) emendadas; linear/meandro = uma serpentina
+    if (pattern === "grid") {
+      const a = infillSerpentine(regions, (2 * lineWidth) / d, angleDeg, startNear)
+      // a 2ª família (90°) começa onde a 1ª terminou
+      const end = a.length ? a[a.length - 1][a[a.length - 1].length - 1] : startNear
+      const bb = infillSerpentine(regions, (2 * lineWidth) / d, angleDeg + 90, end)
+      return a.concat(bb)
+    }
+    if (pattern === "linear" || pattern === "meandering") return infillSerpentine(regions, lineWidth / d, angleDeg, startNear)
+  }
   switch (pattern) {
     case "gyroid": return infillGyroid(regions, lineWidth, d, z)
     case "linear": return infillLinear(regions, lineWidth / d, angleDeg)
@@ -607,7 +725,35 @@ export function generateInfill(pattern: InfillPattern, regions: Region, lineWidt
 }
 
 /* ───────────────────────── trajetórias ───────────────────────── */
-export interface Path { head: number; kind: "external perimeter" | "perimeter" | "infill" | "line"; pts: Pt[]; closed: boolean }
+export interface Path { head: number; kind: "external perimeter" | "perimeter" | "infill" | "line" | "skirt"; pts: Pt[]; closed: boolean; /** id do objeto de origem (emendas contínuas nunca cruzam objetos diferentes) */ obj?: string }
+
+/** casco convexo (monotone chain) — usado pela saia */
+export function convexHull(points: Pt[]): Pt[] {
+  const P = points.slice().sort((a, b) => a.x - b.x || a.y - b.y)
+  if (P.length < 3) return P
+  const cross = (o: Pt, a: Pt, b: Pt) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
+  const lower: Pt[] = []
+  for (const p of P) { while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop(); lower.push(p) }
+  const upper: Pt[] = []
+  for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop(); upper.push(p) }
+  upper.pop(); lower.pop()
+  return lower.concat(upper)
+}
+
+/** Voltas da saia (skirt) ao redor de todas as trajetórias da 1ª camada, a `gap` mm da peça */
+export function skirtLoops(firstLayer: Path[], lw: number, gap: number, loops: number): Pt[][] {
+  const pts = firstLayer.flatMap((p) => p.pts)
+  if (pts.length < 3 || loops <= 0) return []
+  const hull = convexHull(pts)
+  if (hull.length < 3) return []
+  const out: Pt[][] = []
+  for (let i = 0; i < loops; i++) {
+    // offsetPolygon: delta > 0 = encolhe → negativo = expande
+    const ring = offsetPolygon(hull, -(gap + lw / 2 + i * lw))
+    if (ring.length >= 3) out.push(ring)
+  }
+  return out.reverse() // de fora para dentro: termina perto da peça
+}
 export interface ToolLayer { z: number; h: number; paths: Path[] }
 
 /**
@@ -643,7 +789,7 @@ export function shapeRegion(s: Shape): Region {
 }
 
 /** perímetros + preenchimento de uma região (racional MIA Slicer.pathsFor) */
-function regionPaths(head: number, regions: Region, lw: number, layerIndex: number, ls: LayerSettings, solid: boolean, heads?: Head[]): Path[] {
+function regionPaths(head: number, regions: Region, lw: number, layerIndex: number, ls: LayerSettings, solid: boolean, heads?: Head[], strategy?: PathStrategy, startNear?: Pt): Path[] {
   const paths: Path[] = []
   const per = solid ? Math.max(0, ls.perimeters) : Math.max(1, ls.perimeters)
   let inner = regions
@@ -661,20 +807,20 @@ function regionPaths(head: number, regions: Region, lw: number, layerIndex: numb
     if (ls.alternate && layerIndex % 2 === 1) ang += 90
     const infHead = inf.head && heads && heads[inf.head - 1]?.enabled ? inf.head : head
     const infLw = heads && infHead !== head ? lineWidthOf(heads[infHead - 1]) : lw
-    for (const l of generateInfill(inf.pattern, inner, infLw, clamp(inf.density, 0, 100) / 100, ang, z)) if (l.length > 1) paths.push({ head: infHead, kind: "infill", pts: l, closed: false })
+    for (const l of generateInfill(inf.pattern, inner, infLw, clamp(inf.density, 0, 100) / 100, ang, z, strategy?.continuous, startNear)) if (l.length > 1) paths.push({ head: infHead, kind: "infill", pts: l, closed: false })
   }
   return paths
 }
 
 /** Trajetórias de UMA forma numa camada (coordenadas relativas ao centro da superfície) */
-export function shapePaths(s: Shape, layerIndex: number, ls: LayerSettings, heads: Head[]): Path[] {
+export function shapePaths(s: Shape, layerIndex: number, ls: LayerSettings, heads: Head[], strategy?: PathStrategy, startNear?: Pt): Path[] {
   const hd = heads[s.head - 1] ?? heads[0]
   const lw = lineWidthOf(hd)
   const head = hd.id
   const paths: Path[] = []
   switch (s.type) {
     case "disc": case "square": case "ring": case "polygon": case "curve":
-      return regionPaths(head, shapeRegion(s), lw, layerIndex, ls, s.solid, heads)
+      return regionPaths(head, shapeRegion(s), lw, layerIndex, ls, s.solid, heads, strategy, startNear).map((p) => ({ ...p, obj: s.id }))
     case "path": {
       const p = shapePts(s); if (p.length > 1) paths.push({ head, kind: "line", pts: p, closed: false })
       break
@@ -709,7 +855,28 @@ export function shapePaths(s: Shape, layerIndex: number, ls: LayerSettings, head
       break
     }
   }
+  for (const p of paths) p.obj = s.id
   return paths
+}
+
+/** Gira um contorno fechado para começar (e terminar) no ponto da sua borda mais próximo de `target`
+ *  (insere o pé da perpendicular quando ele cai no meio de uma aresta). */
+export function rotateClosedTo(pts: Pt[], target: Pt): Pt[] {
+  if (pts.length < 3) return pts
+  let bi = 0, bd = Infinity, bq: Pt = pts[0]
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length]
+    const vx = b.x - a.x, vy = b.y - a.y, L2 = vx * vx + vy * vy || 1e-12
+    const t = Math.max(0, Math.min(1, ((target.x - a.x) * vx + (target.y - a.y) * vy) / L2))
+    const q = { x: a.x + vx * t, y: a.y + vy * t }
+    const d = Math.hypot(q.x - target.x, q.y - target.y)
+    if (d < bd) { bd = d; bi = i; bq = q }
+  }
+  const a = pts[bi], b = pts[(bi + 1) % pts.length]
+  const onA = Math.hypot(bq.x - a.x, bq.y - a.y) < 1e-6, onB = Math.hypot(bq.x - b.x, bq.y - b.y) < 1e-6
+  if (onA) return pts.slice(bi).concat(pts.slice(0, bi))
+  if (onB) { const k = (bi + 1) % pts.length; return pts.slice(k).concat(pts.slice(0, k)) }
+  return [bq].concat(pts.slice(bi + 1), pts.slice(0, bi + 1))
 }
 
 /** ordena trajetórias pelo vizinho mais próximo (copiado da MIA) */
@@ -762,12 +929,42 @@ export function buildToolpaths(state: BasicState): ToolLayer[] {
       if (!(state.heads[s.head - 1]?.enabled)) continue
       if (s.height > 0 && zMid > s.height) continue
       if (s.height <= 0 && i > 0) continue
-      paths = paths.concat(shapePaths(s, i, ls, state.heads))
+      paths = paths.concat(shapePaths(s, i, ls, state.heads, state.printer.strategy, state.printer.strategy?.continuous ? cursor : undefined))
     }
     // agrupa por cabeçote (ordem crescente) e ordena dentro do grupo
     const heads = Array.from(new Set(paths.map((p) => p.head))).sort()
+    const strat = state.printer.strategy
     let ordered: Path[] = []
-    for (const hd of heads) { const grp = orderPaths(paths.filter((p) => p.head === hd), cursor); ordered = ordered.concat(grp); if (grp.length) { const lp = grp[grp.length - 1]; cursor = lp.closed ? lp.pts[0] : lp.pts[lp.pts.length - 1] } }
+    for (const hd of heads) {
+      const grp0 = paths.filter((p) => p.head === hd)
+      let grp: Path[]
+      if (strat?.continuous && strat.joinPerimeter) {
+        // perímetros primeiro (de fora para dentro), depois o preenchimento; cada perímetro é GIRADO para
+        // terminar no ponto da sua borda mais próximo do início da próxima trajetória → emenda ≈ 1 largura de linha
+        const per = orderPaths(grp0.filter((p) => p.kind !== "infill" && p.kind !== "line"), cursor)
+        const lastPer = per.length ? per[per.length - 1] : null
+        const from = lastPer ? (lastPer.closed ? lastPer.pts[0] : lastPer.pts[lastPer.pts.length - 1]) : cursor
+        const rest = orderPaths(grp0.filter((p) => p.kind === "infill" || p.kind === "line"), from)
+        for (let k = per.length - 1; k >= 0; k--) {
+          const next = k === per.length - 1 ? rest[0] : per[k + 1]
+          if (next && per[k].closed) per[k] = { ...per[k], pts: rotateClosedTo(per[k].pts, next.pts[0]) }
+        }
+        grp = per.concat(rest)
+      } else grp = orderPaths(grp0, cursor)
+      ordered = ordered.concat(grp); if (grp.length) { const lp = grp[grp.length - 1]; cursor = lp.closed ? lp.pts[0] : lp.pts[lp.pts.length - 1] }
+    }
+    // saia de escorva: só na 1ª camada, com o cabeçote da primeira trajetória, antes de tudo
+    if (i === 0 && strat?.skirt && ordered.length) {
+      const hd0 = ordered[0].head
+      const hd = state.heads[hd0 - 1]
+      const loops = skirtLoops(ordered, lineWidthOf(hd), Math.max(0.5, strat.skirtGap || 3), Math.max(1, Math.min(5, Math.round(strat.skirtLoops || 1))))
+      if (loops.length) {
+        const sk: Path[] = loops.map((pts) => ({ head: hd0, kind: "skirt", pts, closed: true }))
+        // começa a saia no ponto mais próximo do início da peça e termina perto dela
+        const start = ordered[0].pts[0]
+        ordered = orderPaths(sk, start).concat(ordered)
+      }
+    }
     layers.push({ z: zTop, h, paths: ordered })
   }
   return layers
@@ -814,7 +1011,7 @@ export function validate(state: BasicState): { errors: string[]; warnings: strin
 }
 
 /* ───────────────────────── G-code (porta do MIA slicer.gcode) ───────────────────────── */
-export interface GcodeStats { layers: number; pathMM: number; travelMM: number; volumeMM3: number; seconds: number; moves: number; perHead: Record<number, { pathMM: number; volumeMM3: number; seconds: number }>; wells: number }
+export interface GcodeStats { layers: number; pathMM: number; travelMM: number; volumeMM3: number; seconds: number; moves: number; perHead: Record<number, { pathMM: number; volumeMM3: number; seconds: number }>; wells: number; travels: number; bridges: number }
 
 export function generateGcode(state: BasicState, toolpaths?: ToolLayer[]): { lines: string[]; gcode: string; stats: GcodeStats } {
   const TP = toolpaths ?? buildToolpaths(state)
@@ -825,8 +1022,9 @@ export function generateGcode(state: BasicState, toolpaths?: ToolLayer[]): { lin
   const extMode = (h: number) => H(h).extrusionMode
   const headsUsed = Array.from(new Set(TP.flatMap((l) => l.paths.map((p) => p.head)))).sort()
   const offsets = wellOffsets(state.surface)
-  const stats: GcodeStats = { layers: TP.length, pathMM: 0, travelMM: 0, volumeMM3: 0, seconds: 0, moves: 0, perHead: {}, wells: offsets.length }
+  const stats: GcodeStats = { layers: TP.length, pathMM: 0, travelMM: 0, volumeMM3: 0, seconds: 0, moves: 0, perHead: {}, wells: offsets.length, travels: 0, bridges: 0 }
   headsUsed.forEach((h) => (stats.perHead[h] = { pathMM: 0, volumeMM3: 0, seconds: 0 }))
+  const strat: PathStrategy = { ...DEFAULT_STRATEGY, ...(P.strategy ?? {}) }
   const needle = (P.origin ?? "needle") === "needle"
   // ponto zero na agulha: origem = centro da superfície (ou centro do 1º poço selecionado); sem home
   const ref = needle && offsets.length ? offsets[0] : { x: 0, y: 0, name: "" }
@@ -850,6 +1048,7 @@ export function generateGcode(state: BasicState, toolpaths?: ToolLayer[]): { lin
     push("; Printhead " + h + " (T" + (h - 1) + ", " + hd.color + "): " + (t?.label ?? hd.type) + " · " + hd.gauge + " G (" + F3(lineWidthOf(hd)) + " mm) · mode " + hd.extrusionMode + (hd.extrusionMode === "pneumatic" ? " · " + hd.pressure + " kPa" : hd.extrusionMode === "filament" ? " · filament " + hd.filamentD + " mm" : " · E in mm3") + " · " + hd.speed + " mm/s · flow " + hd.flow + " % · temp " + (hd.temp > 0 ? hd.temp + " C" : "Off"))
   }
   push("; Printer: Marlin · printbed " + (P.bedTempControl ? P.bedTemp + " C" : "Off") + " · photocrosslinking " + (P.photocrosslinking ? P.uvNm + " nm / " + P.uvSeconds + " s (" + P.uvEvery + ")" : "Off"))
+  push("; Path strategy: " + (strat.continuous ? `CONTINUOUS (bridge <= ${strat.maxBridge || "∞"} mm extruding, ${strat.singleSpeed ? "single speed" : "per-kind speed"}, ${strat.joinPerimeter ? "perimeter joined" : "perimeter separate"}, ${strat.continuousZ ? "continuous Z" : "lift on layer change"})` : "standard (travel + retract between paths)") + (strat.skirt ? ` · skirt ${strat.skirtLoops} loop(s) @ ${strat.skirtGap} mm${strat.liftAfterSkirt ? ", lift+retract after skirt" : ""}` : ""))
   push(needle
     ? "; Origin: NEEDLE ZERO — position the needle at the center of the " + (offsets.length > 1 ? "well " + offsets[0].name : "surface") + ", touching the substrate, and send G92 X0 Y0 Z0 before printing"
     : "; Origin: BED — absolute bed coordinates, offset X" + bx + " Y" + by + " Z" + zOff)
@@ -870,11 +1069,16 @@ export function generateGcode(state: BasicState, toolpaths?: ToolLayer[]): { lin
   for (const h of headsUsed) { const hd = H(h); if (hd.temp > 0) push("M109 T" + (h - 1) + " S" + hd.temp + " ; wait for printhead " + h) }
 
   let cur: Pt | null = null, curZ: number | null = null, curHead: number | null = null, extruding = false
-  const travel = (x: number, y: number, z: number, hd: Head) => {
-    const hop = hd.zHop > 0 && cur ? hd.zHop : 0
+  let prevObj: string | undefined
+  const travel = (x: number, y: number, z: number, hd: Head, forceHop = false) => {
+    let hop = 0
+    if (cur) {
+      if (forceHop) hop = Math.max(hd.zHop, 0.5)
+      else if (hd.zHop > 0 && (!strat.continuous || strat.liftOnLongTravel)) hop = hd.zHop
+    }
     if (hop && cur) push("G1 Z" + F3(z + hop) + " F600")
     if (cur) { const d = Math.hypot(x - cur.x, y - cur.y); stats.travelMM += d; stats.seconds += d / (P.travelSpeed || 50) }
-    push("G0 X" + F3(x) + " Y" + F3(y) + (hop || curZ !== z ? " Z" + F3(z + hop) : "") + " F" + travelF + " ; travel")
+    push("G0 X" + F3(x) + " Y" + F3(y) + (hop || curZ !== z ? " Z" + F3(z + hop) : "") + " F" + travelF + " ; travel"); if (cur) stats.travels++
     if (hop) push("G1 Z" + F3(z) + " F600")
     cur = { x, y }; curZ = z; stats.moves++
   }
@@ -887,10 +1091,10 @@ export function generateGcode(state: BasicState, toolpaths?: ToolLayer[]): { lin
     } else if (hd.retract > 0) push("G1 E" + F3(hd.retract) + " F1500 ; unretract")
     extruding = true
   }
-  const stopExtrude = (hd: Head, h: number) => {
+  const stopExtrude = (hd: Head, h: number, force = false) => {
     if (!extruding) return
     if (extMode(h) === "pneumatic") { if (hd.offCmd) push(hd.offCmd + " ; extrusion off") }
-    else if (hd.retract > 0) push("G1 E-" + F3(hd.retract) + " F1500 ; retract")
+    else if (hd.retract > 0 || force) push("G1 E-" + F3(hd.retract > 0 ? hd.retract : 0.5) + " F1500 ; retract" + (force ? " (after skirt)" : ""))
     extruding = false
   }
   const extrudeTo = (x: number, y: number, h: number, layerH: number, kind: string) => {
@@ -901,9 +1105,10 @@ export function generateGcode(state: BasicState, toolpaths?: ToolLayer[]): { lin
     let e = ""
     if (extMode(h) === "filament") e = " E" + fmtDot(vol / (Math.PI * Math.pow(hd.filamentD / 2, 2)), 5)
     else if (extMode(h) === "volumetric") e = " E" + fmtDot(vol, 5)
-    push("G1 X" + F3(x) + " Y" + F3(y) + e + " F" + Math.round(hd.speed * 60) + " ; " + kind)
-    stats.pathMM += d; stats.volumeMM3 += vol; stats.seconds += d / hd.speed; stats.moves++
-    stats.perHead[h].pathMM += d; stats.perHead[h].volumeMM3 += vol; stats.perHead[h].seconds += d / hd.speed
+    const sp = speedFor(hd, kind, strat)
+    push("G1 X" + F3(x) + " Y" + F3(y) + e + " F" + Math.round(sp * 60) + " ; " + kind)
+    stats.pathMM += d; stats.volumeMM3 += vol; stats.seconds += d / sp; stats.moves++
+    stats.perHead[h].pathMM += d; stats.perHead[h].volumeMM3 += vol; stats.perHead[h].seconds += d / sp
     cur = { x, y }
   }
   const selectHead = (h: number) => {
@@ -926,20 +1131,45 @@ export function generateGcode(state: BasicState, toolpaths?: ToolLayer[]): { lin
       const z = L.z + zOff
       push("")
       push("; LAYER " + (li + 1) + "/" + TP.length + " Z=" + F3(z) + " h=" + F3(L.h))
-      if (curHead !== null) stopExtrude(H(curHead), curHead)
-      push("G1 Z" + F3(z) + " F600 ; layer change"); curZ = z
+      const contZ = strat.continuous && strat.continuousZ && li > 0 && cur && curHead !== null && L.paths.length && L.paths[0].head === curHead && L.paths[0].obj === prevObj
+      if (!contZ) { if (curHead !== null) stopExtrude(H(curHead), curHead); push("G1 Z" + F3(z) + " F600 ; layer change"); curZ = z }
+      let prevKind: string | null = null
       for (const p of L.paths) {
         const hd = H(p.head); const h = p.head
+        const headChange = curHead !== h
         selectHead(h)
         const pts = p.pts.map((q) => ({ x: q.x + hd.offsetX + bx + w.x, y: q.y + hd.offsetY + by + w.y }))
         const first = pts[0]
-        const needTravel = !cur || Math.hypot(first.x - cur.x, first.y - cur.y) > 0.02 || curZ !== z
-        if (needTravel) { stopExtrude(hd, h); travel(first.x, first.y, z, hd) }
+        const gap = cur ? Math.hypot(first.x - cur.x, first.y - cur.y) : Infinity
+        const afterSkirt = prevKind === "skirt" && p.kind !== "skirt"
+        const objChange = !!cur && p.kind !== "skirt" && prevKind !== null && prevKind !== "skirt" && p.obj !== prevObj
+        prevKind = p.kind; prevObj = p.obj
+        if (afterSkirt && strat.liftAfterSkirt) {
+          // fim da saia: ÚNICO levantamento + retração obrigatórios (escolha da usuária)
+          push("; skirt done → lift + retract, then start the part")
+          stopExtrude(hd, h, true); travel(first.x, first.y, z, hd, true)
+        } else if (strat.continuous && cur && !headChange && !objChange && (curZ === z || contZ) && (strat.maxBridge <= 0 || gap <= strat.maxBridge)) {
+          // emenda contínua: segue extrudando até o início da próxima trajetória (sem levantar/retrair)
+          if (curZ !== z) { // troca de camada contínua: sobe em Z enquanto anda
+            const d = gap; const vol = d * lineWidthOf(hd) * L.h * (hd.flow / 100)
+            let e = ""; if (extMode(h) === "filament") e = " E" + fmtDot(vol / (Math.PI * Math.pow(hd.filamentD / 2, 2)), 5); else if (extMode(h) === "volumetric") e = " E" + fmtDot(vol, 5)
+            const sp = speedFor(hd, "bridge", strat)
+            push("G1 X" + F3(first.x) + " Y" + F3(first.y) + " Z" + F3(z) + e + " F" + Math.round(sp * 60) + " ; layer change (continuous)")
+            stats.pathMM += d; stats.volumeMM3 += vol; stats.seconds += d / sp; stats.moves++; cur = { x: first.x, y: first.y }; curZ = z
+          } else if (gap > 0.02) extrudeTo(first.x, first.y, h, L.h, "bridge")
+          stats.bridges++
+        } else {
+          const needTravel = !cur || gap > 0.02 || curZ !== z
+          if (needTravel) { stopExtrude(hd, h); travel(first.x, first.y, z, hd) }
+        }
         startExtrude(hd, h)
         for (let i = 1; i < pts.length; i++) extrudeTo(pts[i].x, pts[i].y, h, L.h, p.kind)
         if (p.closed) extrudeTo(first.x, first.y, h, L.h, p.kind)
       }
-      if (curHead !== null) stopExtrude(H(curHead), curHead)
+      // fim da camada: no modo contínuo (Z contínuo) NÃO para a extrusão — a próxima camada decide
+      // (se não puder continuar, o bloco `!contZ` acima para e sobe em Z). UV por camada sempre para.
+      const keepGoing = strat.continuous && strat.continuousZ && li < TP.length - 1 && !(P.photocrosslinking && P.uvEvery === "layer")
+      if (!keepGoing && curHead !== null) stopExtrude(H(curHead), curHead)
       if (P.photocrosslinking && P.uvEvery === "layer") uv("layer")
     })
   }
@@ -954,7 +1184,7 @@ export function generateGcode(state: BasicState, toolpaths?: ToolLayer[]): { lin
   for (const h of headsUsed) { const hd = H(h); if (hd.temp > 0) push("M104 T" + (h - 1) + " S0") }
   if (P.bedTempControl) push("M140 S0")
   push("M84 ; disable motors")
-  push("; BIA Print Basic — done · " + stats.layers + " layers · " + offsets.length + " target(s) · " + fmtDot(stats.pathMM / 1000, 2) + " m · " + fmtDot(stats.volumeMM3, 1) + " mm3")
+  push("; BIA Print Basic — done · " + stats.layers + " layers · " + offsets.length + " target(s) · " + fmtDot(stats.pathMM / 1000, 2) + " m · " + fmtDot(stats.volumeMM3, 1) + " mm3 · " + stats.travels + " travel(s) · " + stats.bridges + " continuous bridge(s)")
   stats.seconds += TP.length * 1.5 + 5
 
   return { lines: g, gcode: g.join("\n"), stats }
@@ -978,5 +1208,7 @@ export function summarize(state: BasicState, stats: GcodeStats) {
     volume_uL: Math.round(stats.volumeMM3 * 10) / 10,
     path_m: Math.round(stats.pathMM / 100) / 10,
     heads: Object.keys(stats.perHead).map(Number),
+    travels: stats.travels,
+    bridges: stats.bridges,
   }
 }

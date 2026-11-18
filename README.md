@@ -210,6 +210,19 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R40 — Impressão Básica · Trajetória contínua (meandro sem paradas) + saia de escorva (2026-11-18)
+
+Pedido: *"o usuário decide se quer o movimento o mais curto possível, sem paradas, de forma contínua — começar num ponto e, sem levantar e sem retrair, seguir o movimento, sem pausa, sem mudança de velocidade; só na saia haverá levantamento/retração, à escolha do usuário"*.
+
+- **`PathStrategy`** (`src/lib/print-basic/engine.ts`, em `printer.strategy`): `continuous`, `maxBridge` (mm; **0 = nunca levantar dentro da peça**), `singleSpeed`, `joinPerimeter`, `continuousZ`, `liftOnLongTravel`, `skirt`, `skirtGap`, `skirtLoops`, `liftAfterSkirt`. Padrão continua **standard** — quem não ativar recebe o mesmo G-code de antes.
+- **Meandro contínuo (`infillSerpentine`)**: grade/linear/meandro viram **uma polilinha por região** em zigue-zague (grade = serpentina 0° + serpentina 90° emendadas). `startNear` escolhe entre 4 variantes (ordem × sentido) a que começa mais perto do cabeçote. Num quadrado 12 mm grade 30 %: **11 trajetórias → 3**, **21 levantamentos → 0**.
+- **Perímetro emendado**: cada contorno é girado (`rotateClosedTo`) para terminar no ponto da borda mais próximo do início do meandro (emenda ≈ 1 largura de linha, extrudando).
+- **Z contínuo**: troca de camada é um único `G1 X Y Z E` ("layer change (continuous)") — sem retrair, sem parar, sem desligar o ar. Entre **objetos diferentes** o cabeçote sempre levanta (`Path.obj`).
+- **Uma velocidade só** (`speedFor`): todos os `G1` da peça com o mesmo `F`; desligado → perímetro externo a 80 %.
+- **Saia (skirt)**: casco convexo da 1ª camada expandido `skirtGap` mm, 1–5 voltas de fora para dentro, impressa antes da peça; **"Levantar e retrair ao terminar a saia"** é o único levantamento obrigatório do modo contínuo (comentário `; skirt done → lift + retract`). Visível no 3D em tracejado.
+- **UI**: card **"Estratégia de trajetória"** na etapa Impressora (mini-diagrama padrão × contínuo, toggle, controles), atalho **"Trajetória contínua"** no painel lateral de parâmetros principais, e no resumo os cartões **Levantamentos** e **Emendas contínuas** (+ dica para ativar quando houver muitos travels). Cabeçalho do G-code: `; Path strategy: CONTINUOUS (...)`.
+- Testes: `tests/r40_print_basic_strategy.test.ts` (17). Engine R35/R38 seguem verdes (52/52 no módulo).
+
 ### R23 — Aprendizados do DNA Studio 4 (CELLINK) + laço fechado pós-impressão (2026-10-22)
 
 **Fontes estudadas:** BIO X Series Brochure (DNA Studio 4: Shape Generator, Decoding G-Code, Draw & Print, Print Report, Layer groups), protocolo *CELLINK SKIN* v5 (3 cabeçotes, 1 camada cada, concêntrico 42 %, 22G, 10 mm/s), Zdravković 2025 (*AI-native bioprinting* — closed loop com sinal do resultado) e Zhang 2025 (*AI-driven bioprinting* — QbD, controle em linha). A BIA é por **extrusão mecânica** (seringa); nada do nosso fluxo foi trocado — só complementado.

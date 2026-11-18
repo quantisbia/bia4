@@ -101,7 +101,7 @@ export function View3D({ state, layers, layerIdx, onLayerIdx, className }: {
                     {L.paths.map((p, k) => {
                       const hd = state.heads[p.head - 1]; const col = hd?.color ?? "#fff"
                       const pts = p.pts.map((q) => ({ x: q.x + o.x, y: q.y + o.y }))
-                      return <path key={k} d={path(pts, L.z, p.closed)} fill="none" stroke={col} strokeWidth={Math.max(0.6, lineWidthOf(hd) * scale * 0.9)} strokeLinecap="round" strokeLinejoin="round" opacity={p.kind === "infill" ? 0.85 : 1} />
+                      return <path key={k} d={path(pts, L.z, p.closed)} fill="none" stroke={col} strokeWidth={Math.max(0.6, lineWidthOf(hd) * scale * 0.9)} strokeLinecap="round" strokeLinejoin="round" opacity={p.kind === "skirt" ? 0.35 : p.kind === "infill" ? 0.85 : 1} strokeDasharray={p.kind === "skirt" ? "3 2" : undefined} />
                     })}
                   </g>
                 ))

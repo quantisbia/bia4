@@ -10,13 +10,14 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
   ArrowLeft, ArrowRight, Check, Circle, Download, Grid3X3, Layers, Minus, Plus, Printer, Settings2,
-  Square, Trash2, Zap, AlertTriangle, Info, Gamepad2, RefreshCw, Target, FlaskConical, Pencil, Usb, Shapes,
+  Square, Trash2, Zap, AlertTriangle, Info, Gamepad2, RefreshCw, Target, FlaskConical, Pencil, Usb, Shapes, Route,
 } from "lucide-react"
 import {
   type BasicState, type Shape, type ShapeType, type Head, type SurfaceKind, type ToolLayer, type InfillPattern,
   defaultState, defaultShape, describeShape, surfaceExtent, wellOffsets, allWells, MULTIWELL, PETRI, SLIDES, shapePts,
   BED_ROUND, BED_SQUARE, GAUGES, HEAD_TYPES, INFILL, PLATE_W, PLATE_H, validate, buildToolpaths, generateGcode,
   layerCount, syncBed, fmtDot, lineWidthOf, firstLayerH, summarize, type GcodeStats, type InfillZone, sandwichPreset, uid,
+  type PathStrategy, DEFAULT_STRATEGY,
 } from "@/lib/print-basic/engine"
 import { sendToExecute } from "@/lib/bioprint/execute-handoff"
 import { DrawCanvas, ShapeThumb } from "./_components/DrawCanvas"
@@ -34,6 +35,82 @@ const STEPS = [
   { id: "print", label: "Imprimir", desc: "USB & joystick", icon: Usb },
 ] as const
 type StepId = (typeof STEPS)[number]["id"]
+
+/* ─────────────── Estratégia de trajetória (R40) ─────────────── */
+function StrategyPreview({ continuous }: { continuous: boolean }) {
+  // mini-diagrama: padrão (linhas soltas com saltos) vs contínuo (meandro + perímetro emendado)
+  const W = 96, H = 64, m = 8
+  const rows = [0, 1, 2, 3, 4].map((i) => m + 6 + i * 9)
+  if (!continuous) {
+    return (
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-24 h-16 shrink-0" aria-hidden>
+        <rect x={m} y={m} width={W - 2 * m} height={H - 2 * m} rx="3" fill="none" stroke="#a78bfa" strokeWidth="1.6" />
+        {rows.map((y, i) => <line key={i} x1={m + 5} x2={W - m - 5} y1={y} y2={y} stroke="#67e8f9" strokeWidth="1.6" strokeLinecap="round" />)}
+        {rows.slice(0, -1).map((y, i) => <path key={"t" + i} d={`M ${i % 2 === 0 ? W - m - 5 : m + 5} ${y} q ${i % 2 === 0 ? 6 : -6} 4.5 0 9`} fill="none" stroke="#f87171" strokeWidth="1" strokeDasharray="2 1.5" />)}
+      </svg>
+    )
+  }
+  let d = `M ${m} ${m} H ${W - m} V ${H - m} H ${m} V ${rows[0]}`
+  rows.forEach((y, i) => { const left = m + 5, right = W - m - 5; if (i === 0) d += ` H ${right}`; else d += ` V ${y} H ${i % 2 === 0 ? right : left}` })
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-24 h-16 shrink-0" aria-hidden>
+      <path d={d} fill="none" stroke="#34d399" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={m} cy={m} r="2.2" fill="#fbbf24" />
+    </svg>
+  )
+}
+
+function StrategyCard({ strat, setStrat }: { strat: PathStrategy; setStrat: (p: Partial<PathStrategy>) => void }) {
+  return (
+    <div className={cardCls + " space-y-3"} data-testid="pb-strategy">
+      <div className="flex items-start gap-3">
+        <StrategyPreview continuous={strat.continuous} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-3">
+            <div className="font-semibold flex items-center gap-2"><Route className="w-4 h-4 text-emerald-300" /> Estratégia de trajetória</div>
+            <button type="button" data-testid="pb-strategy-toggle" onClick={() => setStrat({ continuous: !strat.continuous })} className={`relative w-11 h-6 rounded-full transition shrink-0 ${strat.continuous ? "bg-emerald-400" : "bg-white/15"}`} aria-pressed={strat.continuous} aria-label="Trajetória contínua"><span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition ${strat.continuous ? "left-[22px]" : "left-0.5"}`} /></button>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            {strat.continuous
+              ? <>Contínua: o cabeçote começa num ponto e percorre a peça inteira <b className="text-gray-200">sem levantar, sem retrair, sem pausa e numa velocidade só</b>. Grade e linhas viram um meandro (zigue-zague) emendado ao perímetro; a troca de camada sobe em Z andando. Só levanta/retrai onde você permitir abaixo.</>
+              : <>Padrão: cada linha é uma trajetória separada — entre elas o cabeçote para, retrai (ou fecha o ar), levanta e desloca. Mais paradas, mais tempo, mais “fios” de biotinta.</>}
+          </p>
+        </div>
+      </div>
+
+      {strat.continuous && (
+        <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2.5 pt-1 border-t border-white/5">
+          <div className="space-y-2.5">
+            <div className="text-[10px] uppercase tracking-wider text-gray-500">Dentro da peça</div>
+            <Num label="Maior emenda extrudando" suffix="mm" value={strat.maxBridge} onChange={(x) => setStrat({ maxBridge: Math.max(0, x) })} step={0.5} min={0} max={50} testId="pb-strategy-maxbridge" />
+            <p className="text-[11px] text-gray-500 -mt-1">{strat.maxBridge > 0 ? `Saltos maiores que ${fmtDot(strat.maxBridge, 1)} mm levantam/retraem; menores são feitos extrudando.` : "0 = nunca levantar nem retrair dentro do mesmo objeto (todas as emendas extrudando)."} Entre objetos diferentes o cabeçote sempre levanta.</p>
+            <Toggle label="Emendar perímetro ao preenchimento" hint="O contorno termina exatamente onde o meandro começa (emenda ≈ 1 largura de linha)." checked={strat.joinPerimeter} onChange={(x) => setStrat({ joinPerimeter: x })} />
+            <Toggle label="Troca de camada sem parar (Z contínuo)" hint="Sobe para a próxima camada enquanto anda e extruda — sem retração nem pausa." checked={strat.continuousZ} onChange={(x) => setStrat({ continuousZ: x })} />
+            <Toggle label="Uma velocidade só" hint="Perímetro, preenchimento e emendas na velocidade do cabeçote. Desligado: perímetro externo a 80 %." checked={strat.singleSpeed} onChange={(x) => setStrat({ singleSpeed: x })} />
+            <Toggle label="Levantar (Z-hop) nos deslocamentos longos" hint="Quando precisar deslocar (salto > limite, outro objeto, fim), usa o Z-hop do cabeçote. Desligado: desloca rente." checked={strat.liftOnLongTravel} onChange={(x) => setStrat({ liftOnLongTravel: x })} />
+          </div>
+          <div className="space-y-2.5">
+            <div className="text-[10px] uppercase tracking-wider text-gray-500">Saia de escorva (skirt)</div>
+            <Toggle label="Imprimir saia antes da peça" hint="Volta(s) ao redor da peça na 1ª camada para a biotinta chegar uniforme na agulha." checked={strat.skirt} onChange={(x) => setStrat({ skirt: x })} />
+            {strat.skirt && (<>
+              <div className="grid grid-cols-2 gap-2">
+                <Num label="Distância da peça" suffix="mm" value={strat.skirtGap} onChange={(x) => setStrat({ skirtGap: Math.max(0.5, x) })} step={0.5} min={0.5} max={20} testId="pb-strategy-skirt-gap" />
+                <Num label="Voltas" value={strat.skirtLoops} onChange={(x) => setStrat({ skirtLoops: Math.max(1, Math.min(5, Math.round(x))) })} min={1} max={5} testId="pb-strategy-skirt-loops" />
+              </div>
+              <Toggle label="Levantar e retrair ao terminar a saia" hint="O único levantamento obrigatório do modo contínuo: fecha a saia, retrai, sobe e vai ao início da peça." checked={strat.liftAfterSkirt} onChange={(x) => setStrat({ liftAfterSkirt: x })} />
+            </>)}
+          </div>
+        </div>
+      )}
+      {!strat.continuous && (
+        <div className="pt-1 border-t border-white/5 space-y-2">
+          <Toggle label="Imprimir saia (skirt) antes da peça" hint="Volta(s) ao redor da peça na 1ª camada para escorvar a agulha." checked={strat.skirt} onChange={(x) => setStrat({ skirt: x })} />
+          {strat.skirt && <div className="grid grid-cols-2 sm:grid-cols-4 gap-2"><Num label="Distância da peça" suffix="mm" value={strat.skirtGap} onChange={(x) => setStrat({ skirtGap: Math.max(0.5, x) })} step={0.5} min={0.5} max={20} /><Num label="Voltas" value={strat.skirtLoops} onChange={(x) => setStrat({ skirtLoops: Math.max(1, Math.min(5, Math.round(x))) })} min={1} max={5} /></div>}
+        </div>
+      )}
+    </div>
+  )
+}
 
 /* ─────────────── UI helpers ─────────────── */
 const inputCls = "w-full bg-black/30 border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-gray-100 focus:outline-none focus:border-violet-400/60"
@@ -97,6 +174,8 @@ export function PrintBasicClient({ initialStep }: { initialStep?: string } = {})
   const setSurface = (patch: Partial<BasicState["surface"]>) => upd((s) => { const ns = { ...s, surface: { ...s.surface, ...patch } }; return { ...ns, bed: syncBed(ns) } })
   const setLS = (patch: Partial<BasicState["layerSettings"]>) => upd((s) => ({ ...s, layerSettings: { ...s.layerSettings, ...patch } }))
   const setPrinter = (patch: Partial<BasicState["printer"]>) => upd((s) => ({ ...s, printer: { ...s.printer, ...patch } }))
+  const strat: PathStrategy = { ...DEFAULT_STRATEGY, ...(state.printer.strategy ?? {}) }
+  const setStrat = (patch: Partial<PathStrategy>) => upd((s) => ({ ...s, printer: { ...s.printer, strategy: { ...DEFAULT_STRATEGY, ...(s.printer.strategy ?? {}), ...patch } } }))
   const setHead = (id: number, patch: Partial<Head>) => upd((s) => ({ ...s, heads: s.heads.map((h) => (h.id === id ? { ...h, ...patch } : h)) }))
   const setShape = (id: string, patch: Partial<Shape>) => upd((s) => ({ ...s, shapes: s.shapes.map((x) => (x.id === id ? { ...x, ...patch } : x)) }))
   const addShape = (type: ShapeType) => upd((s) => ({ ...s, shapes: [...s.shapes, defaultShape(type, 1)] }))
@@ -295,6 +374,7 @@ export function PrintBasicClient({ initialStep }: { initialStep?: string } = {})
           {step === "printer" && (
             <div className="space-y-4">
               <div><h2 className="text-xl font-bold">5 · Impressora</h2><p className="text-sm text-gray-400">Ajustes gerais do firmware Marlin (Ender/Creality e similares adaptados).</p></div>
+              <StrategyCard strat={strat} setStrat={setStrat} />
               <div className={cardCls + " space-y-4"}>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <Num label="Velocidade de deslocamento" suffix="mm/s" value={state.printer.travelSpeed} onChange={(x) => setPrinter({ travelSpeed: x })} min={1} max={300} />
@@ -342,6 +422,11 @@ export function PrintBasicClient({ initialStep }: { initialStep?: string } = {})
                 <Num label="Densidade" suffix="%" value={state.layerSettings.infillDensity} onChange={(x) => setLS({ infillDensity: x })} min={0} max={100} testId="pb-key-density" />
                 <div className="col-span-2"><Sel label="Preenchimento" value={state.layerSettings.infillPattern} onChange={(x) => setLS({ infillPattern: x as InfillPattern })} options={INFILL.map((i) => ({ v: i.id, l: i.label }))} testId="pb-key-infill" /></div>
               </div>
+              <button type="button" data-testid="pb-key-continuous" onClick={() => setStrat({ continuous: !strat.continuous })} className={`w-full flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-xs transition ${strat.continuous ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200" : "border-white/10 bg-black/20 text-gray-400 hover:border-white/20"}`}>
+                <Route className="w-3.5 h-3.5 shrink-0" />
+                <span className="flex-1"><b className="font-semibold">Trajetória contínua</b> <span className="opacity-70">· {strat.continuous ? (strat.maxBridge > 0 ? `emendas ≤ ${fmtDot(strat.maxBridge, 1)} mm` : "sem levantar na peça") : "padrão (levanta/retrai entre linhas)"}</span></span>
+                <span className={`w-8 h-4 rounded-full relative transition ${strat.continuous ? "bg-emerald-400" : "bg-white/15"}`}><span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition ${strat.continuous ? "left-4" : "left-0.5"}`} /></span>
+              </button>
               <div>
                 <span className={labelCls}>Velocidade de impressão <span className="text-gray-500 normal-case tracking-normal">(mm/s · por cabeçote)</span></span>
                 <div className="space-y-1.5">
@@ -537,6 +622,7 @@ function SummaryStep({ state, v, result, busy, charged, error, slice, download, 
   charged: { ok: boolean; msg: string } | null; error: string | null; slice: () => void; download: () => void; toExecute: () => void
 }) {
   const sum = result ? summarize(state, result.stats) : null
+  const strat: PathStrategy = { ...DEFAULT_STRATEGY, ...(state.printer.strategy ?? {}) }
   const used = state.heads.filter((h) => h.enabled && state.shapes.some((s) => s.head === h.id))
   return (
     <div className="space-y-4">
@@ -546,6 +632,7 @@ function SummaryStep({ state, v, result, busy, charged, error, slice, download, 
         <div><span className="text-gray-500 text-xs block">Superfície</span>{surfaceExtent(state.surface).label}{state.surface.kind === "multiwell" && ` · ${wellOffsets(state.surface).length} poço(s)`}</div>
         <div className="sm:col-span-2"><span className="text-gray-500 text-xs block">Objetos</span><ul className="list-disc pl-5">{state.shapes.map((s) => <li key={s.id}>{s.name || s.type}: {describeShape(s)} <span className="text-gray-500">· T{s.head - 1}</span></li>)}</ul></div>
         <div><span className="text-gray-500 text-xs block">Camadas</span>{fmtDot(state.layerSettings.layerHeight, 3)} mm · {layerCount(state)} camadas · {INFILL.find((i) => i.id === state.layerSettings.infillPattern)?.label} {state.layerSettings.infillPattern !== "none" && `${state.layerSettings.infillDensity}%`} · {state.layerSettings.perimeters} perímetro(s)</div>
+        <div><span className="text-gray-500 text-xs block">Trajetória</span>{strat.continuous ? <span className="text-emerald-300">Contínua · {strat.maxBridge > 0 ? `emendas até ${fmtDot(strat.maxBridge, 1)} mm` : "nunca levanta dentro da peça"}{strat.joinPerimeter ? " · perímetro emendado" : ""}{strat.continuousZ ? " · Z contínuo" : ""}</span> : "Padrão (levanta/retrai entre linhas)"}{strat.skirt ? ` · saia ${strat.skirtLoops}× a ${fmtDot(strat.skirtGap, 1)} mm${strat.liftAfterSkirt ? " (levanta + retrai após)" : ""}` : ""}</div>
         <div className="sm:col-span-2"><span className="text-gray-500 text-xs block">Cabeçotes</span>
           <ul className="space-y-0.5">{used.map((h) => <li key={h.id} className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{ background: h.color }} />T{h.id - 1} · {h.label} · {HEAD_TYPES.find((t) => t.id === h.type)?.label} · {h.gauge} G · {h.speed} mm/s · <b className="text-gray-200">{h.extrusionMode === "pneumatic" ? `pneumático ${h.pressure} kPa` : h.extrusionMode === "volumetric" ? "mecânico/volumétrico (mm³)" : `filamento Ø ${h.filamentD} mm`}</b></li>)}</ul>
         </div>
@@ -565,9 +652,10 @@ function SummaryStep({ state, v, result, busy, charged, error, slice, download, 
 
       {result && sum && (
         <div className="space-y-3" data-testid="pb-result">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-            {[["Camadas", String(sum.layers)], ["Tempo est.", `${sum.minutes} min`], ["Volume", `${sum.volume_uL} µL`], ["Trajeto", `${sum.path_m} m`]].map(([l, x]) => <div key={l} className="rounded-xl border border-white/10 bg-white/[0.03] p-3"><div className="text-[10px] uppercase tracking-wider text-gray-500">{l}</div><div className="text-lg font-bold">{x}</div></div>)}
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center" data-testid="pb-stats">
+            {[["Camadas", String(sum.layers)], ["Tempo est.", `${sum.minutes} min`], ["Volume", `${sum.volume_uL} µL`], ["Trajeto", `${sum.path_m} m`], ["Levantamentos", String(sum.travels)], ["Emendas contínuas", String(sum.bridges)]].map(([l, x]) => <div key={l} className="rounded-xl border border-white/10 bg-white/[0.03] p-3"><div className="text-[10px] uppercase tracking-wider text-gray-500">{l}</div><div className={`text-lg font-bold ${l === "Emendas contínuas" && Number(x) > 0 ? "text-emerald-300" : ""}`}>{x}</div></div>)}
           </div>
+          {result.stats.travels > 0 && !strat.continuous && <p className="text-[11px] text-gray-500 flex items-center gap-1.5"><Route className="w-3 h-3" /> Quer menos paradas? Ative <b className="text-gray-300">Trajetória contínua</b> na etapa Impressora (ou no painel lateral) e gere de novo.</p>}
           <details className="rounded-xl border border-white/10 bg-black/30">
             <summary className="cursor-pointer px-4 py-2 text-sm text-gray-300">Ver G-code ({result.gcode.split("\n").length} linhas)</summary>
             <pre className="px-4 pb-4 text-[11px] font-mono text-gray-400 max-h-80 overflow-auto whitespace-pre">{result.gcode.split("\n").slice(0, 400).join("\n")}{result.gcode.split("\n").length > 400 ? "\n; … (baixe o arquivo para ver tudo)" : ""}</pre>
