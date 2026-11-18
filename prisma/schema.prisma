@@ -972,3 +972,35 @@ model PrintLearning {
   @@index([materialKey])
   @@index([createdAt])
 }
+
+/// R39 · Sessão de controle remoto (tablet → notebook) da Impressão Básica
+model PrintRemoteSession {
+  id           String               @id @default(cuid())
+  code         String               @unique
+  userId       String
+  hostLabel    String?
+  state        Json                 @default("{}")
+  hostSeenAt   DateTime             @default(now())
+  clientSeenAt DateTime?
+  createdAt    DateTime             @default(now())
+  expiresAt    DateTime
+  commands     PrintRemoteCommand[]
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PrintRemoteCommand {
+  id        String             @id @default(cuid())
+  sessionId String
+  session   PrintRemoteSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  seq       Int
+  action    String
+  payload   Json?
+  status    String             @default("pending")
+  result    String?
+  createdAt DateTime           @default(now())
+  doneAt    DateTime?
+
+  @@index([sessionId, status, seq])
+}

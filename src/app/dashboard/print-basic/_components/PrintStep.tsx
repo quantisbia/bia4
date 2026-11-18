@@ -14,16 +14,17 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import {
   Usb, Unplug, Play, Pause, Square, OctagonX, Home, Crosshair, LocateFixed, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
   ChevronUp, ChevronDown, Gauge, Droplets, MoveVertical, Syringe, Power, Terminal, FlaskConical, CheckCircle2, AlertTriangle, Beaker,
-  ArrowUpFromLine, RotateCcw, Sparkles, Star, ClipboardList, Wand2,
+  ArrowUpFromLine, RotateCcw, Sparkles, Star, ClipboardList, Wand2, Tablet, Laptop, Link2, Link2Off, Copy,
 } from "lucide-react"
 import type { BasicState, Head } from "@/lib/print-basic/engine"
 import { analyzeFeedback, saveFeedback, SYMPTOMS, type PrintFeedback, type Suggestion, type Symptom } from "@/lib/print-basic/feedback"
+import { remoteApi, loadRemote, saveRemote, isTabletLike, type RemoteState, type RemoteCommand, type RemoteAction } from "@/lib/print-basic/remote"
 import { PrinterConnection, handshakeM115, type PrinterTransport, type FirmwareInfo } from "@/lib/bioprint/printer-connection"
 import { PrinterMock } from "@/lib/bioprint/printer-mock"
 import { PrinterController, type ControllerState, type StreamProgress } from "@/lib/bioprint/printer-controller"
 import { PrintLogger, type LogEntry } from "@/lib/bioprint/print-logger"
 
-type Mode = "usb" | "mock"
+type Mode = "usb" | "mock" | "remote"
 type Pos = { x: number; y: number; z: number }
 
 export function PrintStep({ state, gcode, hasGcode, onApplyState }: { state: BasicState; gcode: string | null; hasGcode: boolean; onApplyState?: (fn: (s: BasicState) => BasicState) => void }) {
@@ -62,13 +63,32 @@ export function PrintStep({ state, gcode, hasGcode, onApplyState }: { state: Bas
   const [applied, setApplied] = useState<Set<string>>(new Set())
   const startedAtRef = useRef<number>(0)
   const finishedRef = useRef(false)
+  // ── ponte tablet ↔ notebook ──
+  const [remoteRole, setRemoteRole] = useState<"none" | "host" | "client">("none")
+  const [remoteSession, setRemoteSession] = useState<{ sessionId: string; code: string } | null>(null)
+  const [remoteCode, setRemoteCode] = useState("")
+  const [peerOnline, setPeerOnline] = useState(false)
+  const [remoteErr, setRemoteErr] = useState<string | null>(null)
+  const [tablet, setTablet] = useState(false)
+  const remoteSinceRef = useRef(0)
+  const isClient = remoteRole === "client"
 
-  useEffect(() => { setSupported(PrinterConnection.isSupported()); if (!PrinterConnection.isSupported()) setMode("mock") }, [])
+  useEffect(() => {
+    const sup = PrinterConnection.isSupported(); setSupported(sup); const tab = isTabletLike(); setTablet(tab)
+    if (!sup) setMode(tab ? "remote" : "mock")
+    const saved = loadRemote(); if (saved) { setRemoteRole(saved.role); setRemoteSession({ sessionId: saved.sessionId, code: saved.code }); if (saved.role === "client") setMode("remote") }
+  }, [])
   useEffect(() => loggerRef.current.subscribe((e) => setLog(e.slice(-120))), [])
 
   const head: Head = state.heads[curHead - 1] ?? state.heads[0]
   const streaming = ctrlState === "streaming" || ctrlState === "paused"
   const canJog = connected && !streaming && !busy
+
+  /** tablet → enfileira comando para o notebook */
+  const dispatch = useCallback(async (action: RemoteAction, payload?: Record<string, unknown>) => {
+    if (!remoteSession) return
+    try { await remoteApi.cmd(remoteSession.sessionId, action, payload) } catch (e) { setRemoteErr(e instanceof Error ? e.message : String(e)) }
+  }, [remoteSession])
 
   const send = useCallback(async (cmd: string, wait = true) => {
     const c = ctrlRef.current; if (!c) return
@@ -124,23 +144,25 @@ export function PrintStep({ state, gcode, hasGcode, onApplyState }: { state: Bas
   }, [])
 
   const jog = useCallback(async (dx: number, dy: number, dz: number) => {
+    if (isClient) return dispatch("jog", { dx, dy, dz })
     if (!canJog) return
     const f = dz ? 600 : 3000
     await send("G91", true); await send(`G1 ${dx ? `X${dx}` : ""}${dy ? ` Y${dy}` : ""}${dz ? ` Z${dz}` : ""} F${f}`.replace(/\s+/g, " "), true); await send("G90", true)
     setPos((p) => ({ x: +(p.x + dx).toFixed(2), y: +(p.y + dy).toFixed(2), z: +(p.z + dz).toFixed(2) }))
-  }, [canJog, send])
+  }, [canJog, send, isClient, dispatch])
 
   const zero = useCallback(async () => {
+    if (isClient) return dispatch("zero")
     if (!canJog) return
     await send("G92 X0 Y0 Z0", true)
     setPos({ x: 0, y: 0, z: 0 }); setZeroed(true)
     loggerRef.current.ok("✓ Zero definido na agulha (G92 X0 Y0 Z0). Pronto para imprimir.", "basic")
-  }, [canJog, send])
-  const goZero = useCallback(async () => { if (!canJog) return; await send("G1 Z5 F600"); await send("G1 X0 Y0 F3000"); await send("G1 Z0 F600"); setPos({ x: 0, y: 0, z: 0 }) }, [canJog, send])
-  const home = useCallback(async () => { if (!canJog) return; await send("G28", true); setZeroed(false); setPos({ x: 0, y: 0, z: 0 }) }, [canJog, send])
+  }, [canJog, send, isClient, dispatch])
+  const goZero = useCallback(async () => { if (isClient) return dispatch("goZero"); if (!canJog) return; await send("G1 Z5 F600"); await send("G1 X0 Y0 F3000"); await send("G1 Z0 F600"); setPos({ x: 0, y: 0, z: 0 }) }, [canJog, send, isClient, dispatch])
+  const home = useCallback(async () => { if (isClient) return dispatch("home"); if (!canJog) return; await send("G28", true); setZeroed(false); setPos({ x: 0, y: 0, z: 0 }) }, [canJog, send, isClient, dispatch])
 
-  const applyFlow = useCallback(async (v: number) => { setFlow(v); await send(`M221 S${v}`, false) }, [send])
-  const applySpeed = useCallback(async (v: number) => { setSpeed(v); await send(`M220 S${v}`, false) }, [send])
+  const applyFlow = useCallback(async (v: number) => { setFlow(v); if (isClient) return dispatch("flow", { v }); await send(`M221 S${v}`, false) }, [send, isClient, dispatch])
+  const applySpeed = useCallback(async (v: number) => { setSpeed(v); if (isClient) return dispatch("speed", { v }); await send(`M220 S${v}`, false) }, [send, isClient, dispatch])
   /**
    * Ajuste fino de altura que FUNCIONA:
    *  • parado → G91 / G1 Z / G90 (movimento real imediato)
@@ -148,6 +170,7 @@ export function PrintStep({ state, gcode, hasGcode, onApplyState }: { state: Bas
    *    injetado entre linhas do stream; "m290" usa baby-step se o firmware tiver BABYSTEPPING.
    */
   const babyZ = useCallback(async (d: number) => {
+    if (isClient) { setZBaby((z) => +(z + d).toFixed(2)); return dispatch("babyZ", { d }) }
     const c = ctrlRef.current; if (!c) return
     const nv = +(zBaby + d).toFixed(2); setZBaby(nv)
     if (!streaming) { await send("G91", true); await send(`G1 Z${d.toFixed(2)} F300`, true); await send("G90", true); setPos((p) => ({ ...p, z: +(p.z + d).toFixed(2) })); return }
@@ -155,23 +178,25 @@ export function PrintStep({ state, gcode, hasGcode, onApplyState }: { state: Bas
     // G92 Z(atual − d): a impressora "acha" que está mais baixa/alta → próxima G1 Z compensa movendo d real
     c.inject("G91", "babyz"); c.inject(`G1 Z${d.toFixed(2)} F300`, "babyz"); c.inject("G90", "babyz"); c.inject("M114", "babyz")
     loggerRef.current.info(`Altura ${d > 0 ? "+" : ""}${d.toFixed(2)} mm aplicada na próxima linha do G-code (acumulado ${nv > 0 ? "+" : ""}${nv.toFixed(2)} mm).`, "basic")
-  }, [zBaby, streaming, send, babyMode])
+  }, [zBaby, streaming, send, babyMode, isClient, dispatch])
 
   const extrude = useCallback(async (sign: 1 | -1) => {
+    if (isClient) return dispatch(head.extrusionMode === "pneumatic" ? "valve" : "extrude", { sign, head: head.id, amount: extAmount, speed: extSpeed })
     if (!connected || busy) return
     await send(`T${head.id - 1}`, true)
     if (head.extrusionMode === "pneumatic") { const on = sign > 0; setExtruding(on); await send(on ? head.onCmd : head.offCmd, true); return }
     // F em mm/min do eixo E. Volumétrico: E em mm³ → F = velocidade·área_filamento? Não — M200 D0 interpreta F como mm³/min? Marlin mantém F em mm/min lineares
     // do eixo E, então usamos a velocidade pedida diretamente (mm/s × 60).
     await send("M83", true); await send(`G1 E${(sign * extAmount).toFixed(2)} F${Math.max(10, Math.round(extSpeed * 60))}`, true)
-  }, [connected, busy, head, send, extAmount, extSpeed])
+  }, [connected, busy, head, send, extAmount, extSpeed, isClient, dispatch])
 
   const start = useCallback(async () => {
+    if (isClient) return dispatch("start")
     if (!gcode || !ctrlRef.current) return
     if (!zeroed && state.printer.origin === "needle" && !confirm("Você ainda não clicou em ZERAR. A impressão vai começar onde a agulha está agora. Continuar?")) return
     setErr(null); setStopped(false); finishedRef.current = false; setShowFeedback(false); startedAtRef.current = Date.now()
     try { await ctrlRef.current.start(gcode) } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
-  }, [gcode, zeroed, state.printer.origin])
+  }, [gcode, zeroed, state.printer.origin, isClient, dispatch])
 
   const submitFeedback = useCallback(() => {
     const fb: PrintFeedback = { rating: fbRating, symptoms: fbSymptoms, notes: fbNotes || undefined, live: { flow, speed, zBaby }, job: { layers: progress?.currentLayer ?? 0, minutes: Math.round((Date.now() - (startedAtRef.current || Date.now())) / 60000), heads: state.heads.filter((h) => h.enabled).map((h) => h.id) }, at: new Date().toISOString() }
@@ -181,6 +206,7 @@ export function PrintStep({ state, gcode, hasGcode, onApplyState }: { state: Bas
   const applySuggestion = useCallback((sg: Suggestion) => { if (!sg.apply || !onApplyState) return; onApplyState(sg.apply); setApplied((a) => new Set(a).add(sg.id)) }, [onApplyState])
   /** PARAR suave: interrompe o stream, desliga válvula/aquecimento, sobe 10 mm, RELIGA motores e fica pronta. */
   const softStop = useCallback(async () => {
+    if (isClient) return dispatch("stop")
     const c = ctrlRef.current, t = transportRef.current; if (!c || !t) return
     setBusy(true)
     try {
@@ -192,26 +218,123 @@ export function PrintStep({ state, gcode, hasGcode, onApplyState }: { state: Bas
       setPos((p) => ({ ...p, z: +(p.z + 10).toFixed(2) })); setExtruding(false); setStopped(true)
       loggerRef.current.ok("■ Parada segura: válvulas desligadas, agulha +10 mm, motores religados. Pronta para zerar/imprimir de novo.", "basic")
     } finally { setBusy(false) }
-  }, [streaming, state.heads])
+  }, [streaming, state.heads, isClient, dispatch])
   /** Emergência real (M112): o firmware trava até reset — só para colisão/perigo. */
   const emergency = useCallback(async () => {
+    if (isClient) return dispatch("stop")
     if (!confirm("PARADA DE EMERGÊNCIA (M112): a impressora trava e precisa ser religada/reconectada. Use só em risco de colisão. Para parar e continuar depois use PARAR.")) return
     try { await ctrlRef.current?.emergency() } catch { /* noop */ } setCtrlState("error"); loggerRef.current.error("M112 enviado — reconecte a impressora.", "basic")
-  }, [])
+  }, [isClient, dispatch])
   /** Religar: M17 + M18 S0 + G90, limpa estado de parada */
   const rearm = useCallback(async () => {
+    if (isClient) return dispatch("rearm")
     const t = transportRef.current; if (!t) return
     await t.write("M17").catch(() => {}); await t.write("M18 S0").catch(() => {}); await t.write("G90").catch(() => {}); await t.write("M83").catch(() => {})
     ctrlRef.current?.resetOkDebt(); setStopped(false); setCtrlState("ready"); setProgress(null)
     loggerRef.current.ok("Motores ligados (M17). Pronta.", "basic")
-  }, [])
+  }, [isClient, dispatch])
   /** Colocar seringa: sobe 50 mm e para no lugar — fácil de encaixar/trocar a seringa. */
   const loadSyringe = useCallback(async () => {
+    if (isClient) return dispatch("loadSyringe")
     if (!canJog) return
     await send("G91", true); await send("G1 Z50 F900", true); await send("G90", true)
     setPos((p) => ({ ...p, z: +(p.z + 50).toFixed(2) }))
     loggerRef.current.info("Cabeçote +50 mm — encaixe a seringa. Depois use Z− ou 'Ir ao zero' para voltar.", "basic")
-  }, [canJog, send])
+  }, [canJog, send, isClient, dispatch])
+
+  // ── HOST (notebook): publica estado e executa comandos do tablet ──
+  const latestRef = useRef({ connected, ctrlState, pos, zeroed, flow, speed, zBaby, curHead, extruding, stopped, hasGcode, progress, firmware, log })
+  latestRef.current = { connected, ctrlState, pos, zeroed, flow, speed, zBaby, curHead, extruding, stopped, hasGcode, progress, firmware, log }
+  const actionsRef = useRef({ jog, zero, goZero, home, applyFlow, applySpeed, babyZ, extrude, start, softStop, rearm, loadSyringe, setCurHead, send })
+  actionsRef.current = { jog, zero, goZero, home, applyFlow, applySpeed, babyZ, extrude, start, softStop, rearm, loadSyringe, setCurHead, send }
+  const pendingResultsRef = useRef<{ id: string; status: "done" | "error"; result?: string }[]>([])
+
+  const runRemote = useCallback(async (c: RemoteCommand) => {
+    const A = actionsRef.current; const p = (c.payload ?? {}) as Record<string, number>
+    switch (c.action) {
+      case "jog": return A.jog(+p.dx || 0, +p.dy || 0, +p.dz || 0)
+      case "zero": return A.zero()
+      case "goZero": return A.goZero()
+      case "home": return A.home()
+      case "flow": return A.applyFlow(+p.v)
+      case "speed": return A.applySpeed(+p.v)
+      case "babyZ": return A.babyZ(+p.d)
+      case "extrude": case "valve": { if (p.head) A.setCurHead(+p.head); if (p.amount) setExtAmount(+p.amount); if (p.speed) setExtSpeed(+p.speed); await new Promise((r) => setTimeout(r, 30)); return A.extrude((+p.sign >= 0 ? 1 : -1) as 1 | -1) }
+      case "start": return A.start()
+      case "stop": return A.softStop()
+      case "pause": ctrlRef.current?.pause(); return
+      case "resume": ctrlRef.current?.resume(); return
+      case "rearm": return A.rearm()
+      case "loadSyringe": return A.loadSyringe()
+      case "setHead": A.setCurHead(+p.head || 1); return
+      case "raw": return A.send(String((c.payload as { line?: string })?.line ?? ""), true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (remoteRole !== "host" || !remoteSession) return
+    let stop = false
+    const tick = async () => {
+      if (stop) return
+      const L = latestRef.current
+      const st: RemoteState = { connected: L.connected, ctrlState: L.ctrlState, pos: L.pos, zeroed: L.zeroed, flow: L.flow, speed: L.speed, zBaby: L.zBaby, curHead: L.curHead, extruding: L.extruding, stopped: L.stopped, hasGcode: L.hasGcode,
+        progress: L.progress ? { current: L.progress.current, total: L.progress.total, percent: L.progress.percent, currentLayer: L.progress.currentLayer } : null, firmware: L.firmware?.name ?? L.firmware?.family ?? null, lastLog: L.log.slice(-6).map((e) => (e.severity === "tx" ? "→ " : "· ") + e.text), updatedAt: Date.now() }
+      const results = pendingResultsRef.current; pendingResultsRef.current = []
+      try {
+        const r = await remoteApi.hostSync(remoteSession.sessionId, st, results)
+        setPeerOnline(r.clientOnline); setRemoteErr(null)
+        for (const c of r.commands) {
+          loggerRef.current.info(`📱 tablet → ${c.action}${c.payload ? " " + JSON.stringify(c.payload) : ""}`, "remote")
+          try { await runRemote(c); pendingResultsRef.current.push({ id: c.id, status: "done" }) }
+          catch (e) { pendingResultsRef.current.push({ id: c.id, status: "error", result: e instanceof Error ? e.message : String(e) }) }
+        }
+      } catch (e) { setRemoteErr(e instanceof Error ? e.message : String(e)) }
+      if (!stop) setTimeout(tick, 700)
+    }
+    void tick()
+    return () => { stop = true }
+  }, [remoteRole, remoteSession, runRemote])
+
+  // ── CLIENT (tablet): recebe estado do notebook ──
+  useEffect(() => {
+    if (remoteRole !== "client" || !remoteSession) return
+    let stop = false
+    const tick = async () => {
+      if (stop) return
+      try {
+        const r = await remoteApi.clientSync(remoteSession.sessionId, remoteSinceRef.current)
+        setPeerOnline(r.hostOnline); setRemoteErr(null)
+        const st = r.state as Partial<RemoteState>
+        if (st && typeof st.connected === "boolean") {
+          setConnected(st.connected); setCtrlState((st.ctrlState as ControllerState) || "idle"); if (st.pos) setPos(st.pos); setZeroed(!!st.zeroed)
+          if (typeof st.flow === "number") setFlow(st.flow); if (typeof st.speed === "number") setSpeed(st.speed); if (typeof st.zBaby === "number") setZBaby(st.zBaby)
+          if (st.curHead) setCurHead(st.curHead); setExtruding(!!st.extruding); setStopped(!!st.stopped)
+          setProgress(st.progress ? { current: st.progress.current, total: st.progress.total, percent: st.progress.percent, currentLayer: st.progress.currentLayer, currentLine: "", elapsedMs: 0, remainingMsEst: null } : null)
+          if (st.firmware) setFirmware({ raw: "", name: st.firmware, family: "marlin", caps: {} })
+        }
+        for (const c of r.commands) { if (c.seq > remoteSinceRef.current && (c.status === "done" || c.status === "error")) { remoteSinceRef.current = c.seq; if (c.status === "error") loggerRef.current.warn(`${c.action}: ${c.result ?? "falhou"}`, "remote") } }
+      } catch (e) { setRemoteErr(e instanceof Error ? e.message : String(e)) }
+      if (!stop) setTimeout(tick, 800)
+    }
+    void tick()
+    return () => { stop = true }
+  }, [remoteRole, remoteSession])
+
+  const shareToTablet = useCallback(async () => {
+    setRemoteErr(null)
+    try { const r = await remoteApi.create(typeof navigator !== "undefined" ? navigator.platform : "notebook"); setRemoteSession({ sessionId: r.sessionId, code: r.code }); setRemoteRole("host"); saveRemote({ role: "host", sessionId: r.sessionId, code: r.code }) }
+    catch (e) { setRemoteErr(e instanceof Error ? e.message : String(e)) }
+  }, [])
+  const joinFromTablet = useCallback(async () => {
+    setRemoteErr(null)
+    try { const r = await remoteApi.join(remoteCode.trim()); setRemoteSession({ sessionId: r.sessionId, code: remoteCode.trim() }); setRemoteRole("client"); setPeerOnline(r.hostOnline); saveRemote({ role: "client", sessionId: r.sessionId, code: remoteCode.trim() }); remoteSinceRef.current = 0 }
+    catch (e) { setRemoteErr(e instanceof Error ? e.message : String(e)) }
+  }, [remoteCode])
+  const leaveRemote = useCallback(async () => {
+    if (remoteSession && remoteRole === "host") { try { await remoteApi.close(remoteSession.sessionId) } catch { /* noop */ } }
+    setRemoteRole("none"); setRemoteSession(null); saveRemote(null); setPeerOnline(false)
+    if (remoteRole === "client") { setConnected(false); setCtrlState("idle"); setProgress(null) }
+  }, [remoteSession, remoteRole])
 
   const stateLabel: Record<ControllerState, string> = { idle: "Ocioso", connecting: "Conectando…", ready: "Pronto", streaming: "Imprimindo", paused: "Pausado", aborting: "Cancelando…", completed: "Concluído", error: "Erro / parado" }
   const card = "rounded-2xl border border-white/10 bg-white/[0.03] p-4"
@@ -225,19 +348,53 @@ export function PrintStep({ state, gcode, hasGcode, onApplyState }: { state: Bas
         <div className="flex rounded-xl overflow-hidden border border-white/10">
           <button data-testid="pb-mode-usb" onClick={() => setMode("usb")} disabled={connected || !supported} className={`px-3 py-2 text-xs flex items-center gap-1.5 ${mode === "usb" ? "bg-violet-500/25 text-white" : "text-gray-400"} disabled:opacity-40`}><Usb className="w-3.5 h-3.5" /> USB (Web Serial)</button>
           <button data-testid="pb-mode-mock" onClick={() => setMode("mock")} disabled={connected} className={`px-3 py-2 text-xs flex items-center gap-1.5 ${mode === "mock" ? "bg-violet-500/25 text-white" : "text-gray-400"} disabled:opacity-40`}><Beaker className="w-3.5 h-3.5" /> Simulador</button>
+          <button data-testid="pb-mode-remote" onClick={() => setMode("remote")} disabled={connected && !isClient} className={`px-3 py-2 text-xs flex items-center gap-1.5 ${mode === "remote" ? "bg-violet-500/25 text-white" : "text-gray-400"} disabled:opacity-40`}><Tablet className="w-3.5 h-3.5" /> Tablet (remoto)</button>
         </div>
         {mode === "usb" && !connected && <select value={baud} onChange={(e) => setBaud(+e.target.value)} className="bg-black/30 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-gray-200">{[115200, 250000, 57600, 9600].map((b) => <option key={b} value={b}>{b} baud</option>)}</select>}
-        {!connected
+        {mode === "remote" ? (
+          remoteRole === "client"
+            ? <button onClick={leaveRemote} className="px-4 py-2 rounded-xl border border-white/15 hover:border-red-400/50 text-sm flex items-center gap-2"><Link2Off className="w-4 h-4" /> Sair do remoto</button>
+            : <div className="flex items-center gap-2">
+                <input data-testid="pb-remote-code" inputMode="numeric" pattern="[0-9]*" maxLength={6} placeholder="código de 6 dígitos" value={remoteCode} onChange={(e) => setRemoteCode(e.target.value.replace(/\D/g, "").slice(0, 6))} className="w-40 bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-base tracking-[0.3em] font-mono text-center text-white focus:outline-none focus:border-violet-400/60" />
+                <button data-testid="pb-remote-join" onClick={joinFromTablet} disabled={remoteCode.length !== 6} className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold flex items-center gap-2 disabled:opacity-50"><Link2 className="w-4 h-4" /> Controlar</button>
+              </div>
+        ) : !connected
           ? <button data-testid="pb-connect" onClick={connect} disabled={busy} className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold flex items-center gap-2 disabled:opacity-50"><Usb className="w-4 h-4" />{busy ? "Conectando…" : "Conectar"}</button>
           : <button data-testid="pb-disconnect" onClick={disconnect} disabled={streaming} className="px-4 py-2 rounded-xl border border-white/15 hover:border-red-400/50 text-sm flex items-center gap-2 disabled:opacity-40"><Unplug className="w-4 h-4" /> Desconectar</button>}
+        {connected && mode !== "remote" && remoteRole === "none" && <button data-testid="pb-share-tablet" onClick={shareToTablet} className="px-3 py-2 rounded-xl border border-violet-400/40 bg-violet-500/10 text-violet-100 text-sm flex items-center gap-2"><Tablet className="w-4 h-4" /> Compartilhar com tablet</button>}
         <div className="flex items-center gap-2 text-xs ml-auto">
           <span className={`w-2.5 h-2.5 rounded-full ${connected ? (streaming ? "bg-cyan-400 animate-pulse" : "bg-emerald-400") : "bg-gray-600"}`} />
           <span className="text-gray-300">{connected ? stateLabel[ctrlState] : "Desconectado"}</span>
           {firmware && connected && <span className="text-gray-500 hidden sm:inline">· {firmware.name ?? firmware.family}</span>}
           {zeroed && <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> zerado</span>}
         </div>
-        {!supported && <p className="w-full text-[11px] text-amber-300 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> Este navegador não tem Web Serial — use Chrome/Edge/Brave no desktop. O simulador está disponível.</p>}
+        {!supported && mode !== "remote" && <p className="w-full text-[11px] text-amber-300 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> Este navegador não tem Web Serial — use Chrome/Edge/Brave no desktop, ou o modo <b>Tablet (remoto)</b>.</p>}
         {err && <p className="w-full text-[11px] text-red-300">{err}</p>}
+        {remoteErr && <p className="w-full text-[11px] text-red-300">{remoteErr}</p>}
+
+        {/* ── painel do HOST (notebook) ── */}
+        {remoteRole === "host" && remoteSession && (
+          <div className="w-full rounded-xl border border-violet-400/30 bg-violet-500/10 p-3 flex flex-wrap items-center gap-3" data-testid="pb-host-panel">
+            <Laptop className="w-5 h-5 text-violet-300" />
+            <div className="flex-1 min-w-[200px]"><div className="text-xs text-violet-200">Este notebook está compartilhando a impressora. No iPad, abra <b>Impressão Básica → Imprimir → Tablet (remoto)</b> (mesma conta) e digite:</div></div>
+            <div className="flex items-center gap-2"><span data-testid="pb-host-code" className="font-mono text-2xl tracking-[0.35em] text-white bg-black/40 rounded-lg px-3 py-1">{remoteSession.code}</span><button onClick={() => navigator.clipboard?.writeText(remoteSession.code)} className="p-2 rounded-lg border border-white/10 text-gray-300 hover:text-white" title="Copiar"><Copy className="w-4 h-4" /></button></div>
+            <span className={`text-[11px] flex items-center gap-1.5 ${peerOnline ? "text-emerald-300" : "text-gray-400"}`}><span className={`w-2 h-2 rounded-full ${peerOnline ? "bg-emerald-400 animate-pulse" : "bg-gray-600"}`} />{peerOnline ? "tablet conectado" : "aguardando tablet"}</span>
+            <button onClick={leaveRemote} className="text-[11px] text-gray-400 hover:text-red-300 flex items-center gap-1"><Link2Off className="w-3.5 h-3.5" /> encerrar</button>
+          </div>
+        )}
+        {/* ── painel do CLIENT (tablet) ── */}
+        {remoteRole === "client" && (
+          <div className="w-full rounded-xl border border-cyan-400/30 bg-cyan-500/10 p-3 flex flex-wrap items-center gap-3" data-testid="pb-client-panel">
+            <Tablet className="w-5 h-5 text-cyan-300" />
+            <div className="flex-1 min-w-[200px] text-xs text-cyan-100">Controlando a impressora do notebook <span className="font-mono">{remoteSession?.code}</span>. Todos os botões desta tela enviam comandos ao notebook.</div>
+            <span className={`text-[11px] flex items-center gap-1.5 ${peerOnline ? "text-emerald-300" : "text-amber-300"}`}><span className={`w-2 h-2 rounded-full ${peerOnline ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />{peerOnline ? "notebook online" : "notebook sem resposta — mantenha a aba da BIA aberta nele"}</span>
+          </div>
+        )}
+        {mode === "remote" && remoteRole === "none" && (
+          <div className="w-full text-[11px] text-gray-400 leading-relaxed">
+            <b className="text-gray-200">Como funciona:</b> 1) no <b>notebook</b> (Chrome/Edge) com a impressora na USB, conecte e clique <i>Compartilhar com tablet</i>; 2) aqui no {tablet ? "tablet" : "outro dispositivo"}, digite o código de 6 dígitos. A mesma conta BIA deve estar logada nos dois. O joystick, ZERAR, fluxo, velocidade, altura, extrusão e Iniciar/PARAR passam a controlar a impressora pelo notebook.
+          </div>
+        )}
       </div>
 
       <div className="grid lg:grid-cols-[minmax(0,320px)_1fr] gap-4">
@@ -327,16 +484,17 @@ export function PrintStep({ state, gcode, hasGcode, onApplyState }: { state: Bas
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-sm font-semibold flex items-center gap-2 mr-auto"><FlaskConical className="w-4 h-4 text-emerald-300" /> Impressão</h3>
               {!streaming
-                ? <button data-testid="pb-start" onClick={start} disabled={!connected || !hasGcode || busy} className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white text-sm font-semibold flex items-center gap-2 disabled:opacity-40"><Play className="w-4 h-4" /> Iniciar impressão</button>
+                ? <button data-testid="pb-start" onClick={start} disabled={!connected || (!hasGcode && !isClient) || busy} className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white text-sm font-semibold flex items-center gap-2 disabled:opacity-40"><Play className="w-4 h-4" /> Iniciar impressão</button>
                 : ctrlState === "paused"
-                  ? <button onClick={() => ctrlRef.current?.resume()} className="px-4 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-semibold flex items-center gap-2"><Play className="w-4 h-4" /> Retomar</button>
-                  : <button onClick={() => ctrlRef.current?.pause()} className="px-4 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold flex items-center gap-2"><Pause className="w-4 h-4" /> Pausar</button>}
+                  ? <button onClick={() => (isClient ? dispatch("resume") : ctrlRef.current?.resume())} className="px-4 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-semibold flex items-center gap-2"><Play className="w-4 h-4" /> Retomar</button>
+                  : <button onClick={() => (isClient ? dispatch("pause") : ctrlRef.current?.pause())} className="px-4 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold flex items-center gap-2"><Pause className="w-4 h-4" /> Pausar</button>}
               <button data-testid="pb-stop" onClick={softStop} disabled={!connected || busy} className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-bold flex items-center gap-2 disabled:opacity-30" title="Para com segurança: desliga válvulas, sobe 10 mm e religa os motores — pronta para recomeçar"><Square className="w-4 h-4" /> PARAR</button>
               {(stopped || ctrlState === "error" || ctrlState === "completed") && <button data-testid="pb-rearm" onClick={rearm} disabled={!connected} className="px-3 py-2.5 rounded-xl border border-emerald-400/40 bg-emerald-500/10 text-emerald-100 text-sm font-semibold flex items-center gap-2"><RotateCcw className="w-4 h-4" /> Religar motores</button>}
               <button data-testid="pb-emergency" onClick={emergency} disabled={!connected} className="px-2.5 py-2.5 rounded-xl border border-red-500/40 text-red-300 hover:bg-red-500/10 text-xs font-semibold flex items-center gap-1.5 disabled:opacity-30" title="M112 — só em risco de colisão; a impressora trava até reconectar"><OctagonX className="w-4 h-4" /> Emergência</button>
             </div>
             {stopped && <p className="text-xs text-emerald-300 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Parada segura concluída — motores ligados. Ajuste o que precisar, zere se necessário e clique Iniciar impressão.</p>}
-            {!hasGcode && <p className="text-xs text-amber-300">Gere o G-code na etapa anterior antes de imprimir.</p>}
+            {!hasGcode && !isClient && <p className="text-xs text-amber-300">Gere o G-code na etapa anterior antes de imprimir.</p>}
+            {isClient && <p className="text-[11px] text-gray-500">O G-code usado é o que está carregado no notebook.</p>}
             {progress && (
               <div>
                 <div className="flex justify-between text-[11px] text-gray-400 mb-1"><span>Linha {progress.current}/{progress.total} · camada {progress.currentLayer}</span><span>{progress.percent.toFixed(0)}%{progress.remainingMsEst != null && ` · ~${Math.ceil(progress.remainingMsEst / 60000)} min restantes`}</span></div>
