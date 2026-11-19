@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
@@ -14,6 +14,7 @@ import {
   Microscope,
   Pencil,
   Gamepad2,
+  Pin, PinOff,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { isSuperAdmin } from "@/lib/auth/admin-shared"
@@ -535,7 +536,7 @@ function SidebarGroupedNav({
 /* ──────────────────────────────────────────────────────────────────────────
    Sidebar Content (shared desktop + drawer)
 ────────────────────────────────────────────────────────────────────────── */
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarContent({ onNavigate, pinned, onTogglePin }: { onNavigate?: () => void; pinned?: boolean; onTogglePin?: () => void }) {
   const pathname = usePathname()
   const { data: session } = useSession()
   const user     = session?.user
@@ -559,19 +560,36 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex flex-col h-full overflow-hidden">
 
       {/* ── Logo ── */}
-      <div className="px-4 py-4 border-b border-white/[0.06]">
+      <div className="px-4 py-4 border-b border-white/[0.06] flex items-center gap-2">
         <Link href="/dashboard" onClick={onNavigate}
-          className="flex items-center gap-3 group">
+          className="flex items-center gap-3 group flex-1 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center shadow-lg shadow-violet-900/50 shrink-0">
             <BiaLogoIcon size={22} />
           </div>
-          <div>
+          <div className="min-w-0">
             <span className="font-bold text-white tracking-tight text-sm leading-none block">BIA</span>
-            <span className="text-[9px] text-violet-300 tracking-[0.15em] uppercase leading-none block mt-0.5">
+            <span className="text-[9px] text-violet-300 tracking-[0.15em] uppercase leading-none block mt-0.5 truncate">
               Biofabrication AI
             </span>
           </div>
         </Link>
+        {onTogglePin && (
+          <button
+            type="button"
+            onClick={onTogglePin}
+            data-testid="sidebar-pin"
+            aria-pressed={!!pinned}
+            title={pinned ? "Desafixar: a barra recolhe sozinha quando não estiver em uso" : "Fixar a barra aberta"}
+            className={cn(
+              "hidden md:inline-flex p-1.5 rounded-lg border transition-colors shrink-0",
+              pinned
+                ? "text-violet-300 border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/20"
+                : "text-gray-500 border-white/[0.06] hover:text-gray-200 hover:bg-white/[0.06]",
+            )}
+          >
+            {pinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
+          </button>
+        )}
       </div>
 
       {/* ── Plan badge + Modo Clínico/Pesquisador (R14.1) ── */}
@@ -689,10 +707,121 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 /* ──────────────────────────────────────────────────────────────────────────
    Desktop sidebar
 ────────────────────────────────────────────────────────────────────────── */
-function DesktopSidebar() {
+/* R41 — Trilho compacto: só os ícones dos tópicos da BIA, visível quando a barra está recolhida. */
+export const SIDEBAR_RAIL_W = 68
+export const SIDEBAR_FULL_W = 256
+const SIDEBAR_PIN_KEY = "bia:sidebar-pinned-v41"
+
+function SidebarRail({ pathname }: { pathname: string }) {
+  const { data: session } = useSession()
+  const user = session?.user
+  const credits = (user?.credits as number) ?? 0
+  const initials = user?.name ? user.name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase() : "U"
+  const homeActive = pathname === "/dashboard"
   return (
-    <aside className="hidden md:flex w-64 shrink-0 h-full border-r border-white/[0.06] bg-[#080412]/70 flex-col">
-      <SidebarContent />
+    <div className="flex flex-col h-full items-center py-3 gap-1" data-testid="sidebar-rail">
+      <Link href="/dashboard" title="BIA · Visão Geral" aria-label="BIA"
+        className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center shadow-lg shadow-violet-900/50 mb-2">
+        <BiaLogoIcon size={22} />
+      </Link>
+      <Link href={NAV_HOME.href} title={NAV_HOME.label} aria-label={NAV_HOME.label}
+        className={cn(
+          "w-10 h-10 rounded-xl flex items-center justify-center border transition-colors",
+          homeActive ? "bg-violet-500/15 text-violet-200 border-violet-500/30" : "text-gray-400 border-transparent hover:bg-white/[0.06] hover:text-white",
+        )}>
+        <NAV_HOME.icon className="w-[18px] h-[18px]" />
+      </Link>
+      <div className="w-6 h-px bg-white/[0.08] my-1.5" />
+      {NAV_GROUPS.map((g) => {
+        const active = g.items.some((it) => pathname.startsWith(it.href))
+        const first = g.items[0]
+        return (
+          <Link key={g.id} href={first.href} title={g.label} aria-label={g.label}
+            data-testid={`sidebar-rail-${g.id}`}
+            className={cn(
+              "relative w-10 h-10 rounded-xl flex items-center justify-center border transition-colors",
+              active ? "bg-white/[0.07] border-white/[0.1]" : "border-transparent hover:bg-white/[0.06]",
+            )}>
+            <g.icon className={cn("w-[18px] h-[18px]", g.accent, !active && "opacity-70")} />
+            {active && <span className="absolute -left-[9px] top-2.5 bottom-2.5 w-[3px] rounded-full bg-violet-400" />}
+          </Link>
+        )
+      })}
+      <div className="flex-1" />
+      <Link href="/dashboard/billing" title={`Créditos: ${credits.toLocaleString("pt-BR")}`}
+        className="flex flex-col items-center gap-0.5 text-violet-400 hover:text-violet-200 transition-colors mb-1">
+        <Zap className="w-4 h-4" />
+        <span className="text-[9px] font-bold leading-none">{credits >= 1000 ? `${Math.round(credits / 100) / 10}k` : credits}</span>
+      </Link>
+      <div title={user?.name ?? "Usuário"} className="w-8 h-8 rounded-full bg-gradient-to-br from-quantis-purple-600 to-quantis-lilac-500 flex items-center justify-center text-[11px] font-bold text-white">
+        {initials}
+      </div>
+    </div>
+  )
+}
+
+/* R41 — Desktop sidebar recolhe sozinha quando não está em uso:
+   • Recolhida: trilho de 68 px com os ícones dos tópicos.
+   • Mouse em cima / foco por teclado: expande SOBRE o conteúdo (não empurra a página).
+   • Sai o mouse / clica num link / Esc: recolhe (pequeno atraso para não piscar).
+   • Botão fixar (📌) mantém aberta e em fluxo — preferência salva em localStorage. */
+function DesktopSidebar() {
+  const pathname = usePathname()
+  const [pinned, setPinned] = useState(false)
+  const [hover, setHover] = useState(false)
+  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    try { setPinned(window.localStorage.getItem(SIDEBAR_PIN_KEY) === "1") } catch { /* modo privado */ }
+  }, [])
+
+  const togglePin = useCallback(() => {
+    setPinned((p) => {
+      const next = !p
+      try { window.localStorage.setItem(SIDEBAR_PIN_KEY, next ? "1" : "0") } catch { /* ignore */ }
+      return next
+    })
+    setHover(false)
+  }, [])
+
+  const cancelLeave = () => { if (leaveTimer.current) { clearTimeout(leaveTimer.current); leaveTimer.current = null } }
+  const open = () => { cancelLeave(); setHover(true) }
+  const closeSoon = (ms = 220) => { cancelLeave(); leaveTimer.current = setTimeout(() => setHover(false), ms) }
+  useEffect(() => () => cancelLeave(), [])
+
+  // Navegou (clicou num link) → recolhe na hora, salvo se fixada
+  useEffect(() => { if (!pinned) setHover(false) }, [pathname, pinned])
+
+  const expanded = pinned || hover
+
+  return (
+    <aside
+      data-testid="desktop-sidebar"
+      data-expanded={expanded ? "1" : "0"}
+      data-pinned={pinned ? "1" : "0"}
+      className="hidden md:block relative shrink-0 h-full transition-[width] duration-200 ease-out"
+      style={{ width: pinned ? SIDEBAR_FULL_W : SIDEBAR_RAIL_W }}
+      onMouseEnter={open}
+      onMouseLeave={() => { if (!pinned) closeSoon() }}
+      onFocusCapture={open}
+      onBlurCapture={(e) => { if (!pinned && !e.currentTarget.contains(e.relatedTarget as Node | null)) closeSoon(120) }}
+      onKeyDown={(e) => { if (e.key === "Escape" && !pinned) setHover(false) }}
+    >
+      <div
+        className={cn(
+          "h-full flex flex-col border-r border-white/[0.06] overflow-hidden transition-[width,box-shadow] duration-200 ease-out",
+          pinned
+            ? "relative bg-[#080412]/70"
+            : expanded
+              ? "absolute inset-y-0 left-0 z-40 bg-[#080412]/97 backdrop-blur-xl shadow-[12px_0_40px_-12px_rgba(0,0,0,0.7)]"
+              : "relative bg-[#080412]/70",
+        )}
+        style={{ width: expanded ? SIDEBAR_FULL_W : SIDEBAR_RAIL_W }}
+      >
+        {expanded
+          ? <SidebarContent pinned={pinned} onTogglePin={togglePin} onNavigate={() => { if (!pinned) setHover(false) }} />
+          : <SidebarRail pathname={pathname} />}
+      </div>
     </aside>
   )
 }

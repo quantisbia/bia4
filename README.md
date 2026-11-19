@@ -210,6 +210,15 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R41 — Barra lateral recolhe sozinha quando não está em uso (2026-11-19)
+
+Pedido: *"a aba da esquerda com os tópicos da BIA, fechar quando não tiver sendo usado"*.
+
+- **Trilho compacto (68 px)** no desktop: logo + Visão Geral + **um ícone por grupo de tópicos** (Projetar, Bioimprimir, Organoides, Qualidade, Aprender, Conta — cada um com a cor do grupo e marcador do grupo ativo) + créditos + avatar. Tooltip nativo com o nome do tópico.
+- **Passar o mouse (ou focar via teclado) expande** a barra completa **por cima do conteúdo** (não empurra a página); **sair com o mouse, clicar num link ou Esc recolhe** (220 ms de atraso para não piscar).
+- **Alfinete 📌** no topo da barra expandida: fixa aberta e em fluxo (comportamento antigo). Preferência salva em `localStorage` (`bia:sidebar-pinned-v41`).
+- Mobile não muda (header + drawer). `src/components/layout/DashboardSidebar.tsx`; teste `tests/r41_sidebar_autocollapse.test.ts` (6).
+
 ### R40 — Impressão Básica · Trajetória contínua (meandro sem paradas) + saia de escorva (2026-11-18)
 
 Pedido: *"o usuário decide se quer o movimento o mais curto possível, sem paradas, de forma contínua — começar num ponto e, sem levantar e sem retrair, seguir o movimento, sem pausa, sem mudança de velocidade; só na saia haverá levantamento/retração, à escolha do usuário"*.
