@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { isBlackFridayActive, bfPrice, bfSavings, bfPercentLabel, brl, BF_ENDS_LABEL } from "@/lib/promo/black-friday"
+import { isBlackFridayActive, bfPrice, bfSavings, bfPercentLabel, brl, BF_ENDS_LABEL, BF_ACADEMY, bfAcademyAnchor, bfAcademyPercent } from "@/lib/promo/black-friday"
 import {
   ArrowRight, FlaskConical, Brain, Layers, Microscope, Zap,
   Shield, BarChart3, CheckCircle2, Star,
@@ -208,20 +208,39 @@ export default function HomePage() {
                 </p>
 
                 {/* Bloco de preço destacado */}
-                <div
-                  data-testid="home-academy-price"
-                  className="rounded-xl bg-black/30 border border-fuchsia-500/25 px-4 py-3 mb-6"
-                >
-                  <div className="flex items-baseline gap-2 flex-wrap">
-                    <span className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
-                      R$ 2.375,00
-                    </span>
-                    <span className="text-xs text-gray-400">à vista</span>
+                {isBlackFridayActive() ? (
+                  <div
+                    data-testid="home-academy-price"
+                    className="rounded-xl bg-black/40 border border-amber-400/40 px-4 py-3 mb-6"
+                  >
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300 mb-1">🔥 Black Friday · curso + acesso integral à BIA · até {BF_ENDS_LABEL}</p>
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <span className="text-3xl sm:text-4xl font-bold text-white tracking-tight" data-testid="home-academy-bf-monthly">{brl(BF_ACADEMY.monthly)}</span>
+                      <span className="text-xs text-gray-400">/mês</span>
+                      <span className="text-xs text-gray-500 mx-1">ou</span>
+                      <span className="text-xl font-bold text-amber-200" data-testid="home-academy-bf-annual">{brl(BF_ACADEMY.annual)}</span>
+                      <span className="text-xs text-gray-400">/ano</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      anual: de <span className="line-through">{brl(bfAcademyAnchor())}</span> → <span className="font-semibold text-amber-200">{bfAcademyPercent()}% OFF</span> · inclui a plataforma BIA completa
+                    </p>
                   </div>
-                  <p className="text-[11px] text-gray-400 mt-1">
-                    ou até <span className="font-semibold text-fuchsia-300">12x de R$ 197,92</span> no cartão sem juros
-                  </p>
-                </div>
+                ) : (
+                  <div
+                    data-testid="home-academy-price"
+                    className="rounded-xl bg-black/30 border border-fuchsia-500/25 px-4 py-3 mb-6"
+                  >
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <span className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+                        R$ 2.375,00
+                      </span>
+                      <span className="text-xs text-gray-400">à vista</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      ou até <span className="font-semibold text-fuchsia-300">12x de R$ 197,92</span> no cartão sem juros
+                    </p>
+                  </div>
+                )}
 
                 {/* CTAs */}
                 <div className="flex flex-col sm:flex-row gap-3">
@@ -234,8 +253,8 @@ export default function HomePage() {
                     <ArrowRight className="w-4 h-4" />
                   </Link>
                   <a
-                    href="https://www.asaas.com/c/iu7ym1dp93cei9zk"
-                    target="_blank"
+                    href={isBlackFridayActive() ? "/academy#investimento" : "https://www.asaas.com/c/iu7ym1dp93cei9zk"}
+                    target={isBlackFridayActive() ? undefined : "_blank"}
                     rel="noopener noreferrer"
                     data-testid="home-academy-cta-asaas"
                     className="inline-flex items-center justify-center gap-2 rounded-xl border border-fuchsia-500/30 text-fuchsia-200 hover:bg-fuchsia-500/10 hover:border-fuchsia-500/50 hover:text-white text-sm sm:text-base font-semibold px-5 py-3 transition-all"
@@ -609,7 +628,7 @@ export default function HomePage() {
                     <p className="text-base sm:text-lg font-extrabold text-white leading-tight">
                       A Black Friday já começou aqui! <span className="bg-gradient-to-r from-amber-300 to-orange-400 bg-clip-text text-transparent">{bfPercentLabel()}</span> em toda a loja BIA
                     </p>
-                    <p className="text-[11px] text-gray-400 mt-0.5">Planos e pacotes de créditos com desconto. Cursos (BIA Academy e turmas presenciais) não participam.</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">Planos e pacotes de créditos com desconto. <Link href="/academy#investimento" className="text-amber-200 underline underline-offset-2">BIA Academy + plataforma</Link> por {brl(BF_ACADEMY.monthly)}/mês ou {brl(BF_ACADEMY.annual)}/ano ({bfAcademyPercent()}% OFF). Turmas presenciais não participam.</p>
                   </div>
                   <Link href="/dashboard/billing" className="shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-400 to-orange-600 text-white shadow-lg shadow-orange-900/40 hover:opacity-90 transition-opacity">
                     Ver ofertas na loja <ArrowRight className="w-3.5 h-3.5" />
@@ -748,7 +767,7 @@ export default function HomePage() {
 
             {/* Nota: BIA Academy é produto separado */}
             <p className="text-center text-xs text-gray-500 mt-6">
-              💡 <Link href="/academy" className="text-fuchsia-300 hover:text-fuchsia-200 underline underline-offset-2">BIA Academy</Link> é um produto separado — curso online de 12 meses com plataforma integrada (R$ 2.375 · pagamento único).{isBlackFridayActive() && <> Cursos não participam da Black Friday.</>}
+              💡 <Link href="/academy" className="text-fuchsia-300 hover:text-fuchsia-200 underline underline-offset-2">BIA Academy</Link> é um produto separado — curso online de 12 meses com plataforma integrada{isBlackFridayActive() ? <> — <strong className="text-amber-200">na Black Friday com acesso integral à BIA: {brl(BF_ACADEMY.monthly)}/mês ou {brl(BF_ACADEMY.annual)}/ano</strong>. Turmas presenciais não participam da Black Friday.</> : <> (R$ 2.375 · pagamento único).</>}
             </p>
           </div>
         </div>

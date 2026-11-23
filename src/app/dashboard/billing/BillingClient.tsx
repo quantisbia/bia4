@@ -11,7 +11,7 @@ import {
 } from "lucide-react"
 import { CreditProgressBar, CreditBadge } from "@/components/credits/CreditWidgets"
 import {
-  isBlackFridayActive, bfPrice, bfSavings, bfPercentLabel, bfPaymentLink, brl,
+  isBlackFridayActive, bfPrice, bfSavings, bfPercentLabel, bfPaymentLink, brl, BF_ACADEMY, bfAcademyAnchor, bfAcademyPercent,
   BF_ENDS_LABEL, BF_COUPON, BF_LABEL,
 } from "@/lib/promo/black-friday"
 import { useToast } from "@/components/ui/Toast"
@@ -281,9 +281,9 @@ function BlackFridayBanner({ compact = false }: { compact?: boolean }) {
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-amber-400/40 bg-amber-500/10 text-amber-200 font-semibold">
             <Tag className="w-3 h-3" /> Planos e pacotes de créditos
           </span>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-white/10 bg-white/[0.04] text-gray-400">
-            <GraduationCap className="w-3 h-3" /> Cursos não participam
-          </span>
+          <a href="/academy#investimento" className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-fuchsia-400/40 bg-fuchsia-500/10 text-fuchsia-200 font-semibold hover:bg-fuchsia-500/20 transition-colors" data-testid="billing-bf-academy-chip">
+            <GraduationCap className="w-3 h-3" /> Academy + plataforma: {brl(BF_ACADEMY.monthly)}/mês · anual {bfAcademyPercent()}% OFF
+          </a>
         </div>
       </div>
       {!compact && (
@@ -929,8 +929,8 @@ export function BillingClient({
                       Novo
                     </span>
                     {isBlackFridayActive() && (
-                      <span data-testid="billing-academy-bf-excluded" className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/[0.04] text-gray-400 border border-white/10">
-                        Curso · fora da Black Friday
+                      <span data-testid="billing-academy-bf-offer" className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-600 text-white">
+                        Black Friday · curso + plataforma
                       </span>
                     )}
                   </div>
@@ -938,10 +938,19 @@ export function BillingClient({
                     Formação em biofabricação e bioimpressão 3D com plataforma BIA integrada.
                     12 módulos + 12 meses de acesso + 3 encontros ao vivo + certificado.
                   </p>
-                  <div className="flex items-baseline gap-2 flex-wrap">
-                    <span className="text-xl font-bold text-white">R$ 2.375,00</span>
-                    <span className="text-[11px] text-gray-500">à vista · ou 12x de R$ 197,92</span>
-                  </div>
+                  {isBlackFridayActive() ? (
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <span className="text-xl font-bold text-white">{brl(BF_ACADEMY.monthly)}<span className="text-xs text-gray-400 font-normal">/mês</span></span>
+                      <span className="text-[11px] text-gray-500">ou</span>
+                      <span className="text-base font-bold text-amber-200">{brl(BF_ACADEMY.annual)}<span className="text-xs text-gray-400 font-normal">/ano</span></span>
+                      <span className="text-[11px] text-gray-500">de <span className="line-through">{brl(bfAcademyAnchor())}</span> · {bfAcademyPercent()}% OFF · acesso integral à BIA</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <span className="text-xl font-bold text-white">R$ 2.375,00</span>
+                      <span className="text-[11px] text-gray-500">à vista · ou 12x de R$ 197,92</span>
+                    </div>
+                  )}
                 </div>
                 <ArrowRight className="w-4 h-4 text-fuchsia-300 shrink-0 mt-1 group-hover:translate-x-0.5 transition-transform" />
               </div>

@@ -26,9 +26,13 @@ import {
   GraduationCap, PlayCircle, Wrench, Save, CheckCircle2,
   Sparkles, ArrowRight, Users, Building2, Flag, Award,
   MessageCircle, ExternalLink, ChevronDown, ChevronUp,
-  Zap, Gift, FileText,
+  Zap, Gift, FileText, Flame, Timer,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
+import {
+  isBlackFridayActive, BF_ACADEMY, BF_ENDS_LABEL, bfAcademyAnchor, bfAcademyPercent,
+  bfAcademyAnnualPerMonth, bfAcademyCta, bfMsLeft, brl,
+} from "@/lib/promo/black-friday"
 import {
   getFeaturedWhitePaper,
   getOpenAccessEbooks,
@@ -64,6 +68,116 @@ const PRICE_PER_INSTALLMENT = (PRICE_BRL / PRICE_INSTALLMENTS).toLocaleString("p
   currency: "BRL",
   minimumFractionDigits: 2,
 })
+
+// ─── R42 · Black Friday da Academy (curso + acesso integral à BIA) ───────
+function useCountdown() {
+  const [ms, setMs] = useState<number | null>(null)
+  useEffect(() => {
+    const tick = () => setMs(bfMsLeft())
+    tick(); const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [])
+  if (ms === null) return null
+  const d = Math.floor(ms / 86400000), h = Math.floor((ms % 86400000) / 3600000), m = Math.floor((ms % 3600000) / 60000), s = Math.floor((ms % 60000) / 1000)
+  return { d, h, m, s }
+}
+
+function BfCountdown({ className }: { className?: string }) {
+  const c = useCountdown()
+  if (!c) return <span className={cn("tabular-nums", className)}>até {BF_ENDS_LABEL}</span>
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return (
+    <span className={cn("tabular-nums", className)} data-testid="academy-bf-countdown">
+      {c.d > 0 && <>{c.d}d </>}{pad(c.h)}:{pad(c.m)}:{pad(c.s)}
+    </span>
+  )
+}
+
+function AcademyBlackFridayPricing() {
+  const anchor = bfAcademyAnchor()
+  const pct = bfAcademyPercent()
+  const monthlyCta = bfAcademyCta("monthly", WHATSAPP_LINK)
+  const annualCta = bfAcademyCta("annual", WHATSAPP_LINK)
+  const perks = [
+    <><strong className="text-white">Todos os 12 módulos</strong> liberados no 1º dia</>,
+    <>3 encontros online ao vivo com a Dra. Kamila Leichtweis</>,
+    <><strong className="text-white">Acesso integral à plataforma BIA</strong> — Formulador Pro, Bioimpressão (STL → G-code), Impressão Básica com joystick USB, Organoid Builder, Protocolos GLP/GMP, Chat IA ({BF_ACADEMY.creditsPerMonth.toLocaleString("pt-BR")} créditos/mês)</>,
+    <>Biblioteca com 65+ artigos e white papers</>,
+    <>Certificado por aula + certificado final verificável</>,
+    <><strong className="text-white">7 dias de garantia</strong> incondicional</>,
+  ]
+  return (
+    <div data-testid="academy-bf-pricing" className="relative overflow-hidden rounded-3xl border border-amber-400/40 bg-gradient-to-br from-[#1a0b00] via-[#200c14] to-[#1a0633] p-5 sm:p-8">
+      <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-amber-500/20 blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-20 left-1/4 w-72 h-72 rounded-full bg-fuchsia-600/15 blur-3xl pointer-events-none" />
+
+      <div className="relative flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5 mb-6">
+        <div className="w-12 h-12 shrink-0 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-900/50">
+          <Flame className="w-6 h-6 text-white" />
+        </div>
+        <div className="flex-1">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">Black Friday · só até {BF_ENDS_LABEL}</p>
+          <h3 className="text-xl sm:text-2xl font-extrabold text-white leading-tight">
+            BIA Academy <span className="text-amber-200">+ acesso integral à plataforma BIA</span>
+          </h3>
+          <p className="text-xs sm:text-sm text-gray-300 mt-1">Aprenda e já saia imprimindo: curso completo e a ferramenta no mesmo plano.</p>
+        </div>
+        <div className="inline-flex items-center gap-2 self-start sm:self-center rounded-xl border border-amber-400/40 bg-black/40 px-3 py-2 text-amber-200 text-sm font-bold">
+          <Timer className="w-4 h-4" /> <BfCountdown />
+        </div>
+      </div>
+
+      <div className="relative grid md:grid-cols-2 gap-4">
+        {/* Mensal */}
+        <div className="rounded-2xl border border-white/10 bg-black/35 p-5 flex flex-col" data-testid="academy-bf-monthly">
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Mensal · cancele quando quiser</p>
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-4xl font-extrabold text-white tracking-tight">{brl(BF_ACADEMY.monthly)}</span>
+            <span className="text-sm text-gray-400">/mês</span>
+          </div>
+          <p className="text-[11px] text-gray-400 mt-1">Curso + plataforma BIA. Sem fidelidade.</p>
+          <a href={monthlyCta.href} target="_blank" rel="noopener noreferrer"
+            onClick={() => trackEvent("cta_bf_academy_clicked", { kind: "monthly", viaAsaas: monthlyCta.viaAsaas })}
+            data-testid="academy-bf-cta-monthly"
+            className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl border border-amber-400/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-100 text-sm font-semibold px-5 py-3 transition-colors">
+            Quero o mensal <ArrowRight className="w-4 h-4" />
+          </a>
+        </div>
+        {/* Anual */}
+        <div className="relative rounded-2xl border-2 border-amber-400/70 bg-black/45 p-5 flex flex-col shadow-xl shadow-amber-900/20" data-testid="academy-bf-annual">
+          <span className="absolute -top-3 left-4 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-600 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 shadow">
+            Melhor oferta · {pct}% OFF
+          </span>
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2 mt-1">Anual · 12 meses</p>
+          <p className="text-sm text-gray-400">
+            de <span className="line-through decoration-red-400/70" data-testid="academy-bf-anchor">{brl(anchor)}</span>
+          </p>
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-4xl font-extrabold text-white tracking-tight">{brl(BF_ACADEMY.annual)}</span>
+            <span className="text-sm text-gray-400">/ano</span>
+          </div>
+          <p className="text-[11px] text-gray-400 mt-1">≈ {brl(bfAcademyAnnualPerMonth())}/mês · âncora = curso avulso {brl(BF_ACADEMY.courseList)} + 12 × BIA Clínico {brl(BF_ACADEMY.clinicoMonthly)}</p>
+          <a href={annualCta.href} target="_blank" rel="noopener noreferrer"
+            onClick={() => trackEvent("cta_bf_academy_clicked", { kind: "annual", viaAsaas: annualCta.viaAsaas })}
+            data-testid="academy-bf-cta-annual"
+            className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-600 hover:from-amber-300 hover:to-orange-500 text-white text-sm font-bold px-5 py-3 shadow-lg shadow-orange-900/40 transition-colors">
+            Quero o anual com {pct}% OFF <ArrowRight className="w-4 h-4" />
+          </a>
+        </div>
+      </div>
+
+      <ul className="relative mt-6 grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm text-gray-300">
+        {perks.map((p, i) => <li key={i} className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" /><span>{p}</span></li>)}
+      </ul>
+      <p className="relative text-[11px] text-gray-500 mt-4">
+        {monthlyCta.viaAsaas && annualCta.viaAsaas
+          ? "Pagamento seguro via Asaas · Boleto, Pix ou cartão · Liberação em 24h úteis"
+          : "Confirme a oferta pelo WhatsApp comercial — enviamos o link de pagamento Asaas (boleto, Pix ou cartão). Liberação em 24h úteis."}
+        {" "}Após {BF_ENDS_LABEL}, curso e plataforma voltam a ser vendidos separadamente.
+      </p>
+    </div>
+  )
+}
 
 // ─── Tracking helper (fire-and-forget) ──────────────────────────
 function trackEvent(event: string, metadata?: Record<string, unknown>) {
@@ -230,10 +344,19 @@ export default function AcademyLandingPage() {
         </div>
 
         <div className="max-w-4xl mx-auto text-center relative z-10">
-          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 mb-6 text-xs text-emerald-200">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            Turma aberta · Todos os 12 módulos disponíveis desde o 1º dia
-          </div>
+          {isBlackFridayActive() ? (
+            <a href="#investimento" data-testid="academy-bf-hero-chip" className="inline-flex items-center gap-2 rounded-full border border-amber-400/50 bg-gradient-to-r from-amber-500/15 to-orange-600/15 px-3.5 py-1.5 mb-6 text-xs text-amber-100 hover:border-amber-300 transition-colors">
+              <Flame className="w-3.5 h-3.5 text-amber-300" />
+              <span className="font-bold uppercase tracking-wider text-amber-300">Black Friday</span>
+              <span>curso + plataforma BIA por <strong className="text-white">{brl(BF_ACADEMY.monthly)}/mês</strong> · anual <strong className="text-white">{bfAcademyPercent()}% OFF</strong></span>
+              <ArrowRight className="w-3 h-3" />
+            </a>
+          ) : (
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 mb-6 text-xs text-emerald-200">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Turma aberta · Todos os 12 módulos disponíveis desde o 1º dia
+            </div>
+          )}
 
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
             Saia do papel e{" "}
@@ -733,11 +856,13 @@ export default function AcademyLandingPage() {
           <div className="text-center mb-10">
             <h2 className="text-2xl sm:text-3xl font-bold mb-3">Investimento</h2>
             <p className="text-sm sm:text-base text-gray-400 max-w-2xl mx-auto">
-              Duas modalidades. Escolha a que faz sentido para você.
+              {isBlackFridayActive() ? "Nesta Black Friday o curso vem com a plataforma BIA inteira. Depois, voltam a ser vendidos separados." : "Duas modalidades. Escolha a que faz sentido para você."}
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-4 sm:gap-6">
+          {isBlackFridayActive() && <div className="mb-6"><AcademyBlackFridayPricing /></div>}
+
+          <div className={cn("grid md:grid-cols-2 gap-4 sm:gap-6", isBlackFridayActive() && "opacity-80")}>
             {/* Card Online */}
             <div className="rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 to-fuchsia-500/5 p-6 sm:p-8 flex flex-col">
               <div className="flex items-center gap-2 mb-3">
@@ -749,7 +874,7 @@ export default function AcademyLandingPage() {
                 </span>
               </div>
               <h3 className="text-xl sm:text-2xl font-bold text-white mb-1">BIA Academy · Online</h3>
-              <p className="text-xs text-gray-500 mb-4">Com plataforma BIA integrada</p>
+              <p className="text-xs text-gray-500 mb-4">{isBlackFridayActive() ? "Preço normal fora da Black Friday · pagamento único, 12 meses" : "Com plataforma BIA integrada"}</p>
 
               {/* Bloco de preço destacado */}
               <div

@@ -210,6 +210,18 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R42 — Black Friday da BIA Academy: curso + acesso integral à plataforma (2026-11-19)
+
+Decisão da Janaina: a Academy ENTRA na Black Friday com oferta própria — **R$ 395/mês** ou **R$ 4.325/ano**, ambos com **acesso integral à plataforma BIA** (equivalente ao BIA Clínico, 1.500 créditos/mês). Ancoragem aprovada: Academy avulsa R$ 2.375 + 12 × BIA Clínico R$ 507 = **R$ 8.459 → R$ 4.325 (−49 %)**.
+
+- `src/lib/promo/black-friday.ts`: `BF_ACADEMY` (preços, âncora, créditos, links Asaas por plano), `bfAcademyAnchor()`, `bfAcademyPercent()`, `bfAcademyAnnualPerMonth()`, `bfAcademyCta()` (link Asaas quando cadastrado; **enquanto vazio, cai no WhatsApp comercial com mensagem pronta**), `bfMsLeft()`. `ACADEMY` saiu de `BF_EXCLUDED_IDS`; `/odontologia` (turma presencial) segue fora.
+- `/academy`: chip Black Friday no hero → `#investimento`; card **"BIA Academy + acesso integral à plataforma BIA"** com contagem regressiva ao vivo, plano mensal e anual (âncora riscada, selo "Melhor oferta · 49 % OFF"), lista de benefícios e aviso de que após 30/11 curso e plataforma voltam a ser vendidos separados. O card antigo (R$ 2.375) permanece como preço normal.
+- Home `/`: bloco de preço do banner Academy mostra a oferta BF (mensal/anual/âncora) e o CTA leva a `/academy#investimento`; nota de rodapé e banner da loja atualizados ("turmas presenciais não participam").
+- `/dashboard/billing`: chip da Academy no banner BF; card prospect com selo "Black Friday · curso + plataforma" e os dois preços.
+- Fora do período (`isBlackFridayActive()=false`) tudo volta automaticamente ao estado anterior.
+- **Pendente (Janaina)**: criar no Asaas os 2 links (R$ 395 recorrente mensal · R$ 4.325 anual) e preencher `BF_ACADEMY.links`; até lá o CTA abre o WhatsApp. Ativação da matrícula + plano Clínico após pagamento continua manual (24 h úteis), como hoje.
+- Testes: `r32_black_friday_store` atualizado (+3), `r13_03_2` ajustado; 225 verdes no conjunto afetado.
+
 ### R41 — Barra lateral recolhe sozinha quando não está em uso (2026-11-19)
 
 Pedido: *"a aba da esquerda com os tópicos da BIA, fechar quando não tiver sendo usado"*.

@@ -235,7 +235,10 @@ describe("R13.03.2.H · Consistência: link Asaas iu7ym1dp93cei9zk", () => {
     // Isola apenas a região do banner Academy
     const bannerRegion = src.match(/home-academy-banner[\s\S]{0,3500}/)?.[0] ?? ""
     expect(bannerRegion, "banner Academy não encontrado na home").not.toBe("")
-    const asaasInBanner = bannerRegion.match(/https?:\/\/[^\s"'<>]*asaas\.com\/c\/[^\s"'<>]+/g) ?? []
+    // R42: durante a Black Friday o CTA aponta para /academy#investimento (oferta curso + plataforma);
+    // fora dela volta ao link Asaas locked. A região é maior porque o bloco de preço ganhou a variante BF.
+    const bannerRegionBF = src.match(/home-academy-banner[\s\S]{0,6000}/)?.[0] ?? ""
+    const asaasInBanner = bannerRegionBF.match(/https?:\/\/[^\s"'<>]*asaas\.com\/c\/[^\s"'<>]+/g) ?? []
     expect(asaasInBanner.length, "banner Academy deve ter pelo menos 1 link Asaas").toBeGreaterThanOrEqual(1)
     for (const link of asaasInBanner) {
       expect(link, `banner home: link Asaas fora do padrão: ${link}`).toBe(ASAAS_LINK_LOCKED)
