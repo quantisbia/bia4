@@ -210,6 +210,12 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R44 — Rota de IA `/api/bioprint/model/ai-generate` passa a exigir login (2026-11-26)
+
+- **Problema:** a rota chamava o Claude com a chave da Quantis sem verificar sessão (confirmado em produção: uma chamada anônima chegava à validação do prompt). Nenhuma tela a utiliza.
+- **Correção:** `POST` e `GET` verificam a sessão antes de qualquer outra coisa e respondem `401 unauthorized` sem login. Sem cobrança de créditos (regra comercial inalterada).
+- **Testes:** `tests/r44_ai_generate_requires_login.test.ts`.
+
 ### R43 — Título da plataforma: BIA OS · Biofabrication Operating System (2026-11-26)
 
 - **Novo título:** `BIA OS` / `Biofabrication Operating System` / `Powered by Quantis Biotechnology`.

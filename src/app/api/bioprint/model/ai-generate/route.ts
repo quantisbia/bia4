@@ -22,6 +22,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import Anthropic from "@anthropic-ai/sdk"
 
+import { auth } from "@/lib/auth/config"
+
 import {
   AI_SYSTEM_PROMPT,
   AI_TOOL_SCHEMA,
@@ -41,6 +43,17 @@ const LLM_TIMEOUT_MS = 60_000
 
 export async function POST(req: NextRequest) {
   const startedAt = Date.now()
+
+  // ─── 0) Exigir login (R44) ───────────────────────────────────────────
+  // Até o R43 esta rota aceitava chamadas anônimas e consumia a chave da
+  // Anthropic. A sessão é verificada antes de ler o corpo ou chamar a IA.
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json(
+      { error: "unauthorized", message: "Faça login para usar esta função." },
+      { status: 401 },
+    )
+  }
 
   // ─── 1) Parse body ────────────────────────────────────────────────────
   let body: { prompt?: unknown }
@@ -160,6 +173,8 @@ export async function POST(req: NextRequest) {
 
 /** GET com metadados úteis para debug/UI. */
 export async function GET() {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: "unauthorized" }, { status: 401 })
   return NextResponse.json({
     endpoint: "/api/bioprint/model/ai-generate",
     method: "POST",
