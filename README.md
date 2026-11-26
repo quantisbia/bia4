@@ -210,7 +210,15 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
-### R45 — Menu reorganizado pelos ambientes do BIA OS (2026-11-26) — commit local, aguardando aprovação para publicar
+### R46 — BIA Print com dois caminhos: básico e avançado (2026-11-26)
+
+- **Caminho básico** = Impressão Básica (`/dashboard/print-basic`): rápido, para quem já domina os parâmetros essenciais. **Caminho avançado** = fluxo de 6 fases (`/dashboard/bioprint`), com BioSlicer, Imprimir (USB) e Análise como atalhos das Fases 3, 4 e 5.
+- **Menu:** os dois caminhos são os dois primeiros itens de BIA Print. **Página de entrada do BIA Print** (`/dashboard/bioprint`): dois cartões no topo, um por caminho; o cartão antigo da Impressão Básica no rodapé foi substituído por eles. Na Impressão Básica, o atalho do cabeçalho virou "Caminho avançado (6 fases)". O ícone de BIA Print na barra recolhida abre a página de entrada.
+- **Nenhuma ferramenta nova:** os dois caminhos já existiam; mudaram nomes, ordem e a porta de entrada. Rotas inalteradas.
+- **Rótulos que não cabiam na barra (medidos):** encurtados para "Biotintas", "BioSlicer · G-code", "Imprimir (USB)", "Maturação e ensaios" e "Ajuda · Manual"; a seta do item ativo e os selos "principal"/"novo" de BIA Print saíram para dar largura ao nome.
+- **Testes:** `tests/r46_bia_print_two_paths.test.ts`.
+
+### R45 — Menu reorganizado pelos ambientes do BIA OS (2026-11-26)
 
 - **Mesmas 23 rotas, novos grupos e rótulos** (`NAV_GROUPS` em `DashboardSidebar.tsx`): Meus projetos · seção **Ferramentas** (BIA Design, BIA Materials, BIA Print, BIA Biology, BIA Lab, BIA Regulatory, BIA Copilot) · Biblioteca científica · BIA Academy · Conta. Nenhuma rota criada, removida ou redirecionada.
 - **BIA Print** passou de 9 para 5 itens; as antigas "Fase 1/2/6" foram para Design, Materials e Biology. As páginas em si continuam com os títulos "Fase N".

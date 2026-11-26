@@ -142,6 +142,42 @@ export default function BioprintHubPage() {
 
   return (
     <div className="bia-hub-page space-y-6">
+      {/* R46 · BIA Print — dois caminhos: básico (Impressão Básica) e avançado (6 fases) */}
+      <section data-testid="bioprint-paths" aria-label="Caminhos do BIA Print" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Link href="/dashboard/print-basic" data-testid="bioprint-basic-card"
+          className="block rounded-2xl border border-violet-500/25 bg-violet-500/[0.06] hover:border-violet-400/50 transition-colors p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-11 h-11 rounded-xl border border-violet-500/30 bg-violet-500/15 flex items-center justify-center shrink-0">
+              <Printer className="w-5 h-5 text-violet-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] uppercase tracking-wider font-semibold text-violet-200/70">Caminho básico · rápido</div>
+              <h3 className="text-base font-bold text-white">Impressão Básica</h3>
+              <p className="text-[11px] text-gray-400 leading-relaxed">
+                Para quem já domina os parâmetros essenciais da bioimpressão. Superfície (mesa, Petri, lâmina ou placa multiwell) → objetos simples → até 3 cabeçotes → G-code → imprimir. Sem STL, sem 6 fases.
+              </p>
+              <span className="inline-block mt-3 text-xs px-3 py-1.5 rounded-lg bg-violet-500/20 text-violet-100 border border-violet-400/30">Abrir o caminho básico →</span>
+            </div>
+          </div>
+        </Link>
+        <a href="#bioprint-fases" data-testid="bioprint-advanced-card"
+          className="block rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.05] hover:border-emerald-400/50 transition-colors p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-11 h-11 rounded-xl border border-emerald-500/30 bg-emerald-500/15 flex items-center justify-center shrink-0">
+              <Layers className="w-5 h-5 text-emerald-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] uppercase tracking-wider font-semibold text-emerald-200/70">Caminho avançado · completo</div>
+              <h3 className="text-base font-bold text-white">Bioimpressão em 6 fases</h3>
+              <p className="text-[11px] text-gray-400 leading-relaxed">
+                Modelo de tecido → biotinta → BioSlicer (STL → G-code) → impressão com validação → análise → maturação. Cada fase alimenta a próxima.
+              </p>
+              <span className="inline-block mt-3 text-xs px-3 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-100 border border-emerald-400/30">Você está aqui · ver as 6 fases ↓</span>
+            </div>
+          </div>
+        </a>
+      </section>
+
       {/* ─── Banner explicativo ────────────────────────────────────── */}
       <section className="rounded-2xl bg-gradient-to-br from-emerald-500/8 via-cyan-500/8 to-violet-500/8 border border-emerald-500/20 p-5">
         <div className="flex items-start gap-3">
@@ -231,7 +267,7 @@ export default function BioprintHubPage() {
       */}
 
       {/* ─── Cards das 6 fases ────────────────────────────────────── */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <section id="bioprint-fases" className="grid grid-cols-1 md:grid-cols-2 gap-4 scroll-mt-4">
         {STEP_CARDS.map((card) => {
           const unlocked = isStepUnlocked(card.key, state)
           return (
@@ -251,24 +287,6 @@ export default function BioprintHubPage() {
       {/* R24.6: os cards "Execução USB direta", "G-code Hub" e "BTIE" foram
           removidos — eram atalhos para ferramentas que já são as Fases 3 e 4.
           Uma ferramenta, um lugar: G-code na Fase 3, impressão na Fase 4. */}
-
-      {/* R35 · Caminho básico (racional MIA) — para quem não precisa das 6 fases */}
-      <Link href="/dashboard/print-basic" data-testid="bioprint-basic-card"
-        className="block rounded-2xl border border-violet-500/25 bg-gradient-to-br from-violet-500/10 to-fuchsia-500/[0.03] hover:border-violet-400/50 transition-colors p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="w-11 h-11 rounded-xl border border-violet-500/30 bg-violet-500/15 flex items-center justify-center shrink-0">
-            <Printer className="w-5 h-5 text-violet-300" />
-          </div>
-          <div className="flex-1 min-w-[220px]">
-            <div className="text-[10px] uppercase tracking-wider font-semibold text-violet-200/70">Caminho básico · novo</div>
-            <h3 className="text-base font-bold text-white">Impressão Básica</h3>
-            <p className="text-[11px] text-gray-400 leading-relaxed">
-              Superfície (mesa, Petri, lâmina ou placa multiwell) → objetos simples → até 3 cabeçotes com extrusão pneumática, mecânica/volumétrica ou filamento → G-code Marlin. Sem STL, sem 6 fases.
-            </p>
-          </div>
-          <span className="text-xs px-3 py-1.5 rounded-lg bg-violet-500/20 text-violet-100 border border-violet-400/30">Abrir →</span>
-        </div>
-      </Link>
 
       {/* ─── Ações secundárias ─────────────────────────────────────── */}
       <section className="rounded-2xl bg-white/[0.02] border border-white/5 p-4 flex flex-wrap items-center gap-3">

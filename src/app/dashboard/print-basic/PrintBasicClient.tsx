@@ -232,7 +232,7 @@ export function PrintBasicClient({ initialStep }: { initialStep?: string } = {})
           <h1 className="text-base sm:text-lg font-bold bg-gradient-to-r from-violet-300 via-fuchsia-300 to-cyan-300 bg-clip-text text-transparent flex items-center gap-2"><Printer className="w-5 h-5 text-violet-300" /> Impressão Básica</h1>
           <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full border border-violet-400/30 text-violet-200">3 cabeçotes · MIA rationale</span>
           <div className="ml-auto flex items-center gap-2">
-            <Link href="/dashboard/bioprint/slice" className="text-xs px-3 py-1.5 rounded-lg border border-white/10 hover:border-violet-400/40 text-gray-300">Modo avançado (BioSlicer) →</Link>
+            <Link href="/dashboard/bioprint" data-testid="pb-advanced-path" className="text-xs px-3 py-1.5 rounded-lg border border-white/10 hover:border-violet-400/40 text-gray-300">Caminho avançado (6 fases) →</Link>
             <button onClick={reset} title="Restaurar padrões" className="text-xs px-2 py-1.5 rounded-lg border border-white/10 hover:border-red-400/40 text-gray-400"><RefreshCw className="w-3.5 h-3.5" /></button>
           </div>
         </div>

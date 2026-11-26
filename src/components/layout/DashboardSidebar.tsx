@@ -8,13 +8,14 @@ import { useSession } from "next-auth/react"
 import {
   LayoutDashboard, GitBranch, CircleDot,
   FileText, BookOpen, MessageSquare, CreditCard, Settings,
-  LogOut, Zap, ChevronRight, Menu, X, Printer, ClipboardCheck, BookMarked,
+  LogOut, Zap, Menu, X, Printer, ClipboardCheck, BookMarked,
   Crown, Wrench, Info, Map, Atom, Library, GraduationCap,
   Lightbulb, ShieldCheck, UserCircle, ChevronDown,
   Microscope,
   Pencil,
   Gamepad2,
   Pin, PinOff,
+  Layers,
 } from "lucide-react"
 import { cn } from "@/lib/utils/helpers"
 import { isSuperAdmin } from "@/lib/auth/admin-shared"
@@ -109,6 +110,8 @@ export type NavGroup = {
   accent: string
   /** Seção exibida acima do primeiro grupo que a declara (ex.: "Ferramentas"). */
   section?: string
+  /** Destino do ícone do grupo no trilho recolhido (padrão: primeiro item). */
+  entry?: string
   items: NavItem[]
 }
 
@@ -161,7 +164,7 @@ export const NAV_GROUPS: NavGroup[] = [
     accent: "text-teal-400",
     section: "Ferramentas",
     items: [
-      { href: "/dashboard/bioprint/bioink", label: "Biotintas e formulações", icon: Atom,
+      { href: "/dashboard/bioprint/bioink", label: "Biotintas", icon: Atom,
         info: "Único local de formulação: formulações validadas (18), laboratório guiado, formulação livre (807 biomateriais, reologia, multimaterial) e Formulador Pro (IA)." },
       { href: "/dashboard/tools", label: "Comparador e custos", icon: Wrench,
         info: "Comparador de biomateriais, calculadora de custos, exportação PDF." },
@@ -173,17 +176,18 @@ export const NAV_GROUPS: NavGroup[] = [
     icon: Printer,
     accent: "text-violet-400",
     section: "Ferramentas",
+    entry: "/dashboard/bioprint",
     items: [
-      { href: "/dashboard/bioprint", label: "Fluxo completo · 6 fases", icon: Printer, exact: true,
-        info: "1 Modelo de tecido → 2 Biotinta → 3 Fatiamento (único local de geometria) → 4 Bioimpressão → 5 Análise → 6 Maturação & caracterizações.", badge: "principal" },
-      { href: "/dashboard/bioprint/slice", label: "BioSlicer · Fatiamento e G-code", icon: Zap,
-        info: "BioSlicer — único local de geometria 3D: modelo anatômico, primitiva, upload, desenho ou teste de imprimibilidade → G-code (ponto zero na agulha, substrato Petri/placa, 1–4 cabeçotes, preenchimentos básicos e avançados)." },
-      { href: "/dashboard/bioprint/execute", label: "Imprimir · Controle da bioimpressora", icon: Gamepad2,
-        info: "Execução na bioimpressora: validação e pré-visualização 3D do G-code, conexão USB (Web Serial / Marlin), movimentação manual, transmissão com handshake, pausa segura e M112. O BIA Host (modo avançado) está acessível a partir desta fase." },
-      { href: "/dashboard/print-basic", label: "Impressão Básica", icon: Printer,
-        info: "Módulo básico (racional MIA): escolha a superfície (mesa, Petri, lâmina ou placa multiwell), monte objetos simples (disco, quadrado, anel, malha, linhas), configure até 3 cabeçotes com extrusão pneumática, mecânica/volumétrica ou filamento e gere o G-code Marlin. 6 créditos por G-code.", badge: "novo" },
+      { href: "/dashboard/print-basic", label: "Caminho básico", icon: Zap,
+        info: "Caminho básico (Impressão Básica) — rápido, para quem já domina os parâmetros essenciais da bioimpressão. Módulo básico (racional MIA): escolha a superfície (mesa, Petri, lâmina ou placa multiwell), monte objetos simples (disco, quadrado, anel, malha, linhas), configure até 3 cabeçotes com extrusão pneumática, mecânica/volumétrica ou filamento e gere o G-code Marlin. 6 créditos por G-code." },
+      { href: "/dashboard/bioprint", label: "Caminho avançado", icon: Printer, exact: true,
+        info: "Caminho avançado — fluxo completo em 6 fases: 1 Modelo de tecido → 2 Biotinta → 3 Fatiamento (único local de geometria) → 4 Bioimpressão → 5 Análise → 6 Maturação & caracterizações." },
+      { href: "/dashboard/bioprint/slice", label: "BioSlicer · G-code", icon: Layers,
+        info: "Caminho avançado · Fase 3. BioSlicer — único local de geometria 3D: modelo anatômico, primitiva, upload, desenho ou teste de imprimibilidade → G-code (ponto zero na agulha, substrato Petri/placa, 1–4 cabeçotes, preenchimentos básicos e avançados)." },
+      { href: "/dashboard/bioprint/execute", label: "Imprimir (USB)", icon: Gamepad2,
+        info: "Caminho avançado · Fase 4. Execução na bioimpressora: validação e pré-visualização 3D do G-code, conexão USB (Web Serial / Marlin), movimentação manual, transmissão com handshake, pausa segura e M112. O BIA Host (modo avançado) está acessível a partir desta fase." },
       { href: "/dashboard/bioprint/review", label: "Análise da impressão", icon: ClipboardCheck,
-        info: "Ciclo de retroalimentação: nota de 1 a 5 e relato técnico → a BIA ajusta o próximo G-code. Histórico de impressões.", badge: "novo" },
+        info: "Caminho avançado · Fase 5. Ciclo de retroalimentação: nota de 1 a 5 e relato técnico → a BIA ajusta o próximo G-code. Histórico de impressões." },
     ],
   },
   {
@@ -195,7 +199,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/dashboard/organoids", label: "Organoid Builder", labelKey: "nav_organoids", icon: CircleDot,
         info: "Biofabricação scaffold-free (sem bioimpressão): esferoides e organoides (intestinal, hepático, neural, cardíaco, renal, pancreático, pulmonar) com protocolo QMicroNiche™ e moldes não-adesivos QMatrix™." },
-      { href: "/dashboard/bioprint/post", label: "Maturação e caracterização", icon: Microscope,
+      { href: "/dashboard/bioprint/post", label: "Maturação e ensaios", icon: Microscope,
         info: "Pós-impressão: cultivo, maturação e caracterizações do construto (viabilidade, histologia, ensaios mecânicos)." },
     ],
   },
@@ -266,7 +270,7 @@ export const NAV_GROUPS: NavGroup[] = [
         info: "Saldo, histórico e recarga de créditos." },
       { href: "/dashboard/settings", label: "Configurações", icon: Settings,
         info: "Perfil, segurança, preferências." },
-      { href: "/dashboard/manual", label: "Ajuda · Manual do Usuário", icon: Library,
+      { href: "/dashboard/manual", label: "Ajuda · Manual", icon: Library,
         info: "Tutoriais passo-a-passo. Comece por aqui se for sua primeira vez." },
     ],
   },
@@ -576,7 +580,6 @@ function SidebarGroupedNav({
                             {item.badge}
                           </span>
                         )}
-                        {active && !item.badge && <ChevronRight className="w-3 h-3 text-violet-400/50 shrink-0" />}
                       </Link>
                       {item.info && <InfoTooltip label={label} text={item.info} />}
                     </div>
@@ -797,9 +800,9 @@ function SidebarRail({ pathname }: { pathname: string }) {
       <div data-testid="sidebar-rail-groups" className="flex-1 min-h-0 w-full flex flex-col items-center gap-1 overflow-y-auto [scrollbar-width:none]">
       {NAV_GROUPS.map((g) => {
         const active = g.items.some((it) => navItemMatches(pathname, it))
-        const first = g.items[0]
+        const entry = g.entry ?? g.items[0].href
         return (
-          <Link key={g.id} href={first.href} title={g.label} aria-label={g.label}
+          <Link key={g.id} href={entry} title={g.label} aria-label={g.label}
             data-testid={`sidebar-rail-${g.id}`}
             className={cn(
               "relative w-10 h-10 shrink-0 rounded-xl flex items-center justify-center border transition-colors",

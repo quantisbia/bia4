@@ -102,7 +102,7 @@ export function ChapterBioprintReviewPost() {
         <Beaker className="w-5 h-5 text-rose-300" /> Fase 6 · Maturação do tecido &amp; caracterizações
       </h3>
       <div className="flex flex-wrap items-center gap-2">
-        <WhereIs path="Ferramentas → BIA Biology → Maturação e caracterização" />
+        <WhereIs path="Ferramentas → BIA Biology → Maturação e ensaios" />
         <WhereIs path="/dashboard/bioprint/post" />
       </div>
 
