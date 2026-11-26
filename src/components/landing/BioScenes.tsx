@@ -7,7 +7,12 @@
  */
 import type { CSSProperties } from "react"
 
-const V = "#a78bfa", L = "#c4b5fd", C = "#67e8f9", E = "#6ee7b7", F = "#f0abfc", A = "#fcd34d"
+/* Paleta: cada cor é uma variável CSS com a cor do tema escuro como padrão. No tema claro,
+   as cenas que ficam direto sobre o fundo da página (.lp-ambient / .lp-strip) recebem tons
+   mais intensos em globals.css (R48); as que ficam em painéis escuros mantêm o padrão. */
+const V = "var(--lp-v,#a78bfa)", L = "var(--lp-l,#c4b5fd)", C = "var(--lp-c,#67e8f9)", E = "var(--lp-e,#6ee7b7)", F = "var(--lp-f,#f0abfc)", A = "var(--lp-a,#fcd34d)"
+/* Brilhos (brancos no escuro) e corpo dos equipamentos — só usados nas cenas de fundo */
+const W = "var(--lp-w,#fff)", W2 = "var(--lp-w,#f5f3ff)", W3 = "var(--lp-w,#e9e3ff)", D = "var(--lp-d,#150d2b)", D2 = "var(--lp-d,#1a1033)"
 const TXT = "#ede9fe", MUTED = "#a8a3b8"
 const css = (v: Record<string, string | number>) => v as CSSProperties
 const r1 = (n: number) => Math.round(n * 10) / 10
@@ -27,8 +32,8 @@ const CELLS: Array<{ x: number; y: number; c: string; t: number; o: number; w: n
 export function ScaffoldCellsScene({ className = "" }: SceneProps) {
   return (
     <svg viewBox="0 0 240 180" className={`lp-scene ${className}`} fill="none" aria-hidden="true">
-      {[30, 60, 90, 120, 150].map((y) => <path key={y} d={`M16 ${y}H224`} stroke={V} strokeOpacity=".38" strokeWidth="5" strokeLinecap="round" />)}
-      {[40, 80, 120, 160, 200].map((x) => <path key={x} d={`M${x} 14V166`} stroke={L} strokeOpacity=".26" strokeWidth="4" strokeLinecap="round" />)}
+      {[30, 60, 90, 120, 150].map((y) => <path key={y} className="lp-line" d={`M16 ${y}H224`} stroke={V} strokeOpacity=".38" strokeWidth="5" strokeLinecap="round" />)}
+      {[40, 80, 120, 160, 200].map((x) => <path key={x} className="lp-line" d={`M${x} 14V166`} stroke={L} strokeOpacity=".26" strokeWidth="4" strokeLinecap="round" />)}
       {CELLS.map((c, i) => (
         <g key={i} className="lp-migrate" style={css({ "--x1": `${c.w[0]}px`, "--y1": `${c.w[1]}px`, "--x2": `${c.w[2]}px`, "--y2": `${c.w[3]}px`, "--x3": `${c.w[4]}px`, "--y3": `${c.w[5]}px`, animationDuration: `${c.t}s`, animationDelay: `${c.o}s` })}>
           <ellipse className="lp-pseudo" cx={c.x + 8} cy={c.y - 1} rx="3.6" ry="2.1" fill={c.c} fillOpacity=".45" />
@@ -44,17 +49,17 @@ export function ScaffoldCellsScene({ className = "" }: SceneProps) {
 export function PrinterScene({ className = "" }: SceneProps) {
   return (
     <svg viewBox="0 0 240 200" className={`lp-scene ${className}`} fill="none" aria-hidden="true">
-      <path d="M30 178V34H210V178" stroke={L} strokeOpacity=".4" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-      <rect x="48" y="170" width="144" height="7" rx="3.5" fill={V} fillOpacity=".2" stroke={V} strokeOpacity=".5" />
+      <path className="lp-line" d="M30 178V34H210V178" stroke={L} strokeOpacity=".4" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+      <rect className="lp-line" x="48" y="170" width="144" height="7" rx="3.5" fill={V} fillOpacity=".2" stroke={V} strokeOpacity=".5" />
       {[1, 3, 5].map((n) => <path key={n} className={`lp-pl lp-pl-${n}`} d={`M70 ${173 - n * 7}H170`} pathLength={1} stroke={V} strokeWidth="5" strokeLinecap="round" />)}
       {[2, 4].map((n) => [0, 1, 2, 3, 4, 5].map((i) => <circle key={`${n}-${i}`} className={`lp-pd lp-pd-${n}-${i}`} cx={170 - i * 20} cy={173 - n * 7} r="2.6" fill={C} />))}
-      <g className="lp-pr-z"><path d="M30 96H210" stroke={L} strokeOpacity=".45" strokeWidth="3" strokeLinecap="round" /></g>
+      <g className="lp-pr-z"><path className="lp-line" d="M30 96H210" stroke={L} strokeOpacity=".45" strokeWidth="3" strokeLinecap="round" /></g>
       <g className="lp-pr-head">
-        <rect x="56" y="88" width="28" height="16" rx="4" fill="#1a1033" stroke={L} strokeOpacity=".85" />
+        <rect x="56" y="88" width="28" height="16" rx="4" fill={D2} stroke={L} strokeOpacity=".85" />
         <rect x="64" y="104" width="12" height="36" rx="2" fill={C} fillOpacity=".12" stroke={C} strokeOpacity=".8" />
         <rect x="66" y="118" width="8" height="20" rx="1" fill={C} fillOpacity=".5" />
         <path d="M70 104V118" stroke={L} strokeOpacity=".8" strokeWidth="2" />
-        <path d="M70 140V161" stroke="#e9e3ff" strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M70 140V161" stroke={W3} strokeWidth="1.6" strokeLinecap="round" />
         <circle className="lp-blink" cx="70" cy="162" r="2.6" fill={C} />
       </g>
     </svg>
@@ -66,38 +71,75 @@ export function StirrerScene({ className = "" }: SceneProps) {
   const liquid = "M64 98Q88 100 110 112Q132 100 156 98V160Q156 170 146 170H74Q64 170 64 160Z"
   return (
     <svg viewBox="0 0 220 220" className={`lp-scene ${className}`} fill="none" aria-hidden="true">
-      <rect x="42" y="178" width="136" height="30" rx="7" fill="#150d2b" stroke={L} strokeOpacity=".5" />
+      <rect className="lp-line" x="42" y="178" width="136" height="30" rx="7" fill={D} stroke={L} strokeOpacity=".5" />
       <path d="M52 178H168" stroke={L} strokeOpacity=".75" strokeWidth="2" strokeLinecap="round" />
       <circle cx="152" cy="193" r="6" stroke={L} strokeOpacity=".7" />
       <path d="M152 193l3.5-4" stroke={L} strokeOpacity=".8" strokeLinecap="round" />
-      <path d="M78 193h42" stroke={L} strokeOpacity=".28" strokeWidth="3" strokeLinecap="round" />
+      <path className="lp-line" d="M78 193h42" stroke={L} strokeOpacity=".28" strokeWidth="3" strokeLinecap="round" />
       <circle className="lp-blink" cx="62" cy="193" r="2.2" fill={E} />
       <path d={liquid} fill={C} fillOpacity=".16" />
       <path className="lp-tint" d={liquid} fill={V} fillOpacity=".24" />
-      <path className="lp-sway" d="M103 109Q108 136 110 152Q112 136 117 109Z" fill="#fff" fillOpacity=".1" />
+      <path className="lp-sway" d="M103 109Q108 136 110 152Q112 136 117 109Z" fill={W} fillOpacity=".1" />
       <path d="M64 98Q88 100 110 112Q132 100 156 98" stroke={C} strokeOpacity=".85" strokeWidth="1.4" strokeLinecap="round" />
       <g transform="translate(110 122) scale(1 .28)">
         <g className="lp-spin" style={css({ animationDuration: "2.6s" })}>
-          <circle r="28" /><circle cx="26" cy="0" r="2.4" fill={C} /><circle cx="-12" cy="-23" r="2" fill="#fff" fillOpacity=".7" />
+          <circle r="28" /><circle cx="26" cy="0" r="2.4" fill={C} /><circle cx="-12" cy="-23" r="2" fill={W} fillOpacity=".7" />
         </g>
       </g>
       <g transform="translate(110 140) scale(1 .3)">
         <g className="lp-spin" style={css({ animationDuration: "3.4s" })}>
-          <circle r="36" /><circle cx="32" cy="0" r="2.8" fill={F} /><circle cx="-22" cy="24" r="2.3" fill={C} /><circle cx="-8" cy="-33" r="2" fill="#fff" fillOpacity=".7" />
+          <circle r="36" /><circle cx="32" cy="0" r="2.8" fill={F} /><circle cx="-22" cy="24" r="2.3" fill={C} /><circle cx="-8" cy="-33" r="2" fill={W} fillOpacity=".7" />
         </g>
       </g>
       <g transform="translate(110 163) scale(1 .34)">
-        <rect className="lp-spin" style={css({ animationDuration: ".7s" })} x="-17" y="-4.5" width="34" height="9" rx="4.5" fill="#f5f3ff" fillOpacity=".92" />
+        <rect className="lp-spin" style={css({ animationDuration: ".7s" })} x="-17" y="-4.5" width="34" height="9" rx="4.5" fill={W2} fillOpacity=".92" />
       </g>
       {[[86, 3.6, 0], [128, 4.4, -1.3], [141, 3.9, -2.4], [97, 4.8, -3.1]].map(([x, d, o]) => (
-        <circle key={x} className="lp-rise" cx={x} cy="160" r="1.8" stroke="#fff" strokeOpacity=".7" strokeWidth=".8" style={css({ animationDuration: `${d}s`, animationDelay: `${o}s`, "--rise": "-50px" })} />
+        <circle key={x} className="lp-rise" cx={x} cy="160" r="1.8" stroke={W} strokeOpacity=".7" strokeWidth=".8" style={css({ animationDuration: `${d}s`, animationDelay: `${o}s`, "--rise": "-50px" })} />
       ))}
       <path d="M56 52Q62 55 62 62V160Q62 172 74 172H146Q158 172 158 160V62Q158 55 165 51" stroke={L} strokeOpacity=".8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M150 84h6M150 104h6M150 124h6M150 144h6" stroke={L} strokeOpacity=".45" strokeLinecap="round" />
-      <path d="M68 70V150" stroke="#fff" strokeOpacity=".12" strokeWidth="3" strokeLinecap="round" />
-      <path d="M136 8L124 50" stroke={L} strokeOpacity=".55" strokeWidth="6" strokeLinecap="round" />
+      <path className="lp-line" d="M150 84h6M150 104h6M150 124h6M150 144h6" stroke={L} strokeOpacity=".45" strokeLinecap="round" />
+      <path d="M68 70V150" stroke={W} strokeOpacity=".12" strokeWidth="3" strokeLinecap="round" />
+      <path className="lp-line" d="M136 8L124 50" stroke={L} strokeOpacity=".55" strokeWidth="6" strokeLinecap="round" />
       <path d="M124 50L121 62" stroke={L} strokeOpacity=".8" strokeWidth="2" strokeLinecap="round" />
       {[0, -1.3].map((o) => <circle key={o} className="lp-drop" cx="120.5" cy="66" r="2.4" fill={F} style={css({ animationDelay: `${o}s`, "--fall": "38px" })} />)}
+    </svg>
+  )
+}
+
+/* ── 3b · Esferoides em suspensão (R48): agregados de células que flutuam, "respiram" e recebem células ── */
+const SPHEROIDS: Array<{ x: number; y: number; r: number; c: string; ring: number; spin: number; float: number; o: number }> = [
+  { x: 82, y: 92, r: 40, c: E, ring: 16, spin: 60, float: 7, o: 0 },
+  { x: 176, y: 56, r: 25, c: C, ring: 11, spin: 44, float: 5.5, o: -2.2 },
+  { x: 190, y: 132, r: 17, c: F, ring: 8, spin: 36, float: 6.4, o: -3.6 },
+]
+const JOINING = [200, 150, 250, 100, 300]
+
+export function SpheroidsScene({ className = "" }: SceneProps) {
+  return (
+    <svg viewBox="0 0 240 170" className={`lp-scene ${className}`} fill="none" aria-hidden="true">
+      {SPHEROIDS.map((s, k) => {
+        const inner = Math.round(s.r / 3), step = (0.7 * s.r) / Math.sqrt(inner), cr = r1(Math.max(2, s.r * 0.085))
+        return (
+          <g key={k} className="lp-float" style={css({ animationDuration: `${s.float}s`, animationDelay: `${s.o}s` })}>
+            {k === 0 && JOINING.map((deg, i) => {
+              const a = (deg * Math.PI) / 180, d = s.r + 7
+              return <circle key={deg} className="lp-gather" cx={r1(s.x + d * Math.cos(a))} cy={r1(s.y + d * Math.sin(a))} r="3.2" fill={s.c} fillOpacity=".5" stroke={s.c} strokeOpacity=".95" strokeWidth=".7"
+                style={css({ "--dx": `${r1(22 * Math.cos(a))}px`, "--dy": `${r1(22 * Math.sin(a))}px`, animationDuration: `${r1(7 + i * 0.9)}s`, animationDelay: `${r1(-i * 1.7)}s` })} />
+            })}
+            <g className="lp-breathe" style={css({ animationDelay: `${s.o}s` })}>
+              <circle cx={s.x} cy={s.y} r={s.r} fill={s.c} fillOpacity=".16" stroke={s.c} strokeOpacity=".9" strokeWidth="1.4" />
+              <circle cx={s.x} cy={s.y} r={r1(s.r * 0.5)} fill={s.c} fillOpacity=".16" />
+              {Array.from({ length: inner }, (_, i) => { const [dx, dy] = spiral(i, step); return <circle key={i} cx={r1(s.x + dx)} cy={r1(s.y + dy)} r={cr} fill={s.c} fillOpacity=".42" stroke={s.c} strokeOpacity=".8" strokeWidth=".6" /> })}
+              <path d={`M${r1(s.x - s.r * 0.62)} ${r1(s.y - s.r * 0.42)}Q${r1(s.x - s.r * 0.3)} ${r1(s.y - s.r * 0.8)} ${r1(s.x + s.r * 0.12)} ${r1(s.y - s.r * 0.78)}`} stroke={W} strokeOpacity=".3" strokeWidth="1.6" strokeLinecap="round" />
+              <g className="lp-spin" style={css({ animationDuration: `${s.spin}s` })}>
+                <circle cx={s.x} cy={s.y} r={s.r + 4} />
+                {Array.from({ length: s.ring }, (_, i) => { const a = (i * 2 * Math.PI) / s.ring; return <circle key={i} cx={r1(s.x + s.r * Math.cos(a))} cy={r1(s.y + s.r * Math.sin(a))} r={cr} fill={s.c} fillOpacity=".55" stroke={s.c} strokeOpacity=".95" strokeWidth=".7" /> })}
+              </g>
+            </g>
+          </g>
+        )
+      })}
     </svg>
   )
 }

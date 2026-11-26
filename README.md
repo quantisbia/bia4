@@ -220,6 +220,13 @@ GOOGLE_AI_API_KEY=...
 - **Inalterado:** banner da Academy (segue logo abaixo do topo), oferta do Guia Inteligente com a imagem existente, planos, preços e Black Friday.
 - **Testes:** `tests/r47_home_bia_os_landing.test.ts`.
 
+### R48 — Página inicial: sai a faixa "Avance em tecidos bioimpressos…", entram esferoides no topo e cores do tema claro (2026-11-26)
+
+- **Sai:** a faixa inteira "Avance em tecidos bioimpressos, esferoides e organoides — com IA científica ao seu lado" (`#platform-launch`: imagem, texto, três pilares, preço e botão). Depois dos esferoides vêm direto os planos; a oferta do Guia Inteligente continua no card de planos. O arquivo `public/marketing/plataforma-bia-launch.jpg` permanece no repositório.
+- **Entra:** cena animada de esferoides (`SpheroidsScene`) no topo, embaixo do béquer do hidrogel; no celular, entra na faixa de cenas (agora quatro).
+- **Tema claro:** as cores das cenas viraram variáveis CSS (`--lp-*`) com a cor do tema escuro como padrão. Em `html.light`, as cenas que ficam sobre o fundo da página (`.lp-ambient`, `.lp-strip`) usam tons mais intensos, sem transparência, e os traços estruturais (`.lp-line`) ganham opacidade. As ilustrações em painéis escuros e o tema escuro não mudam.
+- **Testes:** `tests/r48_home_spheroids_light_colors.test.ts`; `r13_11` e `r47` atualizados para a retirada da faixa.
+
 ### R46 — BIA Print com dois caminhos: básico e avançado (2026-11-26)
 
 - **Caminho básico** = Impressão Básica (`/dashboard/print-basic`): rápido, para quem já domina os parâmetros essenciais. **Caminho avançado** = fluxo de 6 fases (`/dashboard/bioprint`), com BioSlicer, Imprimir (USB) e Análise como atalhos das Fases 3, 4 e 5.

@@ -35,7 +35,7 @@
  */
 
 import { describe, it, expect } from "vitest"
-import { readFileSync } from "node:fs"
+import { readFileSync, statSync } from "node:fs"
 import { resolve } from "node:path"
 
 const ROOT = resolve(__dirname, "..")
@@ -317,69 +317,33 @@ describe("R13.11 · Script de renovação — helper existe e é idempotente", (
   })
 })
 
-describe("R13.11.1 · Banner Plataforma BIA (Tecidos · Esferoides · Organoides)", () => {
+describe("R13.11.1 · Banner Plataforma BIA — retirado da página inicial no R48", () => {
+  // R48 (2026-11-26): a faixa "Avance em tecidos bioimpressos, esferoides e organoides — com IA
+  // científica ao seu lado" saiu inteira da home, a pedido. A oferta do Guia Inteligente segue
+  // no card de planos (testes D, D.2 e D.3 acima).
 
-  it("banner: seção #platform-launch presente na home", () => {
+  it("banner: a seção #platform-launch não existe mais na home", () => {
     const src = read("src/app/page.tsx")
-    expect(src).toContain(`id="platform-launch"`)
-    expect(src).toContain(`data-testid="home-platform-launch-section"`)
+    for (const gone of [`id="platform-launch"`, "home-platform-launch", "/marketing/plataforma-bia-launch.jpg", "Avance em", "Plataforma completa BIA"]) {
+      expect(src, gone).not.toContain(gone)
+    }
+    expect(src).not.toMatch(/label:\s*"(Tecidos|Esferoides|Organoides)"/)
   })
 
-  it("banner: imagem em public/marketing/plataforma-bia-launch.jpg referenciada com alt textual completo", () => {
+  it("a oferta do Guia continua no card de planos, com preço, créditos e link do Asaas", () => {
     const src = read("src/app/page.tsx")
-    expect(src).toContain("/marketing/plataforma-bia-launch.jpg")
-    expect(src).toMatch(/alt="[^"]*tecidos[^"]*esferoides[^"]*organoides/i)
+    const plans = src.slice(src.indexOf('id="pricing"'))
+    expect(plans).toContain(`data-testid="home-plan-guide-card"`)
+    expect(plans).toMatch(/R\$ 507/)
+    expect(plans).toMatch(/1\.500 créditos renovados todo mês/)
+    expect(plans).toMatch(/Cancele quando quiser/i)
+    expect(plans).toContain(GUIDE_ASAAS)
+    expect(plans).toMatch(/BIA Academy/i)
   })
 
-  it("banner: título menciona os 3 pilares (tecidos + esferoides + organoides)", () => {
-    const src = read("src/app/page.tsx")
-    const idxSection = src.indexOf('id="platform-launch"')
-    expect(idxSection).toBeGreaterThan(-1)
-    const sectionBlock = src.slice(idxSection, idxSection + 6000)
-    expect(sectionBlock).toMatch(/tecidos bioimpressos/i)
-    expect(sectionBlock).toMatch(/esferoides/i)
-    expect(sectionBlock).toMatch(/organoides/i)
-  })
-
-  it("banner: 3 pilares visuais renderizados (Tecidos · Esferoides · Organoides)", () => {
-    const src = read("src/app/page.tsx")
-    const sectionBlock = src.slice(src.indexOf('id="platform-launch"'))
-    // Cada pilar deve aparecer como label distinto
-    expect(sectionBlock).toMatch(/label:\s*"Tecidos"/)
-    expect(sectionBlock).toMatch(/label:\s*"Esferoides"/)
-    expect(sectionBlock).toMatch(/label:\s*"Organoides"/)
-  })
-
-  it("banner: preço R$ 507/mês e CTA para Asaas correto", () => {
-    const src = read("src/app/page.tsx")
-    const sectionBlock = src.slice(src.indexOf('id="platform-launch"'))
-    expect(sectionBlock).toMatch(/R\$ 507/)
-    expect(sectionBlock).toContain(GUIDE_ASAAS)
-    expect(sectionBlock).toContain(`data-testid="home-platform-launch-cta"`)
-  })
-
-  it("banner: menciona 1.500 créditos renovados + cancele quando quiser", () => {
-    const src = read("src/app/page.tsx")
-    const sectionBlock = src.slice(src.indexOf('id="platform-launch"'))
-    expect(sectionBlock).toMatch(/1\.500 créditos/)
-    expect(sectionBlock).toMatch(/renovados todo mês/i)
-    expect(sectionBlock).toMatch(/Cancele quando quiser/i)
-  })
-
-  it("banner: nota discreta sobre BIA Academy como produto separado", () => {
-    const src = read("src/app/page.tsx")
-    const sectionBlock = src.slice(src.indexOf('id="platform-launch"'))
-    expect(sectionBlock).toMatch(/BIA Academy/i)
-    expect(sectionBlock).toMatch(/2\.375/)
-  })
-
-  it("banner: imagem física existe em public/marketing/ (não é 404)", () => {
-    // Verifica que o arquivo foi commitado no repo, não só referenciado
-    const { statSync } = require("node:fs")
-    const path = resolve(ROOT, "public/marketing/plataforma-bia-launch.jpg")
-    const stat = statSync(path)
+  it("a imagem de divulgação continua no repositório (uso em materiais de marketing)", () => {
+    const stat = statSync(resolve(ROOT, "public/marketing/plataforma-bia-launch.jpg"))
     expect(stat.isFile()).toBe(true)
-    // Sanity check: imagem deve ter tamanho razoável (>100KB — JPEG 2K)
     expect(stat.size).toBeGreaterThan(100 * 1024)
   })
 })

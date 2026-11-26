@@ -17,8 +17,8 @@ describe("R47 · página inicial BIA OS", () => {
       expect(page, gone).not.toContain(gone)
     }
   })
-  it("novas seções na ordem: topo → Academy → em ação → esquema → esferoides → oferta → planos", () => {
-    const order = ['data-testid="home-hero"', 'data-testid="home-academy-banner"', 'id="takes"', 'id="plataforma"', 'id="esferoides"', 'id="platform-launch"', 'id="pricing"'].map((m) => page.indexOf(m))
+  it("novas seções na ordem: topo → Academy → em ação → esquema → esferoides → planos (R48: a faixa de oferta saiu)", () => {
+    const order = ['data-testid="home-hero"', 'data-testid="home-academy-banner"', 'id="takes"', 'id="plataforma"', 'id="esferoides"', 'id="pricing"'].map((m) => page.indexOf(m))
     expect(order.every((i) => i > -1)).toBe(true)
     expect([...order].sort((a, b) => a - b)).toEqual(order)
   })
@@ -61,7 +61,7 @@ describe("R47 · página inicial BIA OS", () => {
     expect(css).toMatch(/@media \(prefers-reduced-motion:reduce\)\{\s*\.lp-scene \*\{animation:none!important\}\s*\.lp-ambient\{display:none\}/)
   })
   it("blocos comerciais preservados", () => {
-    for (const keep of ['data-testid="home-academy-price"', 'data-testid="home-platform-launch-cta"', "/marketing/plataforma-bia-launch.jpg", 'data-testid="home-plan-guide-card"', 'data-testid="home-black-friday-banner"', "R$ 507"]) {
+    for (const keep of ['data-testid="home-academy-price"', 'data-testid="home-plan-guide-card"', 'data-testid="home-plan-guide-cta"', 'data-testid="home-black-friday-banner"', "R$ 507"]) {
       expect(page, keep).toContain(keep)
     }
   })
