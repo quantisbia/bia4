@@ -39,7 +39,7 @@ export function ChapterBioprintReviewPost() {
         <ClipboardCheck className="w-5 h-5 text-sky-300" /> Fase 5 · Análise da bioimpressão
       </h3>
       <div className="flex flex-wrap items-center gap-2">
-        <WhereIs path="Bioimprimir → Fase 5 · Análise" />
+        <WhereIs path="Ferramentas → BIA Print → Análise da impressão" />
         <WhereIs path="/dashboard/bioprint/review" />
       </div>
 
@@ -102,7 +102,7 @@ export function ChapterBioprintReviewPost() {
         <Beaker className="w-5 h-5 text-rose-300" /> Fase 6 · Maturação do tecido &amp; caracterizações
       </h3>
       <div className="flex flex-wrap items-center gap-2">
-        <WhereIs path="Bioimprimir → Fase 6 · Maturação" />
+        <WhereIs path="Ferramentas → BIA Biology → Maturação e caracterização" />
         <WhereIs path="/dashboard/bioprint/post" />
       </div>
 

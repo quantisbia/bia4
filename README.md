@@ -210,6 +210,14 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R45 — Menu reorganizado pelos ambientes do BIA OS (2026-11-26) — commit local, aguardando aprovação para publicar
+
+- **Mesmas 23 rotas, novos grupos e rótulos** (`NAV_GROUPS` em `DashboardSidebar.tsx`): Meus projetos · seção **Ferramentas** (BIA Design, BIA Materials, BIA Print, BIA Biology, BIA Lab, BIA Regulatory, BIA Copilot) · Biblioteca científica · BIA Academy · Conta. Nenhuma rota criada, removida ou redirecionada.
+- **BIA Print** passou de 9 para 5 itens; as antigas "Fase 1/2/6" foram para Design, Materials e Biology. As páginas em si continuam com os títulos "Fase N".
+- **Correção de destaque:** o hub `/dashboard/bioprint` passou a ser `exact`, para não marcar BIA Print como ativo nas rotas de Design/Materials/Biology.
+- **Fora do menu, de propósito:** BIA Dental (só existe a página pública `/odontologia`), Equipe e SmartFlow — ainda não existem como ferramenta.
+- **Manual:** 4 indicações "Onde fica" atualizadas. **Testes:** `tests/r45_bia_os_menu.test.ts`.
+
 ### R44 — Rota de IA `/api/bioprint/model/ai-generate` passa a exigir login (2026-11-26)
 
 - **Problema:** a rota chamava o Claude com a chave da Quantis sem verificar sessão (confirmado em produção: uma chamada anônima chegava à validação do prompt). Nenhuma tela a utiliza.

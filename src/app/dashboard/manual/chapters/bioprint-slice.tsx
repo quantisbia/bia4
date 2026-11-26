@@ -45,7 +45,7 @@ export function ChapterBioprintSlice() {
         </ul>
       </Box2>
 
-      <WhereIs path="Dashboard → Bioimprimir → Fase 3 · Fatiar (STL → G-code)" />
+      <WhereIs path="Dashboard → Ferramentas → BIA Print → BioSlicer · Fatiamento e G-code" />
 
       {/* ── Passo a passo ─────────────────────────────────────────────── */}
       <h2 className="text-lg font-bold text-white pt-2">Passo a passo</h2>

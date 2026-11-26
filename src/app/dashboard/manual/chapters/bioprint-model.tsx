@@ -52,7 +52,7 @@ export function ChapterBioprintModel() {
       </Box2>
 
       <div className="flex flex-wrap items-center gap-2">
-        <WhereIs path="Dashboard → Bioimprimir → Fase 1 · Modelo de tecido" />
+        <WhereIs path="Dashboard → Ferramentas → BIA Design → Modelo de tecido" />
         <span className="text-[11px] text-gray-500">ou</span>
         <WhereIs path="/dashboard/bioprint/model" />
       </div>

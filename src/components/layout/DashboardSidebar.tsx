@@ -107,7 +107,14 @@ export type NavGroup = {
   icon: typeof LayoutDashboard
   /** Cor temática do grupo (classe tailwind) */
   accent: string
+  /** Seção exibida acima do primeiro grupo que a declara (ex.: "Ferramentas"). */
+  section?: string
   items: NavItem[]
+}
+
+/** Item corresponde à rota atual? Respeita `exact` (ex.: o hub /dashboard/bioprint não "acende" nas subrotas de outros ambientes). */
+function navItemMatches(pathname: string, it: NavItem): boolean {
+  return it.exact ? pathname === it.href : pathname.startsWith(it.href)
 }
 
 export const NAV_HOME: NavItem = {
@@ -118,104 +125,149 @@ export const NAV_HOME: NavItem = {
   info: "Painel inicial personalizado conforme seu perfil (ortopedista, dermatologista, dentista, pós-grad, graduação ou pesquisador).",
 }
 
+/* R45 · BIA OS — mesmo conjunto de rotas, agrupado pelos ambientes do Biofabrication OS.
+ * Meus projetos · Ferramentas (Design, Materials, Print, Biology, Lab, Regulatory, Copilot) ·
+ * Biblioteca científica · Academy · Conta. Nenhuma rota criada ou removida. */
 export const NAV_GROUPS: NavGroup[] = [
   {
     id: "project",
-    label: "Projetar",
+    label: "Meus projetos",
     icon: Lightbulb,
     accent: "text-sky-400",
     items: [
-      { href: "/dashboard/pipeline",       label: "Pipeline",         labelKey: "nav_pipeline",   icon: GitBranch,
+      { href: "/dashboard/pipeline", label: "Pipeline", labelKey: "nav_pipeline", icon: GitBranch,
         info: "Fluxo guiado em 12 etapas: do problema clínico ao protocolo validado." },
-      // R24.6 · O Formulador Pro deixou de ser item separado: é um modo da
-      // Fase 2 · Biotinta (grupo Bioimprimir). Uma ferramenta, um lugar.
-    ],
-  },
-  {
-    id: "bioprint",
-    label: "Bioimprimir",
-    icon: Printer,
-    accent: "text-violet-400",
-    items: [
-      { href: "/dashboard/bioprint",       label: "Bioimpressão · 6 fases", labelKey: "nav_bioprint", icon: Printer,
-        info: "1 Modelo de tecido → 2 Biotinta → 3 Fatiamento (único local de geometria) → 4 Bioimpressão → 5 Análise → 6 Maturação & caracterizações.", badge: "principal" },
-      { href: "/dashboard/print-basic",    label: "Impressão Básica", icon: Printer,
-        info: "Módulo básico (racional MIA): escolha a superfície (mesa, Petri, lâmina ou placa multiwell), monte objetos simples (disco, quadrado, anel, malha, linhas), configure até 3 cabeçotes com extrusão pneumática, mecânica/volumétrica ou filamento e gere o G-code Marlin. 6 créditos por G-code.", badge: "novo" },
-      { href: "/dashboard/bioprint/model", label: "Fase 1 · Modelo de tecido", icon: CircleDot,
-        info: "Definição do construto: tecido-alvo, aplicação pretendida, dimensão e população celular. Sem geometria — a BIA recomenda modelo, perfil e biotinta para as fases seguintes." },
-      { href: "/dashboard/bioprint/bioink", label: "Fase 2 · Biotinta", icon: Atom,
-        info: "Único local de formulação: formulações validadas (18), laboratório guiado, formulação livre (807 biomateriais, reologia, multimaterial) e Formulador Pro (IA)." },
-      { href: "/dashboard/bioprint/slice", label: "Fase 3 · Fatiamento (STL → G-code)", icon: Zap,
-        info: "BioSlicer — único local de geometria 3D: modelo anatômico, primitiva, upload, desenho ou teste de imprimibilidade → G-code (ponto zero na agulha, substrato Petri/placa, 1–4 cabeçotes, preenchimentos básicos e avançados)." },
-      { href: "/dashboard/bioprint/draw", label: "Fase 3 · Desenhar & Imprimir", icon: Pencil,
-        info: "Via alternativa da Fase 3: trace linhas, círculos e retângulos com toque ou mouse — cada traço torna-se uma trajetória de extrusão; defina camadas para gerar volume." },
-      { href: "/dashboard/bioprint/execute", label: "Fase 4 · Bioimpressão", icon: Gamepad2,
-        info: "Execução na bioimpressora: validação e pré-visualização 3D do G-code, conexão USB (Web Serial / Marlin), movimentação manual, transmissão com handshake, pausa segura e M112. O BIA Host (modo avançado) está acessível a partir desta fase." },
-      { href: "/dashboard/bioprint/review", label: "Fase 5 · Análise da bioimpressão", icon: ClipboardCheck,
-        info: "Ciclo de retroalimentação: nota de 1 a 5 e relato técnico → a BIA ajusta o próximo G-code. Histórico de impressões.", badge: "novo" },
-      { href: "/dashboard/bioprint/post", label: "Fase 6 · Maturação & caracterizações", icon: Microscope,
-        info: "Pós-impressão: cultivo, maturação e caracterizações do construto (viabilidade, histologia, ensaios mecânicos)." },
-    ],
-  },
-  {
-    // R24.2 · Esferoides e organoides são biofabricação SCAFFOLD-FREE — não passam
-    // pelas 6 fases de bioimpressão. Vivem em grupo próprio, depois de "Bioimprimir".
-    id: "organoids",
-    label: "Esferoides & Organoides",
-    icon: CircleDot,
-    accent: "text-amber-400",
-    items: [
-      { href: "/dashboard/organoids",      label: "Organoid Builder", labelKey: "nav_organoids",  icon: CircleDot,
-        info: "Biofabricação scaffold-free (sem bioimpressão): esferoides e organoides (intestinal, hepático, neural, cardíaco, renal, pancreático, pulmonar) com protocolo QMicroNiche™ e moldes não-adesivos QMatrix™." },
-    ],
-  },
-  {
-    id: "validate",
-    label: "Validar",
-    icon: ShieldCheck,
-    accent: "text-emerald-400",
-    items: [
-      { href: "/dashboard/protocols",      label: "Protocolos GLP/GMP", labelKey: "nav_protocols", icon: FileText,
-        info: "POPs em formato ABNT ISO/IEC 17025 e ANVISA RDC. Exporta PDF assinável." },
-      { href: "/dashboard/protocol-total", label: "Protocolo Total",    icon: ClipboardCheck,
-        info: "Dossiê executivo consolidando todas as etapas do seu pipeline." },
-      { href: "/dashboard/analyses",       label: "Análises & Dossiês", icon: Microscope,
-        info: "Análises moleculares, celulares e dossiês regulatórios." },
-      { href: "/dashboard/tools",          label: "Ferramentas",        icon: Wrench,
-        info: "Comparador de biomateriais, calculadora de custos, exportação PDF." },
-    ],
-  },
-  {
-    id: "learn",
-    label: "Aprender",
-    icon: GraduationCap,
-    accent: "text-fuchsia-400",
-    items: [
-      { href: "/academy/dashboard",       label: "BIA Academy",         icon: GraduationCap,
-        info: "12 módulos de formação em biofabricação, biblioteca com 65+ artigos, e-books clínicos, encontros ao vivo.",
-        badge: "destaque" },
-      { href: "/dashboard/chat",          label: "Chat IA",             icon: MessageSquare,
-        info: "Converse com a BIA em linguagem natural. 2 créditos/mensagem." },
-      { href: "/dashboard/knowledge",     label: "Motor de Conhecimento", labelKey: "nav_knowledge", icon: BookOpen,
-        info: "65+ artigos curados com DOI, 20+ patentes, 15+ metodologias." },
-      { href: "/dashboard/manual",        label: "Manual do Usuário",    icon: Library,
-        info: "Tutoriais passo-a-passo. Comece por aqui se for sua primeira vez." },
-      { href: "/dashboard/roadmap",       label: "Roteiro Profissional", labelKey: "nav_roadmap", icon: Map,
+      { href: "/dashboard/roadmap", label: "Roteiro Profissional", labelKey: "nav_roadmap", icon: Map,
         info: "Caminho sugerido pela equipe Quantis — do problema clínico ao tecido impresso." },
     ],
   },
   {
+    id: "design",
+    label: "BIA Design",
+    icon: Pencil,
+    accent: "text-cyan-400",
+    section: "Ferramentas",
+    items: [
+      { href: "/dashboard/bioprint/model", label: "Modelo de tecido", icon: CircleDot,
+        info: "Definição do construto: tecido-alvo, aplicação pretendida, dimensão e população celular. Sem geometria — a BIA recomenda modelo, perfil e biotinta para as fases seguintes." },
+      { href: "/dashboard/bioprint/draw", label: "Desenhar & Imprimir", icon: Pencil,
+        info: "Via alternativa da Fase 3: trace linhas, círculos e retângulos com toque ou mouse — cada traço torna-se uma trajetória de extrusão; defina camadas para gerar volume." },
+    ],
+  },
+  {
+    id: "materials",
+    label: "BIA Materials",
+    icon: Atom,
+    accent: "text-teal-400",
+    section: "Ferramentas",
+    items: [
+      { href: "/dashboard/bioprint/bioink", label: "Biotintas e formulações", icon: Atom,
+        info: "Único local de formulação: formulações validadas (18), laboratório guiado, formulação livre (807 biomateriais, reologia, multimaterial) e Formulador Pro (IA)." },
+      { href: "/dashboard/tools", label: "Comparador e custos", icon: Wrench,
+        info: "Comparador de biomateriais, calculadora de custos, exportação PDF." },
+    ],
+  },
+  {
+    id: "bioprint",
+    label: "BIA Print",
+    icon: Printer,
+    accent: "text-violet-400",
+    section: "Ferramentas",
+    items: [
+      { href: "/dashboard/bioprint", label: "Fluxo completo · 6 fases", icon: Printer, exact: true,
+        info: "1 Modelo de tecido → 2 Biotinta → 3 Fatiamento (único local de geometria) → 4 Bioimpressão → 5 Análise → 6 Maturação & caracterizações.", badge: "principal" },
+      { href: "/dashboard/bioprint/slice", label: "BioSlicer · Fatiamento e G-code", icon: Zap,
+        info: "BioSlicer — único local de geometria 3D: modelo anatômico, primitiva, upload, desenho ou teste de imprimibilidade → G-code (ponto zero na agulha, substrato Petri/placa, 1–4 cabeçotes, preenchimentos básicos e avançados)." },
+      { href: "/dashboard/bioprint/execute", label: "Imprimir · Controle da bioimpressora", icon: Gamepad2,
+        info: "Execução na bioimpressora: validação e pré-visualização 3D do G-code, conexão USB (Web Serial / Marlin), movimentação manual, transmissão com handshake, pausa segura e M112. O BIA Host (modo avançado) está acessível a partir desta fase." },
+      { href: "/dashboard/print-basic", label: "Impressão Básica", icon: Printer,
+        info: "Módulo básico (racional MIA): escolha a superfície (mesa, Petri, lâmina ou placa multiwell), monte objetos simples (disco, quadrado, anel, malha, linhas), configure até 3 cabeçotes com extrusão pneumática, mecânica/volumétrica ou filamento e gere o G-code Marlin. 6 créditos por G-code.", badge: "novo" },
+      { href: "/dashboard/bioprint/review", label: "Análise da impressão", icon: ClipboardCheck,
+        info: "Ciclo de retroalimentação: nota de 1 a 5 e relato técnico → a BIA ajusta o próximo G-code. Histórico de impressões.", badge: "novo" },
+    ],
+  },
+  {
+    id: "organoids",
+    label: "BIA Biology",
+    icon: CircleDot,
+    accent: "text-amber-400",
+    section: "Ferramentas",
+    items: [
+      { href: "/dashboard/organoids", label: "Organoid Builder", labelKey: "nav_organoids", icon: CircleDot,
+        info: "Biofabricação scaffold-free (sem bioimpressão): esferoides e organoides (intestinal, hepático, neural, cardíaco, renal, pancreático, pulmonar) com protocolo QMicroNiche™ e moldes não-adesivos QMatrix™." },
+      { href: "/dashboard/bioprint/post", label: "Maturação e caracterização", icon: Microscope,
+        info: "Pós-impressão: cultivo, maturação e caracterizações do construto (viabilidade, histologia, ensaios mecânicos)." },
+    ],
+  },
+  {
+    id: "lab",
+    label: "BIA Lab",
+    icon: BookMarked,
+    accent: "text-rose-400",
+    section: "Ferramentas",
+    items: [
+      { href: "/dashboard/notebook", label: "Notebook", labelKey: "nav_notebook", icon: BookMarked,
+        info: "Caderno digital versionado com rastreabilidade GLP." },
+      { href: "/dashboard/analyses", label: "Análises e dossiês", icon: Microscope,
+        info: "Análises moleculares, celulares e dossiês regulatórios." },
+    ],
+  },
+  {
+    id: "validate",
+    label: "BIA Regulatory",
+    icon: ShieldCheck,
+    accent: "text-emerald-400",
+    section: "Ferramentas",
+    items: [
+      { href: "/dashboard/protocols", label: "Protocolos GLP/GMP", labelKey: "nav_protocols", icon: FileText,
+        info: "POPs em formato ABNT ISO/IEC 17025 e ANVISA RDC. Exporta PDF assinável." },
+      { href: "/dashboard/protocol-total", label: "Protocolo Total", icon: ClipboardCheck,
+        info: "Dossiê executivo consolidando todas as etapas do seu pipeline." },
+    ],
+  },
+  {
+    id: "copilot",
+    label: "BIA Copilot",
+    icon: MessageSquare,
+    accent: "text-indigo-400",
+    section: "Ferramentas",
+    items: [
+      { href: "/dashboard/chat", label: "Chat IA", icon: MessageSquare,
+        info: "Converse com a BIA em linguagem natural. 2 créditos/mensagem." },
+    ],
+  },
+  {
+    id: "library",
+    label: "Biblioteca científica",
+    icon: BookOpen,
+    accent: "text-blue-400",
+    items: [
+      { href: "/dashboard/knowledge", label: "Motor de Conhecimento", labelKey: "nav_knowledge", icon: BookOpen,
+        info: "65+ artigos curados com DOI, 20+ patentes, 15+ metodologias." },
+    ],
+  },
+  {
+    id: "learn",
+    label: "BIA Academy",
+    icon: GraduationCap,
+    accent: "text-fuchsia-400",
+    items: [
+      { href: "/academy/dashboard", label: "BIA Academy", icon: GraduationCap,
+        info: "12 módulos de formação em biofabricação, biblioteca com 65+ artigos, e-books clínicos, encontros ao vivo.", badge: "destaque" },
+    ],
+  },
+  {
     id: "account",
-    label: "Minha Conta",
+    label: "Conta",
     icon: UserCircle,
     accent: "text-amber-400",
     items: [
-      { href: "/dashboard/notebook",      label: "Notebook",      labelKey: "nav_notebook",   icon: BookMarked,
-        info: "Caderno digital versionado com rastreabilidade GLP." },
-      { href: "/dashboard/billing",       label: "Créditos",      icon: CreditCard,
+      { href: "/dashboard/billing", label: "Assinatura e créditos", icon: CreditCard,
         info: "Saldo, histórico e recarga de créditos." },
-      { href: "/dashboard/settings",      label: "Configurações", icon: Settings,
+      { href: "/dashboard/settings", label: "Configurações", icon: Settings,
         info: "Perfil, segurança, preferências." },
+      { href: "/dashboard/manual", label: "Ajuda · Manual do Usuário", icon: Library,
+        info: "Tutoriais passo-a-passo. Comece por aqui se for sua primeira vez." },
     ],
   },
 ]
@@ -352,7 +404,7 @@ function writeGroupState(state: Record<string, boolean>) {
 }
 
 /** Grupos que começam abertos por padrão (primeiro acesso). */
-const DEFAULT_OPEN_GROUPS = new Set(["bioprint", "learn"])
+const DEFAULT_OPEN_GROUPS = new Set(["project", "bioprint"])
 
 function SidebarGroupedNav({
   onNavigate,
@@ -371,7 +423,7 @@ function SidebarGroupedNav({
     const initial: Record<string, boolean> = {}
     for (const g of NAV_GROUPS) {
       // Grupo com item ativo abre automaticamente (sobrepõe o localStorage)
-      const hasActive = g.items.some((it) => pathname.startsWith(it.href))
+      const hasActive = g.items.some((it) => navItemMatches(pathname, it))
       if (hasActive) {
         initial[g.id] = true
       } else if (g.id in stored) {
@@ -392,7 +444,7 @@ function SidebarGroupedNav({
       let changed = false
       const next = { ...prev }
       for (const g of NAV_GROUPS) {
-        const hasActive = g.items.some((it) => pathname.startsWith(it.href))
+        const hasActive = g.items.some((it) => navItemMatches(pathname, it))
         if (hasActive && !next[g.id]) {
           next[g.id] = true
           changed = true
@@ -441,13 +493,19 @@ function SidebarGroupedNav({
       </Link>
 
       {/* 5 grupos colapsáveis */}
-      {NAV_GROUPS.map((group) => {
+      {NAV_GROUPS.map((group, gi) => {
         const isOpen = openGroups[group.id] ?? DEFAULT_OPEN_GROUPS.has(group.id)
         const activeInGroup = group.items.some((it) =>
           isItemActive(it.href, it.exact),
         )
         return (
           <div key={group.id} data-testid={`sidebar-group-${group.id}`}>
+            {group.section && group.section !== NAV_GROUPS[gi - 1]?.section && (
+              <p data-testid="sidebar-section" className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600">
+                {group.section}
+              </p>
+            )}
+            {!group.section && NAV_GROUPS[gi - 1]?.section && <div className="mx-3 my-2 h-px bg-white/[0.06]" />}
             <button
               type="button"
               onClick={() => toggleGroup(group.id)}
@@ -736,7 +794,7 @@ function SidebarRail({ pathname }: { pathname: string }) {
       </Link>
       <div className="w-6 h-px bg-white/[0.08] my-1.5" />
       {NAV_GROUPS.map((g) => {
-        const active = g.items.some((it) => pathname.startsWith(it.href))
+        const active = g.items.some((it) => navItemMatches(pathname, it))
         const first = g.items[0]
         return (
           <Link key={g.id} href={first.href} title={g.label} aria-label={g.label}
