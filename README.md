@@ -215,6 +215,7 @@ GOOGLE_AI_API_KEY=...
 - **Mesmas 23 rotas, novos grupos e rótulos** (`NAV_GROUPS` em `DashboardSidebar.tsx`): Meus projetos · seção **Ferramentas** (BIA Design, BIA Materials, BIA Print, BIA Biology, BIA Lab, BIA Regulatory, BIA Copilot) · Biblioteca científica · BIA Academy · Conta. Nenhuma rota criada, removida ou redirecionada.
 - **BIA Print** passou de 9 para 5 itens; as antigas "Fase 1/2/6" foram para Design, Materials e Biology. As páginas em si continuam com os títulos "Fase N".
 - **Correção de destaque:** o hub `/dashboard/bioprint` passou a ser `exact`, para não marcar BIA Print como ativo nas rotas de Design/Materials/Biology.
+- **Trilho recolhido (R45.1):** com 11 grupos em vez de 6, a lista de ícones passou a rolar dentro do trilho em telas baixas.
 - **Fora do menu, de propósito:** BIA Dental (só existe a página pública `/odontologia`), Equipe e SmartFlow — ainda não existem como ferramenta.
 - **Manual:** 4 indicações "Onde fica" atualizadas. **Testes:** `tests/r45_bia_os_menu.test.ts`.
 

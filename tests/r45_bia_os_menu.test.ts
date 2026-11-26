@@ -55,4 +55,8 @@ describe("R45 · menu BIA OS", () => {
   it("não promete ferramentas que ainda não existem", () => {
     expect(block).not.toMatch(/Dental|SmartFlow|Equipe/)
   })
+  it("trilho recolhido: a lista de grupos rola em telas baixas em vez de achatar os ícones", () => {
+    expect(src).toMatch(/data-testid="sidebar-rail-groups" className="[^"]*min-h-0[^"]*overflow-y-auto/)
+    expect(src).toContain('"relative w-10 h-10 shrink-0 rounded-xl')
+  })
 })

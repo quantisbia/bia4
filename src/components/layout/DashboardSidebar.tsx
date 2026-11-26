@@ -792,7 +792,9 @@ function SidebarRail({ pathname }: { pathname: string }) {
         )}>
         <NAV_HOME.icon className="w-[18px] h-[18px]" />
       </Link>
-      <div className="w-6 h-px bg-white/[0.08] my-1.5" />
+      <div className="w-6 h-px bg-white/[0.08] my-1.5 shrink-0" />
+      {/* R45.1 · 11 grupos: a lista rola dentro do trilho em telas baixas, sem achatar os ícones */}
+      <div data-testid="sidebar-rail-groups" className="flex-1 min-h-0 w-full flex flex-col items-center gap-1 overflow-y-auto [scrollbar-width:none]">
       {NAV_GROUPS.map((g) => {
         const active = g.items.some((it) => navItemMatches(pathname, it))
         const first = g.items[0]
@@ -800,7 +802,7 @@ function SidebarRail({ pathname }: { pathname: string }) {
           <Link key={g.id} href={first.href} title={g.label} aria-label={g.label}
             data-testid={`sidebar-rail-${g.id}`}
             className={cn(
-              "relative w-10 h-10 rounded-xl flex items-center justify-center border transition-colors",
+              "relative w-10 h-10 shrink-0 rounded-xl flex items-center justify-center border transition-colors",
               active ? "bg-white/[0.07] border-white/[0.1]" : "border-transparent hover:bg-white/[0.06]",
             )}>
             <g.icon className={cn("w-[18px] h-[18px]", g.accent, !active && "opacity-70")} />
@@ -808,7 +810,7 @@ function SidebarRail({ pathname }: { pathname: string }) {
           </Link>
         )
       })}
-      <div className="flex-1" />
+      </div>
       <Link href="/dashboard/billing" title={`Créditos: ${credits.toLocaleString("pt-BR")}`}
         className="flex flex-col items-center gap-0.5 text-violet-400 hover:text-violet-200 transition-colors mb-1">
         <Zap className="w-4 h-4" />
