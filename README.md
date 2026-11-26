@@ -210,7 +210,7 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
-### R47 — Nova página inicial da BIA OS com cenas animadas (2026-11-26) — commit local, aguardando aprovação para publicar
+### R47 — Nova página inicial da BIA OS com cenas animadas (2026-11-26)
 
 - **Sai:** a seção "6 Mercados" e as seções "O que é Biofabricação", "Por que escolher BIA" e "6 Módulos".
 - **Entra:** topo com três cenas animadas ao fundo (bioimpressora depositando um scaffold, hidrogel em béquer no agitador magnético, células migrando em um scaffold); "A plataforma em movimento" com ilustrações animadas do BIA Print e do BIA Materials; esquema da BIA OS (núcleo + oito ambientes) e os quatro estágios de formação de um esferoide.
