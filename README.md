@@ -1,4 +1,4 @@
-# BIA v4 — Biomaterial Intelligent Assistant
+# BIA OS — Biofabrication Operating System
 
 > Plataforma de IA científica para formulação de biomateriais, geração de geometrias 3D
 > e otimização de bioimpressão. Desenvolvida pela **Quantis Biotechnology**.
@@ -7,7 +7,7 @@
 
 ## 🎯 Visão Geral
 
-- **Nome:** BIA v4 (Biomaterial Intelligent Assistant)
+- **Nome:** BIA OS — Biofabrication Operating System · Powered by Quantis Biotechnology (BIA = Biofabrication Intelligent Assistant)
 - **Stack:** Next.js 14 + TypeScript + TailwindCSS + Prisma + Gemini 2.5 Flash + Claude Sonnet 4.5 (geração de modelo 3D via IA · R12.56)
 - **Foco:** Acelerar pesquisa em medicina regenerativa com IA + ferramentas científicas integradas
 - **Status:** ✅ Operacional em produção
@@ -209,6 +209,13 @@ GOOGLE_AI_API_KEY=...
 ---
 
 ## 🗓 Changelog Recente
+
+### R43 — Título da plataforma: BIA OS · Biofabrication Operating System (2026-11-26)
+
+- **Novo título:** `BIA OS` / `Biofabrication Operating System` / `Powered by Quantis Biotechnology`.
+- **Onde mudou:** cabeçalho da barra lateral do dashboard (3 linhas; o alfinete passou a ficar sobreposto no canto para dar largura ao texto), home (`/` — nav, selo, H1, H2 e rodapé), login, cadastro e página de erro de autenticação, títulos de aba e metadados de compartilhamento (`src/app/layout.tsx`, `src/app/dashboard/layout.tsx`), `platform.name` (pt/en/es) e `siteConfig.name`.
+- **O que NÃO mudou (de propósito):** "BIA" continua sendo *Biofabrication Intelligent Assistant* — rodapés de PDF/DOCX, cabeçalhos de G-code/STL, prompts de IA, Termos/Privacidade e o Manual seguem com o nome anterior até decisão da coordenação. Menu, rotas e funcionalidades inalterados.
+- **Testes:** `tests/r43_bia_os_title.test.ts`.
 
 ### R42 — Black Friday da BIA Academy: curso + acesso integral à plataforma (2026-11-19)
 

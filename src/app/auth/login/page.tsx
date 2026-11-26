@@ -94,15 +94,18 @@ export default function LoginPage() {
             </div>
             <div>
               <span className="text-xl sm:text-2xl font-bold leading-tight block">
-                BIA <span className="text-violet-400">v4</span>
+                BIA <span className="text-violet-400">OS</span>
               </span>
-              <span className="text-[10px] text-violet-300 tracking-widest uppercase block">
-                Biofabrication AI
+              <span className="text-[11px] text-violet-300 block">
+                Biofabrication Operating System
+              </span>
+              <span className="text-[10px] text-gray-500 block mt-0.5">
+                Powered by Quantis Biotechnology
               </span>
             </div>
           </Link>
           <h1 className="text-xl sm:text-2xl font-bold mt-6 mb-1.5">Bem-vindo de volta</h1>
-          <p className="text-gray-400 text-sm">Entre na sua conta BIA v4</p>
+          <p className="text-gray-400 text-sm">Entre na sua conta BIA OS</p>
         </div>
 
         {/* Registration success */}

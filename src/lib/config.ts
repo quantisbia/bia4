@@ -11,7 +11,7 @@ export const env = {
 }
 
 export const siteConfig = {
-  name: "BIA v4",
+  name: "BIA OS",
   description: "Plataforma de IA para Biofabricação — Quantis Biotechnology",
   url: env.APP_URL,
   version: "4.0.0",

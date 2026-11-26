@@ -5,7 +5,7 @@ import { DashboardSidebar } from "@/components/layout/DashboardSidebar"
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav"
 
 export const metadata: Metadata = {
-  title: { default: "Dashboard", template: "%s | BIA v4" },
+  title: { default: "Dashboard", template: "%s | BIA OS" },
 }
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {

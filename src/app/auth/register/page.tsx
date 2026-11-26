@@ -124,10 +124,13 @@ export default function RegisterPage() {
             </div>
             <div>
               <span className="text-xl font-bold leading-tight block">
-                BIA <span className="text-violet-400">v4</span>
+                BIA <span className="text-violet-400">OS</span>
               </span>
-              <span className="text-[10px] text-violet-300 tracking-widest uppercase block">
-                Biofabrication AI
+              <span className="text-[11px] text-violet-300 block">
+                Biofabrication Operating System
+              </span>
+              <span className="text-[10px] text-gray-500 block mt-0.5">
+                Powered by Quantis Biotechnology
               </span>
             </div>
           </Link>

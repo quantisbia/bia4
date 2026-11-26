@@ -38,7 +38,7 @@ export default function AuthErrorPage() {
             <Dna className="w-5 h-5 text-white" />
           </div>
           <span className="text-xl font-bold">
-            BIA <span className="text-emerald-400">v3</span>
+            BIA <span className="text-emerald-400">OS</span>
           </span>
         </Link>
 

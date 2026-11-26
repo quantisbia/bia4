@@ -13,7 +13,7 @@ import { auth } from "@/lib/auth/config"
 const siteUrl = process.env.NEXTAUTH_URL || "https://bia.quantis.bio"
 
 export const metadata: Metadata = {
-  title: { default: "BIA v4 - Biofabrication Intelligent Assistant", template: "%s | BIA v4" },
+  title: { default: "BIA OS — Biofabrication Operating System", template: "%s | BIA OS" },
   description: "Plataforma de IA para biofabricação: design de tecidos artificiais, organoides, bioimpressão 3D, formulação de biomateriais e protocolos GLP/GMP. 807+ formulações, 120+ artigos científicos, 12 etapas de pipeline.",
   keywords: [
     "biofabricação", "biofabrication", "tecidos artificiais", "tissue engineering",
@@ -38,22 +38,22 @@ export const metadata: Metadata = {
     type: "website",
     locale: "pt_BR",
     url: siteUrl,
-    siteName: "BIA - Biofabrication Intelligent Assistant",
-    title: "BIA v4 - IA para Biofabricação | Quantis Biotechnology",
+    siteName: "BIA OS — Biofabrication Operating System",
+    title: "BIA OS — Biofabrication Operating System | Powered by Quantis Biotechnology",
     description: "Plataforma de IA para design de tecidos, organoides e biomateriais. Pipeline de 12 etapas, 807+ formulações, 120+ artigos científicos. Comece com 30 créditos grátis.",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "BIA v4 - Biofabrication Intelligent Assistant",
+        alt: "BIA OS — Biofabrication Operating System",
         type: "image/png",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "BIA v4 - IA para Biofabricação",
+    title: "BIA OS — Biofabrication Operating System",
     description: "Design de tecidos, organoides e biomateriais com IA. 807+ formulações, 120+ artigos. Comece grátis.",
     images: ["/og-image.png"],
     creator: "@quantisbio",
@@ -107,7 +107,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "SoftwareApplication",
-              name: "BIA - Biofabrication Intelligent Assistant",
+              name: "BIA OS — Biofabrication Operating System",
               applicationCategory: "BusinessApplication",
               operatingSystem: "Web",
               description: "Plataforma de IA para biofabricação: design de tecidos, organoides e biomateriais",

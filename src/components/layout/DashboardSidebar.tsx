@@ -560,16 +560,19 @@ function SidebarContent({ onNavigate, pinned, onTogglePin }: { onNavigate?: () =
     <div className="flex flex-col h-full overflow-hidden">
 
       {/* ── Logo ── */}
-      <div className="px-4 py-4 border-b border-white/[0.06] flex items-center gap-2">
+      <div className="relative px-4 py-4 border-b border-white/[0.06] flex items-center gap-2">
         <Link href="/dashboard" onClick={onNavigate}
           className="flex items-center gap-3 group flex-1 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center shadow-lg shadow-violet-900/50 shrink-0">
             <BiaLogoIcon size={22} />
           </div>
           <div className="min-w-0">
-            <span className="font-bold text-white tracking-tight text-sm leading-none block">BIA</span>
-            <span className="text-[9px] text-violet-300 tracking-[0.15em] uppercase leading-none block mt-0.5 truncate">
-              Biofabrication AI
+            <span className="font-bold text-white tracking-tight text-sm leading-none block">BIA <span className="text-violet-300">OS</span></span>
+            <span className="text-[9px] text-violet-300 leading-tight block mt-1 whitespace-nowrap">
+              Biofabrication Operating System
+            </span>
+            <span className="text-[9px] text-gray-500 leading-tight block mt-0.5 whitespace-nowrap">
+              Powered by Quantis Biotechnology
             </span>
           </div>
         </Link>
@@ -581,7 +584,7 @@ function SidebarContent({ onNavigate, pinned, onTogglePin }: { onNavigate?: () =
             aria-pressed={!!pinned}
             title={pinned ? "Desafixar: a barra recolhe sozinha quando não estiver em uso" : "Fixar a barra aberta"}
             className={cn(
-              "hidden md:inline-flex p-1.5 rounded-lg border transition-colors shrink-0",
+              "hidden md:inline-flex absolute top-3 right-3 p-1.5 rounded-lg border transition-colors shrink-0",
               pinned
                 ? "text-violet-300 border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/20"
                 : "text-gray-500 border-white/[0.06] hover:text-gray-200 hover:bg-white/[0.06]",
@@ -720,7 +723,7 @@ function SidebarRail({ pathname }: { pathname: string }) {
   const homeActive = pathname === "/dashboard"
   return (
     <div className="flex flex-col h-full items-center py-3 gap-1" data-testid="sidebar-rail">
-      <Link href="/dashboard" title="BIA · Visão Geral" aria-label="BIA"
+      <Link href="/dashboard" title="BIA OS · Visão Geral" aria-label="BIA OS"
         className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center shadow-lg shadow-violet-900/50 mb-2">
         <BiaLogoIcon size={22} />
       </Link>
@@ -869,7 +872,7 @@ function MobileHeader() {
             <BiaLogoIcon size={15} />
           </div>
           <span className="text-sm font-semibold text-white truncate">
-            {currentItem?.label ?? "BIA"}
+            {currentItem?.label ?? "BIA OS"}
           </span>
         </div>
 

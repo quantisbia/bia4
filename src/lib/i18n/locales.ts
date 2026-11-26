@@ -125,7 +125,7 @@ export const DICTIONARIES = {
     "auth.forgot": "Esqueci a senha",
 
     // Plataforma / marketing
-    "platform.name": "BIA - Biofabrication Intelligent Assistant",
+    "platform.name": "BIA OS - Biofabrication Operating System",
     "platform.tagline": "Plataforma de IA para biofabricação",
   },
 
@@ -204,7 +204,7 @@ export const DICTIONARIES = {
     "auth.password": "Password",
     "auth.forgot": "Forgot password",
 
-    "platform.name": "BIA - Biofabrication Intelligent Assistant",
+    "platform.name": "BIA OS - Biofabrication Operating System",
     "platform.tagline": "AI platform for biofabrication",
 
     "knowledge.title": "Knowledge Engine",
@@ -329,7 +329,7 @@ export const DICTIONARIES = {
     "auth.password": "Contraseña",
     "auth.forgot": "Olvidé mi contraseña",
 
-    "platform.name": "BIA - Biofabrication Intelligent Assistant",
+    "platform.name": "BIA OS - Biofabrication Operating System",
     "platform.tagline": "Plataforma de IA para biofabricación",
   },
 } as const

@@ -57,9 +57,9 @@ export default function HomePage() {
           <div className="flex items-center gap-2.5">
             <BiaLogoBox sizeClass="w-9 h-9" size={26} rounded="rounded-xl" />
             <div>
-              <span className="text-lg font-bold tracking-tight leading-tight block">BIA</span>
-              <span className="hidden sm:block text-[9px] text-violet-300 tracking-widest uppercase leading-tight">
-                Biofabrication AI
+              <span className="text-lg font-bold tracking-tight leading-tight block">BIA <span className="text-violet-300">OS</span></span>
+              <span className="hidden sm:block md:hidden lg:block text-[9px] text-violet-300 leading-tight whitespace-nowrap">
+                Biofabrication Operating System
               </span>
             </div>
           </div>
@@ -105,7 +105,7 @@ export default function HomePage() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 bg-violet-500/10 border border-violet-500/20 rounded-full px-3 sm:px-4 py-1.5 text-xs sm:text-sm text-violet-400 mb-6 sm:mb-8">
             <Zap className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-            <span>Powered by Quantis</span>
+            <span>Powered by Quantis Biotechnology</span>
           </div>
 
           {/* Logo */}
@@ -120,10 +120,10 @@ export default function HomePage() {
           </div>
 
           <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-tight mb-3">
-            <span className="bia-gradient-text glow-text">BIA</span>
+            <span className="bia-gradient-text glow-text">BIA OS</span>
           </h1>
           <h2 className="text-lg sm:text-2xl md:text-3xl font-semibold text-white/80 tracking-tight mb-5">
-            Biofabrication Intelligent Assistant
+            Biofabrication Operating System
           </h2>
 
           <p className="text-base sm:text-xl text-gray-300 max-w-2xl mx-auto mb-3 leading-relaxed font-medium px-2">
@@ -802,7 +802,7 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <BiaLogoBox sizeClass="w-8 h-8" size={22} rounded="rounded-lg" />
-            <span className="text-sm text-gray-500">BIA — Quantis Biotechnology © 2026</span>
+            <span className="text-sm text-gray-500">BIA OS — Quantis Biotechnology © 2026</span>
           </div>
           <div className="flex items-center gap-6 text-xs text-gray-600">
             <Link href="/auth/login" className="hover:text-gray-400 transition-colors">Login</Link>
