@@ -210,6 +210,16 @@ GOOGLE_AI_API_KEY=...
 
 ## 🗓 Changelog Recente
 
+### R47 — Nova página inicial da BIA OS com cenas animadas (2026-11-26) — commit local, aguardando aprovação para publicar
+
+- **Sai:** a seção "6 Mercados" e as seções "O que é Biofabricação", "Por que escolher BIA" e "6 Módulos".
+- **Entra:** topo com três cenas animadas ao fundo (bioimpressora depositando um scaffold, hidrogel em béquer no agitador magnético, células migrando em um scaffold); "A plataforma em movimento" com ilustrações animadas do BIA Print e do BIA Materials; esquema da BIA OS (núcleo + oito ambientes) e os quatro estágios de formação de um esferoide.
+- **Como é feito:** SVG + CSS em `src/components/landing/BioScenes.tsx` e no bloco R47 de `globals.css` (prefixo `lp-`), sem JavaScript no navegador nem arquivos de vídeo/GIF. Com `prefers-reduced-motion`, as cenas ficam paradas no quadro final e o fundo decorativo some.
+- **São ilustrações, não gravações de tela** — cada uma traz essa legenda; os valores mostrados são de exemplo.
+- **Fundo animado:** aparece só em telas de 1280 px ou mais, nas margens do topo, do esquema (a partir de 1400 px), dos esferoides e da chamada final; no celular, as três cenas viram uma faixa abaixo das estatísticas.
+- **Inalterado:** banner da Academy (segue logo abaixo do topo), oferta do Guia Inteligente com a imagem existente, planos, preços e Black Friday.
+- **Testes:** `tests/r47_home_bia_os_landing.test.ts`.
+
 ### R46 — BIA Print com dois caminhos: básico e avançado (2026-11-26)
 
 - **Caminho básico** = Impressão Básica (`/dashboard/print-basic`): rápido, para quem já domina os parâmetros essenciais. **Caminho avançado** = fluxo de 6 fases (`/dashboard/bioprint`), com BioSlicer, Imprimir (USB) e Análise como atalhos das Fases 3, 4 e 5.

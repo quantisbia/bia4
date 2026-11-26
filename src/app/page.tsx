@@ -1,13 +1,13 @@
 import Link from "next/link"
 import { isBlackFridayActive, bfPrice, bfSavings, bfPercentLabel, brl, BF_ENDS_LABEL, BF_ACADEMY, bfAcademyAnchor, bfAcademyPercent } from "@/lib/promo/black-friday"
 import {
-  ArrowRight, FlaskConical, Brain, Layers, Microscope, Zap,
-  Shield, BarChart3, CheckCircle2, Star,
-  Pill, Heart, Leaf, Building2, GraduationCap, TestTube2,
-  TrendingUp, AlertCircle, Crown,
-  ChevronRight
+  ArrowRight, Brain, Microscope, Zap, CheckCircle2, Star, GraduationCap, ChevronRight,
+  Atom, Printer, PenTool, BookMarked, ShieldCheck, MessageSquare,
 } from "lucide-react"
 import { FloatingThemeLocale } from "@/components/ui/FloatingThemeLocale"
+import {
+  PrinterScene, StirrerScene, ScaffoldCellsScene, PrintTake, MaterialsTake, BiaOsDiagram, SpheroidStage,
+} from "@/components/landing/BioScenes"
 
 /* ─── Logo BIA SVG ──────────────────────────────────────────────────── */
 function BiaLogoSvg({ size = 32 }: { size?: number }) {
@@ -42,6 +42,37 @@ function BiaLogoBox({ sizeClass = "w-10 h-10", size = 32, rounded = "rounded-xl"
   )
 }
 
+/* ─── R47 · Ambientes da BIA OS e estágios do esferoide (página inicial) ─── */
+const AMBIENTES = [
+  { icon: PenTool, name: "BIA Design", desc: "Modelo de tecido, geometrias e desenho de trajetórias.", tone: "text-cyan-300 bg-cyan-500/10 border-cyan-500/20" },
+  { icon: Atom, name: "BIA Materials", desc: "Biotintas, formulações e comparação de biomateriais.", tone: "text-teal-300 bg-teal-500/10 border-teal-500/20" },
+  { icon: Printer, name: "BIA Print", desc: "BioSlicer, G-code e controle da bioimpressora, em dois caminhos.", tone: "text-violet-300 bg-violet-500/10 border-violet-500/20" },
+  { icon: Microscope, name: "BIA Biology", desc: "Esferoides, organoides e maturação do construto.", tone: "text-amber-300 bg-amber-500/10 border-amber-500/20" },
+  { icon: BookMarked, name: "BIA Lab", desc: "Notebook de experimentos, análises e relatórios.", tone: "text-rose-300 bg-rose-500/10 border-rose-500/20" },
+  { icon: ShieldCheck, name: "BIA Regulatory", desc: "Protocolos GLP/GMP e dossiês regulatórios.", tone: "text-emerald-300 bg-emerald-500/10 border-emerald-500/20" },
+  { icon: MessageSquare, name: "BIA Copilot", desc: "Chat de IA especializado em biofabricação.", tone: "text-indigo-300 bg-indigo-500/10 border-indigo-500/20" },
+  { icon: GraduationCap, name: "BIA Academy", desc: "Formação em 12 módulos, com a ferramenta aberta ao lado.", tone: "text-fuchsia-300 bg-fuchsia-500/10 border-fuchsia-500/20" },
+]
+
+const SPHEROID_STAGES: Array<{ n: 1 | 2 | 3 | 4; title: string; text: string }> = [
+  { n: 1, title: "1 · Semeadura", text: "Células em suspensão entram em um micropoço não aderente." },
+  { n: 2, title: "2 · Agregação", text: "Sem onde aderir, elas sedimentam e se aproximam." },
+  { n: 3, title: "3 · Compactação", text: "Os contatos entre células adensam o agregado." },
+  { n: 4, title: "4 · Esferoide", text: "Microtecido compacto; nos maiores, o núcleo recebe menos oxigênio." },
+]
+
+const PRINT_POINTS = [
+  "Caminho básico: superfície, objetos simples e até 3 cabeçotes, com G-code em poucos passos",
+  "Caminho avançado: do modelo de tecido à maturação, em 6 fases",
+  "BioSlicer com validação do G-code e envio à bioimpressora por USB",
+]
+
+const MATERIALS_POINTS = [
+  "18 formulações validadas na literatura, com parâmetros de impressão",
+  "Formulação livre com reologia recalculada a cada ajuste",
+  "Formulador Pro: até 8 componentes com análise assistida por IA",
+]
+
 /* ══════════════════════════════════════════════════════════════════════ */
 export default function HomePage() {
   return (
@@ -66,9 +97,9 @@ export default function HomePage() {
 
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-7 text-sm text-gray-400">
-            <Link href="#what-is" className="hover:text-white transition-colors">O que é?</Link>
-            <Link href="#markets" className="hover:text-white transition-colors">Mercados</Link>
-            <Link href="#modules" className="hover:text-white transition-colors">Módulos</Link>
+            <Link href="#takes" className="hover:text-white transition-colors">Em ação</Link>
+            <Link href="#plataforma" className="hover:text-white transition-colors">Plataforma</Link>
+            <Link href="#esferoides" className="hover:text-white transition-colors">Esferoides</Link>
             <Link href="#academy" className="hover:text-fuchsia-300 transition-colors font-medium">
               Academy
             </Link>
@@ -97,26 +128,20 @@ export default function HomePage() {
       </nav>
 
       {/* ── Hero ────────────────────────────────────────────────────────── */}
-      <section className="relative pt-24 sm:pt-32 pb-16 sm:pb-24 px-4 sm:px-6 grid-bg">
-        {/* Glows */}
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[300px] sm:w-[600px] h-[300px] sm:h-[600px] bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
+      <section className="relative overflow-hidden pt-24 sm:pt-32 pb-14 sm:pb-20 px-4 sm:px-6 grid-bg" data-testid="home-hero">
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 w-[320px] sm:w-[680px] h-[320px] sm:h-[680px] bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        {/* R47 · Fundo animado (telas largas): impressão de um scaffold, células migrando e hidrogel no agitador magnético */}
+        <div aria-hidden="true" data-testid="home-ambient" className="hidden xl:block">
+          <div className="lp-ambient left-6 2xl:left-24 top-28 w-[200px] 2xl:w-[230px]"><PrinterScene /></div>
+          <div className="lp-ambient left-10 2xl:left-28 top-[23rem] w-[210px] 2xl:w-[240px]"><ScaffoldCellsScene /></div>
+          <div className="lp-ambient right-8 2xl:right-28 top-44 w-[190px] 2xl:w-[220px]"><StirrerScene /></div>
+        </div>
 
         <div className="max-w-4xl mx-auto text-center relative z-10">
-          {/* Badge */}
           <div className="inline-flex items-center gap-2 bg-violet-500/10 border border-violet-500/20 rounded-full px-3 sm:px-4 py-1.5 text-xs sm:text-sm text-violet-400 mb-6 sm:mb-8">
             <Zap className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
             <span>Powered by Quantis Biotechnology</span>
-          </div>
-
-          {/* Logo */}
-          <div className="flex justify-center mb-6 sm:mb-8">
-            <BiaLogoBox
-              sizeClass="w-20 h-20 sm:w-28 sm:h-28"
-              size={72}
-              rounded="rounded-3xl"
-              shadow="shadow-2xl shadow-violet-900/80"
-              pulse
-            />
           </div>
 
           <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-tight mb-3">
@@ -127,15 +152,13 @@ export default function HomePage() {
           </h2>
 
           <p className="text-base sm:text-xl text-gray-300 max-w-2xl mx-auto mb-3 leading-relaxed font-medium px-2">
-            IA para{" "}
-            <em className="text-violet-300 not-italic font-semibold">criar tecidos humanos, órgãos e biomateriais</em>{" "}
-            com precisão científica.
+            Formule biomateriais, modele estruturas, bioimprima e cultive{" "}
+            <em className="text-violet-300 not-italic font-semibold">em um só sistema</em>.
           </p>
           <p className="text-sm sm:text-base text-gray-400 max-w-xl mx-auto mb-8 leading-relaxed px-2">
-            BIA guia pesquisadores e empresas em cada etapa — do laboratório ao mercado.
+            Do objetivo científico ao tecido fabricado, com ferramentas científicas e IA especializada em biofabricação.
           </p>
 
-          {/* CTAs */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-8 px-4">
             <Link href="/auth/register"
               className="bia-button-primary flex items-center justify-center gap-2 text-base w-full sm:w-auto px-8 py-3.5 rounded-xl font-semibold">
@@ -150,25 +173,28 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {/* Free credits banner */}
           <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-blue-300">
             <Zap className="w-3.5 h-3.5 text-blue-400 shrink-0" />
             <span>Comece com <strong className="text-blue-200">30 créditos grátis</strong> para testar</span>
           </div>
 
-          {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8 pt-8 mt-8 border-t border-white/5">
             {[
               { value: "807+", label: "Formulações bio" },
-              { value: "12",   label: "Etapas pipeline" },
               { value: "120+", label: "Artigos científicos" },
-              { value: "5",    label: "Pacotes de créditos" },
+              { value: "12",   label: "Etapas pipeline" },
+              { value: "8",    label: "Ambientes de trabalho" },
             ].map((stat) => (
               <div key={stat.label} className="text-center">
                 <div className="text-2xl sm:text-3xl font-bold text-violet-400 mb-1">{stat.value}</div>
                 <div className="text-xs sm:text-sm text-gray-500">{stat.label}</div>
               </div>
             ))}
+          </div>
+
+          {/* Em telas menores as três cenas entram como faixa decorativa */}
+          <div aria-hidden="true" className="xl:hidden mt-10 grid grid-cols-3 gap-4 items-end max-w-md mx-auto opacity-70">
+            <PrinterScene /><StirrerScene /><ScaffoldCellsScene />
           </div>
         </div>
       </section>
@@ -321,34 +347,143 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── O que é biofabricação ─────────────────────────────────────── */}
-      <section id="what-is" className="py-16 sm:py-20 px-4 sm:px-6 bg-gradient-to-b from-black/30 to-transparent">
-        <div className="max-w-4xl mx-auto">
-          <div className="rounded-2xl sm:rounded-3xl border border-violet-500/15 bg-violet-500/5 p-6 sm:p-10 md:p-14 relative overflow-hidden">
-            <div className="absolute inset-0 grid-bg opacity-30" />
-            <div className="relative z-10 flex flex-col md:flex-row gap-6 sm:gap-10 items-start md:items-center">
-              <div className="shrink-0">
-                <BiaLogoBox sizeClass="w-14 h-14 sm:w-20 sm:h-20" size={48} rounded="rounded-2xl" />
+      {/* ── R47 · A plataforma em movimento (BIA Print e BIA Materials) ───── */}
+      <section id="takes" data-testid="home-takes" className="relative scroll-mt-20 py-16 sm:py-24 px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-10 sm:mb-14">
+            <span className="text-xs font-bold uppercase tracking-widest text-violet-400 mb-2 block">A plataforma em movimento</span>
+            <h2 className="text-3xl sm:text-4xl font-bold mb-3">
+              Do béquer à bioimpressora, <span className="bia-gradient-text">no mesmo fluxo</span>
+            </h2>
+            <p className="text-gray-400 text-sm sm:text-base max-w-2xl mx-auto">
+              Formule a biotinta, gere o G-code e imprima. Cada fase alimenta a próxima.
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center mb-14 sm:mb-20">
+            <figure className="lp-stage p-2 sm:p-3" data-testid="home-take-print">
+              <PrintTake />
+              <figcaption className="lp-caption px-2 pt-2 pb-1">Ilustração esquemática · não é gravação de tela</figcaption>
+            </figure>
+            <div>
+              <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-violet-300 mb-3">
+                <Printer className="w-3.5 h-3.5" /> BIA Print
               </div>
-              <div>
-                <span className="text-xs font-bold uppercase tracking-widest text-violet-400 mb-2 block">
-                  Entenda em 30 segundos
-                </span>
-                <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 leading-tight">
-                  O que é <span className="bia-gradient-text">Biofabricação</span>?
-                </h2>
-                <p className="text-gray-300 text-sm sm:text-base leading-relaxed mb-3">
-                  Biofabricação é a ciência de{" "}
-                  <strong className="text-white">construir estruturas biológicas vivas</strong> —
-                  como pele, cartilagem, vasos e mini-órgãos — usando células e bioimpressão 3D.
-                </p>
-                <p className="text-gray-400 text-sm leading-relaxed">
-                  A BIA usa IA para{" "}
-                  <strong className="text-violet-300">acelerar, organizar e guiar</strong>{" "}
-                  cada etapa desse processo.
-                </p>
-              </div>
+              <h3 className="text-2xl sm:text-3xl font-bold leading-tight mb-3">Do modelo ao G-code, camada por camada</h3>
+              <p className="text-gray-300 text-sm sm:text-base leading-relaxed mb-4">
+                Dois caminhos para a mesma bioimpressora: um rápido, para quem já domina os parâmetros essenciais, e um completo, em 6 fases.
+              </p>
+              <ul className="space-y-2.5 text-sm text-gray-300 mb-5">
+                {PRINT_POINTS.map((t) => (
+                  <li key={t} className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" /><span>{t}</span></li>
+                ))}
+              </ul>
+              <Link href="/auth/register" className="inline-flex items-center gap-1.5 text-sm font-semibold text-violet-300 hover:text-violet-200 underline-offset-4 hover:underline">
+                Experimentar o BIA Print <ArrowRight className="w-4 h-4" />
+              </Link>
             </div>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+            <div className="order-2 lg:order-1">
+              <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-teal-300 mb-3">
+                <Atom className="w-3.5 h-3.5" /> BIA Materials
+              </div>
+              <h3 className="text-2xl sm:text-3xl font-bold leading-tight mb-3">Formule a biotinta e veja a reologia responder</h3>
+              <p className="text-gray-300 text-sm sm:text-base leading-relaxed mb-4">
+                Parta de uma formulação validada, monte a sua do zero ou peça a análise do Formulador Pro.
+              </p>
+              <ul className="space-y-2.5 text-sm text-gray-300 mb-5">
+                {MATERIALS_POINTS.map((t) => (
+                  <li key={t} className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-teal-400 mt-0.5 shrink-0" /><span>{t}</span></li>
+                ))}
+              </ul>
+              <Link href="/auth/register" className="inline-flex items-center gap-1.5 text-sm font-semibold text-teal-300 hover:text-teal-200 underline-offset-4 hover:underline">
+                Experimentar o BIA Materials <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+            <figure className="lp-stage p-2 sm:p-3 order-1 lg:order-2" data-testid="home-take-materials">
+              <MaterialsTake />
+              <figcaption className="lp-caption px-2 pt-2 pb-1">Ilustração esquemática · valores de exemplo</figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      {/* ── R47 · Esquema da BIA OS: um núcleo, oito ambientes ─────────────── */}
+      <section id="plataforma" data-testid="home-bia-os" className="relative overflow-hidden scroll-mt-20 py-16 sm:py-24 px-4 sm:px-6">
+        {/* Só em telas bem largas: abaixo disso a cena ficaria atrás do esquema */}
+        <div aria-hidden="true" className="hidden 2xl:block">
+          <div className="lp-ambient right-6 top-16 w-[180px]"><ScaffoldCellsScene /></div>
+        </div>
+        <div className="max-w-6xl mx-auto relative z-10">
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center mb-12">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-widest text-violet-400 mb-2 block">Como a BIA OS se organiza</span>
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4 leading-tight">
+                Um sistema, <span className="bia-gradient-text">oito ambientes</span>
+              </h2>
+              <p className="text-gray-300 text-sm sm:text-base leading-relaxed mb-3">
+                Em vez de uma lista de ferramentas soltas, a BIA OS agrupa o trabalho de biofabricação em ambientes.
+                Você entra pelo que precisa fazer: formular, modelar, imprimir, cultivar, registrar ou validar.
+              </p>
+              <p className="text-gray-400 text-sm leading-relaxed">
+                O Copilot responde dúvidas técnicas e a Academy ensina cada etapa com a ferramenta aberta ao lado.
+              </p>
+            </div>
+            <div className="lp-stage p-4 sm:p-6 w-full max-w-md mx-auto" data-testid="home-bia-os-diagram">
+              <BiaOsDiagram />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {AMBIENTES.map((a) => (
+              <div key={a.name} className="lp-card p-5">
+                <div className={`w-10 h-10 rounded-xl border flex items-center justify-center mb-3 ${a.tone}`}>
+                  <a.icon className="w-5 h-5" />
+                </div>
+                <h3 className="text-base font-semibold text-white mb-1.5">{a.name}</h3>
+                <p className="text-gray-400 text-xs sm:text-sm leading-relaxed">{a.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── R47 · Esferoides: de células dispersas a microtecidos ──────────── */}
+      <section id="esferoides" data-testid="home-spheroids" className="relative overflow-hidden scroll-mt-20 py-16 sm:py-24 px-4 sm:px-6">
+        {/* Cabe na margem lateral: não encosta no título centralizado */}
+        <div aria-hidden="true" className="hidden xl:block">
+          <div className="lp-ambient left-3 2xl:left-10 top-12 w-[110px] 2xl:w-[170px]"><StirrerScene /></div>
+        </div>
+        <div className="max-w-5xl mx-auto relative z-10">
+          <div className="text-center mb-10">
+            <span className="text-xs font-bold uppercase tracking-widest text-amber-300 mb-2 block">BIA Biology</span>
+            <h2 className="text-3xl sm:text-4xl font-bold mb-3 leading-tight">
+              Esferoides: de células dispersas a <span className="bia-gradient-text">microtecidos 3D</span>
+            </h2>
+            <p className="text-gray-400 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
+              Esferoides se formam sem scaffold. No Organoid Builder você planeja o tipo celular, o método de agregação e o cronograma de cultivo.
+            </p>
+          </div>
+
+          <div className="lp-stage p-4 sm:p-6" data-testid="home-spheroid-stages">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              {SPHEROID_STAGES.map((s) => (
+                <div key={s.n}>
+                  <SpheroidStage stage={s.n} />
+                  <p className="lp-stage-title mt-2">{s.title}</p>
+                  <p className="lp-stage-text">{s.text}</p>
+                </div>
+              ))}
+            </div>
+            <p className="lp-caption mt-5">Ilustração esquemática · tempos e tamanhos variam com o tipo celular</p>
+          </div>
+
+          <div className="text-center mt-8">
+            <Link href="/auth/register" className="inline-flex items-center gap-1.5 text-sm font-semibold text-amber-300 hover:text-amber-200 underline-offset-4 hover:underline">
+              Planejar esferoides no Organoid Builder <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
         </div>
       </section>
@@ -356,7 +491,7 @@ export default function HomePage() {
       {/* ── R13.11 · Banner Plataforma BIA (Tecidos · Esferoides · Organoides) ──
           Faixa visual que apresenta a plataforma completa em 1 cena e
           conecta direto ao checkout de assinatura R$ 507/mês. Aparece
-          entre "O que é biofabricação" e "6 Mercados". */}
+          depois da seção de esferoides e antes dos planos. */}
       <section
         id="platform-launch"
         data-testid="home-platform-launch-section"
@@ -465,148 +600,6 @@ export default function HomePage() {
             </Link>{" "}
             é o programa de 12 módulos com plataforma integrada por 12 meses (R$ 2.375 · pagamento único).
           </p>
-        </div>
-      </section>
-
-      {/* ── 6 Mercados ──────────────────────────────────────────────────── */}
-      <section id="markets" className="py-16 sm:py-24 px-4 sm:px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-8 sm:mb-12">
-            <span className="text-xs font-bold uppercase tracking-widest text-violet-400 mb-2 block">
-              Oportunidade de mercado
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-bold mb-3">
-              6 Mercados em <span className="bia-gradient-text">Alta Demanda</span>
-            </h2>
-            <p className="text-gray-400 text-sm sm:text-base max-w-2xl mx-auto">
-              A biofabricação movimenta <strong className="text-white">bilhões de dólares</strong> em setores reais.
-            </p>
-          </div>
-
-          {/* Warning box */}
-          <div className="max-w-2xl mx-auto mb-8 sm:mb-12">
-            <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-4">
-              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-              <p className="text-xs sm:text-sm text-amber-200 leading-relaxed">
-                <strong className="text-amber-100">Nenhum especialista está fora do mercado.</strong>{" "}
-                A escassez de profissionais qualificados em biofabricação é um dos maiores gargalos do setor.
-              </p>
-            </div>
-          </div>
-
-          {/* Markets grid — 1 col mobile, 2 col md, 3 col lg */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {[
-              { icon: Heart,         color: "violet",  market: "Medicina Regenerativa",         size: "US$ 28 bi", growth: "+19% a.a.", desc: "Implantes, enxertos de pele e reparação de tecidos. Hospitais buscam soluções para reduzir listas de espera por órgãos.", tags: ["Implantes","Transplantes"] },
-              { icon: Pill,          color: "blue",    market: "Farmacêutica & Drug Discovery",  size: "US$ 62 bi", growth: "+15% a.a.", desc: "Organoides e tecido 3D substituem testes em animais e aceleram validação de medicamentos. Reduz P&D em até 40%.", tags: ["Big Pharma","Biotech"] },
-              { icon: Leaf,          color: "purple",  market: "Alimentos do Futuro",           size: "US$ 25 bi", growth: "+32% a.a.", desc: "Carne cultivada, laticínios sem animais e proteínas de precisão. Empresas como Upside Foods já estão no mercado.", tags: ["Carne Lab","AgTech"] },
-              { icon: TestTube2,     color: "indigo",  market: "Cosméticos & Dermatologia",     size: "US$ 9 bi",  growth: "+22% a.a.", desc: "Pele artificial para testes sem crueldade animal, colágeno biosintetizado e curativos inteligentes.", tags: ["Skincare","Cicatrização"] },
-              { icon: Building2,     color: "blue",    market: "Indústria & Materiais Bio",     size: "US$ 14 bi", growth: "+18% a.a.", desc: "Biomateriais para embalagens biodegradáveis, sensores biológicos e materiais de construção sustentáveis.", tags: ["Bioplásticos","ESG"] },
-              { icon: GraduationCap, color: "violet",  market: "Academia & Pesquisa",           size: "US$ 7 bi",  growth: "+24% a.a.", desc: "Universidades precisam de IA para publicar mais rápido, obter financiamento e treinar novos cientistas.", tags: ["Universidades","Grant"] },
-            ].map((item) => (
-              <div key={item.market}
-                className="rounded-xl sm:rounded-2xl border border-white/8 bg-white/2 p-5 hover:border-violet-500/25 hover:bg-violet-500/3 transition-all">
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`w-10 h-10 rounded-xl bg-${item.color}-500/10 border border-${item.color}-500/20 flex items-center justify-center shrink-0`}>
-                    <item.icon className={`w-5 h-5 text-${item.color}-400`} />
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-white">{item.size}</div>
-                    <div className="flex items-center gap-1 justify-end">
-                      <TrendingUp className="w-3 h-3 text-green-400" />
-                      <span className="text-xs text-green-400 font-semibold">{item.growth}</span>
-                    </div>
-                  </div>
-                </div>
-                <h3 className={`text-sm sm:text-base font-bold mb-2 text-${item.color}-300`}>{item.market}</h3>
-                <p className="text-gray-400 text-xs sm:text-sm leading-relaxed mb-3">{item.desc}</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {item.tags.map((tag) => (
-                    <span key={tag}
-                      className={`text-xs bg-${item.color}-500/10 border border-${item.color}-500/15 text-${item.color}-400/80 px-2 py-0.5 rounded-full`}>
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-8 sm:mt-12 text-center">
-            <Link href="/auth/register"
-              className="inline-flex items-center gap-2 text-sm text-violet-400 hover:text-violet-300 underline underline-offset-2">
-              Começar agora com BIA →
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Features ──────────────────────────────────────────────────── */}
-      <section id="features" className="py-16 sm:py-24 px-4 sm:px-6 bg-black/20">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-10 sm:mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-3">Por que escolher BIA?</h2>
-            <p className="text-gray-400 text-sm sm:text-base max-w-xl mx-auto">
-              Tecnologia de ponta para pesquisadores e empresas de biotecnologia
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {[
-              { icon: Brain,        title: "IA Especializada",     desc: "Modelos treinados em literatura científica de biofabricação, engenharia de tecidos e biomateriais",    color: "violet" },
-              { icon: Layers,       title: "Pipeline Estruturado", desc: "12 etapas metodológicas validadas por especialistas, desde o tecido-alvo até a escalabilidade",           color: "blue"   },
-              { icon: FlaskConical, title: "807+ Formulações",     desc: "Base de biomateriais com propriedades mecânicas, biocompatibilidade e aplicações mapeadas",                color: "purple" },
-              { icon: Microscope,   title: "Organoid Builder",     desc: "Design assistido por IA de mini-órgãos funcionais para modelos de doenças e testes pré-clínicos",          color: "indigo" },
-              { icon: Shield,       title: "Base RAG Científica",  desc: "Recuperação aumentada com mais de 120 artigos científicos indexados e atualizados",                         color: "blue"   },
-              { icon: BarChart3,    title: "Analytics & Reports",  desc: "Dashboard com métricas de projeto, consumo de créditos e relatórios exportáveis",                           color: "violet" },
-            ].map((f) => (
-              <div key={f.title}
-                className="bia-card bg-white/2 border-white/8 hover:border-violet-500/20 p-5">
-                <div className={`w-10 h-10 rounded-xl bg-${f.color}-500/10 border border-${f.color}-500/20 flex items-center justify-center mb-4`}>
-                  <f.icon className={`w-5 h-5 text-${f.color}-400`} />
-                </div>
-                <h3 className="text-base font-semibold mb-2">{f.title}</h3>
-                <p className="text-gray-400 text-xs sm:text-sm leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Modules ──────────────────────────────────────────────────── */}
-      <section id="modules" className="py-16 sm:py-24 px-4 sm:px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-10 sm:mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-3">6 Módulos Especializados</h2>
-            <p className="text-gray-400 text-sm sm:text-base">Cobrindo todo o ciclo da biofabricação</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {[
-              { num:"01", title:"Pipeline de Design",         desc:"12 etapas para design completo de tecidos artificiais",                  tags:["Scaffold","Bioimpressão"], color:"violet" },
-              { num:"02", title:"Formulador de Biomateriais", desc:"Database com 807+ formulações e propriedades detalhadas",                tags:["Hidrogéis","Bioinks"],     color:"blue"   },
-              { num:"03", title:"Organoid Builder",           desc:"Design de mini-órgãos: cerebral, cardíaco, hepático e mais",             tags:["Brain","Heart","Liver"],   color:"purple" },
-              { num:"04", title:"Gerador de Protocolos",      desc:"Protocolos laboratoriais personalizados com base nas suas specs",        tags:["SOP","Reagentes"],         color:"indigo" },
-              { num:"05", title:"Base de Conhecimento",       desc:"120+ artigos científicos com busca semântica RAG",                      tags:["PubMed","Nature"],         color:"blue"   },
-              { num:"06", title:"Chat IA Especializado",      desc:"Assistente com contexto científico profundo em biofabricação",           tags:["Gemini","RAG"],            color:"violet" },
-            ].map((m) => (
-              <div key={m.num}
-                className="relative overflow-hidden rounded-xl sm:rounded-2xl border border-white/8 bg-white/2 p-5 hover:border-violet-500/20 transition-all">
-                <div className="text-5xl font-bold text-white/4 absolute top-3 right-4 select-none">{m.num}</div>
-                <div className="relative z-10">
-                  <div className={`text-${m.color}-400 text-xs font-mono mb-2`}>módulo {m.num}</div>
-                  <h3 className="text-base sm:text-lg font-semibold mb-2">{m.title}</h3>
-                  <p className="text-gray-400 text-xs sm:text-sm mb-3 leading-relaxed">{m.desc}</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {m.tags.map((tag) => (
-                      <span key={tag}
-                        className={`text-xs bg-${m.color}-500/10 border border-${m.color}-500/20 text-${m.color}-400 px-2 py-0.5 rounded-full`}>
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
@@ -774,8 +767,12 @@ export default function HomePage() {
       </section>
 
       {/* ── Footer CTA ──────────────────────────────────────────────── */}
-      <section className="py-16 sm:py-20 px-4 sm:px-6">
-        <div className="max-w-2xl mx-auto text-center">
+      <section className="relative overflow-hidden py-16 sm:py-20 px-4 sm:px-6" data-testid="home-final-cta">
+        <div aria-hidden="true" className="hidden xl:block">
+          <div className="lp-ambient left-[6%] top-12 w-[180px]"><PrinterScene /></div>
+          <div className="lp-ambient right-[6%] top-16 w-[190px]"><ScaffoldCellsScene /></div>
+        </div>
+        <div className="max-w-2xl mx-auto text-center relative z-10">
           <BiaLogoBox sizeClass="w-16 h-16 sm:w-20 sm:h-20" size={52} rounded="rounded-2xl sm:rounded-3xl"
             shadow="shadow-2xl shadow-violet-900/80" pulse className="mx-auto mb-6" />
           <h2 className="text-2xl sm:text-3xl font-bold mb-3">
