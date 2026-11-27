@@ -45,7 +45,7 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-xl font-semibold mt-6 mb-2">4. Compartilhamento</h2>
-            <p>Os prompts enviados ao chat são processados pelo Google Gemini (Vertex AI), conforme os termos do Google Cloud. Não vendemos dados pessoais a terceiros. Compartilhamos apenas quando exigido por ordem judicial ou autoridade competente.</p>
+            <p>Os prompts enviados ao chat são processados pela Anthropic (modelos Claude), conforme os termos de serviço da Anthropic. Não vendemos dados pessoais a terceiros. Compartilhamos apenas quando exigido por ordem judicial ou autoridade competente.</p>
           </section>
 
           <section>

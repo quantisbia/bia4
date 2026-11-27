@@ -20,7 +20,7 @@
 - [ ] `DATABASE_URL` configurada no Vercel
 - [ ] `NEXTAUTH_SECRET` configurada no Vercel
 - [ ] `NEXTAUTH_URL` configurada (URL de produção)
-- [ ] `GOOGLE_AI_API_KEY` configurada no Vercel
+- [ ] `ANTHROPIC_API_KEY` configurada no Vercel
 - [ ] Outras variáveis específicas adicionadas
 
 ### 4. Autenticação

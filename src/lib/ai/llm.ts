@@ -2,53 +2,111 @@
  * BIA — PROMPT MESTRE v4.0 — BIOFABRICAÇÃO COMPLETA
  * Janaina Dernowsek / Quantis Biotechnology — 2026
  * Estado da arte científico 2024–2026 + Bioimpressão STL/GCode + Regulatório FDA/ANVISA/EMA
+ *
+ * R49 · A camada de IA passou do Google Gemini para o Claude (Anthropic).
+ * As funções exportadas mantêm os mesmos nomes e formatos de retorno, então
+ * as rotas de API continuam chamando-as do mesmo jeito.
  */
 
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai"
+import Anthropic, { APIError, APIConnectionError } from "@anthropic-ai/sdk"
 
-const API_KEY = process.env.GOOGLE_AI_API_KEY ?? process.env.GEMINI_API_KEY ?? ""
+/** Modelo usado em toda a plataforma. Troca-se por variável de ambiente, sem mexer no código. */
+export const AI_MODEL = process.env.BIA_AI_MODEL?.trim() || "claude-haiku-5-5"
 
-let genAI: GoogleGenerativeAI | null = null
-function getGenAI(): GoogleGenerativeAI {
-  if (!genAI) {
-    if (!API_KEY) throw new Error("GOOGLE_AI_API_KEY não configurada")
-    genAI = new GoogleGenerativeAI(API_KEY)
+type Effort = "low" | "medium" | "high" | "xhigh" | "max"
+const EFFORTS: readonly Effort[] = ["low", "medium", "high", "xhigh", "max"]
+/** Esforço de raciocínio. Sem a variável BIA_AI_EFFORT vale o padrão do próprio modelo. */
+const AI_EFFORT: Effort | null = EFFORTS.includes(process.env.BIA_AI_EFFORT as Effort)
+  ? (process.env.BIA_AI_EFFORT as Effort)
+  : null
+
+/**
+ * Endereço fixo da API da Anthropic. Por padrão o SDK obedece à variável
+ * ANTHROPIC_BASE_URL do ambiente; fixar aqui garante que a chave da Quantis
+ * só seja enviada à própria Anthropic.
+ */
+const ANTHROPIC_API_URL = "https://api.anthropic.com"
+
+type AIClient = Pick<Anthropic, "messages">
+let client: AIClient | null = null
+
+class AINotConfiguredError extends Error {
+  constructor() {
+    super("ANTHROPIC_API_KEY ausente ou fora do formato sk-ant-…")
+    this.name = "AINotConfiguredError"
   }
-  return genAI
+}
+
+class AIRefusalError extends Error {
+  constructor() {
+    super("O modelo recusou a solicitação (stop_reason: refusal)")
+    this.name = "AIRefusalError"
+  }
+}
+
+function getClient(): AIClient {
+  if (client) return client
+  const apiKey = process.env.ANTHROPIC_API_KEY ?? ""
+  // Só chaves da Anthropic são aceitas: evita enviar à Anthropic um token de outro serviço.
+  if (!apiKey.startsWith("sk-ant-")) throw new AINotConfiguredError()
+  client = new Anthropic({ apiKey, baseURL: ANTHROPIC_API_URL, timeout: 120_000, maxRetries: 1 })
+  return client
+}
+
+/** Só para testes: injeta um cliente simulado (ou `null` para voltar ao real). */
+export function __setAIClientForTests(c: AIClient | null) {
+  client = c
+}
+
+export type BiaAIErrorCode =
+  | "NOT_CONFIGURED"
+  | "API_KEY_INVALID"
+  | "BILLING"
+  | "QUOTA_EXCEEDED"
+  | "OVERLOADED"
+  | "SAFETY_BLOCK"
+  | "NETWORK"
+  | "UNKNOWN"
+
+const USER_MESSAGES: Record<BiaAIErrorCode, string> = {
+  NOT_CONFIGURED: "A IA não está configurada no servidor. Entre em contato com o suporte.",
+  API_KEY_INVALID: "Chave de IA mal configurada. Entre em contato com o suporte.",
+  BILLING: "A IA está indisponível por um problema na conta do provedor de IA. A equipe da BIA precisa regularizar; tente novamente mais tarde.",
+  QUOTA_EXCEEDED: "Muitas solicitações à IA neste momento. Aguarde cerca de um minuto e tente novamente.",
+  OVERLOADED: "O serviço de IA está sobrecarregado no momento. Tente novamente em instantes.",
+  SAFETY_BLOCK: "Sua solicitação foi bloqueada pelos filtros de segurança da IA. Reformule o texto e tente novamente.",
+  NETWORK: "O servidor da BIA não conseguiu se conectar ao serviço de IA. Tente novamente em instantes.",
+  UNKNOWN: "A IA está temporariamente indisponível. Tente novamente em alguns instantes.",
+}
+
+/** Classifica o erro pelo status/tipo devolvido pela API, não por trechos da mensagem. */
+export function classifyAIError(e: unknown): BiaAIErrorCode {
+  if (e instanceof AINotConfiguredError) return "NOT_CONFIGURED"
+  if (e instanceof AIRefusalError) return "SAFETY_BLOCK"
+  if (e instanceof APIConnectionError) return "NETWORK" // inclui timeout
+  if (e instanceof APIError) {
+    const status = e.status
+    const type = e.type
+    // Saldo esgotado chega como 400 "Your credit balance is too low…" (ou billing_error/402).
+    if (type === "billing_error" || status === 402 || /credit balance/i.test(e.message ?? "")) return "BILLING"
+    if (status === 401 || status === 403 || type === "authentication_error" || type === "permission_error") return "API_KEY_INVALID"
+    if (status === 429 || type === "rate_limit_error") return "QUOTA_EXCEEDED"
+    if (type === "overloaded_error" || (typeof status === "number" && status >= 500)) return "OVERLOADED"
+  }
+  return "UNKNOWN"
 }
 
 /**
- * Converte erros brutos do Gemini SDK em mensagens amigáveis ao usuário.
- * Evita que stack traces técnicas (com API keys vazadas, 403, etc.) cheguem
- * na UI — log fica completo no servidor, usuário vê mensagem limpa.
+ * Converte erros brutos do SDK em mensagens amigáveis ao usuário.
+ * O log completo fica no servidor; o usuário vê uma mensagem limpa.
  */
 export class BiaAIError extends Error {
   public readonly userMessage: string
-  public readonly code: "API_KEY_INVALID" | "API_KEY_LEAKED" | "QUOTA_EXCEEDED" | "SAFETY_BLOCK" | "NETWORK" | "UNKNOWN"
+  public readonly code: BiaAIErrorCode
 
   constructor(originalError: unknown) {
-    const msg = originalError instanceof Error ? originalError.message : String(originalError)
-    const lower = msg.toLowerCase()
-    let code: BiaAIError["code"] = "UNKNOWN"
-    let userMessage = "A IA está temporariamente indisponível. Tente novamente em alguns instantes."
-
-    if (lower.includes("api key") && (lower.includes("leaked") || lower.includes("reported"))) {
-      code = "API_KEY_LEAKED"
-      userMessage = "Chave de IA indisponível no momento (em rotação de segurança). O administrador já foi notificado. Tente novamente mais tarde."
-    } else if (lower.includes("api key") && lower.includes("invalid")) {
-      code = "API_KEY_INVALID"
-      userMessage = "Chave de IA mal configurada. Entre em contato com o suporte."
-    } else if (lower.includes("quota") || lower.includes("429") || lower.includes("rate limit")) {
-      code = "QUOTA_EXCEEDED"
-      userMessage = "Limite diário de IA atingido. Tente novamente amanhã ou entre em contato com o suporte."
-    } else if (lower.includes("safety") || lower.includes("blocked")) {
-      code = "SAFETY_BLOCK"
-      userMessage = "Sua solicitação foi bloqueada pelos filtros de segurança da IA. Reformule o texto e tente novamente."
-    } else if (lower.includes("fetch") || lower.includes("network") || lower.includes("timeout")) {
-      code = "NETWORK"
-      userMessage = "Falha de rede ao chamar a IA. Verifique sua conexão e tente novamente."
-    }
-
+    const code = originalError instanceof BiaAIError ? originalError.code : classifyAIError(originalError)
+    const userMessage = USER_MESSAGES[code]
     super(userMessage)
     this.name = "BiaAIError"
     this.userMessage = userMessage
@@ -58,37 +116,25 @@ export class BiaAIError extends Error {
   }
 }
 
-/** Wrapper uniforme para todas as chamadas Gemini */
-async function safeGeminiCall<T>(fn: () => Promise<T>): Promise<T> {
+/** Wrapper uniforme para todas as chamadas à IA */
+async function safeAICall<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn()
   } catch (e) {
-    // log detalhado no server
-    console.error("[Gemini]", e)
+    console.error("[IA]", e)
     throw new BiaAIError(e)
   }
 }
 
 /**
- * Helper para rotas API: converte um erro qualquer em `{error, code, status}`
- * apropriado. Se for BiaAIError, devolve 503 + userMessage. Caso contrário,
- * passa adiante. Uso:
- *   try { ... } catch (e) { return aiErrorResponse(e) }
+ * Helper para rotas API: converte um erro qualquer em `{error, code, status}`.
+ * 422 para bloqueio de segurança; 503 para os demais problemas de IA.
  */
 export function aiErrorToHttp(e: unknown): { error: string; code: string; status: number } {
   const biaErr = e instanceof BiaAIError ? e : new BiaAIError(e)
-  // 503 Service Unavailable para problemas de IA (key/quota/network)
-  // 422 Unprocessable Entity para bloqueio de segurança
   const status = biaErr.code === "SAFETY_BLOCK" ? 422 : 503
   return { error: biaErr.userMessage, code: `AI_${biaErr.code}`, status }
 }
-
-const SAFETY_SETTINGS = [
-  { category: HarmCategory.HARM_CATEGORY_HARASSMENT,        threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,       threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-]
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROMPT MESTRE BIA v4 — BASE CIENTÍFICA COMPLETA
@@ -1010,16 +1056,81 @@ Use linguagem formal técnica com especificidade clínica e regulatória.`,
 // ═══════════════════════════════════════════════════════════════════════════
 // INTERFACES
 // ═══════════════════════════════════════════════════════════════════════════
-export interface GeminiOptions {
+export interface AIOptions {
   systemPrompt?: string
+  /** Aceito por compatibilidade. Os modelos Claude atuais recusam `temperature` (HTTP 400), então não é enviado. */
   temperature?: number
+  /** Limite de saída na escala antiga (tokens do Gemini); convertido por toClaudeMaxTokens(). */
   maxTokens?: number
   stream?: boolean
 }
 
-export interface GeminiMessage {
+export interface AIMessage {
   role: "user" | "model"
   content: string
+}
+
+/**
+ * Os limites de saída do código foram calibrados em tokens do Gemini. Para o
+ * mesmo texto em português o Claude contou ~1,43× mais tokens (medido em
+ * 27/11/2026), e o raciocínio do modelo também consome desse limite.
+ * Por isso: ×1,5 + 2.000 de folga, com teto de 21.000.
+ */
+export function toClaudeMaxTokens(requested: number): number {
+  return Math.min(21_000, Math.ceil(requested * 1.5) + 2_000)
+}
+
+/**
+ * Converte o histórico do chat para o formato da API da Anthropic:
+ * ignora mensagens vazias, junta turnos seguidos do mesmo autor (acontece
+ * quando uma resposta anterior falhou) e exige que a conversa comece e
+ * termine com mensagem do usuário.
+ */
+export function toClaudeMessages(messages: AIMessage[]): Anthropic.Messages.MessageParam[] {
+  const out: { role: "user" | "assistant"; content: string }[] = []
+  for (const m of messages) {
+    const content = (m.content ?? "").trim()
+    if (!content) continue
+    const role = m.role === "user" ? "user" : "assistant"
+    if (out.length === 0 && role === "assistant") continue
+    const last = out[out.length - 1]
+    if (last && last.role === role) last.content += `\n\n${content}`
+    else out.push({ role, content })
+  }
+  if (out.length === 0 || out[out.length - 1].role !== "user") {
+    throw new Error("Histórico de chat sem mensagem do usuário no final.")
+  }
+  return out
+}
+
+function buildRequest(messages: Anthropic.Messages.MessageParam[], options: AIOptions, defaultMaxTokens: number) {
+  return {
+    model: AI_MODEL,
+    max_tokens: toClaudeMaxTokens(options.maxTokens ?? defaultMaxTokens),
+    // cache_control: o prompt de sistema (longo e repetido) é lido do cache nas chamadas seguintes.
+    system: [
+      {
+        type: "text" as const,
+        text: options.systemPrompt ?? SYSTEM_PROMPTS.BIOFAB_EXPERT,
+        cache_control: { type: "ephemeral" as const },
+      },
+    ],
+    messages,
+    ...(AI_EFFORT ? { output_config: { effort: AI_EFFORT } } : {}),
+  }
+}
+
+function readMessage(msg: Anthropic.Messages.Message): { text: string; tokens: number } {
+  if (msg.stop_reason === "refusal") throw new AIRefusalError()
+  let text = ""
+  for (const block of msg.content) {
+    if (block.type === "text") text += block.text
+  }
+  if (!text.trim()) throw new Error(`IA retornou resposta vazia (stop_reason: ${msg.stop_reason}).`)
+  const u = msg.usage
+  const tokens =
+    (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.output_tokens ?? 0)
+  return { text, tokens }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1028,89 +1139,52 @@ export interface GeminiMessage {
 
 export async function generateContent(
   prompt: string,
-  options: GeminiOptions = {}
+  options: AIOptions = {}
 ): Promise<{ text: string; tokens: number }> {
-  return safeGeminiCall(async () => {
-    const model = getGenAI().getGenerativeModel({
-      model: "gemini-2.5-flash",
-      systemInstruction: options.systemPrompt ?? SYSTEM_PROMPTS.BIOFAB_EXPERT,
-      safetySettings: SAFETY_SETTINGS,
-      generationConfig: {
-        temperature: options.temperature ?? 0.7,
-        maxOutputTokens: options.maxTokens ?? 4096,
-        topP: 0.95,
-        topK: 40,
-      },
-    })
-    const result = await model.generateContent(prompt)
-    const text = result.response.text()
-    const tokens = result.response.usageMetadata?.totalTokenCount ?? 0
-    return { text, tokens }
+  return safeAICall(async () => {
+    const msg = await getClient().messages.create(
+      buildRequest([{ role: "user", content: prompt }], options, 4096)
+    )
+    return readMessage(msg)
   })
 }
 
 export async function generateChat(
-  messages: GeminiMessage[],
-  options: GeminiOptions = {}
+  messages: AIMessage[],
+  options: AIOptions = {}
 ): Promise<{ text: string; tokens: number }> {
-  return safeGeminiCall(async () => {
-    const model = getGenAI().getGenerativeModel({
-      model: "gemini-2.5-flash",
-      systemInstruction: options.systemPrompt ?? SYSTEM_PROMPTS.BIOFAB_EXPERT,
-      safetySettings: SAFETY_SETTINGS,
-      generationConfig: {
-        temperature: options.temperature ?? 0.7,
-        maxOutputTokens: options.maxTokens ?? 4096,
-        topP: 0.95,
-      },
-    })
-    const chat = model.startChat({
-      history: messages.slice(0, -1).map((m) => ({
-        role: m.role,
-        parts: [{ text: m.content }],
-      })),
-    })
-    const lastMessage = messages[messages.length - 1]
-    const result = await chat.sendMessage(lastMessage.content)
-    const text = result.response.text()
-    const tokens = result.response.usageMetadata?.totalTokenCount ?? 0
-    return { text, tokens }
+  return safeAICall(async () => {
+    const msg = await getClient().messages.create(buildRequest(toClaudeMessages(messages), options, 4096))
+    return readMessage(msg)
   })
 }
 
 export async function generateChatStream(
-  messages: GeminiMessage[],
-  options: GeminiOptions = {}
+  messages: AIMessage[],
+  options: AIOptions = {}
 ): Promise<ReadableStream<Uint8Array>> {
-  return safeGeminiCall(async () => {
-    const model = getGenAI().getGenerativeModel({
-      model: "gemini-2.5-flash",
-      systemInstruction: options.systemPrompt ?? SYSTEM_PROMPTS.BIOFAB_EXPERT,
-      safetySettings: SAFETY_SETTINGS,
-      generationConfig: {
-        temperature: options.temperature ?? 0.7,
-        maxOutputTokens: options.maxTokens ?? 4096,
-      },
+  return safeAICall(async () => {
+    // Erros de chave, saldo ou limite estouram aqui, antes de o stream começar.
+    const stream = await getClient().messages.create({
+      ...buildRequest(toClaudeMessages(messages), options, 4096),
+      stream: true,
     })
-    const chat = model.startChat({
-      history: messages.slice(0, -1).map((m) => ({
-        role: m.role,
-        parts: [{ text: m.content }],
-      })),
-    })
-    const lastMessage = messages[messages.length - 1]
-    const result = await chat.sendMessageStream(lastMessage.content)
     const encoder = new TextEncoder()
-    return new ReadableStream({
+    return new ReadableStream<Uint8Array>({
       async start(controller) {
         try {
-          for await (const chunk of result.stream) {
-            const text = chunk.text()
-            if (text) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
+          for await (const event of stream) {
+            if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+              const text = event.delta.text
+              if (text) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
+            } else if (event.type === "message_delta" && event.delta.stop_reason === "refusal") {
+              throw new AIRefusalError()
+            }
           }
           controller.enqueue(encoder.encode("data: [DONE]\n\n"))
           controller.close()
         } catch (err) {
+          console.error("[IA stream]", err)
           const biaErr = new BiaAIError(err)
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: biaErr.userMessage })}\n\n`))
           controller.enqueue(encoder.encode("data: [DONE]\n\n"))
@@ -1124,7 +1198,7 @@ export async function generateChatStream(
 export async function generateStructured<T>(
   prompt: string,
   schema: string,
-  options: GeminiOptions = {}
+  options: AIOptions = {}
 ): Promise<T> {
   const structured = `${prompt}
 
@@ -1137,23 +1211,11 @@ IMPORTANTE: Responda APENAS com JSON válido seguindo o esquema abaixo.
 Esquema esperado:
 ${schema}`
 
-  return safeGeminiCall(async () => {
-    const model = getGenAI().getGenerativeModel({
-      model: "gemini-2.5-flash",
-      systemInstruction: options.systemPrompt ?? SYSTEM_PROMPTS.BIOFAB_EXPERT,
-      safetySettings: SAFETY_SETTINGS,
-      generationConfig: {
-        temperature: options.temperature ?? 0.2,
-        maxOutputTokens: options.maxTokens ?? 8192,
-        topP: 0.95,
-        topK: 40,
-        // Recurso oficial do Gemini: garante saída JSON válida
-        responseMimeType: "application/json",
-      },
-    })
-    const result = await model.generateContent(structured)
-    const text = result.response.text()
-    return parseJsonFromAI<T>(text)
+  return safeAICall(async () => {
+    const msg = await getClient().messages.create(
+      buildRequest([{ role: "user", content: structured }], options, 8192)
+    )
+    return parseJsonFromAI<T>(readMessage(msg).text)
   })
 }
 
@@ -1173,7 +1235,7 @@ export function parseJsonFromAI<T>(text: string): T {
   }
 
   // 1. Remover blocos markdown (qualquer posição)
-  let clean = text.replace(/```(?:json|JSON)?\s*/g, "").replace(/```\s*/g, "").trim()
+  const clean = text.replace(/```(?:json|JSON)?\s*/g, "").replace(/```\s*/g, "").trim()
 
   // 2. Tentar parse direto
   try { return JSON.parse(clean) as T } catch { /* continua */ }

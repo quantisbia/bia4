@@ -86,7 +86,7 @@ export async function POST(req: Request) {
       console.error("[organoids] Erro ao gerar design com IA:", aiError)
       const message = aiError instanceof Error ? aiError.message : "Erro desconhecido na IA"
       return NextResponse.json(
-        { error: `Falha ao gerar protocolo: ${message}. Verifique se GOOGLE_AI_API_KEY está configurada.` },
+        { error: `Falha ao gerar protocolo: ${message}` },
         { status: 500 }
       )
     }

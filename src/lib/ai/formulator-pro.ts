@@ -13,7 +13,7 @@
  * 5. Validação de incompatibilidades (cation-anion clash, pH, crosslinking conflict)
  */
 
-import { generateStructured, SYSTEM_PROMPTS } from "./gemini"
+import { generateStructured, SYSTEM_PROMPTS } from "./llm"
 
 // ────────────────────────────────────────────────────────────────────────────
 // TIPOS PÚBLICOS
@@ -504,7 +504,7 @@ ${constraintsBlock || "  (nenhuma)"}
 }
 
 // Schema enxuto: descrições curtas, sem comentários longos.
-// Gemini reproduz melhor schemas pequenos sem perder qualidade do conteúdo.
+// O modelo reproduz melhor schemas pequenos sem perder qualidade do conteúdo.
 const RESULT_SCHEMA = `{
   "name": "string (nome profissional da formulação)",
   "goalCategory": "WOUND_HEALING|BONE_REGENERATION|GINGIVAL_REGENERATION|CARTILAGE_REPAIR|BREAST_IMPLANT|VASCULAR_GRAFT|NEURAL_REGENERATION|DRUG_DELIVERY|ORGANOID_SCAFFOLD|GENERIC",

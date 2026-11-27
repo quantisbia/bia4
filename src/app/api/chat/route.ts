@@ -7,7 +7,7 @@ import {
   getChatSession,
   addChatMessage,
 } from "@/lib/db/queries"
-import { generateChatStream, SYSTEM_PROMPTS, BiaAIError, aiErrorToHttp, type GeminiMessage } from "@/lib/ai/gemini"
+import { generateChatStream, SYSTEM_PROMPTS, BiaAIError, aiErrorToHttp, AI_MODEL, type AIMessage } from "@/lib/ai/llm"
 import { retrieveUploads, buildRagContext } from "@/lib/knowledge/rag"
 import { Prisma } from "@prisma/client"
 import { z } from "zod"
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
 
   // Carregar histórico
   const chatSession = await getChatSession(chatSessionId, session.user.id)
-  const history: GeminiMessage[] = (chatSession?.messages ?? []).map((m) => ({
+  const history: AIMessage[] = (chatSession?.messages ?? []).map((m) => ({
     role: m.role === "user" ? "user" : "model",
     content: m.content,
   }))
@@ -143,7 +143,7 @@ export async function POST(req: NextRequest) {
           await addChatMessage(chatSessionId, {
             role: "assistant",
             content: fullResponse,
-            model: "gemini-2.5-flash",
+            model: AI_MODEL,
             creditsUsed: 0, // Já cobrado na mensagem do usuário
           }).catch(console.error)
         }
@@ -163,13 +163,13 @@ export async function POST(req: NextRequest) {
   }
 
   // Resposta sem streaming (fallback)
-  const { generateChat } = await import("@/lib/ai/gemini")
+  const { generateChat } = await import("@/lib/ai/llm")
   const { text, tokens } = await generateChat(history, { systemPrompt })
 
   await addChatMessage(chatSessionId, {
     role: "assistant",
     content: text,
-    model: "gemini-2.5-flash",
+    model: AI_MODEL,
     tokens,
   })
 

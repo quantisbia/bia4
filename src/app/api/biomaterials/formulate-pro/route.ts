@@ -18,7 +18,7 @@ import {
   type ClinicalGoal,
   type BiomaterialRole,
 } from "@/lib/ai/formulator-pro"
-import { aiErrorToHttp } from "@/lib/ai/gemini"
+import { aiErrorToHttp } from "@/lib/ai/llm"
 
 const CLINICAL_GOALS = [
   "WOUND_HEALING",

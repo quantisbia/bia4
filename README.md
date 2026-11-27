@@ -8,7 +8,7 @@
 ## 🎯 Visão Geral
 
 - **Nome:** BIA OS — Biofabrication Operating System · Powered by Quantis Biotechnology (BIA = Biofabrication Intelligent Assistant)
-- **Stack:** Next.js 14 + TypeScript + TailwindCSS + Prisma + Gemini 2.5 Flash + Claude Sonnet 4.5 (geração de modelo 3D via IA · R12.56)
+- **Stack:** Next.js 14 + TypeScript + TailwindCSS + Prisma + Claude (Anthropic) — `claude-haiku-5-5` por padrão (R49)
 - **Foco:** Acelerar pesquisa em medicina regenerativa com IA + ferramentas científicas integradas
 - **Status:** ✅ Operacional em produção
 
@@ -128,7 +128,7 @@ Problema nº 1 de bancada: ao clicar em **Bioimprimir**, o fluxo é pouco e **n�
 ### Stack
 - **Banco:** PostgreSQL (Prisma ORM)
 - **Auth:** NextAuth.js (sessões JWT)
-- **IA:** Google Gemini 2.5 Flash (via `@google/generative-ai`)
+- **IA:** Claude, da Anthropic (via `@anthropic-ai/sdk`; camada em `src/lib/ai/llm.ts`)
 - **Persistência:** Formulações, protocolos, transações de crédito, sessões de chat
 
 ### Modelos principais (Prisma)
@@ -167,7 +167,8 @@ curl http://localhost:3000/dashboard/formulator-pro  # 307 (redirect login)
 DATABASE_URL=postgresql://...
 NEXTAUTH_SECRET=...
 NEXTAUTH_URL=http://localhost:3000
-GOOGLE_AI_API_KEY=...
+ANTHROPIC_API_KEY=sk-ant-...
+# opcionais: BIA_AI_MODEL (padrão claude-haiku-5-5) · BIA_AI_EFFORT (low | medium | high)
 ```
 
 ---
@@ -209,6 +210,17 @@ GOOGLE_AI_API_KEY=...
 ---
 
 ## 🗓 Changelog Recente
+
+### R49 — IA da plataforma migrada do Google Gemini para o Claude (2026-11-27)
+- **Motivo:** o crédito pré-pago da conta Google acabou (a API respondia 402 "prepayment credits are depleted" em 27/11), então toda chamada de IA falhava.
+- **O que mudou:** `src/lib/ai/gemini.ts` virou `src/lib/ai/llm.ts` e passou a chamar o Claude pelo SDK da Anthropic. As funções exportadas (`generateContent`, `generateChat`, `generateChatStream`, `generateStructured`) mantêm nomes e formatos, então as rotas só trocaram o import. Os prompts de sistema não foram alterados.
+- **Modelo:** `claude-haiku-5-5` por padrão; troca-se com a variável `BIA_AI_MODEL` (ex.: `claude-sonnet-5-5`), sem mexer no código. `BIA_AI_EFFORT` (opcional) ajusta o esforço de raciocínio.
+- **Produção:** exige `ANTHROPIC_API_KEY` nas variáveis da Vercel. `GOOGLE_AI_API_KEY` não é mais lida.
+- **Mensagens de erro:** classificadas pelo status devolvido pela API. Falta de saldo no provedor deixa de aparecer como "falha de rede, verifique sua conexão".
+- **Custo e limites:** o prompt de sistema é lido do cache da Anthropic nas chamadas seguintes; os limites de saída foram convertidos (o Claude conta ~1,43× mais tokens que o Gemini para o mesmo texto em português); `temperature` não é mais enviada porque os modelos atuais a recusam.
+- **Medições (27/11, uma execução cada):** resposta de chat em ~15 s e JSON do Pipeline em ~10–13 s no Haiku 5.5; um POP completo de 22 mil caracteres levou 59 s. No Sonnet 5.5 as mesmas chamadas levaram ~30 s e ~19 s e custaram cerca de 20× mais.
+- **Testes:** 19 novos em `tests/r49_ai_claude_migration.test.ts` (cliente simulado), mais chamadas reais pelas funções da camada.
+- **Não alterado:** cobrança de créditos (continua antes da chamada, sem devolução em caso de falha); rota `/api/bioprint/model/ai-generate`; a dependência `@google/generative-ai` segue no `package.json`, sem uso. O PDF `public/Manual_BIA_v4_Quantis.pdf` ainda cita o Gemini.
 
 ### R47 — Nova página inicial da BIA OS com cenas animadas (2026-11-26)
 

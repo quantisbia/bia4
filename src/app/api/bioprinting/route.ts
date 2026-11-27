@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { requireCredits } from "@/lib/auth/credits"
-import { generateContent, SYSTEM_PROMPTS, BiaAIError, aiErrorToHttp } from "@/lib/ai/gemini"
+import { generateContent, SYSTEM_PROMPTS, BiaAIError, aiErrorToHttp } from "@/lib/ai/llm"
 import { prisma } from "@/lib/db/prisma"
 import { Prisma } from "@prisma/client"
 import { z } from "zod"

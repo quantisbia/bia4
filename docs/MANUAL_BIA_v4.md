@@ -47,7 +47,7 @@ A **BIA — Biofabrication Intelligence Agent v4** é uma plataforma de intelig�
 
 ### Motor de IA
 
-A BIA v4 é alimentada pelo **Google Gemini 2.5 Flash** com um prompt mestre especializado que contém:
+A BIA v4 é alimentada pelo **Claude (Anthropic)** com um prompt mestre especializado que contém:
 
 | Domínio | Cobertura |
 |---------|-----------|

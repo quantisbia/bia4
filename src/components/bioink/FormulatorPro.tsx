@@ -355,7 +355,7 @@ export function FormulatorPro() {
     // Atualizar fase exibida ao usuário
     const phaseTimers = [
       setTimeout(() => setLoadingPhase("Analisando incompatibilidades químicas dos componentes…"), 1500),
-      setTimeout(() => setLoadingPhase("Consultando IA científica (Gemini 2.5)…"), 3500),
+      setTimeout(() => setLoadingPhase("Consultando IA científica…"), 3500),
       setTimeout(() => setLoadingPhase("Calculando propriedades preditas e protocolo…"), 12000),
       setTimeout(() => setLoadingPhase("Compilando referências e classificação regulatória…"), 22000),
     ]
@@ -981,7 +981,7 @@ export function FormulatorPro() {
                   <div className="max-w-md mx-auto space-y-1.5 text-left mt-6">
                     {[
                       { t: 0,  label: "Validar entrada e detectar incompatibilidades determinísticas" },
-                      { t: 3,  label: "Construir prompt científico e consultar Gemini 2.5" },
+                      { t: 3,  label: "Construir prompt científico e consultar a IA" },
                       { t: 12, label: "Calcular score multidimensional + propriedades preditas" },
                       { t: 22, label: "Compilar protocolo, parâmetros de impressão e referências" },
                     ].map((p, i) => {

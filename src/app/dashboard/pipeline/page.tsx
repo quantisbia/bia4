@@ -5,7 +5,7 @@ import {
   GitBranch, Plus, CheckCircle2, Circle, Clock,
   Loader2, Zap, ArrowRight, ChevronLeft, X, Box, ExternalLink, Trash2
 } from "lucide-react"
-import { PIPELINE_STAGES } from "@/lib/ai/pipeline"
+import { PIPELINE_STAGES } from "@/lib/ai/pipeline-stages"
 // R12.68 · ExportBar universal + adapter da Pipeline
 import { ExportBar } from "@/components/notebook/ExportBar"
 import { buildContentFromPipeline } from "@/lib/export/adapters/pipeline-adapter"

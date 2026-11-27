@@ -2,7 +2,7 @@
  * BIA v3 - Biomaterial AI Service
  */
 
-import { generateContent, generateStructured, SYSTEM_PROMPTS } from "./gemini"
+import { generateContent, generateStructured, SYSTEM_PROMPTS } from "./llm"
 
 export interface BiomaterialFormulation {
   name: string

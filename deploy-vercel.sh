@@ -64,7 +64,7 @@ echo -e "${YELLOW}⚠️  IMPORTANTE: Variáveis de ambiente necessárias no Ver
 echo "  • DATABASE_URL"
 echo "  • NEXTAUTH_SECRET"
 echo "  • NEXTAUTH_URL"
-echo "  • GOOGLE_AI_API_KEY"
+echo "  • ANTHROPIC_API_KEY"
 echo ""
 read -p "As variáveis estão configuradas no Vercel? (s/N): " vars_ok
 vars_ok=${vars_ok:-n}
@@ -75,7 +75,7 @@ if [[ ! "$vars_ok" =~ ^[Ss]$ ]]; then
     echo "  vercel env add DATABASE_URL production"
     echo "  vercel env add NEXTAUTH_SECRET production"
     echo "  vercel env add NEXTAUTH_URL production"
-    echo "  vercel env add GOOGLE_AI_API_KEY production"
+    echo "  vercel env add ANTHROPIC_API_KEY production"
     echo ""
     echo -e "Ou no dashboard: ${BLUE}https://vercel.com/dashboard${NC}"
     exit 1

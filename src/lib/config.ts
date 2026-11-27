@@ -5,7 +5,7 @@ export const env = {
   DATABASE_URL: process.env.DATABASE_URL!,
   NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET!,
   NEXTAUTH_URL: process.env.NEXTAUTH_URL || "http://localhost:3000",
-  GOOGLE_AI_API_KEY: process.env.GOOGLE_AI_API_KEY!,
+  ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY!,
   NODE_ENV: process.env.NODE_ENV || "development",
   APP_URL: process.env.NEXTAUTH_URL || "http://localhost:3000",
 }

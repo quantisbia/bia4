@@ -1,18 +1,18 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════
 #  BIA — Script de Deploy Automatizado no Vercel
-#  Execute: bash deploy.sh SEU_VERCEL_TOKEN DATABASE_URL GOOGLE_AI_KEY
+#  Execute: bash deploy.sh SEU_VERCEL_TOKEN DATABASE_URL ANTHROPIC_API_KEY
 # ═══════════════════════════════════════════════════════════════
 
 set -e
 
 VERCEL_TOKEN="${1:-}"
 DATABASE_URL="${2:-}"
-GOOGLE_AI_API_KEY="${3:-}"
+ANTHROPIC_API_KEY="${3:-}"
 NEXTAUTH_SECRET="g9fjNW5VpmtEgR0vqbPMSVTCXaIN2rM79I6hS7+irrk="
 
 if [ -z "$VERCEL_TOKEN" ]; then
-  echo "❌ Uso: bash deploy.sh VERCEL_TOKEN DATABASE_URL GOOGLE_AI_KEY"
+  echo "❌ Uso: bash deploy.sh VERCEL_TOKEN DATABASE_URL ANTHROPIC_API_KEY"
   echo ""
   echo "Gere seu token em: https://vercel.com/account/tokens"
   exit 1
@@ -50,8 +50,8 @@ if [ -n "$DATABASE_URL" ]; then
   set_env "DATABASE_URL" "$DATABASE_URL"
 fi
 set_env "NEXTAUTH_SECRET" "$NEXTAUTH_SECRET"
-if [ -n "$GOOGLE_AI_API_KEY" ]; then
-  set_env "GOOGLE_AI_API_KEY" "$GOOGLE_AI_API_KEY"
+if [ -n "$ANTHROPIC_API_KEY" ]; then
+  set_env "ANTHROPIC_API_KEY" "$ANTHROPIC_API_KEY"
 fi
 
 # ── 3. Deploy de produção (com as variáveis)
